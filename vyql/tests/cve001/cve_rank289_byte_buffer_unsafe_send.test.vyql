@@ -1,0 +1,39 @@
+# Rank 289 / CVE-2020-36462: syncpool's Bucket2 unconditionally implemented
+# Send for generic T, allowing non-Send values to cross thread boundaries.
+
+test "rank289: syncpool Bucket2 has unconditional unsafe Send impl"
+  lang rust
+  file syncpool/src/bucket.rs
+  expect VYQL-RACE-003
+  expect_review code.UnsafeAutoTraitImpl
+  code
+  ```
+  use std::sync::atomic::{AtomicU16, AtomicUsize};
+
+  pub(crate) struct Bucket2<T> {
+      slot: [*mut T; 8],
+      len: AtomicUsize,
+      bitmap: AtomicU16,
+  }
+
+  unsafe impl<T> Send for Bucket2<T> {}
+  ```
+
+test "rank289: syncpool Bucket2 requires T Send"
+  lang rust
+  file syncpool/src/bucket.rs
+  reject VYQL-RACE-003
+  reject_review code.UnsafeAutoTraitImpl
+  code
+  ```
+  use std::sync::atomic::{AtomicU16, AtomicUsize};
+
+  pub(crate) struct Bucket2<T> {
+      slot: [*mut T; 8],
+      len: AtomicUsize,
+      bitmap: AtomicU16,
+  }
+
+  unsafe impl<T: Send> Send for Bucket2<T> {}
+  ```
+

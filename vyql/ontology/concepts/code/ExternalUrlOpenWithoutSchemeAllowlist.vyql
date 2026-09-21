@@ -1,0 +1,11 @@
+module code;
+
+concept ExternalUrlOpenWithoutSchemeAllowlist : issue {
+  cwe: [CWE_78, CWE_20]
+  reviewAssumption: "the opened URL string is not a compile-time constant, so a remote or peer-supplied value can reach it"
+  reviewCategory: command
+  reviewCondition: "a non-constant URL is handed to the platform's external URL handler without restricting the scheme to an allowlist"
+  reviewConfidence: medium
+  reviewEvidence: "URL-launch context {pattern} passes a computed URL to the desktop URL handler with no scheme accessor read in the same function"
+  vulnerableTo: [injection.CommandInjection, validation.ImproperInputValidation]
+}

@@ -1,0 +1,6 @@
+module bindings.ruby.generated.mgitclonebranchoption;
+
+binding gitCloneBranchOptionShellInjection262 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "ruby" and node.context.rubyReview == "git_clone_interpolated_branch_option_unescaped"
+  emit issue code.GitCloneBranchOptionShellInjection at node
+}

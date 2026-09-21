@@ -1,0 +1,11 @@
+module code;
+
+concept CallerControlledFilenameComponentPathTraversal : issue {
+  cwe: [CWE_22]
+  reviewAssumption: "the returned filename is later joined under a storage directory or used for persisted XML/report files"
+  reviewCategory: path
+  reviewCondition: "a filename builder returns caller-controlled name or version components without component encoding"
+  reviewConfidence: high
+  reviewEvidence: "filename builder context {pattern} concatenates caller-controlled filename components before returning the name without rawEncode or equivalent basename/component encoding"
+  vulnerableTo: [path.PathTraversal]
+}

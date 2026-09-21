@@ -1,0 +1,259 @@
+# Rank 1343 / CVE-2022-23514: Loofah's HTML5 attribute scrubber stripped absolute
+# `url(...)` references out of the SVG attributes that may carry a local reference
+# with an unanchored regular expression substitution, and the substitution's cost
+# is quadratic in the length of the attacker-supplied attribute value (CWE-1333
+# inefficient regular expression complexity, CWE-400).
+#
+# `Scrub.scrub_attributes` (lib/loofah/html5/scrub.rb:54-56) reaches, for every
+# attribute named in `SafeList::SVG_ATTR_VAL_ALLOWS_REF` (`fill`, `stroke`,
+# `filter`, `clip-path` and the rest),
+# `attr_node.value = attr_node.value.gsub(/url\s*\(\s*[^#\s][^)]+?\)/m, " ")`.
+# The pattern is unanchored and applied globally, so `gsub` retries it at every
+# `url(` in the value, and each retry grows `[^)]+?` one character at a time to
+# the end of the value when no `)` follows -- an attribute value built out of
+# repeated `url(` prefixes with no closing parenthesis costs O(n^2). The
+# attribute value is markup the caller handed the sanitizer, which is the input
+# a sanitizer exists to accept, so the bound is entirely the attacker's.
+#
+# The fixing commit a6e0a1ab90675a17b1b2be189129d94139e4b143 touches lib/loofah/html5/scrub.rb plus the two
+# test fixtures that recorded the old output, replaces the `gsub` call with
+# `scrub_attribute_that_allows_local_ref(attr_node)`, and implements that method
+# with `Crass::Parser.new(attr_node.value).parse_component_values`, keeping the
+# `:url` component values whose target starts with `#` along with `:hash`,
+# `:ident` and `:string` values and dropping everything else
+# is needed.
+#
+# ATTENTION, engine gap, and two separate absences block it.
+#
+# First, the pattern is not classified as backtracking-prone, and that
+# classification is correct as far as it goes: `regexambig.Ambiguous` answers
+# false for `url\s*\(\s*[^#\s][^)]+?\)` because the pattern has no overlapping
+# quantified branches at all. `\s*` is followed by `\(` and by `[^#\s]`, both
+# disjoint from `\s`, and `[^)]+?` is followed by `\)`, which it excludes. Its
+# cost is polynomial in the number of start positions, not exponential in one
+# match attempt, and polynomial backtracking is a class the engine does not
+# model. So `rubyRegexMayBacktrack`
+# (internal/extract/frontend/treesitter/ruby.go:1130) leaves the literal a plain
+# `nir.Const` instead of the `__regex.match` call it synthesises for a
+# backtracking-prone literal, and no `code.RegexMatch`, `code.RegexMatchSink` or
+# `code.CatastrophicRegex` label is ever emitted. `vyql match` over a repro of
+# the vulnerable branch reports no source and no sink whatsoever; the single
+# label is `threat.CharFilter` on `attr_node.value.gsub`. A bounded scan of the
+# real checkout at the vulnerable revision (`--cache off --max-ram 6GB`, 219
+# findings, 217 at or above high) reports nothing in lib/loofah/html5/scrub.rb --
+# 216 of those 219 are VYQL-SEC-025 on a bundled `benchmark/www.slashdot.com.html`
+# fixture.
+#
+# Second, there is no source side either. `vyql resolve` over the repro reports
+# `node.attribute_nodes.each` unresolved, and `vyql/bindings/ruby/` carries no
+# Nokogiri binding at all, so nothing labels a parsed attribute's value as
+# untrusted markup. VYQL-DOS-002 asks for `core.UserControlledData` to reach
+# `code.RegexMatchSink`, and the source half is missing independently of the sink
+# half. Only the presence rule VYQL-DOS-003 (`issue code.CatastrophicRegex`)
+# could fire on the label alone, and a probe binding emitting that concept
+# confirms it does -- but a `presenceNode` binding cannot address a regex
+# literal: the probe's four findings land on the enclosing module and class scope
+# nodes at scrub.rb:1, 2, 3 and 5, not on the pattern. The label has to come from
+# the frontend, which is why this is not a binding.
+#
+# Extending the classification is what a fix would mean, and it does not survive
+# its own precision measurement. Over the `lib/` trees of loofah, rack and
+# sanitize -- 268 Ruby regex literals, all three libraries whose job is handling
+# untrusted input -- a label for "quantified negated character class" flags 7,
+# exactly one of them this vulnerability; the other six are ordinary and safe
+# (`/bytes=([^;]+)/`, `/\A\/[^#]*\z/`, `/[^;]*/`, `/\A[^\/:]+:\d+\z/`,
+# `/\A(["'])?[^"']+\1\z/`, and sanitize's scheme extractor). The narrower shape
+# "negated class quantifier immediately followed by the literal it excludes"
+# flags 2, the second being rack's anchored `/\A[^\/:]+:\d+\z/` -- and that idiom
+# is the recommended way to write a delimited scan, so it cannot be a soundness
+# criterion. The broadest shape, "unanchored open-ended quantifier", flags 11,
+# `/\s+/` among them. One true positive in seven to eleven, on libraries this
+# small, is worse than no label.
+#
+# The reason no pattern-shape criterion works here is visible in that sample:
+# rack's `/bytes=([^;]+)/`, matched against the untrusted `Range` request header,
+# is structurally the same regex as loofah's -- fixed literal prefix, quantified
+# negated character class, unanchored -- and it is fine. What separates them is
+# not readable off the pattern. It is that loofah's operand is an unbounded
+# attacker-supplied SVG attribute value, and what the fixed revision changes is the
+# algorithm that reads it, from a regex substitution to CSS component-value
+# parsing, not any structural property of the pattern.
+#
+# The isolating pair below places the boundary with no Loofah or Nokogiri API:
+# the same `case`/`when` shape over a method parameter reports VYQL-DOS-002 when
+# the pattern carries a nested ambiguous quantifier, and reports nothing when it
+# carries this CVE's pattern instead. The two differ only in the quantifier
+# structure of the literal. The gap is the cost model: `regexambig.Ambiguous` is
+# the one shared answer for three call sites -- ruby.go:1135,
+# javascript.go:1113 and lowering.go:2157, the last covering every language
+# without its own frontend check -- so teaching it polynomial backtracking is a
+# new classification with solver-wide effect on what gets labelled, not a
+# localized correction to a construct it handles. Deciding which
+# polynomial shapes are reportable is design work, and the measurement above says
+# the obvious candidates are not. No definition change attempted.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1343: the SVG local-ref attribute scrubber substitutes with a quadratic regex"
+  lang ruby
+  file lib/loofah/html5/scrub.rb
+  profile library
+  reject VYQL-DOS-001
+  reject VYQL-DOS-002
+  reject VYQL-DOS-003
+  code
+  ```
+  require "cgi"
+  require "crass"
+
+  module Loofah
+    module HTML5
+      module Scrub
+        DATA_ATTRIBUTE_NAME = /\Adata-[\w-]+\z/
+
+        class << self
+          def scrub_attributes(node)
+            node.attribute_nodes.each do |attr_node|
+              attr_name = if attr_node.namespace
+                "#{attr_node.namespace.prefix}:#{attr_node.node_name}"
+              else
+                attr_node.node_name
+              end
+
+              if attr_name =~ DATA_ATTRIBUTE_NAME
+                next
+              end
+
+              unless SafeList::ALLOWED_ATTRIBUTES.include?(attr_name)
+                attr_node.remove
+                next
+              end
+
+              if SafeList::SVG_ATTR_VAL_ALLOWS_REF.include?(attr_name)
+                attr_node.value = attr_node.value.gsub(/url\s*\(\s*[^#\s][^)]+?\)/m, " ") if attr_node.value
+              end
+
+              if SafeList::SVG_ALLOW_LOCAL_HREF.include?(node.name) && attr_name == "xlink:href" && attr_node.value =~ /^\s*[^#\s].*/m
+                attr_node.remove
+                next
+              end
+            end
+          end
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1343: the local-ref scrubber reading component values with the CSS parser is clean"
+  lang ruby
+  file lib/loofah/html5/scrub.rb
+  profile library
+  reject VYQL-DOS-001
+  reject VYQL-DOS-002
+  reject VYQL-DOS-003
+  code
+  ```
+  require "cgi"
+  require "crass"
+
+  module Loofah
+    module HTML5
+      module Scrub
+        DATA_ATTRIBUTE_NAME = /\Adata-[\w-]+\z/
+
+        class << self
+          def scrub_attributes(node)
+            node.attribute_nodes.each do |attr_node|
+              attr_name = if attr_node.namespace
+                "#{attr_node.namespace.prefix}:#{attr_node.node_name}"
+              else
+                attr_node.node_name
+              end
+
+              if attr_name =~ DATA_ATTRIBUTE_NAME
+                next
+              end
+
+              unless SafeList::ALLOWED_ATTRIBUTES.include?(attr_name)
+                attr_node.remove
+                next
+              end
+
+              if SafeList::SVG_ATTR_VAL_ALLOWS_REF.include?(attr_name)
+                scrub_attribute_that_allows_local_ref(attr_node)
+              end
+
+              if SafeList::SVG_ALLOW_LOCAL_HREF.include?(node.name) && attr_name == "xlink:href" && attr_node.value =~ /^\s*[^#\s].*/m
+                attr_node.remove
+                next
+              end
+            end
+          end
+
+          def scrub_attribute_that_allows_local_ref(attr_node)
+            return unless attr_node.value
+
+            nodes = Crass::Parser.new(attr_node.value).parse_component_values
+
+            values = nodes.map do |node|
+              case node[:node]
+              when :url
+                if node[:value].start_with?("#")
+                  node[:raw]
+                else
+                  nil
+                end
+              when :hash, :ident, :string
+                node[:raw]
+              else
+                nil
+              end
+            end.compact
+
+            attr_node.value = values.join(" ")
+          end
+        end
+      end
+    end
+  end
+  ```
+
+# The isolating pair. Same shape, same operand, no library API: only the
+# quantifier structure of the literal differs.
+
+test "rank1343 pair: a nested ambiguous quantifier in the url() pattern is reported"
+  lang ruby
+  profile library
+  expect VYQL-DOS-002
+  code
+  ```
+  class LocalRefScrubber
+    def call(value)
+      case value
+      when /url\s*\(\s*([^#\s]+)+\)/m
+        ""
+      else
+        value
+      end
+    end
+  end
+  ```
+
+test "rank1343 pair: the quadratic url() pattern in the same shape is not reported"
+  lang ruby
+  profile library
+  reject VYQL-DOS-002
+  code
+  ```
+  class LocalRefScrubber
+    def call(value)
+      case value
+      when /url\s*\(\s*[^#\s][^)]+?\)/m
+        ""
+      else
+        value
+      end
+    end
+  end
+  ```

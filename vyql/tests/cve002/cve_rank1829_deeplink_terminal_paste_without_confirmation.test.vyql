@@ -1,0 +1,241 @@
+# A desktop application's `tabby://` URL scheme hands any web page a way to
+# reach the renderer's CLI dispatch. The main process parses
+# `tabby://paste?text=<payload>` into `CLIEvent.argv` (app/lib/urlHandler.ts),
+# ships it over IPC, and `hostApp.service.ts` walks the registered
+# `CLIHandler`s. The terminal handler in tabby-terminal/src/cli.ts takes the
+# payload straight from that argv and types it into the active session:
+#
+#   async handle (event: CLIEvent): Promise<boolean> {
+#       const op = event.argv._[0]
+#       if (op === 'paste') {
+#           let text = event.argv.text!
+#           if (event.argv.escape!) {
+#               text = shellQuote.quote([text])
+#           }
+#           this.handlePaste(text)
+#           return true
+#       }
+#       return false
+#   }
+#
+#   private handlePaste (text: string) {
+#       if (this.app.activeTab instanceof BaseTerminalTabComponent && this.app.activeTab.session) {
+#           this.app.activeTab.sendInput(text)
+#           this.hostWindow.bringToFront()
+#       }
+#   }
+#
+# `sendInput` writes into the PTY behind the focused terminal, so the payload
+# is interpreted as typed input by whatever shell is sitting there, and
+# `escape` is itself an argv field the same link chooses -- the attacker simply
+# omits it. Nothing between the link and the socket asks the user. The fixed revision adds
+# a native modal before the dispatch: `PlatformService.showMessageBox` with the
+# text in the message and a Cancel button, returning early when the user
+# declines (CWE-78 in its typed-into-a-live-shell form, CWE-20 for the
+# unvalidated deep-link parameter).
+#
+# The same tree carries the safe spelling: tabby-local's `run`
+# deep-link wraps its dispatch in exactly that modal, at the revision this
+# spec's vulnerable snippet comes from. The third case below is that handler,
+# so the discrimination is between two spellings that coexist in one codebase,
+# not between a snapshot and its patch.
+#
+# Detection is a module-scope review binding: a module that reads a
+# deep-link-supplied `argv` field and also writes into a terminal session
+# (`sendInput`), with no interactive confirmation call in the module. Both
+# halves are API facts -- `CLIEvent.argv` is the parsed command-line/URL-scheme
+# argument object and `BaseTerminalTabComponent.sendInput` is the documented
+# write into the session -- and the negation names the documented confirmation
+# API rather than any helper the fixed revision introduces. The module scope is what lets
+# the two halves meet: the argv read sits in `handle` and the session write in
+# `handlePaste`, sibling methods of one class, and no class-scope context node
+# exists for JavaScript. `callPath` tokens are AST-derived, so a commented-out
+# `showMessageBox` does not silence the negation.
+#
+# Measured on the real checkout (timeout 180, --cache off --max-ram 6GB, three
+# runs per cell, counts identical every run): the vulnerable parent of the change
+# reports 132 findings without the binding and 133 with it, the one addition
+# landing on tabby-terminal/src/cli.ts:1; the fixed revision itself reports 132 with the
+# binding, the modal now sitting in the same module. Every other `sendInput`
+# call site in the tree (hotkey handlers, the drag-drop path paste, focus
+# helpers) lives in a module that reads no argv. Collateral: an exhaustive text
+# enumeration over every clone under /tmp/cve-work/rank*/ finds `event.argv` in
+# no JavaScript or TypeScript file outside this repository, and bounded scans
+# of four sibling trees (NodeBB 667, mongoose 526, graphql-js 1040,
+# matrix-react-sdk 741 findings) are identical with and without the binding.
+
+test "deeplink paste handler types the link payload into the focused terminal session"
+  lang javascript
+  file cli.ts
+  expect VYQL-INJ-276
+  expect_review code.DeepLinkTerminalInputWithoutConfirmation
+  code
+  ```
+  import shellQuote from 'shell-quote'
+  import { Injectable } from '@angular/core'
+  import { CLIHandler, CLIEvent, AppService, HostWindowService } from 'tabby-core'
+  import { BaseTerminalTabComponent } from './api/baseTerminalTab.component'
+
+  @Injectable()
+  export class TerminalCLIHandler extends CLIHandler {
+      firstMatchOnly = true
+      priority = 0
+
+      constructor (
+          private app: AppService,
+          private hostWindow: HostWindowService,
+      ) {
+          super()
+      }
+
+      async handle (event: CLIEvent): Promise<boolean> {
+          const op = event.argv._[0]
+
+          if (op === 'paste') {
+              let text = event.argv.text!
+              if (event.argv.escape!) {
+                  text = shellQuote.quote([text])
+              }
+              this.handlePaste(text)
+              return true
+          }
+
+          return false
+      }
+
+      private handlePaste (text: string) {
+          if (this.app.activeTab instanceof BaseTerminalTabComponent && this.app.activeTab.session) {
+              this.app.activeTab.sendInput(text)
+              this.hostWindow.bringToFront()
+          }
+      }
+  }
+  ```
+
+test "the paste dispatch waits for the user to accept the payload in a native modal"
+  lang javascript
+  file cli.ts
+  reject VYQL-INJ-276
+  reject_review code.DeepLinkTerminalInputWithoutConfirmation
+  code
+  ```
+  import shellQuote from 'shell-quote'
+  import { Injectable } from '@angular/core'
+  import { CLIHandler, CLIEvent, AppService, HostWindowService, TranslateService, PlatformService } from 'tabby-core'
+  import { BaseTerminalTabComponent } from './api/baseTerminalTab.component'
+
+  @Injectable()
+  export class TerminalCLIHandler extends CLIHandler {
+      firstMatchOnly = true
+      priority = 0
+
+      constructor (
+          private app: AppService,
+          private hostWindow: HostWindowService,
+          private platform: PlatformService,
+          private translate: TranslateService,
+      ) {
+          super()
+      }
+
+      async handle (event: CLIEvent): Promise<boolean> {
+          const op = event.argv._[0]
+
+          if (op === 'paste') {
+              let text = event.argv.text!
+              if (event.argv.escape!) {
+                  text = shellQuote.quote([text])
+              }
+
+              if ((await this.platform.showMessageBox({
+                  type: 'warning',
+                  message: this.translate.instant(`Paste "{text}"?`, { text }),
+                  buttons: [
+                      this.translate.instant('Paste'),
+                      this.translate.instant('Cancel'),
+                  ],
+                  defaultId: 0,
+                  cancelId: 1,
+              })).response === 1) {
+                  return true
+              }
+
+              this.handlePaste(text)
+              return true
+          }
+
+          return false
+      }
+
+      private handlePaste (text: string) {
+          if (this.app.activeTab instanceof BaseTerminalTabComponent && this.app.activeTab.session) {
+              this.app.activeTab.sendInput(text)
+              this.hostWindow.bringToFront()
+          }
+      }
+  }
+  ```
+
+test "a deep-link command that asks before it runs reports nothing"
+  lang javascript
+  file cli.ts
+  reject VYQL-INJ-276
+  reject_review code.DeepLinkTerminalInputWithoutConfirmation
+  code
+  ```
+  import { Injectable } from '@angular/core'
+  import { CLIHandler, CLIEvent, HostWindowService, TranslateService, PlatformService } from 'tabby-core'
+  import { TerminalService } from './services/terminal.service'
+
+  @Injectable()
+  export class LocalTerminalCLIHandler extends CLIHandler {
+      firstMatchOnly = true
+      priority = 0
+
+      constructor (
+          private hostWindow: HostWindowService,
+          private terminal: TerminalService,
+          private platform: PlatformService,
+          private translate: TranslateService,
+      ) {
+          super()
+      }
+
+      async handle (event: CLIEvent): Promise<boolean> {
+          const op = event.argv._[0]
+
+          if (op === 'run') {
+              await this.handleRunCommand(event.argv.command!)
+          } else {
+              return false
+          }
+
+          return true
+      }
+
+      private async handleRunCommand (command: string[]) {
+          if ((await this.platform.showMessageBox({
+              type: 'warning',
+              message: this.translate.instant(`Run "{command}"?`, { command: command.join(' ') }),
+              buttons: [
+                  this.translate.instant('Run'),
+                  this.translate.instant('Cancel'),
+              ],
+              defaultId: 0,
+              cancelId: 1,
+          })).response === 1) {
+              return
+          }
+
+          this.terminal.openTab({
+              type: 'local',
+              name: '',
+              options: {
+                  command: command[0],
+                  args: command.slice(1),
+              },
+          }, null, true)
+          this.hostWindow.bringToFront()
+      }
+  }
+  ```

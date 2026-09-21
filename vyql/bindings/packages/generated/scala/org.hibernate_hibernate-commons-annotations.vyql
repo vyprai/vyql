@@ -1,0 +1,9 @@
+module bindings.scala.generated.mbd4aea15;
+
+binding codeEval0 {
+  requires {
+    dependency("org.hibernate:hibernate-commons-annotations")
+  }
+  query pattern callExpr where callee.method == "invoke"
+  emit sink code.CodeEval at args[0]
+}

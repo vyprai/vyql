@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m43bbf62e;
+
+binding filePathAccess0 {
+  requires {
+    dependency("jest-util")
+  }
+  query pattern callExpr where callee.method == "createDirectory"
+  emit sink code.FilePathAccess at args[0]
+}

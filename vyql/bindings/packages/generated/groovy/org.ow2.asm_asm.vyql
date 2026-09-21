@@ -1,0 +1,9 @@
+module bindings.groovy.generated.mcceee295;
+
+binding deserialization0 {
+  requires {
+    dependency("org.ow2.asm:asm")
+  }
+  query pattern callExpr where callee.method == "accept"
+  emit sink code.Deserialization at args[0]
+}

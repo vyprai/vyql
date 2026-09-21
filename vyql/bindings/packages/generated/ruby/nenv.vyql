@@ -1,0 +1,17 @@
+module bindings.ruby.generated.md14e983b;
+
+binding userControlledData0 {
+  requires {
+    dependency("nenv")
+  }
+  query pattern callExpr where callee.method == "Nenv"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("nenv")
+  }
+  query pattern callExpr where callee.method == "method_missing"
+  emit source core.UserControlledData at call.result
+}

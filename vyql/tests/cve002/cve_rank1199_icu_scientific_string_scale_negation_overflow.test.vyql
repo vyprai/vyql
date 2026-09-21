@@ -1,0 +1,217 @@
+# Rank 1199 / CVE-2018-18928: ICU's DecimalQuantity::toScientificString (and
+# Formattable::internalGetCharString, fmtable.cpp) computes an exponent value,
+# `_scale`, from arithmetic on internal fields (`upperPos + scale`), then, when
+# it is negative, negates it with `_scale *= -1;` before rendering its digits.
+# When `_scale` equals INT32_MIN -- reachable because the parser accepts
+# exponents across the full int32 range -- negating it is undefined behaviour:
+# two's-complement has no positive counterpart for INT32_MIN, so the value
+# does not become positive and the digit-rendering loop that follows reads
+# past what the caller expects (CWE-190, GHSA fixed by 53d8c8f3d1).
+#
+# No flag on the pool row; read the diff per Step 0's note that flags are not
+# the only source of pool errors, and confirmed 53d8c8f3d181d87a6aa925b449b51c4a2c922a51
+# is the real, targeted fix: it touches only fmtable.cpp (guards the sibling
+# `std::abs(getMagnitude())` call the same way), number_decimalquantity.cpp
+# (adds the `_scale == INT32_MIN` early return below), and the equivalent
+# Java files, plus adds regression tests asserting on the literal string
+# "-2147483648" and BigDecimal underflow at the DualStorageBCD layer.
+#
+# ATTENTION, engine gap. `vyql match` on the vulnerable function labels
+# nothing at the negation at all: no source, no sink, nothing for a rule to
+# consume. Isolated with a CVE-independent minimal pair naming no ICU API,
+# gated on a real taint source (`recv`) reaching a real sink (`memcpy`) so the
+# comparison is a full rule-firing diff, not just a labelling one:
+#
+#   int32_t x = 0; recv(sockfd, &x, sizeof(x), 0);
+#   if (x < 0) { x *= -1; }        // compound assignment
+#   memcpy(buf, &x, x);
+#
+# reports only the pre-existing VYQL-MEM-016/VYQL-MEM-003 memcpy findings,
+# while the identical shape written explicitly --
+#
+#   if (x < 0) { x = x * -1; }     // same operation, expanded
+#
+# -- additionally reports VYQL-NUM-003 (TaintedIntegerSizeArithmetic) on the
+# multiplication. The two snippets differ only in whether the negation is
+# written `x *= -1` or `x = x * -1`; the engine treats them differently
+# because of internal/extract/frontend/treesitter/c.go:1144-1153, `exprStmt`'s
+# `"assignment_expression"` case: for every compound assignment operator
+# (`+=`, `-=`, `*=`, ...), it evaluates only the right-hand side and emits
+# `nir.Assign{Targets: [left], Value: right}` -- the same statement a plain
+# `x = right` would produce. The operator itself is read (`assignmentOp`
+# already extracts it, and other call sites already use it for context
+# tokens) but never applied, so no BinOp node is ever synthesized for the
+# implicit `x <op> right` the operator means: `x *= -1` is lowered as if it
+# were `x = -1`, discarding both the multiplication and the read of `x`'s own
+# prior value. This is generic C/C++ semantics, documented by the language
+# itself (any compound-assignment operator, not just `*=`), not specific to
+# ICU or to this CVE -- and it is a real loss of signal beyond this one rank:
+# every rule that pattern-matches on a BinOp (the numeric-overflow family
+# among them) is blind to the same arithmetic when a codebase happens to
+# write it as `x op= y` instead of `x = x op y`, which is the more common
+# spelling in idiomatic C/C++.
+#
+# Fixing that gap would not by itself close this rank, though, which is why
+# it stays ATTENTION rather than FIXED once the mechanical gap is swept:
+# `toScientificString` and `internalGetCharString` take no arguments at all.
+# `scale`, `precision`, and `getMagnitude()`'s backing field are
+# `DecimalQuantity` members set far upstream, by the parser that reads a
+# formatted number string -- a second gap, non-mechanical (interprocedural
+# field taint into a zero-argument member function, the same shape rank
+# 1198's field-crossing gap named), sits between any source and this
+# function's own arithmetic regardless of the compound-assignment fix.
+#
+# Scanning the real checkout (icu4c/source/i18n, bounded, cpp:465 files)
+# reports the identical 3114 findings on both revisions, none in
+# number_decimalquantity.cpp or near fmtable.cpp's internalGetCharString --
+# no discriminator either direction. Both gaps entered in ENGINE-GAPS.md: the
+# compound-assignment lowering under Mechanical, with the recv/memcpy pair
+# above as the regression test; the zero-argument-method field taint under
+# its own non-mechanical entry, alongside rank 1198's. No definition change
+# shipped: even a perfect fix for the compound-assignment gap has no source
+# to carry into this function while the second gap stands.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1199: toScientificString negates _scale unconditionally when it is negative"
+  lang cpp
+  file number_decimalquantity.cpp
+  reject VYQL-NUM-003
+  code
+  ```
+  UnicodeString DecimalQuantity::toScientificString() const {
+      U_ASSERT(!isApproximate);
+      UnicodeString result;
+      if (isNegative()) {
+          result.append(u'-');
+      }
+      if (precision == 0) {
+          result.append(u"0E+0", -1);
+          return result;
+      }
+      int32_t upperPos = std::min(precision + scale, lOptPos) - scale - 1;
+      int32_t lowerPos = std::max(scale, rOptPos) - scale;
+      int32_t p = upperPos;
+      result.append(u'0' + getDigitPos(p));
+      if ((--p) >= lowerPos) {
+          result.append(u'.');
+          for (; p >= lowerPos; p--) {
+              result.append(u'0' + getDigitPos(p));
+          }
+      }
+      result.append(u'E');
+      int32_t _scale = upperPos + scale;
+      if (_scale < 0) {
+          _scale *= -1;
+          result.append(u'-');
+      } else {
+          result.append(u'+');
+      }
+      if (_scale == 0) {
+          result.append(u'0');
+      }
+      int32_t insertIndex = result.length();
+      while (_scale > 0) {
+          std::div_t res = std::div(_scale, 10);
+          result.insert(insertIndex, u'0' + res.rem);
+          _scale = res.quot;
+      }
+      return result;
+  }
+  ```
+
+test "rank1199: the fixed revision returns early once _scale is the one value negation cannot invert"
+  lang cpp
+  file number_decimalquantity.cpp
+  reject VYQL-NUM-003
+  code
+  ```
+  UnicodeString DecimalQuantity::toScientificString() const {
+      U_ASSERT(!isApproximate);
+      UnicodeString result;
+      if (isNegative()) {
+          result.append(u'-');
+      }
+      if (precision == 0) {
+          result.append(u"0E+0", -1);
+          return result;
+      }
+      int32_t upperPos = std::min(precision + scale, lOptPos) - scale - 1;
+      int32_t lowerPos = std::max(scale, rOptPos) - scale;
+      int32_t p = upperPos;
+      result.append(u'0' + getDigitPos(p));
+      if ((--p) >= lowerPos) {
+          result.append(u'.');
+          for (; p >= lowerPos; p--) {
+              result.append(u'0' + getDigitPos(p));
+          }
+      }
+      result.append(u'E');
+      int32_t _scale = upperPos + scale;
+      if (_scale == INT32_MIN) {
+          result.append({u"-2147483648", -1});
+          return result;
+      } else if (_scale < 0) {
+          _scale *= -1;
+          result.append(u'-');
+      } else {
+          result.append(u'+');
+      }
+      if (_scale == 0) {
+          result.append(u'0');
+      }
+      int32_t insertIndex = result.length();
+      while (_scale > 0) {
+          std::div_t res = std::div(_scale, 10);
+          result.insert(insertIndex, u'0' + res.rem);
+          _scale = res.quot;
+      }
+      return result;
+  }
+  ```
+
+# The isolating pair. Same taint source (recv), same sink (memcpy's size
+# argument), same negation; only whether it is spelled `x *= -1` or
+# `x = x * -1` differs.
+
+test "rank1199: a tainted value negated with a compound assignment reaches a size-sensitive sink unlabelled"
+  lang cpp
+  file compound.cpp
+  reject VYQL-NUM-003
+  code
+  ```
+  #include <sys/socket.h>
+  #include <cstring>
+  #include <cstdint>
+  int f(int sockfd) {
+      int32_t x = 0;
+      recv(sockfd, &x, sizeof(x), 0);
+      if (x < 0) {
+          x *= -1;
+      }
+      char buf[16];
+      memcpy(buf, &x, x);
+      return x;
+  }
+  ```
+
+test "rank1199: the same negation, spelled as an explicit multiplication, is labelled"
+  lang cpp
+  file explicit.cpp
+  expect VYQL-NUM-003
+  code
+  ```
+  #include <sys/socket.h>
+  #include <cstring>
+  #include <cstdint>
+  int f(int sockfd) {
+      int32_t x = 0;
+      recv(sockfd, &x, sizeof(x), 0);
+      if (x < 0) {
+          x = x * -1;
+      }
+      char buf[16];
+      memcpy(buf, &x, x);
+      return x;
+  }
+  ```

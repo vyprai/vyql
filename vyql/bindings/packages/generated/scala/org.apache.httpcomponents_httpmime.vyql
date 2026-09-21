@@ -1,0 +1,9 @@
+module bindings.scala.generated.m7c1eab0b;
+
+binding filePathAccess0 {
+  requires {
+    dependency("org.apache.httpcomponents:httpmime")
+  }
+  query pattern callExpr where callee.method == "FileBody"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,17 @@
+module bindings.scala.generated.m26729f2d;
+
+binding deserialization0 {
+  requires {
+    dependency("org.springframework.amqp:spring-rabbit")
+  }
+  query pattern callExpr where callee.method == "parseArguments"
+  emit sink code.Deserialization at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("org.springframework.amqp:spring-rabbit")
+  }
+  query pattern callExpr where callee.method == "sendAndReceive"
+  emit sink code.NetworkSend at args[0]
+}

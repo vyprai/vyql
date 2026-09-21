@@ -1,0 +1,212 @@
+# Piwigo's web-service search accepted date filter parameters without
+# validating them as MySQL datetimes, so a crafted f_min_date_available (and
+# its siblings) injected SQL into the search query built from the filters
+# (SQL injection, CWE-89; GHSA-mgqc-3445-qghq). The filter setup in
+# include/ws_functions.inc.php, ws_std_image_sql_filter, concatenated
+# $params['f_min_date_available'] and its three siblings straight into WHERE
+# clauses, and every web-service handler that asks for those filters
+# implodes the returned clauses into one statement and hands it to
+# pwg_query, which runs it through mysql_query. Fix 0d5ed1f777 ("(cp
+# 0f359f2af) fixes GHSA-mgqc-3445-qghq checks standard date fields"): a loop
+# at the top of the function validates each of the four fields with
+# is_valid_mysql_datetime (a helper added to include/functions.inc.php that
+# round-trips the value through DateTime::createFromFormat) and rejects the
+# request with WS_ERR_INVALID_PARAM on any mismatch.
+#
+# ## Re-measured at the current tip
+#
+# The whole repository exceeds the memory ceiling, so the measurement runs
+# over include/ (the directory holding the vulnerable file, the handlers and
+# the database layer). Three `--cache off` runs per revision (timeout 180,
+# --max-ram 6GB): 151 findings, 74 at or above high, at the parent and the
+# identical 151 at the fix, stable across all six runs, and the two
+# revisions' fingerprint sets are identical -- the fix adds a validator
+# nothing recognises, so the trees score the same. The `-flags only` view
+# reports 175 flags at both revisions, none of them on
+# include/ws_functions.inc.php, so the zero is not a `-flags` replacement
+# misread.
+#
+# ## The boundary has moved since the first pass, and the chain is intact
+#
+# The first pass recorded that nothing labels the web-service parameter
+# array as a source and nothing labels the project's query builder as a
+# sink. Both halves are now stale, measured on this tree:
+#
+# - $_POST and $_GET in include/ws_protocols/rest_handler.php are labelled
+#   code.HttpInput by php.input, and the taint crosses into
+#   PwgServer::invoke's $params parameter and through its $params[$name]
+#   reads -- the INJ-004 rows on ws_core.inc.php:433/444/457 carry it.
+# - mysql_query inside pwg_query (dblayer/functions_mysql.inc.php:69) is a
+#   bound code.SqlExecution sink, reached through the project's own wrapper,
+#   and it already holds the tree's two VYQL-INJ-001 rows.
+#
+# A throwaway probe that labels the $params parameter of a ws_ handler as
+# code.HttpInput (the parameter.entry idiom bindings/php/mfbe84119.vyql
+# already uses for routed controller actions) connects the whole downstream
+# chain: 75 distinct paths from ws handler parameters reach the SQL sink,
+# through the array-element read, the concatenation, the clause list's
+# return to the caller, implode, and pwg_query's own parameter. The chain
+# needs no engine work below the handler. The probe also measures clean
+# collateral: 151 -> 163 findings, +12 new fingerprints (5 INJ-004, 3
+# PATH-001, 2 DOS-001, 1 PATH-002, 1 INJ-015), 19 rows change their
+# representative source, none removed, stable 3/3 -- and the identical
+# 151 -> 163 at the fixed revision, because the validator is not a control.
+#
+# ## Why the chain still cannot surface
+#
+# Two independent blocks, both measured:
+#
+# - Dispatch. The request reaches the handler through
+#   `call_user_func_array($method['callback'], array($params, &$this))` in
+#   ws_core.inc.php, and the engine has no callback dispatch for
+#   call_user_func_array or call_user_func -- the name appears nowhere in
+#   internal/. Minimal pair, identical except for that one construct: the
+#   wrapper dispatching through call_user_func_array reports 0, the same
+#   wrapper calling the handler directly reports 1 VYQL-INJ-001. In the real
+#   code the callback is $method['callback'], a subscript of the method
+#   table addMethod() fills, so even literal-name dispatch would not reach
+#   it.
+# - Reporting. Findings dedup to one per (rule, sink)
+#   (internal/solvers/taint.go:171), and Piwigo funnels every statement in
+#   the application through the single mysql_query call inside pwg_query.
+#   The 75 probe-connected paths land on a sink that already holds its one
+#   INJ-001 row, sourced from the cookie reader -- the shortest witness --
+#   so adding the source label produced zero new INJ-001 rows. An
+#   application with one query funnel gets one SQL-injection finding.
+#
+# ## The discriminator the fix leaves is its own helper
+#
+# With the probe in place the fixed form still reports 1: the guard calls
+# is_valid_mysql_datetime, which the fix commit itself adds and documents
+# only in its own docblock. Binding it would encode the fixing commit's
+# vocabulary as the discriminator, and PHP's DateTime::createFromFormat is
+# not a neutralising control for a query built elsewhere -- a broad
+# date-format check would silence unrelated injection findings. No
+# definition change is justified by this code.
+#
+# Pin both revisions as a double miss. The snippet below carries the real
+# two-function shape and pwg_query's own body, so the first block fires the
+# moment a ws-handler parameter source lands -- unlike a snippet ending in
+# query2array, which is unbound and would stay green either way.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1579: the date filters reach the statement unvalidated"
+  lang php
+  file include/ws_functions.inc.php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  function ws_std_image_sql_filter( $params, $tbl_name='' )
+  {
+      $clauses = array();
+      if ( is_numeric($params['f_min_rate']) )
+      {
+          $clauses[] = $tbl_name.'rating_score>='.$params['f_min_rate'];
+      }
+      if ( isset($params['f_min_date_available']) )
+      {
+          $clauses[] = $tbl_name."date_available>='".$params['f_min_date_available']."'";
+      }
+      if ( isset($params['f_max_date_available']) )
+      {
+          $clauses[] = $tbl_name."date_available<'".$params['f_max_date_available']."'";
+      }
+      return $clauses;
+  }
+
+  function pwg_query($query)
+  {
+      $result = mysql_query($query);
+      return $result;
+  }
+
+  function ws_getDerivativeImages( $params, &$service )
+  {
+      $where_clauses = ws_std_image_sql_filter( $params, '' );
+      $query_model = '
+  SELECT id, path, representative_ext
+    FROM '. IMAGES_TABLE .'
+   WHERE '. implode(' AND ', $where_clauses) .'
+   ORDER BY id DESC
+  ;';
+      $result = pwg_query($query_model);
+      return $result;
+  }
+  ```
+
+test "rank1579: the fixed revision checks each field against the grammar"
+  lang php
+  file include/ws_functions.inc.php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  function is_valid_mysql_datetime(string $datetime)
+  {
+      $format = 'Y-m-d H:i:s';
+      $date = DateTime::createFromFormat($format, $datetime);
+      if ($date and $date->format($format) === $datetime)
+      {
+          return true;
+      }
+      $format = 'Y-m-d';
+      $date = DateTime::createFromFormat($format, $datetime);
+      if ($date and $date->format($format) === $datetime)
+      {
+          return true;
+      }
+      return false;
+  }
+
+  function ws_std_image_sql_filter( $params, $tbl_name='' )
+  {
+      foreach (array('f_min_date_available', 'f_max_date_available',
+                     'f_min_date_created', 'f_max_date_created') as $datefield)
+      {
+          if (isset($params[$datefield]) and !is_valid_mysql_datetime($params[$datefield]))
+          {
+              global $service;
+              $service->sendResponse(new PwgError(WS_ERR_INVALID_PARAM, 'Invalid '.$datefield));
+              exit;
+          }
+      }
+
+      $clauses = array();
+      if ( is_numeric($params['f_min_rate']) )
+      {
+          $clauses[] = $tbl_name.'rating_score>='.$params['f_min_rate'];
+      }
+      if ( isset($params['f_min_date_available']) )
+      {
+          $clauses[] = $tbl_name."date_available>='".$params['f_min_date_available']."'";
+      }
+      if ( isset($params['f_max_date_available']) )
+      {
+          $clauses[] = $tbl_name."date_available<'".$params['f_max_date_available']."'";
+      }
+      return $clauses;
+  }
+
+  function pwg_query($query)
+  {
+      $result = mysql_query($query);
+      return $result;
+  }
+
+  function ws_getDerivativeImages( $params, &$service )
+  {
+      $where_clauses = ws_std_image_sql_filter( $params, '' );
+      $query_model = '
+  SELECT id, path, representative_ext
+    FROM '. IMAGES_TABLE .'
+   WHERE '. implode(' AND ', $where_clauses) .'
+   ORDER BY id DESC
+  ;';
+      $result = pwg_query($query_model);
+      return $result;
+  }
+  ```

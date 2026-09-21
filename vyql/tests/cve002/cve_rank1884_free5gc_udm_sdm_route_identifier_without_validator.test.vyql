@@ -1,0 +1,228 @@
+# free5gc/udm CVE-2026-33191 (GHSA-p9hg-pq3q-v9gv): the Nudm_SubscriberDataManagement
+# handlers read the SUPI or UE ID straight from the gin route path and forward it
+# into the processor layer with no format validation. The identifier grammars
+# (TS 23.003 / TS 29.571) forbid control characters, so a route value carrying a
+# null byte (URL-encoded %00) travels through the UDR client construction and
+# NRF discovery until Go's net/url rejects it -- "invalid control character in
+# URL" -- and the failure surfaces as a 500 instead of a 400.
+#
+# The advisory's fix is PR free5gc/udm#79 (88de9fa74a1b3f3522e53b4cfa2d184712ffa4ee,
+# a merge whose combined diff is empty; `git diff 9308405 88de9fa` reads it in
+# full). It adds the free5gc util validator in front of the forwarding in four
+# handlers -- HandleGetAmData gains `if !validator.IsValidSupi(supi) { ...400...;
+# return }`, and HandleUnsubscribe, HandleModify and HandleGetIdTranslationResult
+# gain `valid := validator.IsValidGpsi(ueId) || validator.IsValidSupi(ueId)` --
+# and bumps github.com/free5gc/util to the revision carrying the validator
+# package. The pool row named 65d7070f, PR #78, which is a different fix (the
+# SDM-notify 204 nil guard); the advisory references 88de9fa.
+#
+# The pool-row commit and the fixing change both leave API-documented calls inside
+# the guarded functions, which is the counterweight that makes this detectable
+# without keying on the fixed revision's own helpers: free5gc's util/validator is a
+# documented library (one format validator per 3GPP identifier, each explicitly
+# rejecting null bytes), and the handler side keys on the standard identifier
+# names the route registration carries.
+#
+# Detection is code.UnvalidatedRouteIdentifier (VYQL-VAL-036, CWE-20/158/248),
+# a new concept for the weakness class "a request-supplied standard-identifier
+# route parameter is forwarded into request processing without the ecosystem's
+# documented format validator in the handling function", emitted by
+# sbiRouteIdentifierForwardedWithoutValidator in
+# vyql/bindings/go/sbiRouteIdentifierValidation.vyql. The same file labels the
+# validator package's calls as core.InputValidation checks, so taint rules that
+# honour InputValidation respect free5gc identifier validation from now on.
+#
+# Measured with `--cache off` over three runs per revision. The whole udm tree
+# at the vulnerable parent 9308405 reports 32 VYQL-VAL-036 rows (32/32/32)
+# across six SBI handler files -- subscriberdatamanagement 15,
+# uecontextmanagement 8, ueauthentication 4, eventexposure 3, parameterprovision
+# 1, httpcallback 1 -- for 47 findings total against a 15-finding baseline, so
+# the rule adds its 32 rows and moves nothing else. At the fixed revision 88de9fa it
+# reports 28 (28/28/28), and the four rows the fixed revision's own handlers carried are
+# gone -- HandleGetAmData, HandleUnsubscribe, HandleModify,
+# HandleGetIdTranslationResult. The remaining 28 are handlers the fixed revision does not
+# touch and that still forward supi/ueId unvalidated at that revision, which is
+# the advisory's "all endpoints that include path parameters". The 500/400
+# null-byte story is unchanged in them.
+#
+# Collateral, enumerated by grep rather than sampled: across every clone under
+# /tmp/cve-work/rank*/ the identifier-narrowed shape (a gin route-param read of
+# supi/ueId/gpsi/suci/pei) exists only in the two free5gc trees -- this udm
+# checkout and the sibling udr clone, whose api_datarepository.go carries 60
+# such reads and zero validator calls anywhere in the tree; scanning it reports
+# exactly those 60 rows (60/60/60), all in that one file. Two non-free5gc Go
+# trees scan to zero rows for the rule: traefik, and the free5gc umbrella
+# repository, whose checked-out tree is build scripts and webconsole code with
+# no SBI handlers. Removing the identifier-name clause would drop the binding
+# back onto every gin handler in the world, since the negation can only be
+# satisfied by free5gc's own validators.
+
+test "rank1884: an sdm handler forwards the supi route parameter with no identifier validator"
+  lang go
+  file internal/sbi/api_subscriberdatamanagement.go
+  expect VYQL-VAL-036
+  expect_review code.UnvalidatedRouteIdentifier
+  code
+  ```
+  package sbi
+
+  import (
+  	"net/http"
+  	"net/url"
+
+  	"github.com/free5gc/openapi/models"
+  	"github.com/free5gc/udm/internal/logger"
+  	"github.com/gin-gonic/gin"
+  )
+
+  // GetAmData - retrieve a UE's Access and Mobility Subscription Data
+  func (s *Server) HandleGetAmData(c *gin.Context) {
+  	query := url.Values{}
+  	query.Set("plmn-id", c.Query("plmn-id"))
+  	query.Set("supported-features", c.Query("supported-features"))
+
+  	plmnID := query.Get("plmn-id")
+  	supportedFeatures := query.Get("supported-features")
+
+  	logger.SdmLog.Infof("Handle GetAmData")
+
+  	supi := c.Params.ByName("supi")
+
+  	s.Processor().GetAmDataProcedure(c, supi, plmnID, supportedFeatures)
+  }
+  ```
+  file go.mod
+  code
+  ```
+  module github.com/free5gc/udm
+
+  go 1.25
+
+  require (
+  	github.com/free5gc/openapi v1.2.3
+  	github.com/free5gc/util v1.3.2-0.20260107090449-c09baaf75b11
+  	github.com/gin-gonic/gin v1.10.0
+  )
+  ```
+
+test "rank1884: the handler with the supi-format validator in front of the forwarding is not reported"
+  lang go
+  file internal/sbi/api_subscriberdatamanagement.go
+  reject VYQL-VAL-036
+  reject_review code.UnvalidatedRouteIdentifier
+  code
+  ```
+  package sbi
+
+  import (
+  	"net/http"
+  	"net/url"
+
+  	"github.com/free5gc/openapi/models"
+  	"github.com/free5gc/udm/internal/logger"
+  	"github.com/free5gc/util/metrics/sbi"
+  	"github.com/free5gc/util/validator"
+  	"github.com/gin-gonic/gin"
+  )
+
+  // GetAmData - retrieve a UE's Access and Mobility Subscription Data
+  func (s *Server) HandleGetAmData(c *gin.Context) {
+  	query := url.Values{}
+  	query.Set("plmn-id", c.Query("plmn-id"))
+  	query.Set("supported-features", c.Query("supported-features"))
+
+  	plmnID := query.Get("plmn-id")
+  	supportedFeatures := query.Get("supported-features")
+
+  	logger.SdmLog.Infof("Handle GetAmData")
+
+  	// TS 29.503 6.1.3.5.2
+  	// Validate SUPI format
+  	supi := c.Params.ByName("supi")
+  	if !validator.IsValidSupi(supi) {
+  		problemDetail := models.ProblemDetails{
+  			Title:  "Malformed request syntax",
+  			Status: http.StatusBadRequest,
+  			Detail: "Supi is invalid",
+  			Cause:  "MANDATORY_IE_INCORRECT",
+  		}
+  		logger.SdmLog.Warnln("Supi is invalid")
+  		c.Set(sbi.IN_PB_DETAILS_CTX_STR, http.StatusText(int(problemDetail.Status)))
+  		c.JSON(int(problemDetail.Status), problemDetail)
+  		return
+  	}
+
+  	s.Processor().GetAmDataProcedure(c, supi, plmnID, supportedFeatures)
+  }
+  ```
+  file go.mod
+  code
+  ```
+  module github.com/free5gc/udm
+
+  go 1.25
+
+  require (
+  	github.com/free5gc/openapi v1.2.3
+  	github.com/free5gc/util v1.3.2-0.20260107090449-c09baaf75b11
+  	github.com/gin-gonic/gin v1.10.0
+  )
+  ```
+
+test "rank1884: the ueId form validated as gpsi-or-supi is not reported"
+  lang go
+  file internal/sbi/api_subscriberdatamanagement.go
+  reject VYQL-VAL-036
+  reject_review code.UnvalidatedRouteIdentifier
+  code
+  ```
+  package sbi
+
+  import (
+  	"net/http"
+
+  	"github.com/free5gc/openapi/models"
+  	"github.com/free5gc/udm/internal/logger"
+  	"github.com/free5gc/util/metrics/sbi"
+  	"github.com/free5gc/util/validator"
+  	"github.com/gin-gonic/gin"
+  )
+
+  // Unsubscribe - unsubscribe from notifications
+  func (s *Server) HandleUnsubscribe(c *gin.Context) {
+  	logger.SdmLog.Infof("Handle Unsubscribe")
+
+  	// TS 29.503 6.1.3.4.2
+  	// Validate SUPI and GPSI format the UE ID (SUPI or GPSI)
+  	ueId := c.Params.ByName("ueId")
+  	valid := validator.IsValidGpsi(ueId) || validator.IsValidSupi(ueId)
+  	if !valid {
+  		problemDetail := models.ProblemDetails{
+  			Title:  "Malformed request syntax",
+  			Status: http.StatusBadRequest,
+  			Detail: "UE ID is invalid",
+  			Cause:  "MANDATORY_IE_INCORRECT",
+  		}
+  		logger.SdmLog.Warnln("UE ID is invalid")
+  		c.Set(sbi.IN_PB_DETAILS_CTX_STR, http.StatusText(int(problemDetail.Status)))
+  		c.JSON(int(problemDetail.Status), problemDetail)
+  		return
+  	}
+  	subscriptionID := c.Params.ByName("subscriptionId")
+
+  	s.Processor().UnsubscribeProcedure(c, ueId, subscriptionID)
+  }
+  ```
+  file go.mod
+  code
+  ```
+  module github.com/free5gc/udm
+
+  go 1.25
+
+  require (
+  	github.com/free5gc/openapi v1.2.3
+  	github.com/free5gc/util v1.3.2-0.20260107090449-c09baaf75b11
+  	github.com/gin-gonic/gin v1.10.0
+  )
+  ```

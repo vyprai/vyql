@@ -1,0 +1,10 @@
+module bindings.perl.generated.m6085e27f;
+
+binding privilegedOp0 {
+  requires {
+    dependency("Device-Delcom-VSI")
+  }
+  query pattern callExpr where callee.method == "_delcom_write_command"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}

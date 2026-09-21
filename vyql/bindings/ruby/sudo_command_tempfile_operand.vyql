@@ -1,0 +1,52 @@
+module bindings.ruby.sudo_command_tempfile_operand;
+
+// A command run under sudo is authorized by a sudoers entry that has to name
+// the path it operates on. The tempfile API deliberately generates a random
+// name under the shared temporary directory -- its own documentation says so
+// and recommends it for exactly that reason -- so a function that installs a
+// file created through `Tempfile.create`/`Tempfile.new`/`Tempfile.open` with
+// `sudo chown`/`sudo mv`/`sudo install` forces whoever administers the grant
+// to wildcard the directory (`/bin/mv -f /tmp/* /etc/exports`), and a
+// directory wildcard lets any local user point the whitelisted privileged
+// command at a file of their own. The remediation pins the operand to a fixed
+// name (`File.join(Dir.tmpdir, "vagrant-exports")` through `File.open`), which
+// is what lets the grant name one path; the sudo commands themselves stay as
+// they were, so the tempfile assignment is the whole discrimination.
+//
+// Both conjuncts read the function's own `assign:` tokens, which are matched
+// against the function context's own facts and nothing else:
+//
+//   * the tempfile side matches an assignment whose right-hand side calls the
+//     tempfile API (`new_exports_file = Tempfile.create('vagrant')` emits
+//     `assign:new_exports_file=Tempfile.create('vagrant')`), in the plain and
+//     the `::`-qualified spelling;
+//   * the sudo side matches an assignment whose value begins with `sudo` --
+//     `chown_cmd = "sudo chown ..."` and `sudo_command = "sudo "` both emit it
+//     (whitespace is stripped, so the needle carries none).
+//
+// The block form `Tempfile.open("...") do |f|` creates no assignment node and
+// emits no `assign:` token, and the guest-cap pattern that dominates the
+// reachable set passes its command to `machine.communicate.sudo(...)` as a
+// call argument -- that sudo runs inside the guest VM, not through a local
+// sudoers grant -- so neither satisfies the conjuncts.
+//
+// The tokens are AST-derived, so a comment naming either side cannot stand in
+// for the call or the assignment.
+//
+// Further costs, stated rather than hidden. The two facts combine by
+// co-occurrence, so a function that creates a tempfile for one purpose and
+// builds a sudo command for an unrelated one reports as well; on the vagrant
+// tree that is `plugins/providers/docker/communicator.rb`'s `execute`, which
+// wraps a shell in `sudo -E -H` while its tempfile is uploaded by path. The
+// value-compaction keeps no whitespace, so the sudo needle cannot carry the
+// trailing space of the source and a right-hand side merely *containing* the
+// letters `=sudo` (a `sudoers...` variable, say) would match. And a sudo
+// command assembled without an assignment -- passed to the executor inline,
+// or with `sudo` as a separate argument vector element -- is not reported.
+binding sudoCommandTempFileOperand {
+  query pattern presenceNode where node.scope == "function"
+    and node.context.language == "ruby"
+    and containsAny(node.context.assign, ["=Tempfile.create(", "=Tempfile.new(", "=Tempfile.open(", "=::Tempfile.create(", "=::Tempfile.new(", "=::Tempfile.open("])
+    and containsAny(node.context.assign, ["=sudo"])
+  emit issue code.SudoCommandTempFileOperand at node
+}

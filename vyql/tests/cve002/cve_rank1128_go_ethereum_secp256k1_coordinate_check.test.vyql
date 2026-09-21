@@ -1,0 +1,160 @@
+# Rank 1128 / CVE-2026-26314: go-ethereum's secp256k1 IsOnCurve accepts (x, y)
+# without confirming both coordinates are reduced below the field prime, so a
+# coordinate an attacker chose to be P plus some offset balances the curve
+# equation through Go's modular wraparound and passes as a valid point (CWE-20).
+# The fix (crypto/secp256k1/curve.go) adds
+#     if x.Cmp(bitCurve.P) >= 0 || y.Cmp(bitCurve.P) >= 0 { return false }
+# at the top of IsOnCurve and the same guard to the nocgo btCurve override; the
+# Go standard library's generic crypto/elliptic CurveParams.IsOnCurve carries
+# this guard natively, so the fix restores the reference spelling.
+#
+# ATTENTION, engine gap: the check cannot be attributed to the value it bounds.
+# Nothing labels the file at all -- `vyql match` on crypto/secp256k1/curve.go
+# reports no source, sink or control label, and a full findings-plus-flags scan
+# of the subtree reports nothing on any .go file at either revision. The shape
+# is expressible: a function-scoped binding on `function_name:IsOnCurve` plus
+# `param_type:big.Int` plus a `.Mod` call reports the vulnerable revision and
+# not the fixed one (measured 1 -> 0 on crypto/, one finding and no collateral
+# on the reference implementations in crypto/elliptic, keybase/go-crypto and
+# gnark-crypto). The neutraliser is what is not expressible -- every guard
+# route keys on the guard's spelling or its position:
+#   - `not containsAny(node.context.callArg, [".Cmp:"])` does not discriminate
+#     (0/0): the vulnerable body already compares two derived values,
+#     `x3.Cmp(y2)`, so the naive "no comparison in the body" form of this class
+#     misses the defect entirely.
+#   - `not (node.context.callArg endsWith ".P")` does not discriminate (0/0):
+#     the arithmetic's own modulus argument `bitCurve.P` satisfies it at both
+#     revisions.
+#   - `not containsAny(node.context.callBefore, ["Cmp>"])` discriminates 1 -> 0
+#     but is a position key, and still fires on two of the four correctly
+#     patched spellings below: a guard delegated to a helper method and a guard
+#     spelled as a bit-length bound leave no fact a binding can read.
+# Enumerating the reachable set, 22 Go functions across this tree and the
+# collateral clones call `.Mod(` with no `.Cmp(` in the same body, so the
+# unguarded form of the class is not shippable either.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1128: IsOnCurve feeds unreduced coordinates into the field arithmetic"
+  lang go
+  file curve.go
+  reject_review code.EcdhPeerPublicKeyMissingCurveValidation
+  code
+  ```
+  package secp256k1
+
+  import "math/big"
+
+  func (bitCurve *BitCurve) IsOnCurve(x, y *big.Int) bool {
+      // y² = x³ + b
+      y2 := new(big.Int).Mul(y, y) //y²
+      y2.Mod(y2, bitCurve.P)       //y²%P
+
+      // x³
+      x3 := new(big.Int).Mul(x, x) //x²
+      x3.Mul(x3, x)                //x³
+
+      // x³ + b
+      x3.Add(x3, bitCurve.B) //x³+B
+      x3.Mod(x3, bitCurve.P) //(x³+B)%P
+
+      return x3.Cmp(y2) == 0
+  }
+  ```
+
+test "rank1128: fix rejects coordinates at or beyond the field prime first"
+  lang go
+  file curve.go
+  reject_review code.EcdhPeerPublicKeyMissingCurveValidation
+  code
+  ```
+  package secp256k1
+
+  import "math/big"
+
+  func (bitCurve *BitCurve) IsOnCurve(x, y *big.Int) bool {
+      if x.Cmp(bitCurve.P) >= 0 || y.Cmp(bitCurve.P) >= 0 {
+          return false
+      }
+
+      // y² = x³ + b
+      y2 := new(big.Int).Mul(y, y) //y²
+      y2.Mod(y2, bitCurve.P)       //y²%P
+
+      // x³
+      x3 := new(big.Int).Mul(x, x) //x²
+      x3.Mul(x3, x)                //x³
+
+      // x³ + b
+      x3.Add(x3, bitCurve.B) //x³+B
+      x3.Mod(x3, bitCurve.P) //(x³+B)%P
+
+      return x3.Cmp(y2) == 0
+  }
+  ```
+
+test "rank1128: correctly patched, range check extracted into a helper"
+  lang go
+  file curve.go
+  reject_review code.EcdhPeerPublicKeyMissingCurveValidation
+  code
+  ```
+  package secp256k1
+
+  import "math/big"
+
+  func (bitCurve *BitCurve) inField(v *big.Int) bool {
+      return v.Sign() >= 0 && v.Cmp(bitCurve.P) < 0
+  }
+
+  func (bitCurve *BitCurve) IsOnCurve(x, y *big.Int) bool {
+      if !bitCurve.inField(x) || !bitCurve.inField(y) {
+          return false
+      }
+
+      // y² = x³ + b
+      y2 := new(big.Int).Mul(y, y) //y²
+      y2.Mod(y2, bitCurve.P)       //y²%P
+
+      // x³
+      x3 := new(big.Int).Mul(x, x) //x²
+      x3.Mul(x3, x)                //x³
+
+      // x³ + b
+      x3.Add(x3, bitCurve.B) //x³+B
+      x3.Mod(x3, bitCurve.P) //(x³+B)%P
+
+      return x3.Cmp(y2) == 0
+  }
+  ```
+
+test "rank1128: correctly patched, range check spelled as a bit-length bound"
+  lang go
+  file curve.go
+  reject_review code.EcdhPeerPublicKeyMissingCurveValidation
+  code
+  ```
+  package secp256k1
+
+  import "math/big"
+
+  func (bitCurve *BitCurve) IsOnCurve(x, y *big.Int) bool {
+      if x.BitLen() > bitCurve.P.BitLen() || y.BitLen() > bitCurve.P.BitLen() {
+          return false
+      }
+
+      // y² = x³ + b
+      y2 := new(big.Int).Mul(y, y) //y²
+      y2.Mod(y2, bitCurve.P)       //y²%P
+
+      // x³
+      x3 := new(big.Int).Mul(x, x) //x²
+      x3.Mul(x3, x)                //x³
+
+      // x³ + b
+      x3.Add(x3, bitCurve.B) //x³+B
+      x3.Mod(x3, bitCurve.P) //(x³+B)%P
+
+      return x3.Cmp(y2) == 0
+  }
+  ```

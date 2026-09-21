@@ -1,0 +1,163 @@
+# Rank 1534 / CVE-2026-29181: OpenTelemetry Go's Baggage propagator
+# accumulated members from every baggage header without any W3C limit, so a
+# request carrying many headers (or huge ones) drove unbounded parsing and
+# memory growth in every service using the propagator (resource exhaustion,
+# CWE-400/CWE-770; PR #7880). extractMultiBaggage in propagation/baggage.go
+# did `for _, bStr := range bVals { currBag, err := baggage.Parse(bStr);
+# if err != nil { continue }; members = append(members,
+# currBag.Members()...) }` -- nothing caps the accumulated member count or
+# the combined bytes across headers. Pool commit aa1894e09 is the real fix
+# (COMMIT_OK -- "Comply with W3C Baggage specification limits (#7880)"): the
+# loop breaks once len(members) >= maxMembers (64, the W3C compliance
+# number), the parse layer enforces the combined 8192 byte budget, per-member
+# byte limits are dropped as non-spec, and empty results are reported
+# through the error handler. No pool correction.
+#
+# ## What fires, both revisions
+#
+# Three --cache off runs per revision report identical output: scanning the
+# whole repository gives 282 findings at the vulnerable parent and 283 at
+# the fix, and the entire difference is a line-number shift inside
+# _test.go files -- nothing on propagation/baggage.go or baggage/baggage.go
+# in either revision, in the default report or under the flags view. The
+# default report does carry go.flags@resolved rows (four
+# code.UnboundedAllocationReview findings live on unrelated otest
+# collectors), so this is a real zero and not a -flags-only misread.
+# `vyql match` on both source files reports no source and no sink label at
+# all: carrier.Values is unbound, so no taint route exists either.
+#
+# ## Why the near-miss analysis does not reach it
+#
+# The one relevant later-shipped item is goUnboundedAppendAccumulation
+# (bindings/go/unboundedAppendAccumulation.vyql), which reports exactly this
+# shape -- a loop growing a slice through x = append(x, ...) whose enclosing
+# function never compares that slice's len or cap -- through the existing
+# code.UnboundedAllocationReview concept and VYQL-DOS-041. Its frontend fact
+# (golang.go goUnboundedAppendAccumulationObservations) only inspects
+# *ast.ForStmt with a nil Cond, i.e. the C-style conditionless `for {}`
+# decode loop; a `for _, x := range xs` body is a *ast.RangeStmt and
+# produces no fact. A minimal pair confirms it: the same accumulation is
+# labelled in the `for {}` spelling and unlabelled in the range spelling.
+#
+# ## Why widening it is measured unshippable
+#
+# Extending that one function to *ast.RangeStmt was probed on the real
+# checkouts. Taking every range-loop accumulation reports 141
+# UnboundedAllocationReview findings on this repository against a baseline
+# of 4, and the additional 137 are ordinary mapping code -- exporters/otlp
+# transform loops, bridge/opencensus converters, metricdatatest comparisons
+# -- appending one constructed element per iteration. Narrowing to the
+# principled form (a range loop runs exactly len(rangeExpr) times, so only
+# a spread -- append(dst, src...) -- grows the output by an amount each
+# iteration's data decides, whereas a conditionless for loop is unbounded
+# even appending single elements) drops it to 17 and keeps a clean
+# discrimination: propagation/baggage.go:64 is reported at the vulnerable
+# parent and gone at the fix, whose `if len(members) >= maxMembers` is
+# exactly the bound goComparesLenOrCap looks for. But the collateral stays
+# decisive -- across six real Go trees the narrowed form adds 47 findings
+# for this one true positive (opentelemetry-go +13, consul +14, neuvector
+# +18, distribution +2, grafana and vitess +0), and the false positives are
+# structurally identical to the hit: `for _, p := range producers {
+# data = append(data, p.Read()...) }` differs from the vulnerable loop only
+# in what is being ranged over. That discriminator -- whether the ranged
+# collection is peer-controlled -- is source information the syntactic loop
+# fact does not carry, and no binding labels carrier.Values, so keying on it
+# means naming this SDK's own interface. The discriminator is not in the
+# construct; the same cross-iteration budget family as ranks 1554 and 1560.
+#
+# Both blocks below reject VYQL-DOS-041: the unbounded accumulation and the
+# capped form are equally unreported. When accumulation-budget vocabulary
+# that is source-aware lands, the first block must flip to expect.
+
+test "rank1534: members accumulate from every header without a budget"
+  lang go
+  file propagation/baggage.go
+  reject VYQL-DOS-041
+  code
+  ```
+  package propagation
+
+  import (
+      "context"
+
+      "go.opentelemetry.io/otel/baggage"
+  )
+
+  const baggageHeader = "baggage"
+
+  func extractMultiBaggage(parent context.Context, carrier ValuesGetter) context.Context {
+      bVals := carrier.Values(baggageHeader)
+      if len(bVals) == 0 {
+          return parent
+      }
+      var members []baggage.Member
+      for _, bStr := range bVals {
+          currBag, err := baggage.Parse(bStr)
+          if err != nil {
+              continue
+          }
+          members = append(members, currBag.Members()...)
+      }
+
+      b, err := baggage.New(members...)
+      if err != nil || b.Len() == 0 {
+          return parent
+      }
+      return baggage.ContextWithBaggage(parent, b)
+  }
+  ```
+
+test "rank1534: the fixed revision stops at the member budget"
+  lang go
+  file propagation/baggage.go
+  reject VYQL-DOS-041
+  code
+  ```
+  package propagation
+
+  import (
+      "context"
+
+      "go.opentelemetry.io/otel/baggage"
+      "go.opentelemetry.io/otel/internal/errorhandler"
+  )
+
+  const (
+      baggageHeader = "baggage"
+
+      // W3C Baggage specification limits.
+      // https://www.w3.org/TR/baggage/#limits
+      maxMembers = 64
+  )
+
+  func extractMultiBaggage(parent context.Context, carrier ValuesGetter) context.Context {
+      bVals := carrier.Values(baggageHeader)
+      if len(bVals) == 0 {
+          return parent
+      }
+
+      var members []baggage.Member
+      for _, bStr := range bVals {
+          currBag, err := baggage.Parse(bStr)
+          if err != nil {
+              errorhandler.GetErrorHandler().Handle(err)
+          }
+          if currBag.Len() == 0 {
+              continue
+          }
+          members = append(members, currBag.Members()...)
+          if len(members) >= maxMembers {
+              break
+          }
+      }
+
+      b, err := baggage.New(members...)
+      if err != nil {
+          errorhandler.GetErrorHandler().Handle(err)
+      }
+      if b.Len() == 0 {
+          return parent
+      }
+      return baggage.ContextWithBaggage(parent, b)
+  }
+  ```

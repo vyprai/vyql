@@ -1,0 +1,21 @@
+module bindings.php.generated.mf2fe8b79;
+
+binding nosqlQuery0 {
+  requires {
+    dependency("colinmollenhour/credis")
+  }
+  query pattern callExpr where callee.method == "rawCommand"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding authenticationCheck1 {
+  requires {
+    dependency("colinmollenhour/credis")
+  }
+  query pattern callExpr where callee.method == "auth"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

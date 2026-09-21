@@ -1,0 +1,77 @@
+# Rank 385 / CVE-2026-42553: Cinny's service worker treated Matrix media
+# path substrings as sufficient to attach the Matrix bearer token, so an
+# attacker-controlled non-homeserver URL could receive the access token.
+
+test "rank385: Cinny service worker bearer token follows substring media URL"
+  lang javascript
+  file sw.ts
+  expect VYQL-SEC-008
+  expect_review code.CinnyServiceWorkerMediaAuthLeak
+  code
+  ```
+  declare const self: ServiceWorkerGlobalScope;
+
+  async function askForAccessToken(client: Client): Promise<string | undefined> {
+    client.postMessage({ responseKey: "r", type: "token" });
+    return "token";
+  }
+
+  function fetchConfig(token?: string): RequestInit | undefined {
+    if (!token) return undefined;
+    return { headers: { Authorization: `Bearer ${token}` } };
+  }
+
+  self.addEventListener("fetch", (event: FetchEvent) => {
+    const { url, method } = event.request;
+    if (method !== "GET") return;
+    if (
+      !url.includes("/_matrix/client/v1/media/download") &&
+      !url.includes("/_matrix/client/v1/media/thumbnail")
+    ) {
+      return;
+    }
+    event.respondWith(
+      (async (): Promise<Response> => {
+        const client = await self.clients.get(event.clientId);
+        let token: string | undefined;
+        if (client) token = await askForAccessToken(client);
+        return fetch(event.request, fetchConfig(token));
+      })()
+    );
+  });
+  ```
+
+test "rank385: Cinny service worker validates media URL against homeserver base URL"
+  lang javascript
+  file sw.ts
+  reject VYQL-SEC-008
+  reject_review code.CinnyServiceWorkerMediaAuthLeak
+  code
+  ```
+  declare const self: ServiceWorkerGlobalScope;
+
+  const sessions = new Map<string, { accessToken: string; baseUrl: string }>();
+
+  function validMediaRequest(url: string, baseUrl: string): boolean {
+    const downloadUrl = new URL("/_matrix/client/v1/media/download", baseUrl);
+    const thumbnailUrl = new URL("/_matrix/client/v1/media/thumbnail", baseUrl);
+    return url.startsWith(downloadUrl.href) || url.startsWith(thumbnailUrl.href);
+  }
+
+  function fetchConfig(token: string): RequestInit {
+    return { headers: { Authorization: `Bearer ${token}` } };
+  }
+
+  self.addEventListener("fetch", (event: FetchEvent) => {
+    const { url, method } = event.request;
+    if (method !== "GET") return;
+    event.respondWith(
+      (async (): Promise<Response> => {
+        const session = sessions.get(event.clientId);
+        if (!session) return fetch(event.request);
+        if (!validMediaRequest(url, session.baseUrl)) return fetch(event.request);
+        return fetch(event.request, fetchConfig(session.accessToken));
+      })()
+    );
+  });
+  ```

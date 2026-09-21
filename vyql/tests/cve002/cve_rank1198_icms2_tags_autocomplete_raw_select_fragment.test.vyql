@@ -1,0 +1,177 @@
+# Rank 1198 / CVE-2023-4188: instantCMS 2 (icms2)'s tag autocomplete endpoint
+# reads the search term straight from the request and splices it into a raw
+# SQL comparison fragment (CWE-89, GHSA-h267-xjjf-qgxq):
+#
+#   $term = $this->request->get('term', '');
+#   $tags = $this->model->filterLike('tag', "%{$term}%")->
+#           select("(LEFT(`tag`, " . mb_strlen($term) . ") = '{$term}')", 'tag_order')->
+#           orderByList([...])->
+#           getTags();
+#
+# select() only appends the fragment to $this->select[]; the query itself is
+# assembled and executed later inside cmsModel::get() -> cmsDatabase::query(),
+# two methods away. The fixed revision keeps the same shape and escapes
+# the interpolated value with the framework's own
+# $this->model->db->escape($term).
+#
+# ATTENTION, engine gap. `vyql match` on the vulnerable file labels nothing at
+# all -- not $this->request->get() as a source, not select() as a sink -- so
+# there is no binding to add that would connect this specific call chain: even
+# a perfect source binding for $this->request->get() has nowhere to flow,
+# because select()'s own SQL sink is two methods and one field read away from
+# where the value is written.
+#
+# A generic code.SqlExecution binding on select() itself was considered and
+# rejected as a workaround: the real icms2 checkout already shows why. The
+# same call shape means something else entirely in ordinary PHP code --
+# i-Educar's Portabilis view helpers use `$this->inputsHelper()->select($attrName,
+# $options, ...)` to build an HTML <select> form control, sixteen call sites in
+# that one codebase alone -- and `callee.method == "select"` cannot see which
+# overload it is looking at (the query language has no per-argument shape
+# predicate; `internal/bindings/compile_shapes.go:175` `lowerV2CallShapeAtom`
+# lists every field a callExpr binding may filter on -- callee.method/path,
+# callee.receiver.type, args.count, args.any.literal -- and none inspects one
+# argument's own value kind). Labelling every select() call a SQL sink would
+# mislabel an unrelated widget builder as a SQL execution point, not just add
+# noise.
+#
+# The real gap is upstream of any binding: a field written on `this` inside
+# one method is not visible when the same field is read on the same receiver
+# inside a different method, even without any fluent chaining. `aliasReceiverSelf`
+# (internal/extract/lowering/lowering.go:2787, invoked at :4574 once a call
+# resolves to a known target) exists specifically to make this shape work --
+# its own comment names "fluent/builder mutators whose bodies update fields on
+# the receiver" -- but the isolating pairs below show it does not connect the
+# write to the read for this rank's shape, container (`$this->select[] = $x`)
+# or plain scalar (`$this->frag = $x`) alike, chained through a return value or
+# not. `vyql trace` dead-ends at the field write itself in every case:
+# "no outgoing flow (callee not traced -- external or cross-package)".
+#
+# Scanning the real vulnerable directory (system/controllers/tags, bounded)
+# reports 6 findings, none at the autocomplete endpoint -- five CSRF-shaped
+# VYQL-RF-043/003 rows elsewhere in modelTags. `vyql match` on
+# autocomplete.php labels no source and no sink.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1198: the tag search term reaches select() through the request wrapper, then a two-method-later field read"
+  lang php
+  file autocomplete.php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php
+  class actionTagsAutocomplete extends cmsAction {
+
+      public function run() {
+
+          $result = [];
+
+          $term = $this->request->get('term', '');
+          if (!$term) {
+              return $this->cms_template->renderJSON($result);
+          }
+
+          $tags = $this->model->filterLike('tag', "%{$term}%")->
+                  select("(LEFT(`tag`, " . mb_strlen($term) . ") = '{$term}')", 'tag_order')->
+                  orderByList([
+                      ['by' => 'tag_order', 'to' => 'desc', 'strict' => true],
+                      ['by' => 'tag', 'to' => 'asc']
+                  ])->
+                  getTags();
+
+          return $this->cms_template->renderJSON($tags);
+      }
+  }
+  ```
+
+test "rank1198: the fixed revision escapes the term before it reaches the fragment"
+  lang php
+  file autocomplete.php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php
+  class actionTagsAutocomplete extends cmsAction {
+
+      public function run() {
+
+          $result = [];
+
+          $term = strip_tags($this->request->get('term', ''));
+          if (!$term) {
+              return $this->cms_template->renderJSON($result);
+          }
+
+          $tags = $this->model->filterLike('tag', "%{$term}%")->
+                  select("(LEFT(`tag`, " . mb_strlen($term) . ") = '".$this->model->db->escape($term)."')", 'tag_order')->
+                  orderByList([
+                      ['by' => 'tag_order', 'to' => 'desc', 'strict' => true],
+                      ['by' => 'tag', 'to' => 'asc']
+                  ])->
+                  getTags();
+
+          return $this->cms_template->renderJSON($tags);
+      }
+  }
+  ```
+
+# The isolating pair. Same source ($_GET), same eventual sink (a db->query()
+# call, already bound), same fragment string; only whether the fragment
+# crosses a method boundary through a field differs.
+
+test "rank1198: the fragment reaches db->query() inline, in one method"
+  lang php
+  file inline.php
+  expect VYQL-INJ-001
+  code
+  ```
+  <?php
+  class FooModel {
+      public $db;
+
+      public function get($field) {
+          $sql = "SELECT " . $field . " FROM t";
+          return $this->db->query($sql);
+      }
+  }
+
+  class FooController {
+      public function run() {
+          $term = $_GET['term'];
+          $model = new FooModel();
+          return $model->get("(x = '{$term}')");
+      }
+  }
+  ```
+
+test "rank1198: the same fragment, written to a field in one method and read in another"
+  lang php
+  file field_crossing.php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php
+  class FooModel {
+      private $frag;
+      public $db;
+
+      public function select($field) {
+          $this->frag = $field;
+      }
+
+      public function get() {
+          $sql = "SELECT " . $this->frag . " FROM t";
+          return $this->db->query($sql);
+      }
+  }
+
+  class FooController {
+      public function run() {
+          $term = $_GET['term'];
+          $model = new FooModel();
+          $model->select("(x = '{$term}')");
+          return $model->get();
+      }
+  }
+  ```

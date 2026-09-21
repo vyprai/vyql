@@ -1,0 +1,8 @@
+module code;
+
+review code.ConstellationLuks2AttachedHeaderActivation {
+  category: crypto
+  expected: [core.InputValidation]
+  kind: attention
+  text: "review Constellation LUKS2 persistent-storage activation for detached-header metadata validation before opening host-provided volumes"
+}

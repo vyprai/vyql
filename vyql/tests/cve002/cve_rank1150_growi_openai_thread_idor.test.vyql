@@ -1,0 +1,178 @@
+# Rank 1150 / CVE-2026-25083: GROWI's OpenAI thread and message routes look
+# up a ThreadRelation by threadId alone, so a logged-in user who learned a
+# shared AI assistant's thread id could read or post into another user's
+# thread (CWE-862). postMessageHandlersFactory and its siblings
+# (get-messages, get-threads, delete-thread, edit) call
+#
+#   const threadRelation = await ThreadRelationModel.findOne({ threadId });
+#
+# with threadId taken straight from req.body/req.params and no filter tying
+# the row to req.user. The fixed revision adds userId: user._id to every
+# ThreadRelationModel query and to getThreadsByAiAssistantId's and
+# deleteThread's signatures.
+#
+# ATTENTION, vocabulary gap, re-confirmed on a second pass with two measured
+# candidate bindings. Scanning either revision reports nothing on the
+# construct: req.body is labelled code.HttpInput at the threadId destructure
+# but ThreadRelationModel.findOne carries no sink or check label in either
+# revision, and the full findings view over the whole apps/app tree (583
+# findings) contains no authorization finding in the openai feature at all.
+# code.IdorPolicyReview (VYQL-AUTH-081) is the right concept and its
+# JavaScript binding is a per-project presence match on prisma.accounts.update.
+#
+# The second pass measured the two forms that shape could take, on this
+# checkout, three --cache off runs per revision over apps/app:
+#
+#   * call-scoped -- a Mongoose model read (findOne/findById/find and the
+#     six write siblings, dependency("mongoose") gated) whose filter
+#     argument carries no conventional ownership key (userId, user, owner,
+#     createdBy, accountId, tenantId, memberId). 1053 VYQL-AUTH-081 rows on
+#     the vulnerable tree and 1053 on the fixed one: the four fixed call
+#     sites are 4 rows of 1053, and the count does not move.
+#   * handler-scoped -- the same model read inside a function that mentions
+#     the principal (identifier contains "user"), negated on the function's
+#     prop tokens instead of the call's argument. 353 rows on vulnerable,
+#     351 on fixed, from a baseline of zero. It reaches one of the four
+#     fixed sites (post-message); the other three keep their query in the
+#     service layer, where the vulnerable function names no principal at
+#     all, so the conjunct meant to buy precision is what drops them.
+#
+# The third test below is why neither form can be shipped: updateThreads is
+# the same project's own maintenance path, an ownerless find over every
+# knowledge thread of an assistant, and it is correct code. A lookup that
+# legitimately owns every row it returns has the identical shape to the
+# IDOR, so any binding narrow enough to skip it has to name this project's
+# field names -- the same flat-bag negation declined at ranks 1074, 1081 and
+# 1311. No definition change shipped.
+#
+# One engine fact was isolated while measuring the handler-scoped form, with
+# a two-file pair that differs only in the property's spelling: a shorthand
+# property ({ threadId }) emits no prop: token at all, while the same
+# property written with a value ({ threadId: threadId }) does
+# (internal/extract/frontend/treesitter/javascript.go, case "pair"). The
+# handler-scoped form therefore discriminates on this project's fixed
+# revision partly because the fix writes userId: user._id with an explicit
+# value; a project writing the same fix as { threadId, userId } would still
+# be reported. Filed as an engine gap rather than worked around.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1150: thread lookup keyed only by threadId, no owner filter"
+  lang javascript
+  file package.json
+  code
+  ```
+  {
+    "name": "growi-app",
+    "dependencies": {
+      "express": "^4.21.0",
+      "mongoose": "^6.13.6"
+    }
+  }
+  ```
+  file apps/app/src/features/openai/server/routes/message/post-message.ts
+  reject VYQL-AUTH-081
+  reject_review code.IdorPolicyReview
+  code
+  ```
+  export const postMessageHandlersFactory = (crowi) => {
+    return [
+      loginRequiredStrictly,
+      certifyAiService,
+      async (req, res) => {
+        const { user } = req;
+        const { aiAssistantId, threadId } = req.body;
+
+        const aiAssistant = await AiAssistantModel.findById(aiAssistantId);
+        if (aiAssistant == null) {
+          return res.apiv3Err(new ErrorV3('AI assistant not found'), 404);
+        }
+
+        const threadRelation = await ThreadRelationModel.findOne({ threadId });
+        if (threadRelation == null) {
+          return res.apiv3Err(new ErrorV3('ThreadRelation not found'), 404);
+        }
+
+        return streamMessageToThread(threadRelation, user);
+      },
+    ];
+  };
+  ```
+
+test "rank1150: thread lookup scoped to the requesting user's id"
+  lang javascript
+  file package.json
+  code
+  ```
+  {
+    "name": "growi-app",
+    "dependencies": {
+      "express": "^4.21.0",
+      "mongoose": "^6.13.6"
+    }
+  }
+  ```
+  file apps/app/src/features/openai/server/routes/message/post-message.ts
+  reject VYQL-AUTH-081
+  reject_review code.IdorPolicyReview
+  code
+  ```
+  export const postMessageHandlersFactory = (crowi) => {
+    return [
+      loginRequiredStrictly,
+      certifyAiService,
+      async (req, res) => {
+        const { user } = req;
+        const { aiAssistantId, threadId } = req.body;
+
+        const aiAssistant = await AiAssistantModel.findById(aiAssistantId);
+        if (aiAssistant == null) {
+          return res.apiv3Err(new ErrorV3('AI assistant not found'), 404);
+        }
+
+        const threadRelation = await ThreadRelationModel.findOne({
+          threadId,
+          userId: user._id,
+        });
+        if (threadRelation == null) {
+          return res.apiv3Err(new ErrorV3('ThreadRelation not found'), 404);
+        }
+
+        return streamMessageToThread(threadRelation, user);
+      },
+    ];
+  };
+  ```
+
+test "rank1150: maintenance walk over every thread of an assistant is ownerless by design"
+  lang javascript
+  file package.json
+  code
+  ```
+  {
+    "name": "growi-app",
+    "dependencies": {
+      "express": "^4.21.0",
+      "mongoose": "^6.13.6"
+    }
+  }
+  ```
+  file apps/app/src/features/openai/server/services/openai.ts
+  reject VYQL-AUTH-081
+  reject_review code.IdorPolicyReview
+  code
+  ```
+  export const updateThreads = async (aiAssistantId, vectorStoreId) => {
+    const threadRelations = await ThreadRelationModel.find({
+      aiAssistant: aiAssistantId,
+      type: ThreadType.KNOWLEDGE,
+    }).sort({ updatedAt: -1 });
+    for await (const threadRelation of threadRelations) {
+      const updatedThreadResponse = await client.updateThread(
+        threadRelation.threadId,
+        vectorStoreId,
+      );
+      logger.debug('Update thread', updatedThreadResponse);
+    }
+  };
+  ```

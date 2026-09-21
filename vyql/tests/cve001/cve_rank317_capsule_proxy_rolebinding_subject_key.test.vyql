@@ -1,0 +1,64 @@
+test "rank317: capsule-proxy RoleBinding index omits ServiceAccount namespace"
+  lang go
+  expect VYQL-AUTH-010
+  expect_review code.NamespacedSubjectKeyCollision
+  code
+  ```
+  package controllers
+
+  import "fmt"
+
+  type RoleBinding struct {
+      Subjects []Subject
+  }
+
+  type Subject struct {
+      Kind      string
+      Namespace string
+      Name      string
+  }
+
+  func OwnerRoleBindingsIndexFunc(obj interface{}) (result []string, err error) {
+      rb := obj.(*RoleBinding)
+      for _, subject := range rb.Subjects {
+          result = append(result, fmt.Sprintf("%s-%s", subject.Kind, subject.Name))
+      }
+
+      return result, nil
+  }
+  ```
+
+test "rank317: capsule-proxy RoleBinding index includes ServiceAccount namespace"
+  lang go
+  reject VYQL-AUTH-010
+  reject_review code.NamespacedSubjectKeyCollision
+  code
+  ```
+  package controllers
+
+  import "strings"
+
+  type RoleBinding struct {
+      Subjects []Subject
+  }
+
+  type Subject struct {
+      Kind      string
+      Namespace string
+      Name      string
+  }
+
+  func OwnerRoleBindingsIndexFunc(obj interface{}) (result []string, err error) {
+      rb := obj.(*RoleBinding)
+      for _, subject := range rb.Subjects {
+          parts := []string{subject.Kind}
+          if len(subject.Namespace) > 0 {
+              parts = append(parts, subject.Namespace)
+          }
+          parts = append(parts, subject.Name)
+          result = append(result, strings.Join(parts, "-"))
+      }
+
+      return result, nil
+  }
+  ```

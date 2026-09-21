@@ -1,0 +1,7 @@
+module code;
+
+review code.PointerOffsetBoundsCheck {
+  category: numeric
+  kind: attention
+  text: "review the bounds a walk states for its pointer; compare the cursor against the stated end before advancing or dereferencing past it"
+}

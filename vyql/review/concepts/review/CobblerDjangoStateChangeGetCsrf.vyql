@@ -1,0 +1,8 @@
+module code;
+
+review code.CobblerDjangoStateChangeGetCsrf {
+  category: csrf
+  expected: [core.CsrfProtection, core.AuthenticationCheck]
+  kind: attention
+  text: "review Cobbler Django web actions for @require_POST plus CSRF-protected POST forms before state changes"
+}

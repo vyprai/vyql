@@ -1,0 +1,7 @@
+module code;
+
+concept WeakHash : issue {
+  cwe: [CWE_327]
+  enabledBy: [taint.UntrustedData]
+  vulnerableTo: [crypto.WeakHash]
+}

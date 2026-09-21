@@ -1,0 +1,321 @@
+# Rank 1738 / CVE-2024-22406: Shopware's DAL splices the aggregation
+# name from the API search criteria into its SELECT clause inside
+# hand-rolled backticks, so a crafted name containing a backtick breaks
+# out of the quoting and injects SQL (blind SQL injection, CWE-89;
+# GHSA-qmp9-2xwj-m6m9). The chain: RequestCriteriaBuilder::handleRequest
+# reads $request->query->all(), AggregationParser builds
+# `new SumAggregation($aggregation['name'], ...)` and stores it with
+# $criteria->addAggregation(), which does
+# `$this->aggregations[$aggregation->getName()] = $aggregation;` -- and
+# later EntityAggregator does
+# `$query->addSelect(sprintf('SUM(%s) as `%s`', $accessor,
+# $aggregation->getName()))` (src/Core/Framework/DataAbstractionLayer/
+# Dbal/EntityAggregator.php:368 and siblings), with only the literal
+# backticks around %s for quoting. The fixing commit 5005213e60
+# ("NEXT-32887 - Improve SQL escaping in DAL") routes every identifier
+# position through EntityDefinitionQueryHelper::escape(), which throws
+# InvalidArgumentException('Backtick not allowed in identifier').
+#
+# ATTENTION, rechecked. Both blockers stand, measured against the real
+# subtree (src/Core/Framework/DataAbstractionLayer, 401 php files) at
+# 5005213e^ (fb25e24ca) and 5005213e, three --cache off runs per side:
+#
+# 1. Both revisions report identically: 57 findings and 49 review flags
+#    each (38 VYQL-RF-043, 11 VYQL-AUTH-079, 5 VYQL-CRY-001, 3
+#    VYQL-RF-003), and nothing at all on EntityAggregator.php, where
+#    every sprintf in the chain lives.
+# 2. Sink side, re-measured: a throwaway `callee.method == "addSelect"`
+#    SqlExecution binding (loading verified, bindings 33019 -> 33020)
+#    labels all sixteen addSelect argument nodes in EntityAggregator.php
+#    (167, 296, 300, 329, 334, 357, 368, 379, 390, 401, 413, 416, 419,
+#    422, 448, 462 -- eleven of them splicing $aggregation->getName())
+#    and adds zero findings on both revisions (57 = 57): no taint
+#    reaches any addSelect argument, so the binding is inert here rather
+#    than merely indiscriminate. Doctrine DBAL's clause methods still
+#    carry no shipped sink -- the generated
+#    packages/generated/php/doctrine_dbal.vyql binds only query, exec,
+#    executeQuery, executeStatement and execute behind
+#    dependency("doctrine/dbal"), and shopware commits no composer.lock,
+#    so those are inert on this tree as well.
+# 3. Source side: `vyql trace -from code.HttpInput -to code.SqlExecution`
+#    on the vulnerable subtree reports 33 sources, 0 reaching a sink; the
+#    request leg dies at RequestCriteriaBuilder.php:53 and :55
+#    ($this->fromArray). The isolating pair below pins the construct the
+#    cross-method object-field entry names: the same aggregation name
+#    handed to the aggregator as a plain parameter reaches the executed
+#    query (VYQL-INJ-001, the $request->query->all() read labelled
+#    HttpInput and the promoted constructor parameter carrying to
+#    getName()), while the identical name stored on the criteria object
+#    in one method and read back in another reports nothing -- trace
+#    dead-ends at call=$this.aggregations.__setitem__, "no outgoing flow
+#    (callee not traced -- external or cross-package)". That is the
+#    aliasReceiverSelf field-crossing family (PHP, C# and Ruby
+#    instances on record), a new dataflow relation rather than a
+#    localized correction.
+# 4. The fix form is already half-labelled, wrongly: the shipped
+#    htmlEscape312 matches `callee.path ~= "escape"` and would label
+#    EntityDefinitionQueryHelper::escape, but as core.HtmlEscape, which
+#    does not neutralise SqlExecution taint -- and no taint reaches the
+#    sink in any case.
+#
+# The first two tests pin the real chain and the fix form as misses; the
+# last two are the isolating pair, so the suite exercises a firing rule
+# rather than only misses. When query-builder clause vocabulary with a
+# credited identifier-escape gate, or property-store taint, lands, the
+# raw form must flip to expect.
+
+test "rank1738: the dal splices the api aggregation name into the select clause inside hand-rolled backticks"
+  lang php
+  file src/Core/Framework/DataAbstractionLayer/Dbal/EntityAggregator.php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php declare(strict_types=1);
+
+  namespace Shopware\Core\Framework\DataAbstractionLayer;
+
+  use Shopware\Core\Framework\DataAbstractionLayer\Dbal\QueryBuilder;
+
+  class RequestCriteriaBuilder
+  {
+      public function handleRequest($request, Criteria $criteria): Criteria
+      {
+          $payload = $request->query->all();
+
+          foreach ($payload['aggregations'] as $aggregation) {
+              $criteria->addAggregation(new SumAggregation($aggregation['name'], $aggregation['field']));
+          }
+
+          return $criteria;
+      }
+  }
+
+  class Criteria
+  {
+      public array $aggregations = [];
+
+      public function addAggregation(SumAggregation ...$aggregations): self
+      {
+          foreach ($aggregations as $aggregation) {
+              $this->aggregations[$aggregation->getName()] = $aggregation;
+          }
+
+          return $this;
+      }
+
+      public function getAggregations(): array
+      {
+          return $this->aggregations;
+      }
+  }
+
+  class EntityAggregator
+  {
+      private function parseSumAggregation(SumAggregation $aggregation, QueryBuilder $query): void
+      {
+          $accessor = 'product.tax_rate';
+
+          $query->addSelect(sprintf('SUM(%s) as `%s`', $accessor, $aggregation->getName()));
+      }
+
+      public function aggregate(Criteria $criteria, QueryBuilder $query): void
+      {
+          foreach ($criteria->getAggregations() as $aggregation) {
+              $this->parseSumAggregation($aggregation, $query);
+          }
+      }
+  }
+  ```
+
+test "rank1738: the fixed revision routes every identifier through the backtick-rejecting escape helper"
+  lang php
+  file src/Core/Framework/DataAbstractionLayer/Dbal/EntityAggregator.php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php declare(strict_types=1);
+
+  namespace Shopware\Core\Framework\DataAbstractionLayer;
+
+  use Shopware\Core\Framework\DataAbstractionLayer\Dbal\EntityDefinitionQueryHelper;
+  use Shopware\Core\Framework\DataAbstractionLayer\Dbal\QueryBuilder;
+
+  class RequestCriteriaBuilder
+  {
+      public function handleRequest($request, Criteria $criteria): Criteria
+      {
+          $payload = $request->query->all();
+
+          foreach ($payload['aggregations'] as $aggregation) {
+              $criteria->addAggregation(new SumAggregation($aggregation['name'], $aggregation['field']));
+          }
+
+          return $criteria;
+      }
+  }
+
+  class Criteria
+  {
+      public array $aggregations = [];
+
+      public function addAggregation(SumAggregation ...$aggregations): self
+      {
+          foreach ($aggregations as $aggregation) {
+              $this->aggregations[$aggregation->getName()] = $aggregation;
+          }
+
+          return $this;
+      }
+
+      public function getAggregations(): array
+      {
+          return $this->aggregations;
+      }
+  }
+
+  class EntityAggregator
+  {
+      private function parseSumAggregation(SumAggregation $aggregation, QueryBuilder $query): void
+      {
+          $accessor = 'product.tax_rate';
+
+          $query->addSelect(sprintf('SUM(%s) as %s', $accessor, EntityDefinitionQueryHelper::escape($aggregation->getName())));
+      }
+
+      public function aggregate(Criteria $criteria, QueryBuilder $query): void
+      {
+          foreach ($criteria->getAggregations() as $aggregation) {
+              $this->parseSumAggregation($aggregation, $query);
+          }
+      }
+  }
+
+  class EntityDefinitionQueryHelper
+  {
+      public static function escape(string $string): string
+      {
+          if (mb_strpos($string, '`') !== false) {
+              throw new \InvalidArgumentException('Backtick not allowed in identifier');
+          }
+
+          return '`' . $string . '`';
+      }
+  }
+  ```
+
+test "rank1738: the same aggregation name handed to the aggregator as a plain parameter reaches the executed query"
+  lang php
+  file inline.php
+  expect VYQL-INJ-001
+  code
+  ```
+  <?php declare(strict_types=1);
+
+  namespace Shopware\Core\Framework\DataAbstractionLayer;
+
+  class RequestCriteriaBuilder
+  {
+      public function handleRequest($request, EntityAggregator $aggregator): void
+      {
+          $payload = $request->query->all();
+
+          foreach ($payload['aggregations'] as $aggregation) {
+              $aggregator->parseSumAggregation(new SumAggregation($aggregation['name'], $aggregation['field']));
+          }
+      }
+  }
+
+  class SumAggregation
+  {
+      public function __construct(private readonly string $name, private readonly string $field)
+      {
+      }
+
+      public function getName(): string
+      {
+          return $this->name;
+      }
+  }
+
+  class EntityAggregator
+  {
+      public $db;
+
+      public function parseSumAggregation(SumAggregation $aggregation): void
+      {
+          $accessor = 'product.tax_rate';
+
+          $this->db->query(sprintf('SUM(%s) as `%s`', $accessor, $aggregation->getName()));
+      }
+  }
+  ```
+
+test "rank1738: the same aggregation name, stored on the criteria object in one method and read back in another"
+  lang php
+  file field_crossing.php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php declare(strict_types=1);
+
+  namespace Shopware\Core\Framework\DataAbstractionLayer;
+
+  class RequestCriteriaBuilder
+  {
+      public function handleRequest($request, Criteria $criteria): Criteria
+      {
+          $payload = $request->query->all();
+
+          foreach ($payload['aggregations'] as $aggregation) {
+              $criteria->addAggregation(new SumAggregation($aggregation['name'], $aggregation['field']));
+          }
+
+          return $criteria;
+      }
+  }
+
+  class SumAggregation
+  {
+      public function __construct(private readonly string $name, private readonly string $field)
+      {
+      }
+
+      public function getName(): string
+      {
+          return $this->name;
+      }
+  }
+
+  class Criteria
+  {
+      public array $aggregations = [];
+
+      public function addAggregation(SumAggregation ...$aggregations): self
+      {
+          foreach ($aggregations as $aggregation) {
+              $this->aggregations[$aggregation->getName()] = $aggregation;
+          }
+
+          return $this;
+      }
+
+      public function getAggregations(): array
+      {
+          return $this->aggregations;
+      }
+  }
+
+  class EntityAggregator
+  {
+      public $db;
+
+      public function aggregate(Criteria $criteria): void
+      {
+          foreach ($criteria->getAggregations() as $aggregation) {
+              $accessor = 'product.tax_rate';
+
+              $this->db->query(sprintf('SUM(%s) as `%s`', $accessor, $aggregation->getName()));
+          }
+      }
+  }
+  ```

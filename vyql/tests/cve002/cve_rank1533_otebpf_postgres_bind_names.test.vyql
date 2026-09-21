@@ -1,0 +1,105 @@
+# Rank 1533 / CVE-2026-45678: OpenTelemetry eBPF Instrumentation's Postgres
+# protocol parser assumed BIND message payloads carry a valid NUL-terminated
+# portal name, so a crafted empty or unterminated payload sliced past the
+# captured buffer and panicked the instrumentation (improper input validation
+# to denial of service, CWE-20/CWE-754; GHSA-pgvv-q3wf-mm9m, patched in
+# 0.9.0). The BIND branch in pkg/ebpf/common/sql_detect_postgres.go did
+# `portal := strings.Clone(unix.ByteSliceToString(msg.data));
+# portalLen := len(portal) + 1; stmtName := strings.Clone(
+# unix.ByteSliceToString(msg.data[portalLen:]))`. The x/sys documentation
+# defines ByteSliceToString as returning the text "with a terminating NUL
+# and any bytes after the NUL removed", implemented as bytes.IndexByte and a
+# truncation, so a payload without a terminator yields a string spanning the
+# whole slice and len(portal) + 1 is one past the buffer: the slice
+# expression panics. The pool row is corrected in place: it held e92b0c2dd4
+# (the v0.9.0 release commit, the nocommit flag's origin); the real fix is
+# 8ac96fa, "Merge commit from fork -- postgres: guard BIND name parsing
+# against malformed payloads", which adds parsePostgresBindNames -- it
+# rejects payloads with no NUL byte (bytes.IndexByte < 0) and checks
+# stmtStart against len(data) before slicing.
+#
+# The 1st pass held this as a vocabulary miss: nothing observed a
+# length-derived slice index against its buffer. The delimiter-width
+# assumption family that rank 1378 minted for the C memchr scans names
+# exactly this assumption -- a fixed delimiter width charged against a
+# measured length that no byte inspection confirmed -- so the Go binding
+# extends that family to the x/sys conversion idiom rather than minting a
+# sibling, and the concept's wording now covers both directions of the
+# arithmetic. The PARSE branch of the same loop advances by len(stmtName)
+# with no terminator width, which slices at worst at exactly len(msg.data)
+# and is legal, so the third block pins that the width, not the conversion,
+# is what fires.
+
+test "rank1533: the bind names are sliced past an assumed terminator"
+  lang go
+  file pkg/ebpf/common/sql_detect_postgres.go
+  expect VYQL-MEM-055
+  expect_review code.AssumedLineTerminatorWidthScan
+  code
+  ```
+  package common
+
+  import (
+      "strings"
+
+      "golang.org/x/sys/unix"
+  )
+
+  func processBind(msg *pgMessage) (string, string) {
+      portal := strings.Clone(unix.ByteSliceToString(msg.data))
+      portalLen := len(portal) + 1 // +1 for the null terminator
+      stmtName := strings.Clone(unix.ByteSliceToString(msg.data[portalLen:]))
+      return portal, stmtName
+  }
+  ```
+
+test "rank1533: the fixed revision searches for the terminator before deriving the offset"
+  lang go
+  file pkg/ebpf/common/sql_detect_postgres.go
+  reject VYQL-MEM-055
+  code
+  ```
+  package common
+
+  import (
+      "bytes"
+
+      "golang.org/x/sys/unix"
+  )
+
+  func parsePostgresBindNames(data []byte) (string, string, bool) {
+      portalEnd := bytes.IndexByte(data, 0)
+      if portalEnd < 0 {
+          return "", "", false
+      }
+
+      stmtStart := portalEnd + 1
+      if stmtStart >= len(data) {
+          return "", "", false
+      }
+
+      return string(data[:portalEnd]), unix.ByteSliceToString(data[stmtStart:]), true
+  }
+  ```
+
+test "rank1533: advancing by the measured length alone charges no terminator width"
+  lang go
+  file pkg/ebpf/common/sql_detect_postgres.go
+  reject VYQL-MEM-055
+  code
+  ```
+  package common
+
+  import (
+      "strings"
+
+      "golang.org/x/sys/unix"
+  )
+
+  func processParse(msg *pgMessage) string {
+      stmtName := strings.Clone(unix.ByteSliceToString(msg.data))
+      stmtNameLen := len(stmtName)
+      _, _, stmt := detectSQL(msg.data[stmtNameLen:])
+      return stmtName + stmt
+  }
+  ```

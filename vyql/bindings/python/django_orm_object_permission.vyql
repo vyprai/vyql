@@ -1,0 +1,38 @@
+module bindings.python.django_orm_object_permission;
+
+// Django's manager documents two spellings of a by-identity fetch:
+// Model.objects.get(id=...) with the lookup passed as keyword arguments, and
+// the get_object_or_404(Model, id=...) shortcut. The keyword form is the
+// canonical one in the documentation, and it is also the form an
+// insecure-direct-object-reference lookup takes when the identity arrives
+// from the request. A keyword argument lowers to a pair-shaped argument
+// slot, which a plain args[0] / args.any selection never targets, so the
+// existing objects.get lookup binding sees only the rare positional
+// spelling. Selecting through .collection reaches the keyword slot's value,
+// and leaves the positional behaviour of the existing binding unchanged.
+binding objectLookupByUserInputKwarg {
+  query pattern callExpr where callee.path ~= "objects.get"
+  emit sink code.ObjectLookupByUserInput at args.any.collection
+}
+
+// The per-object permission tester idiom: fetch the object, build its
+// permission tester with permissions_for_user(user), then branch on a
+// can_<verb>() answer and raise PermissionDenied. The check can only run
+// after the fetch that yields the object, so a call-anchored control never
+// dominates the lookup it guards; the enclosing function is the granularity
+// at which the idiom is visible at all. Crediting the copy verb covers the
+// tester methods whose answer is about the fetched object itself; the
+// substring also credits can_copy_to(destination), whose answer includes the
+// same source-page permission. Python context call paths are
+// function-confined, so a tester consulted in a sibling function is not
+// credited.
+binding ownershipCheckCopyPermission {
+  query pattern presenceNode where node.scope == "function"
+    and node.context.language == "python"
+    and node.context.callPath contains "can_copy"
+  emit check core.OwnershipCheck at node {
+    covers endpoint {
+      anchor: node
+    }
+  }
+}

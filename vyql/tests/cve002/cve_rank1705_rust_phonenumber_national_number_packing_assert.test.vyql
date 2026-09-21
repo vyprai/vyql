@@ -1,0 +1,272 @@
+# Rank 1705 / CVE-2024-39697: rust-phonenumber packed the national significant
+# number into the low 56 bits of a u64 (leading-zero count in the top 8) and
+# enforced the packing width with an always-on assert!.
+#
+# NationalNumber::new (src/national_number.rs:25 at b792151b^) asserts
+# `value < (1 << 56), "number too long"`. The value arrives from
+# parser::parse_with, whose own guard admits 17 decimal digits
+# (consts::MAX_LENGTH_FOR_NSN = 17) -- and 10^17 - 1 is above 2^56, so a
+# 17-digit national number whose leading digit is 7 or greater panics inside the
+# public `pub fn parse` on caller-supplied text. The advisory's proptest
+# regressions reach the same assert through the digits a `;phone-context=`
+# contributes. CWE-617/CWE-248 (reachable assertion / uncaught panic),
+# CWE-392 (the crate has a Parse error channel and does not use it here),
+# CWE-1284 (the validated quantity, not the representation width).
+#
+# The fixed revision replaces the assert with the error the crate defines:
+# `-> Result<Self, crate::error::Parse>` and `if value >= (1 << 56) { return
+# Err(Parse::TooLong); }`. Remediation is present at b792151b; the assert is
+# present at its parent.
+#
+# ATTENTION, rechecked. Both halves of a taint route are present in the engine
+# and absent from the vocabulary, and the half that is cheap to add is measured
+# unshippable. Re-measured against the current knowledge base.
+#
+# The engine is not the blocker. `macro_invocation` lowers to a `nir.Call`
+# carrying the macro name as its path (`internal/extract/frontend/treesitter/
+# rust.go:1284`, the `other macros ... model as a call so they can be sinks`
+# arm), so `assert!` is a bindable call node: `vyql resolve` over
+# national_number.rs lists `assert national_number.rs:28` as an unresolved
+# callee, which is a node, not an absence. The call into the constructor
+# resolves interprocedurally -- `NationalNumber::new` at parser/mod.rs:86 is
+# absent from the unresolved list -- so the value's path from
+# `parse_with#param#string` to the assert is walkable. Nothing is labelled at
+# either end.
+#
+# Later-shipped vocabulary does not reach it. The Rust set gained
+# `reachableAssertionReview220-237` (vyql/bindings/rust/mdc4f74cd.vyql), which
+# emit code.ReachableAssertionReview for a `.unwrap()`/`.expect()` on a
+# `checked_*` arithmetic result -- the yamux shape, a fallible operation whose
+# None a panicking consumer discards. An `assert!` macro invocation is not a
+# `checked_*` chain and none of the 18 bindings matches it. Four further Rust
+# bindings shipped since the first review (container capability grants, header
+# value decode unwrapped, type-erasure lifetime bounds, zip member containment)
+# and none labels a panic construct. A full scan of the vulnerable revision
+# reports 5 findings -- VYQL-PATH-001 at build.rs:23 (an EnvVariable to
+# FilePathAccess path in the build script) and four VYQL-MEM-006 NullableDeref
+# at formatter.rs:243/254, parser/rfc3966.rs:38 and validator.rs:135 -- and the
+# `-flags only` view reports 22 review flags, every one a memory IndexAccess or
+# NullableDeref. Nothing lands on national_number.rs. This is a clean zero, not
+# a misread one.
+#
+# The sink half alone is one line, and one line is all it can be:
+# `node.token contains "assert!"` on a function-scoped presence node emits
+# code.ReachableAssertionReview and VYQL-DOS-040 fires at high severity. That
+# one line, a throwaway probe (removed, not shipped), re-measured with the
+# scanner itself over the Rust checkouts under /tmp/cve-work/rank*/:
+# 1529 VYQL-DOS-040 findings across fifteen Rust trees (uv 377, qdrant 292,
+# tremor-runtime 189, risc0 188, quinn 127, tract 116, rs-soroban-sdk 65,
+# tokio-tar 50, router 41, tough 41, rust-smallvec 24, rulex 11, warpgate 6,
+# vaultwarden 2, rustfs 0) for exactly one true positive. On rust-phonenumber
+# the finding set is byte-stable over three `--cache off` runs per revision and
+# the count does not move at all: 10 rows at the parent and 10 at the fix. The
+# parent's set is national_number.rs:25 plus nine `#[test]` bodies
+# (parser/helper.rs:443/452/461/468/518, parser/mod.rs:272/278/284,
+# parser/valid.rs:49, validator.rs:318); the fix drops national_number.rs:25 and
+# gains a tenth test row at parser/mod.rs:284 from the proptest merge. The probe
+# isolates the defect site and still cannot be told from the noise by count.
+#
+# The one-line form is also prose-triggerable, measured on this spec: the
+# parser block below carries no assert! at all, only a comment that names the
+# macro, and under the probe it reported VYQL-DOS-040 at high severity --
+# the Rust function context token keeps comments, so the text route fires on
+# a doc mention the way it is silenceable by one. The comment stays in place
+# as a canary: a future binding that keys on the call node leaves this block
+# green, a text-over-nodes binding turns it red. On qdrant, the noisiest
+# tree, all 126 files carrying findings do contain a real assert!
+# invocation, so breadth rather than prose dominates the count above.
+#
+# Excluding test bodies is not the answer. The Rust frontend emits no test
+# marker token, and the population that dominates is not in test files anyway:
+# qdrant's 292 rows land in 98 non-test-path files -- lib/segment/src/types.rs,
+# segment.rs, index/query_estimator.rs, index/field_index/geo_hash.rs (13 rows)
+# -- and uv's 377 in 72, led by uv-pep508/src/marker/tree.rs (24) and
+# uv-pep440/src/version.rs (19). Those are correct representation invariants,
+# the same shape as the vulnerable one.
+#
+# Every narrowing candidate inside the assert's own text is enumerated by grep
+# over the Rust checkouts and each dies the same way:
+#   - a comparison in the condition (`value < (1 << 56)`): 1178 sites, 433 of
+#     them outside test modules, dominated by risc0's
+#     `assert!(index < U256::BITS)` -- the same shape, a representation-width
+#     guard, and correct.
+#   - restricting the right-hand side to a fixed constant (CWE-1284's
+#     "specified quantity" reading): 59 non-test sites, same population.
+#     The discriminator is not in the pattern -- the finding recorded for regex
+#     complexity applies verbatim.
+#   - an assert message argument: 45 sites, and a message is not a security
+#     property at all.
+# Narrowing on the constructor's signature (`-> Self` rather than
+# `-> Result<Self, Parse>`) encodes the fixing commit's own layout, so a
+# correctly-enforcing variant written one signature different still fires.
+#
+# The remaining qualifier is the one code.ReachableAssertionReview itself
+# states -- "externally reachable input" -- and the rules reach it only through
+# a taint `from` source. Building that source for a library means labelling a
+# public entry point's parameter as untrusted, which is the shape measured
+# unshippable before (+88 findings for 1 true positive on one tree; a
+# request-body decode cap taking a tree from 1 finding to 124). The in-tree
+# evidence agrees: `code.ExternalEntryInput` exists in the ontology with one
+# emitter, `externalEntryInput0` in vyql/bindings/library/m699b14a0.vyql, whose
+# query is `param as param` -- every parameter of every function, no boundary
+# test at all -- and it is not applied under the default scan profile, so
+# `vyql match` over this tree reports `source: (none)`. Enabling it is the
+# unshippable shape, not a route around it.
+#
+# Both revisions of the tree report the identical five findings, so nothing
+# here discriminates today. No ENGINE-GAPS.md entry: nothing localised is
+# missing, the macro lowers and the constructor resolves, and the missing piece
+# is an untrusted-library-entry source concept, a vocabulary question rather
+# than a mishandled construct.
+#
+# verify_current_expected: attention-vocabulary-gap, all four blocks reject.
+
+test "rank1705: the packed national number enforces its width with assert!"
+  lang rust
+  file national_number.rs
+  reject VYQL-DOS-040
+  reject_review code.ReachableAssertionReview
+  reject VYQL-DOS-019
+  reject VYQL-DOS-034
+  code
+  ```
+  pub struct NationalNumber {
+      pub(crate) value: u64,
+  }
+
+  impl NationalNumber {
+      pub fn new(value: u64, zeros: u8) -> Self {
+          // E.164 specifies a maximum of 15 decimals, which corresponds to
+          // slightly over 48.9 bits. 56 bits ought to cut it here.
+          assert!(value < (1 << 56), "number too long");
+          Self {
+              value: ((zeros as u64) << 56) | value,
+          }
+      }
+
+      /// The number without any leading zeroes.
+      pub fn value(&self) -> u64 {
+          self.value & 0x00ffffffffffffff
+      }
+
+      /// The number of leading zeroes.
+      pub fn zeros(&self) -> u8 {
+          (self.value >> 56) as u8
+      }
+  }
+  ```
+
+test "rank1705: the parser hands a 17-digit national number to the packing constructor"
+  lang rust
+  file parser.rs
+  reject VYQL-DOS-040
+  reject_review code.ReachableAssertionReview
+  code
+  ```
+  use crate::consts::{MAX_LENGTH_FOR_NSN, MIN_LENGTH_FOR_NSN};
+  use crate::national_number::NationalNumber;
+
+  pub struct Number<'a> {
+      pub national: &'a str,
+  }
+
+  pub enum Parse {
+      TooShortNsn,
+      TooLong,
+      NoNumber,
+  }
+
+  /// Parse a phone number.
+  pub fn parse(string: &str) -> Result<(), Parse> {
+      let number = phone_number(string.as_ref()).or(Err(Parse::NoNumber))?;
+
+      if number.national.len() < MIN_LENGTH_FOR_NSN {
+          return Err(Parse::TooShortNsn);
+      }
+
+      if number.national.len() > MAX_LENGTH_FOR_NSN {
+          return Err(Parse::TooLong);
+      }
+
+      // Seventeen decimal digits reach 10^17 - 1, past the 2^56 the
+      // constructor's assert! admits, so this call panics on caller text.
+      NationalNumber::new(
+          number.national.parse()?,
+          number.national.chars().take_while(|&c| c == '0').count() as u8,
+      );
+
+      Ok(())
+  }
+  ```
+
+test "rank1705: the constructor reports an over-wide number through the error channel"
+  lang rust
+  file national_number_fixed.rs
+  reject VYQL-DOS-040
+  reject_review code.ReachableAssertionReview
+  reject VYQL-DOS-019
+  reject VYQL-DOS-034
+  code
+  ```
+  pub struct NationalNumber {
+      pub(crate) value: u64,
+  }
+
+  pub enum Parse {
+      TooLong,
+  }
+
+  impl NationalNumber {
+      pub fn new(value: u64, zeros: u8) -> Result<Self, Parse> {
+          // E.164 specifies a maximum of 15 decimals, which corresponds to
+          // slightly over 48.9 bits. 56 bits ought to cut it here.
+          if value >= (1 << 56) {
+              return Err(Parse::TooLong);
+          }
+
+          Ok(Self {
+              value: ((zeros as u64) << 56) | value,
+          })
+      }
+
+      /// The number without any leading zeroes.
+      pub fn value(&self) -> u64 {
+          self.value & 0x00ffffffffffffff
+      }
+
+      /// The number of leading zeroes.
+      pub fn zeros(&self) -> u8 {
+          (self.value >> 56) as u8
+      }
+  }
+  ```
+
+test "rank1705: a correct representation-width invariant is the same shape"
+  lang rust
+  file merkle_width_invariant.rs
+  reject VYQL-DOS-040
+  reject_review code.ReachableAssertionReview
+  reject VYQL-DOS-019
+  reject VYQL-DOS-034
+  code
+  ```
+  // The control that pins why the discriminator cannot be the assert's own
+  // text: this is a correct, internal width guard with the identical spelling
+  // to the vulnerable one -- a caller-controlled index compared against the
+  // representation's fixed bound inside a pub fn -- and it is not reachable
+  // from any parse of external text. Any binding narrow enough to fire on
+  // NationalNumber::new fires here too.
+  pub struct Tree {
+      levels: Vec<Vec<u8>>,
+  }
+
+  pub const TREE_HEIGHT: usize = 128;
+
+  impl Tree {
+      pub fn sibling(&self, height: usize, index: usize) -> &[u8] {
+          assert!(height <= TREE_HEIGHT);
+          assert!(index < (1usize << (TREE_HEIGHT - height)));
+          &self.levels[height][index]
+      }
+  }
+  ```

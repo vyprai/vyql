@@ -1,0 +1,9 @@
+module bindings.swift.generated.m7b8ef6da;
+
+binding httpInput0 {
+  requires {
+    dependency("github.com/SilverPineSoftware/UUSwiftNetworking")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit source code.HttpInput at call.result
+}

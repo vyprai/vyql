@@ -1,0 +1,156 @@
+# Rank 1577 / CVE-2022-39365: Pimcore rendered user-editable email
+# content as full Twig templates, so anyone able to set a mail subject or
+# body executed arbitrary Twig -- including PHP-reaching extensions -- on
+# the server (server-side template injection, CWE-1336/CWE-94; PR #13347).
+# renderParams in lib/Mail.php took the delegating templating engine's
+# plain Twig environment and did `$template = $twig->createTemplate($string);
+# return $template->render($this->getParams());` -- every tag, filter and
+# function available -- on strings arriving from document and email
+# fields, with the class-definition Text layout and the Web2Print
+# processor compiling their markup the same way. Pool commit 43aa34e018
+# is the real fix (COMMIT_OK -- "[Mail] Renderer email content twig
+# templates in a sandbox"): a new Pimcore\Twig\Sandbox\SecurityPolicy
+# (allowed tags, filters and functions only) backs the delegating engine's
+# getTwigEnvironment(true), renderParams and the Text layout render in
+# that sandboxed environment and convert SecurityError into a logged
+# exception with a sandbox hint, disabling the sandbox extension
+# afterwards.
+#
+# The taint rule for the sink cannot tell the two revisions apart: the
+# compile-and-render pair survives the fix unchanged, so a request-sourced
+# string reaching createTemplate reports VYQL-INJ-008 at both revisions.
+# What the fix changes is the environment's policy, which is why the
+# discriminating detection is the unsandboxed-template-validation family
+# (VYQL-INJ-024): Twig's own security documentation requires the sandbox
+# whenever the template author is untrusted, and createTemplate is the
+# engine's documented call for compiling a string handed to it at runtime.
+# The third case pins the scope -- the policy lives where the environment
+# is built, not necessarily in the rendering function -- and the fourth
+# pins the engine: Smarty spells its own createTemplate for loading a
+# template by resource name, which compiles nothing the caller handed it.
+
+test "rank1577: mail params compile and render on the plain environment"
+  lang php
+  file lib/Mail.php
+  expect VYQL-INJ-024
+  code
+  ```
+  <?php
+
+  namespace Pimcore;
+
+  use Pimcore\Templating\TwigDefaultDelegatingEngine;
+
+  class Mail
+  {
+      private $params = [];
+
+      private function renderParams(string $string): string
+      {
+          $templatingEngine = \Pimcore::getContainer()->get('pimcore.templating.engine.delegating');
+          $twig = $templatingEngine->getTwigEnvironment();
+          $template = $twig->createTemplate($string);
+
+          return $template->render($this->getParams());
+      }
+
+      public function setSubject(string $subject)
+      {
+          $this->subject = $this->renderParams($subject);
+
+          return $this;
+      }
+  }
+  ```
+
+test "rank1577: the fixed revision renders inside the sandbox"
+  lang php
+  file lib/Mail.php
+  reject VYQL-INJ-024
+  code
+  ```
+  <?php
+
+  namespace Pimcore;
+
+  use Twig\Sandbox\SecurityError;
+
+  class Mail
+  {
+      private $params = [];
+
+      private function renderParams(string $string, string $context): string
+      {
+          $templatingEngine = \Pimcore::getContainer()->get('pimcore.templating.engine.delegating');
+
+          try {
+              $twig = $templatingEngine->getTwigEnvironment(true);
+              $template = $twig->createTemplate($string);
+
+              return $template->render($this->getParams());
+          } catch (SecurityError $e) {
+              throw new \Exception(sprintf(
+                  "Failed rendering the %s: %s. Please check your twig sandbox security policy.",
+                  $context,
+                  $e->getMessage()
+              ));
+          } finally {
+              $templatingEngine->disableSandboxExtensionFromTwigEnvironment();
+          }
+      }
+
+      public function setSubject(string $subject)
+      {
+          $this->subject = $this->renderParams($subject, 'subject');
+
+          return $this;
+      }
+  }
+  ```
+
+test "rank1577: a policy installed where the environment is built clears the renderer"
+  lang php
+  file ViewRenderer.php
+  reject VYQL-INJ-024
+  code
+  ```
+  <?php
+
+  class ViewRenderer
+  {
+      private $twig;
+
+      public function init()
+      {
+          $policy = new \Twig\Sandbox\SecurityPolicy(['if'], ['upper'], ['attribute'], [], ['range']);
+          $this->twig->addExtension(new \Twig\Sandbox\SandboxExtension($policy, true));
+      }
+
+      public function renderString(string $source, array $context): string
+      {
+          $template = $this->twig->createTemplate($source);
+
+          return $template->render($context);
+      }
+  }
+  ```
+
+test "rank1577: an engine that loads templates by name compiles nothing handed to it"
+  lang php
+  file TemplateBase.php
+  reject VYQL-INJ-024
+  code
+  ```
+  <?php
+
+  class TemplateBase
+  {
+      public function fetch($template, $cache_id = null, $compile_id = null)
+      {
+          $smarty = $this->getEngine();
+          $tpl = $smarty->createTemplate($template, $cache_id, $compile_id, $this, false);
+
+          return $tpl->render(false, 'fetch');
+      }
+  }
+  ```

@@ -1,0 +1,150 @@
+# Rank 1090 / CVE-2020-15133: faye-websocket-ruby's Faye::WebSocket::Client
+# connects to wss: URLs through EventMachine and never verifies the server
+# certificate. Client#initialize opens the socket with EventMachine.connect,
+# and on_connect calls @stream.start_tls on a hash merged from :sni_hostname
+# and the caller's :tls options. EventMachine documents both halves of the
+# contract this breaks: :verify_peer defaults to off, and even with it on the
+# reactor only calls back into ssl_verify_peer, leaving the chain check and
+# the hostname check to the application. The class sets no :verify_peer option
+# and implements neither callback, so every wss connection accepted any
+# certificate for any hostname (CWE-295). Fix f41e67c428 adds :verify_peer to
+# the merged options and implements ssl_verify_peer and
+# ssl_handshake_completed through a new SslVerifier that verifies the chain
+# against an OpenSSL::X509::Store and the hostname against the request URL.
+#
+# The binding that reports this is certValidationDisabled263
+# (vyql/bindings/ruby/m5a48bf47.vyql): a Ruby file that opens an outbound
+# EventMachine connection, calls start_tls, and neither passes
+# :verify_peer => true nor performs the OpenSSL certificate work the reactor
+# delegates. The outbound-connect requirement separates the client role, where
+# checking the peer certificate is mandatory, from an EventMachine TLS server,
+# where asking for a client certificate is optional.
+#
+# Measured bounded (timeout 180, --max-ram 6GB, --cache off, three runs per
+# revision): the repository at f41e67c428^ reports 11 findings each run,
+# including VYQL-CFG-004 high/conf=high at lib/faye/websocket/client.rb; the
+# fixed revision reports 10 each run with no VYQL-CFG-004 anywhere.
+
+test "rank1090: a wss client starts TLS with no certificate verification"
+  lang ruby
+  file lib/faye/websocket/client.rb
+  expect VYQL-CFG-004
+  code
+  ```
+  module Faye
+    class WebSocket
+
+      class Client
+        DEFAULT_PORTS    = { 'http' => 80, 'https' => 443, 'ws' => 80, 'wss' => 443 }
+        SECURE_PROTOCOLS = ['https', 'wss']
+
+        def initialize(url, protocols = nil, options = {})
+          @url = url
+          proxy       = options.fetch(:proxy, {})
+          endpoint    = URI.parse(proxy[:origin] || @url)
+          port        = endpoint.port || DEFAULT_PORTS[endpoint.scheme]
+          @secure     = SECURE_PROTOCOLS.include?(endpoint.scheme)
+          @origin_tls = options.fetch(:tls, {})
+          @socket_tls = proxy[:origin] ? proxy.fetch(:tls, {}) : @origin_tls
+
+          EventMachine.connect(endpoint.host, port, Connection) do |conn|
+            conn.parent = self
+          end
+        end
+
+      private
+
+        def on_connect(stream)
+          @stream = stream
+
+          if @secure
+            socket_tls = { :sni_hostname => URI.parse(@url).host }.merge(@socket_tls)
+            @stream.start_tls(socket_tls)
+          end
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1090: the fixed revision enables verify_peer and verifies in the callbacks"
+  lang ruby
+  file lib/faye/websocket/client.rb
+  reject VYQL-CFG-004
+  code
+  ```
+  module Faye
+    class WebSocket
+
+      class Client
+        SECURE_PROTOCOLS = ['https', 'wss']
+
+        def initialize(url, protocols = nil, options = {})
+          @url = url
+          proxy       = options.fetch(:proxy, {})
+          @endpoint   = URI.parse(proxy[:origin] || @url)
+          port        = @endpoint.port || DEFAULT_PORTS[@endpoint.scheme]
+          @origin_tls = options.fetch(:tls, {})
+          @socket_tls = proxy[:origin] ? proxy.fetch(:tls, {}) : @origin_tls
+
+          EventMachine.connect(@endpoint.host, port, Connection) do |conn|
+            conn.parent = self
+          end
+        end
+
+      private
+
+        def start_tls(uri, options)
+          return unless SECURE_PROTOCOLS.include?(uri.scheme)
+
+          tls_options = { :sni_hostname => uri.host, :verify_peer => true }.merge(options)
+          @ssl_verifier = SslVerifier.new(uri.host, tls_options)
+          @stream.start_tls(tls_options)
+        end
+
+        def on_connect(stream)
+          @stream = stream
+          start_tls(@endpoint, @socket_tls)
+        end
+
+        def ssl_verify_peer(cert)
+          @ssl_verifier.ssl_verify_peer(cert)
+        end
+
+        def ssl_handshake_completed
+          @ssl_verifier.ssl_handshake_completed
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1090: start_tls in a file that opens no connection carries no client role"
+  lang ruby
+  file lib/faye/websocket/stream.rb
+  reject VYQL-CFG-004
+  code
+  ```
+  module Faye
+    class WebSocket
+
+      class Stream
+        def initialize(url, options = {})
+          @url = url
+          @origin_tls = options.fetch(:tls, {})
+          @socket_tls = @origin_tls
+        end
+
+        def on_connect(stream)
+          @stream = stream
+          secure = @url.start_with?('wss:')
+
+          if secure
+            socket_tls = { :sni_hostname => URI.parse(@url).host }.merge(@socket_tls)
+            @stream.start_tls(socket_tls)
+          end
+        end
+      end
+    end
+  end
+  ```

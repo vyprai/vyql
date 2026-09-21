@@ -1,0 +1,9 @@
+module bindings.rust.generated.m244801fc;
+
+binding deserialization0 {
+  requires {
+    dependency("erased-serde")
+  }
+  query pattern callExpr where callee.method == "erased_deserialize_seed"
+  emit sink code.Deserialization at args[0]
+}

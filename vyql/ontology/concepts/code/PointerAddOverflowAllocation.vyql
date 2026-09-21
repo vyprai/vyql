@@ -1,0 +1,11 @@
+module code;
+
+concept PointerAddOverflowAllocation : issue {
+  cwe: [CWE_190, CWE_787]
+  reviewAssumption: "a caller-controlled or model-controlled allocation size can wrap the end pointer below the aligned start"
+  reviewCategory: memory
+  reviewCondition: "allocator end pointer is computed with pointer-plus-size before checking for addition wraparound"
+  reviewConfidence: high
+  reviewEvidence: "allocator context {pattern} computes end = start + size and checks only the upper bound before returning or committing the advanced pointer"
+  vulnerableTo: [memory.IntegerOverflow, memory.OobWrite]
+}

@@ -1,0 +1,6 @@
+module injection;
+
+threat CsvInjection {
+  cwe: [CWE_1236]
+  desc: "Untrusted data written to a spreadsheet/CSV cell (formula injection)"
+}

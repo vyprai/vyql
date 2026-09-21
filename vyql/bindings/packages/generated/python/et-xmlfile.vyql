@@ -1,0 +1,9 @@
+module bindings.python.generated.m9d6fda3f;
+
+binding xmlParse0 {
+  requires {
+    dependency("et-xmlfile")
+  }
+  query pattern callExpr where callee.method == "xmlfile.element"
+  emit sink code.XmlParse at args[0]
+}

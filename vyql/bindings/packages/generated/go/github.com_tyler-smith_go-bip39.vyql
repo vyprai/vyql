@@ -1,0 +1,49 @@
+module bindings.go.generated.mde9d2ffa;
+
+binding secretValue0 {
+  requires {
+    dependency("github.com/tyler-smith/go-bip39")
+  }
+  query pattern callExpr where callee.method == "NewEntropy"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("github.com/tyler-smith/go-bip39")
+  }
+  query pattern callExpr where callee.method == "NewMnemonic"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue2 {
+  requires {
+    dependency("github.com/tyler-smith/go-bip39")
+  }
+  query pattern callExpr where callee.method == "EntropyFromMnemonic"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue3 {
+  requires {
+    dependency("github.com/tyler-smith/go-bip39")
+  }
+  query pattern callExpr where callee.method == "MnemonicToByteArray"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue4 {
+  requires {
+    dependency("github.com/tyler-smith/go-bip39")
+  }
+  query pattern callExpr where callee.method == "NewSeed"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue5 {
+  requires {
+    dependency("github.com/tyler-smith/go-bip39")
+  }
+  query pattern callExpr where callee.method == "NewSeedWithErrorChecking"
+  emit source code.SecretValue at call.result
+}

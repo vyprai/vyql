@@ -1,0 +1,69 @@
+# Rank 960 / CVE-2022-21687: gh-ost used the database name in a
+# MySQL DSN without URL-escaping query separators.
+
+test "rank960: migration database name is stored without DSN escaping"
+  lang go
+  profile api
+  file main.go
+  expect VYQL-INJ-191
+  expect_review code.UnescapedMysqlDsnDatabaseName
+  code
+  ```
+  package main
+
+  import (
+    "log"
+
+    "github.com/github/gh-ost/go/base"
+    "github.com/github/gh-ost/go/sql"
+  )
+
+  func main() {
+    migrationContext := base.NewMigrationContext()
+    parser := sql.NewParserFromAlterStatement(migrationContext.AlterStatement)
+    if migrationContext.DatabaseName == "" {
+      if parser.HasExplicitSchema() {
+        migrationContext.DatabaseName = parser.GetExplicitSchema()
+      } else {
+        log.Fatalf("--database must be provided")
+      }
+    }
+    _ = migrationContext.DatabaseName
+  }
+  ```
+
+test "rank960: migration database name is URL-escaped before DSN use"
+  lang go
+  profile api
+  file main.go
+  reject VYQL-INJ-191
+  reject_review code.UnescapedMysqlDsnDatabaseName
+  code
+  ```
+  package main
+
+  import (
+    "flag"
+    "log"
+    "net/url"
+
+    "github.com/github/gh-ost/go/base"
+    "github.com/github/gh-ost/go/sql"
+  )
+
+  func main() {
+    migrationContext := base.NewMigrationContext()
+    parser := sql.NewParserFromAlterStatement(migrationContext.AlterStatement)
+    if migrationContext.DatabaseName == "" {
+      if parser.HasExplicitSchema() {
+        migrationContext.DatabaseName = parser.GetExplicitSchema()
+      } else {
+        log.Fatalf("--database must be provided")
+      }
+    }
+    if err := flag.Set("database", url.QueryEscape(migrationContext.DatabaseName)); err != nil {
+      log.Fatal(err)
+    }
+    _ = migrationContext.DatabaseName
+  }
+  ```

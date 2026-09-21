@@ -1,0 +1,32 @@
+# Rank 378 / CVE-2012-1001: Chyrp preview rendered posted content
+# directly into the AJAX preview response. The patch wrapped the content
+# in Chyrp's local fix() helper, which is an htmlspecialchars wrapper.
+
+test "rank378: Chyrp AJAX preview echoes raw posted content as XSS"
+  lang php
+  expect VYQL-INJ-004
+  file ajax.php
+  ```
+  <?php
+  echo "<h2 class=\"preview-header\">".__("Preview")."</h2>\n".
+       "<div class=\"preview-content\">".$_POST["content"]."</div>";
+  ```
+
+test "rank378: Chyrp AJAX preview fix helper escapes posted content"
+  lang php
+  reject VYQL-INJ-004
+  file helpers.php
+  ```
+  <?php
+  function fix($string, $quotes = false, $double = false) {
+      $quotes = ($quotes) ? ENT_QUOTES : ENT_NOQUOTES;
+      return htmlspecialchars($string, $quotes, "utf-8", $double);
+  }
+  ```
+  file ajax.php
+  ```
+  <?php
+  require "helpers.php";
+  echo "<h2 class=\"preview-header\">".__("Preview")."</h2>\n".
+       "<div class=\"preview-content\">".fix($_POST["content"])."</div>";
+  ```

@@ -1,0 +1,8 @@
+module code;
+
+review code.AuthCallbackAmbientPolicyReuse {
+  category: auth
+  expected: [core.AuthenticationCheck]
+  kind: attention
+  text: "review authentication callbacks that hand back the ambient authorization policy collection: the parameter carries prior cached decisions, so a failed login inherits the previous caller's authentication"
+}

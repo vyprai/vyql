@@ -1,0 +1,10 @@
+module vypr.injection;
+
+rule ExpressionInjection {
+  meta {
+    cwe: [CWE_917]
+    id: "VYQL-INJ-016"
+    severity: critical
+  }
+  taint core.UserControlledData -> code.ExpressionEval
+}

@@ -1,0 +1,25 @@
+module bindings.cpp.generated.mb21b01b4;
+
+binding deserialization0 {
+  requires {
+    dependency("jasper")
+  }
+  query pattern callExpr where callee.method == "jas_image_decode"
+  emit sink code.Deserialization at args[0]
+}
+
+binding cliArgument1 {
+  requires {
+    dependency("jasper")
+  }
+  query pattern callExpr where callee.method == "cmdopts_parse"
+  emit source code.CliArgument at call.result
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("jasper")
+  }
+  query pattern callExpr where callee.method == "jpc_bitstream_sopen"
+  emit sink code.FilePathAccess at args[0]
+}

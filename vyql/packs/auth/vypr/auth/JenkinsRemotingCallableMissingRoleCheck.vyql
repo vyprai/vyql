@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule JenkinsRemotingCallableMissingRoleCheck {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_862, CWE_269]
+    id: "VYQL-AUTH-113"
+    severity: high
+  }
+  issue code.JenkinsRemotingCallableMissingRoleCheck as callable
+}

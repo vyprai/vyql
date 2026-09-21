@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule PresenceDerivedEmailVerification {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_287, CWE_290]
+    id: "VYQL-AUTH-128"
+    severity: high
+  }
+  issue code.PresenceDerivedEmailVerification as profile
+}

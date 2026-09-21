@@ -1,0 +1,130 @@
+# Rank 1459 / CVE-2025-54419: node-saml verified a SAML response with
+# xml-crypto's `SignedXml.checkSignature`, took the boolean as the whole
+# answer, and then processed an Assertion element re-selected from the parsed
+# document. xml-crypto's README documents the second half of the API for
+# exactly this reason: after a successful check the caller must read
+# `getSignedReferences()`, because `getReferences()` content "should be treated
+# as unsigned" and the signed references are what "will help prevent future XML
+# signature wrapping attacks".
+
+test "rank1459: xml-crypto verification never reads the signed references"
+  lang javascript
+  file src/xml.ts
+  expect VYQL-AUTH-062
+  expect_review code.SamlAssertionWrappingBypass
+  code
+  ```
+  import * as xmlCrypto from "xml-crypto";
+  import * as xpath from "xpath";
+
+  const validateXmlSignatureWithPemFile = (
+    signature: Node,
+    pemFile: string,
+    fullXml: string,
+    currentNode: Element,
+  ): boolean => {
+    const sig = new xmlCrypto.SignedXml();
+    sig.publicCert = pemFile;
+    sig.loadSignature(signature);
+    if (sig.getReferences().length !== 1) return false;
+    const refUri = sig.getReferences()[0].uri;
+    const refId = refUri[0] === "#" ? refUri.substring(1) : refUri;
+    const idAttribute = currentNode.getAttribute("ID") ? "ID" : "Id";
+    if (currentNode.getAttribute(idAttribute) != refId) return false;
+    const totalReferencedNodes = xpath.selectElements(
+      currentNode.ownerDocument,
+      "//*[@" + idAttribute + "='" + refId + "']",
+    );
+    if (totalReferencedNodes.length > 1) {
+      return false;
+    }
+    try {
+      return sig.checkSignature(fullXml);
+    } catch (err) {
+      return false;
+    }
+  };
+
+  export const validateSignature = (
+    fullXml: string,
+    currentNode: Element,
+    pemFiles: string[],
+  ): boolean => {
+    const signatures = xpath.selectElements(
+      currentNode,
+      ".//*[local-name(.)='Signature' and namespace-uri(.)='http://www.w3.org/2000/09/xmldsig#']",
+    );
+    if (signatures.length !== 1) {
+      return false;
+    }
+    const signature = signatures[0];
+    return pemFiles.some((pemFile) => {
+      return validateXmlSignatureWithPemFile(signature, pemFile, fullXml, currentNode);
+    });
+  };
+  ```
+
+test "rank1459: xml-crypto verification returns the signed references"
+  lang javascript
+  file src/xml.ts
+  reject VYQL-AUTH-062
+  reject_review code.SamlAssertionWrappingBypass
+  code
+  ```
+  import * as xmlCrypto from "xml-crypto";
+  import * as xpath from "xpath";
+
+  export const getVerifiedXml = (
+    fullXml: string,
+    currentNode: Element,
+    pemFiles: string[],
+  ): string | null => {
+    const signatures = xpath.selectElements(
+      currentNode,
+      "./*[local-name(.)='Signature' and namespace-uri(.)='http://www.w3.org/2000/09/xmldsig#']",
+    );
+    if (signatures.length < 1) {
+      return null;
+    }
+    if (signatures.length > 1) {
+      throw new Error("Too many signatures found for this element");
+    }
+    const signature = signatures[0];
+
+    for (const pemFile of pemFiles) {
+      const sig = new xmlCrypto.SignedXml();
+      sig.publicCert = pemFile;
+      sig.loadSignature(signature);
+      const refs = sig.getReferences();
+      if (refs.length !== 1) return null;
+      const refUri = refs[0].uri;
+      const refId = refUri[0] === "#" ? refUri.substring(1) : refUri;
+      if (refId.includes("'") || refId.includes('"')) {
+        throw new Error("ref URI included quote character ' or \". Not a valid ID, and not allowed");
+      }
+      const totalReferencedNodes = xpath.selectElements(
+        signature.ownerDocument,
+        `//*[@ID="${refId}"]`,
+      );
+      if (totalReferencedNodes.length !== 1) {
+        throw new Error("Invalid signature: ID cannot refer to more than one element");
+      }
+      if (totalReferencedNodes[0] !== signature.parentNode) {
+        throw new Error("Invalid signature: Referenced node does not refer to it's parent element");
+      }
+      try {
+        if (!sig.checkSignature(fullXml)) {
+          continue;
+        }
+        if (sig.getSignedReferences().length !== 1) {
+          throw new Error("Only 1 signed references should be present in signature");
+        }
+        return sig.getSignedReferences()[0];
+      } catch {
+        // verify with another key
+      }
+    }
+
+    return null;
+  };
+  ```

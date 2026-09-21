@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule AdmissionSubresourcePolicyReview {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_863]
+    id: "VYQL-AUTH-174"
+    severity: high
+  }
+  issue code.AdmissionSubresourcePolicyReview as authz
+}

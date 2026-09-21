@@ -1,0 +1,110 @@
+# Rank 1660 / CVE-2025-23211: Tandoor Recipes rendered the instruction text
+# of a recipe step as a Jinja2 template, so a step whose instruction carried
+# template markup executed it in the server's interpreter when anyone opened
+# the recipe (server-side template injection, CWE-1336). render_instructions
+# in cookbook/helper/template_helper.py took step.instruction, ran it through
+# markdown and bleach.clean -- an HTML sanitizer, which passes template
+# markup through untouched -- and then compiled it with the module-level
+# `Template(instructions)` from `from jinja2 import Template`, rendering with
+# template.render(ingredients=..., scale=...). The instruction text is
+# authored through the API, stored on the Step model (a TextField), and
+# rendered when a serializer reads it back: StepSerializer's
+# get_instructions_markdown calls obj.get_instruction_render(), which calls
+# render_instructions(self). the fixing commit e6087d5129
+# (confirmed): it switches to jinja2.sandbox.SandboxedEnvironment and
+# env.from_string(instructions).render(...), adding a SecurityError handler.
+
+#
+# FIXED by binding unsandboxedJinjaTemplateCompile
+# (vyql/bindings/python/jinja_unsandboxed_template_compile.vyql) emitting the
+# existing code.IncompleteTemplateValidation (VYQL-INJ-024, CWE-1336) -- the
+# concept the Jinja sandbox familydy uses (ranks 661, 1234, 1271) -- so
+# no concept or rule is minted. The taint rule VYQL-INJ-008 cannot see this
+# flow: the sink exists (code.TemplateRender labels Template's argument,
+# template_helper.py:92 at the parent) but no source reaches it, because the
+# payload crosses a database between the API write and the render -- the ORM
+# store/load round trip no intra-file taint analysis bridges, and bleach.clean
+# at :81 is core.HtmlEscape, which neutralizes injection.Xss only, so even a
+# tainted path would survive it. The binding is presence-based instead: a
+# function that compiles a non-literal through jinja2's module-level Template,
+# whose documented hardening for untrusted sources is SandboxedEnvironment.
+# The scopeCall needle matches the resolved call path (jinja2.Template however
+# the import is spelled); the negation reads the assign token, whose text
+# keeps the argument's quotes, so `=Template("` recognises the literal
+# quickstart form (`Template("Hello {{ name }}!")`) and excludes it.
+#
+# Measured, timeout 180 / --max-ram 6GB / --cache off: the vulnerable parent
+# 4f9bff2 reports VYQL-INJ-024 exactly once, at cookbook/helper/
+# template_helper.py:54 (render_instructions), 1820 findings on the cookbook
+# subtree against 1819 without the binding; the fixing commit e6087d5 reports
+# zero, the sole delta in both directions. Minimal pairs: the literal
+# quickstart form and the SandboxedEnvironment form report nothing. Collateral
+# across the clone corpus, enumerated exhaustively by grep for jinja2 Template
+# calls: neutron's module-level literal compiles stay silent (function scope
+# and the quote negation), litestar and nautobot use env.from_string, whose
+# receiver stays unresolved and so is indistinguishable from the sandboxed
+# spelling -- an uncovered recall residual, as is script-style module-scope
+# code -- and the one remaining hit is nltk's docs generator reading its own
+# bundled template files (web/conf.py), the file-read form the binding
+# deliberately still reports. BenchmarkPython contains no jinja2 Template
+# call at all, so the +0.90 gate cannot move.
+
+test "rank1660: recipe instructions compiled as an unsandboxed jinja template"
+  lang python
+  file cookbook/helper/template_helper.py
+  expect VYQL-INJ-024
+  code
+  ```
+  from jinja2 import Template, TemplateSyntaxError, UndefinedError
+
+
+  def render_instructions(step):
+      instructions = step.instruction
+      try:
+          template = Template(instructions)
+          instructions = template.render(ingredients=step.ingredients, scale=1)
+      except TemplateSyntaxError:
+          return 'template syntax broken'
+      except UndefinedError:
+          return 'undefined error'
+      return instructions
+  ```
+
+test "rank1660: the fixed revision compiles the instructions in a sandboxed environment"
+  lang python
+  file cookbook/helper/template_helper.py
+  reject VYQL-INJ-024
+  code
+  ```
+  from jinja2 import TemplateSyntaxError, UndefinedError
+  from jinja2.exceptions import SecurityError
+  from jinja2.sandbox import SandboxedEnvironment
+
+
+  def render_instructions(step):
+      instructions = step.instruction
+      try:
+          env = SandboxedEnvironment()
+          instructions = env.from_string(instructions).render(ingredients=step.ingredients, scale=1)
+      except TemplateSyntaxError:
+          return 'template syntax broken'
+      except UndefinedError:
+          return 'undefined error'
+      except SecurityError:
+          return 'security error'
+      return instructions
+  ```
+
+test "rank1660: a literal template is the documented quickstart form, not data"
+  lang python
+  file cookbook/helper/template_helper.py
+  reject VYQL-INJ-024
+  code
+  ```
+  from jinja2 import Template
+
+
+  def render_instructions(step):
+      template = Template("Hello {{ name }}!")
+      return template.render(name=step.name)
+  ```

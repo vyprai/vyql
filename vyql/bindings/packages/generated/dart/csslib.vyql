@@ -1,0 +1,9 @@
+module bindings.dart.generated.m8611eaa3;
+
+binding deserialization0 {
+  requires {
+    dependency("csslib")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

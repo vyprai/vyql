@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule UnvalidatedCoordinateSqlInterpolation {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_89, CWE_20]
+    id: "VYQL-INJ-188"
+    severity: high
+  }
+  issue code.UnvalidatedCoordinateSqlInterpolation as sink
+}

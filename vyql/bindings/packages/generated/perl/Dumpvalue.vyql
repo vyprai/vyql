@@ -1,0 +1,9 @@
+module bindings.perl.generated.md5286d72;
+
+binding codeEval0 {
+  requires {
+    dependency("Dumpvalue")
+  }
+  query pattern callExpr where callee.method == "matchvar"
+  emit sink code.CodeEval at args[0]
+}

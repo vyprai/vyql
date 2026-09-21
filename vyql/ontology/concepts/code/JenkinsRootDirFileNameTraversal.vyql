@@ -1,0 +1,11 @@
+module code;
+
+concept JenkinsRootDirFileNameTraversal : issue {
+  cwe: [CWE_22]
+  reviewAssumption: "Jenkins reconstitutes persisted plugin classes from configuration XML without running their constructors, so a name field the constructor derived is caller-supplied on the persisted path, and job configuration is a weaker permission than access to controller files"
+  reviewCategory: path
+  reviewCondition: "a File is joined under the Jenkins controller root directory from a name component the joining function never inspects for path separators"
+  reviewConfidence: medium
+  reviewEvidence: "controller-root storage context {pattern} derives its directory from getRootDir() and joins a name into a File without any string inspection of the component"
+  vulnerableTo: [path.PathTraversal]
+}

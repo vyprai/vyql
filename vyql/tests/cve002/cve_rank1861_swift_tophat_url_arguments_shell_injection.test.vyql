@@ -1,0 +1,340 @@
+# Tophat (CVE-2026-39862, no CWE recorded; the shape is CWE-78) launches
+# Android and Apple devices by building a bash command as one string and
+# running it through Process.launchBash, which sets launchPath /bin/bash and
+# arguments ["-c", command]. Every dynamic value reaches that string raw:
+# a tophat://install?...&arguments=... URL is read by URLReader, whose
+# queryItems are binned, subscripted by "arguments", split on commas and
+# packed into InstallRecipe.launchArguments; InstallApplicationTask hands
+# them to Device.launch, Adb packs them into an --esa extra, and
+# ShellCommand.string joins the whole argument list with spaces. The old
+# wrappedInQuotationMarks() wraps a value in double quotes, which stops
+# neither $(...), backticks, nor ; inside a double-quoted bash word, so a
+# crafted URL runs arbitrary commands as the user (and the elevated
+# AppleScript path runs them with administrator privileges).
+#
+# 60f77659425a7888439d1a6795a664f4410a4d45 ("Sanitize launch arguments before
+# passing them to bash commands") introduces ShellArgument.safe/unsafe,
+# single-quote shellEscaped() for every dynamic argument, and an
+# isSafeShellArgument guard in Adb.launch. The pool row's `nocommit` flag is
+# wrong: the commit exists and reads in full -- another instance of the
+# flag meaning "something is odd about this row", not "the change is
+# unavailable".
+#
+# The three statement lowerings the original review pinned as the chain's
+# breaks are in the live frontend: the for-in loop binds its pattern and
+# sequence (swift.go:326, swPatternBindings at :776), a bracketed call_suffix
+# lowers to an index read of the callee (swIsSubscript, swift.go:861 and the
+# call_expression arm at :699), and a switch case pattern's let-bindings
+# become assignments of the subject (swSwitch, swift.go:385, swLetBindings at
+# :802). Every distilled case below therefore reports through the system()
+# stand-in, and the suite holds them as regression coverage for those
+# lowerings. Cases two and three read the opened url directly rather than
+# through URLComponents on purpose: `components.queryItems` carries its own
+# code.HttpInput label (swift's `.query` binding), which is active wherever
+# no profile prunes it and would carry those two cases on their own,
+# construct or no construct.
+#
+# Re-measured at the current state, three --cache off runs per revision of
+# the real checkout: exactly one finding on the vulnerable parent and the
+# same one on the fixed revision -- VYQL-DOS-040, a ReachableAssertionReview
+# on EventMonitor.swift:24 that predates and survives the change -- and the
+# review-flag view holds that same single flag on both sides. The source and
+# the chain are both live on the real shape: the application(_:open:)
+# seeding labels TophatApp.swift:201, and on a distilled probe of the real
+# sink the opened URL's query value flows through read, the case-pattern
+# binding and the joined string into Process.launchBash#param#command and on
+# to the ["-c", command] collection element. The miss is the sink alone.
+#
+# The sink is not bindable today. Foundation's Process receives its command
+# through property assignments -- launchPath and arguments -- whose targets
+# leave no node in the graph (only the assigned values do, as
+# Const/Seq/CollectionElement), so no binding can key on them; the two
+# Foundation-visible calls carry no arguments at all (Process() constructs,
+# launch() spawns), so the generated commandExecution20/21 args[0] sinks
+# cannot land. The labels those bindings do emit on this tree sit on
+# untainted first arguments -- the serial/udid/application args of the app's
+# own Adb.launch, DeviceCtl.launch and SimCtl.launch -- and Swift has no
+# per-function presence facts (swift.go emits one file-wide
+# analysis.module.context and never populates FuncDef.ContextTokens), so the
+# only call-argument-visible bash site is the app's own launchBash helper,
+# which fails the documentation test: a binding naming it fires on one
+# application in the world. The run(command:) code.SqlExecution mislabel
+# (generated sqlExecution19, callee.method == "run") does fire VYQL-INJ-001
+# on the real shape, but it reports a SQL injection that is not one and
+# fires on the patched form identically, so it is not detection.
+#
+# Case 7 pins the miss with the real sink shape and asserts reject, because
+# no command-injection judgement can reach a property-configured Foundation
+# process launch under the current routes. When a swift sink route can see
+# one -- an assign-position binding route, or per-function presence facts --
+# case 7 must flip to expect while the stand-in cases keep reporting and the
+# constant-array reject stays silent. A reject for the patched direction
+# additionally waits on a generic swift shell-escape control: the real
+# patch's isSafeShellArgument guard and single-quote wrapping are
+# application-internal, and case 6 records that they leave the stand-in sink
+# reporting.
+
+test "tophat: url-scheme parameter read whole reaches the shell through the shipped sink"
+  lang swift
+  file AppDelegate.swift
+  expect VYQL-INJ-002
+  code
+  ```
+  import Foundation
+
+  final class AppDelegate: NSObject, NSApplicationDelegate {
+  	func application(_ application: NSApplication, open urls: [URL]) {
+  		system("adb shell " + urls.description)
+  	}
+  }
+  ```
+
+test "tophat: a constant array through the same loop and sink reports nothing"
+  lang swift
+  file Constant.swift
+  reject VYQL-INJ-002
+  code
+  ```
+  import Foundation
+
+  final class AppDelegate: NSObject, NSApplicationDelegate {
+  	func application(_ application: NSApplication, open urls: [URL]) {
+  		for url in [URL(filePath: "/usr/bin/open")] {
+  			system("adb shell " + url.description)
+  		}
+  	}
+  }
+  ```
+
+test "tophat: the opened url reaches the shell through the for-loop binding"
+  lang swift
+  file Loop.swift
+  expect VYQL-INJ-002
+  code
+  ```
+  import Foundation
+
+  final class AppDelegate: NSObject, NSApplicationDelegate {
+  	func application(_ application: NSApplication, open urls: [URL]) {
+  		for url in urls {
+  			system("adb shell " + url.absoluteString)
+  		}
+  	}
+  }
+  ```
+
+test "tophat: the same flow through a subscripted url reports too"
+  lang swift
+  file Subscript.swift
+  expect VYQL-INJ-002
+  code
+  ```
+  import Foundation
+
+  final class AppDelegate: NSObject, NSApplicationDelegate {
+  	func application(_ application: NSApplication, open urls: [URL]) {
+  		let url = urls[0]
+  		system("adb shell " + url.absoluteString)
+  	}
+  }
+  ```
+
+test "tophat: the install result's enum case binding carries the requests to the shell"
+  lang swift
+  file InstallResult.swift
+  expect VYQL-INJ-002
+  code
+  ```
+  import Foundation
+
+  enum URLReaderResult {
+  	case install(requests: [String])
+  }
+
+  final class AppDelegate: NSObject, NSApplicationDelegate {
+  	func application(_ application: NSApplication, open urls: [URL]) {
+  		for url in urls {
+  			let result = read(url: url)
+  			switch result {
+  				case .install(let requests):
+  					for request in requests {
+  						system("adb shell " + request)
+  					}
+  			}
+  		}
+  	}
+  }
+
+  func read(url: URL) -> URLReaderResult {
+  	let components = URLComponents(url: url, resolvingAgainstBaseURL: true)
+  	let value = components?.queryItems?.first??.value ?? ""
+  	return .install(requests: [value])
+  }
+  ```
+
+test "tophat: the whole distilled chain, from query binning to the joined command string"
+  lang swift
+  file Tophat.swift
+  expect VYQL-INJ-002
+  code
+  ```
+  import Foundation
+
+  enum URLReaderResult {
+  	case install(requests: [InstallRecipe])
+  }
+
+  struct InstallRecipe {
+  	let launchArguments: [String]
+  }
+
+  protocol Device {
+  	func launch(arguments: [String]) throws
+  }
+
+  enum AdbCommand {
+  	case launch(serial: String, arguments: [String])
+
+  	var string: String {
+  		switch self {
+  			case .launch(let serial, let arguments):
+  				return ["-s", serial, "shell", "am", "start", "--esa", arguments.joined(separator: ",")].joined(separator: " ")
+  		}
+  	}
+  }
+
+  struct AdbDevice: Device {
+  	func launch(arguments: [String]) throws {
+  		try ShellCommandRunner.run(command: AdbCommand.launch(serial: "emulator-1", arguments: arguments))
+  	}
+  }
+
+  struct ShellCommandRunner {
+  	static func run(command: AdbCommand) throws {
+  		system(command.string)
+  	}
+  }
+
+  final class AppDelegate: NSObject, NSApplicationDelegate {
+  	func application(_ application: NSApplication, open urls: [URL]) {
+  		do {
+  			for url in urls {
+  				let urlReaderResult = try read(url: url)
+  				switch urlReaderResult {
+  					case .install(let recipes):
+  						launchApp(recipes: recipes)
+  				}
+  			}
+  		} catch {}
+  	}
+
+  	func launchApp(recipes: [InstallRecipe]) {
+  		for recipe in recipes {
+  			do {
+  				let device = AdbDevice()
+  				try device.launch(arguments: recipe.launchArguments)
+  			} catch {}
+  		}
+  	}
+  }
+
+  func read(url: URL) throws -> URLReaderResult {
+  	let components = URLComponents(url: url, resolvingAgainstBaseURL: true)
+  	let queryItems = components?.queryItems ?? []
+  	let binned = Dictionary(grouping: queryItems, by: { element in element.name }).mapValues { items in
+  		items.compactMap { item in item.value }
+  	}
+  	let launchArguments = binned["arguments"]?.first?.split(separator: ",").map(String.init) ?? []
+  	return .install(requests: [InstallRecipe(launchArguments: launchArguments)])
+  }
+  ```
+
+test "tophat: the change's own guard and single-quote wrapping leave the stand-in sink reporting"
+  lang swift
+  file Patched.swift
+  expect VYQL-INJ-002
+  code
+  ```
+  import Foundation
+
+  enum URLReaderResult {
+  	case install(requests: [String])
+  }
+
+  final class AppDelegate: NSObject, NSApplicationDelegate {
+  	func application(_ application: NSApplication, open urls: [URL]) {
+  		for url in urls {
+  			let result = read(url: url)
+  			switch result {
+  				case .install(let requests):
+  					launch(arguments: requests)
+  			}
+  		}
+  	}
+
+  	func launch(arguments: [String]) {
+  		guard arguments.allSatisfy({ $0.allSatisfy { $0.isLetter || $0.isNumber } }) else {
+  			return
+  		}
+  		let formatted = arguments.map { argument in
+  			"'" + argument.replacingOccurrences(of: "'", with: "'\\''") + "'"
+  		}
+  		system("adb shell " + formatted.joined(separator: " "))
+  	}
+  }
+
+  func read(url: URL) -> URLReaderResult {
+  	let components = URLComponents(url: url, resolvingAgainstBaseURL: true)
+  	let value = components?.queryItems?.first??.value ?? ""
+  	return .install(requests: [value])
+  }
+  ```
+
+test "tophat: the same chain through the real Foundation Process sink reports nothing"
+  lang swift
+  file LaunchBash.swift
+  reject VYQL-INJ-002
+  code
+  ```
+  import Foundation
+
+  enum URLReaderResult {
+  	case install(requests: [String])
+  }
+
+  extension Process {
+  	func launchBash(command: String) throws -> String {
+  		launchPath = "/bin/bash"
+  		arguments = ["-c", command]
+  		launch()
+  		return ""
+  	}
+  }
+
+  struct ShellCommandRunner {
+  	static func run(command: String) throws -> String {
+  		let process = Process()
+  		return try process.launchBash(command: command)
+  	}
+  }
+
+  final class AppDelegate: NSObject, NSApplicationDelegate {
+  	func application(_ application: NSApplication, open urls: [URL]) {
+  		for url in urls {
+  			let result = read(url: url)
+  			switch result {
+  				case .install(let requests):
+  					for request in requests {
+  						try? ShellCommandRunner.run(command: "adb shell " + request)
+  					}
+  			}
+  		}
+  	}
+  }
+
+  func read(url: URL) -> URLReaderResult {
+  	let components = URLComponents(url: url, resolvingAgainstBaseURL: true)
+  	let value = components?.queryItems?.first??.value ?? ""
+  	return .install(requests: [value])
+  }
+  ```

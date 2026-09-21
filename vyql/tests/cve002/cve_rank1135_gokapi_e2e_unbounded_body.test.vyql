@@ -1,0 +1,131 @@
+# Rank 1135 / CVE-2026-30955: Gokapi's E2E metadata-store API decodes the raw
+# HTTP request body as JSON with no size limit, so an authenticated user
+# sending a very large body can exhaust server memory and take the process
+# down for every user (CWE-400). internal/webserver/api/routing.go's
+# paramE2eStore.ProcessParameter reads json.NewDecoder(r.Body).Decode(&input)
+# and Go's json.Decoder buffers as much of the stream as the payload needs.
+# The fix, dc934729 ("Fixed race conditions and limit e2e info"), wraps the
+# body in http.MaxBytesReader(nil, r.Body, 5*1024*1024) inside the same
+# function before decoding, so unlike a middleware-installed cap the control
+# is local to the reader and a function-scoped negation on the wrapper would
+# discriminate here.
+#
+# Nothing reports either revision. Measured with ./bin/vyql scan --cache off
+# --max-ram 6GB, three runs per revision: the vulnerable parent 9c0171e
+# reports 271 findings (identical across all three runs) and the fixed
+# revision 272, and the single difference is a VYQL-LIFE-001 on the new
+# apiMutex package the same commit adds -- nothing on either side concerns a
+# request body, and no finding has a source or sink in routing.go. The site
+# is labelled on the other axes only: `vyql match` reports code.HttpInput on
+# the *http.Request parameter and core.SafeDeserialization on both json
+# decodes, which are controls, so the body read has no sink at all.
+#
+# ATTENTION, precision cost. The vocabulary the first pass called missing
+# now exists -- code.UnboundedAllocationReview / VYQL-DOS-041 carries the
+# advisory's own CWE-400/CWE-770 pair -- and the shape it would need is the
+# request-body byte cap measured unshippable: r.Body handed to
+# json.NewDecoder or io.ReadAll with no http.MaxBytesReader or io.LimitReader
+# in the function took canonical/lxd from 1 finding to 124 and mailpit from 1
+# to 7, because that is the ordinary form of nearly every Go handler. lxd's
+# 123 non-test reads are structural, minder carries 29 of which 28 sit in a
+# generated grpc-gateway file, and the same denominator settles PHP at 242
+# files for one true positive. This tree reconfirms it locally: exactly three
+# non-test sites read a request body (Setup.go:673 io.ReadAll(r.Body),
+# Setup.go:844 json.NewDecoder(r.Body), routing.go:590 json.NewDecoder) and
+# none of their functions caps it, so the shape reports 3 here for the 1 true
+# positive and still reports 2 at the fixed revision, because the fix caps
+# only the e2e endpoint and leaves both setup-wizard reads uncapped. A form
+# narrow enough to single out this endpoint would have to key on
+# base64.StdEncoding.DecodeString over the decoded field, which is this
+# application's own blob protocol, not the weakness. Gokapi is an
+# application, so a dependency-keyed advisory cannot carry it either.
+#
+# verify_current_expected: attention-precision-cost, both revisions rejected.
+
+test "rank1135: the e2e metadata body is decoded with no size limit"
+  lang go
+  file routing.go
+  reject VYQL-DOS-041
+  reject_review code.UnboundedAllocationReview
+  reject_review code.ConduitHyperUnboundedBodyToBytes
+  code
+  ```
+  package api
+
+  import (
+      "encoding/base64"
+      "encoding/json"
+      "net/http"
+  )
+
+  type E2EInfoEncrypted struct {
+      Data string
+  }
+
+  type paramE2eStore struct {
+      EncryptedInfo E2EInfoEncrypted
+  }
+
+  func (p *paramE2eStore) ProcessParameter(r *http.Request) error {
+      type expectedInput struct {
+          Content string `json:"content"`
+      }
+      var input expectedInput
+
+      err := json.NewDecoder(r.Body).Decode(&input)
+      if err != nil {
+          return err
+      }
+      content, err := base64.StdEncoding.DecodeString(input.Content)
+      if err != nil {
+          return err
+      }
+      return json.Unmarshal(content, &p.EncryptedInfo)
+  }
+  ```
+
+test "rank1135: the body is wrapped in MaxBytesReader before decoding"
+  lang go
+  file routing.go
+  reject VYQL-DOS-041
+  reject_review code.UnboundedAllocationReview
+  reject_review code.ConduitHyperUnboundedBodyToBytes
+  code
+  ```
+  package api
+
+  import (
+      "encoding/base64"
+      "encoding/json"
+      "net/http"
+  )
+
+  type E2EInfoEncrypted struct {
+      Data string
+  }
+
+  type paramE2eStore struct {
+      EncryptedInfo E2EInfoEncrypted
+  }
+
+  func (p *paramE2eStore) ProcessParameter(r *http.Request) error {
+      const maxBodySize = 5 * 1024 * 1024 // 5MB in bytes
+      bodyReader := http.MaxBytesReader(nil, r.Body, maxBodySize)
+      defer bodyReader.Close()
+
+      type expectedInput struct {
+          Content string `json:"content"`
+      }
+      var input expectedInput
+
+      err := json.NewDecoder(bodyReader).Decode(&input)
+      if err != nil {
+          return err
+      }
+      content, err := base64.StdEncoding.DecodeString(input.Content)
+      if err != nil {
+          return err
+      }
+      return json.Unmarshal(content, &p.EncryptedInfo)
+  }
+  ```

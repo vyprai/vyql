@@ -1,0 +1,9 @@
+module bindings.perl.generated.m5e767334;
+
+binding commandExecution0 {
+  requires {
+    dependency("MetaTrans")
+  }
+  query pattern callExpr where callee.method == "get_trans_command"
+  emit sink code.CommandExecution at args[0]
+}

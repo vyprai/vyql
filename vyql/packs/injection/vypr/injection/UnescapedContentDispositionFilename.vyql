@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule UnescapedContentDispositionFilename {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_113, CWE_116]
+    id: "VYQL-INJ-172"
+    severity: medium
+  }
+  issue code.UnescapedContentDispositionFilename as sink
+}

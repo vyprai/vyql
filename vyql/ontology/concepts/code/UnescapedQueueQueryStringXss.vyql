@@ -1,0 +1,11 @@
+module code;
+
+concept UnescapedQueueQueryStringXss : issue {
+  cwe: [CWE_79]
+  reviewAssumption: "queue names can contain characters that break the query parameter or rendered link context"
+  reviewCategory: xss
+  reviewCondition: "queue names are joined into a URL query string without URL escaping before links are rendered"
+  reviewConfidence: high
+  reviewEvidence: "URL helper context {pattern} appends a queues query parameter from joined queue names without CGI.escape"
+  vulnerableTo: [injection.Xss]
+}

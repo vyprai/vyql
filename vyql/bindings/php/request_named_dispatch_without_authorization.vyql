@@ -1,0 +1,65 @@
+module bindings.php.request_named_dispatch_without_authorization;
+
+// A request handler that forwards control to a method whose name it computes
+// from the request is the dispatch idiom of PHP admin surfaces: the entry
+// point reads a `task`/`action`/`command` parameter, builds a handler name
+// from it, checks the object really has that method and calls it. The two
+// controls that entry point owes the caller are of different kinds -- a form
+// token proves the request came from a page the application served, an
+// authorization decision proves the requester may perform the task at all --
+// and code that remembers the first while never consulting the second
+// dispatches every handler it owns to whoever obtained a token. Reviewing
+// that dispatch is what `code.PrivilegedEntryPointReview` exists for.
+//
+// The three positive conjuncts hold that shape to the dispatch idiom rather
+// than to any framework's spelling.
+//
+//   * `call startsWith "$"` is the name-independent form of "the callee is a
+//     variable": a member call whose method name is a variable lowers to a
+//     `call:$<name>` token, so the conjunct reads the *shape* of the call and
+//     not the variable name some one codebase happened to choose.
+//   * `method_exists` beside it is what makes the call a dispatch to a chosen
+//     handler rather than a generic callback: the name was checked against
+//     the object's own method table first. `is_callable` is the same check
+//     spelled differently and stays unreported -- stated below.
+//   * A form-token verification is required, read from the documented
+//     spellings of that check (`validateNonce`, `checkNonce`,
+//     `verifyNonce`, WordPress' `wp_verify_nonce`/`check_admin_referer`/
+//     `check_ajax_referer`, the CSRF middleware hooks, Joomla's
+//     `Session::checkToken`). An entry point with neither a token check nor
+//     an authorization decision is missing request-forgery protection as
+//     well, and the request-forgery rules already report its state-changing
+//     operations; this label is for the narrower case of a handler that
+//     already runs one of the two checks and not the other. A getter such as
+//     `getNonceName()` is not a verification and is not in the list.
+//
+// The negation is the documented spelling of an authorization decision
+// (`authorize`, `isGranted`, `isAllowed`, `hasPermission`,
+// `checkPermission`, `current_user_can`), read from the dispatcher's own
+// body only. Two consequences, stated rather than hidden.
+//
+//   * Authorization performed by a caller, a route or a middleware filter is
+//     invisible to a function-scoped read, so a dispatcher guarded one level
+//     up still reports. The review flag names the dispatch entry point; where
+//     the decision belongs is the reviewer's call.
+//   * A handler name built from a string the application does not derive from
+//     the request is not distinguished, so a dispatcher of fixed internal
+//     steps that happens to carry a token check reports too. On the reachable
+//     PHP set that combination did not occur.
+//
+// Reachable set measured. Two functions in the admin plugin this shape was
+// taken from -- its live dispatcher, which the fix secures, and an unwired
+// second controller of the same design that carries no authorization either.
+// Across the Grav core, CodeIgniter 4, GNUBoard, Group-Office, TYPO3, dokan,
+// Vvveb, WBCE, FOSSBilling, BookStack, autoptimize, wallabag, wallos,
+// user_oidc and ultimate-member checkouts the binding reports nothing: seven
+// of those scanned clean end to end, and over the rest no file holds both a
+// variable-name member call and one of the token-check spellings above.
+binding dispatchByRequestNameWithoutAuthorization {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php"
+    and node.context.call startsWith "$"
+    and node.context.callPath contains "method_exists"
+    and containsAny(node.context.callPath, ["validateNonce", "checkNonce", "verifyNonce", "wp_verify_nonce", "check_admin_referer", "check_ajax_referer", "validateCsrf", "verifyCsrf", "validate_csrf", "verify_csrf", "checkToken"])
+    and not containsAny(node.context.callPath, ["authorize", "authorise", "isGranted", "isAllowed", "hasPermission", "checkPermission", "current_user_can"])
+  emit issue code.PrivilegedEntryPointReview at node
+}

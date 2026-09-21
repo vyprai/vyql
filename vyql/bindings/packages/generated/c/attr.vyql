@@ -1,0 +1,81 @@
+module bindings.c.generated.ma3178d8e;
+
+binding filePathAccess0 {
+  requires {
+    dependency("attr")
+  }
+  query pattern callExpr where callee.method == "attr_get"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("attr")
+  }
+  query pattern callExpr where callee.method == "attr_set"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("attr")
+  }
+  query pattern callExpr where callee.method == "attr_remove"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("attr")
+  }
+  query pattern callExpr where callee.method == "attr_list"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("attr")
+  }
+  query pattern callExpr where callee.method == "attr_listf"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess5 {
+  requires {
+    dependency("attr")
+  }
+  query pattern callExpr where callee.method == "attr_multi"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess6 {
+  requires {
+    dependency("attr")
+  }
+  query pattern callExpr where callee.method == "attr_copy_file"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess7 {
+  requires {
+    dependency("attr")
+  }
+  query pattern callExpr where callee.method == "attr_copy_fd"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess8 {
+  requires {
+    dependency("attr")
+  }
+  query pattern callExpr where callee.method == "attr_copy_action"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess9 {
+  requires {
+    dependency("attr")
+  }
+  query pattern callExpr where callee.method == "walk_tree"
+  emit sink code.FilePathAccess at args[0]
+}

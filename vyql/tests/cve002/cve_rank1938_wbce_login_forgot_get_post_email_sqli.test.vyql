@@ -1,0 +1,181 @@
+# Rank 1938 / CVE-2021-3817: WBCE's unauthenticated forgot-password page
+# read the submitted address through the framework's request accessor and
+# spliced it straight into a SELECT before querying:
+#
+#   $email = strip_tags($wb->get_post('email'));
+#   ...
+#   $sSql = "SELECT * FROM `{TP}users` WHERE `email` = '" . $email . "'";
+#   $rRow = $database->query($sSql);
+#
+# (wbce/admin/login/forgot/index.php; the same shape with the Accounts
+# spelling sits in modules/tool_account_settings/account/form_forgot.php,
+# where $oAccounts = new Accounts() and Accounts extends Frontend extends
+# wb). get_post($field) is documented in framework/class.wb.php as "Get
+# POST data" and returns $_POST[$field] raw, and strip_tags() removes
+# markup without touching quotes, so a crafted email injects SQL into the
+# statement (CWE-89). The fixed revision wraps the value in
+# $database->escapeString($email), the object spelling of the escaper
+# family core.SqlParameterization binds.
+#
+# FIXED at the binding layer,
+# bindings/php/website_baker_request_accessors.vyql, reusing existing
+# vocabulary only: httpInputWbGetPost labels the four receiver call
+# spellings of get_post() -- $wb and $admin are the framework's documented
+# global objects, $this covers the class's own body, $oAccounts is the
+# account pages' instantiation of the same class family -- and
+# httpInputWbGetGet labels get_get() by method. get_post is deliberately
+# NOT matched by bare method name: WordPress ships an unrelated
+# receiverless get_post() function that fetches a post row from the
+# database by ID, and labelling that one as request input reports the
+# database row it returns -- measured two false positives on a WordPress
+# plugin tree (HttpInput to HtmlRender and to RegexCompileSink, both
+# rooted at `$post = get_post( $profile_id )`), both gone with the
+# receiver-path form. get_post_escaped() is also not labelled: it wraps
+# get_post() in add_slashes() inside its own body, so the call site never
+# shows the escape.
+#
+# Measured on the real trees (three --cache off runs each, timeout 180,
+# --max-ram 6GB, deterministic counts): the vulnerable login/forgot page
+# goes 1 -> 3 findings, gaining exactly VYQL-INJ-001 HIGH
+# (source $wb->get_post at :26, sink $database->query at :34), and the
+# fixed revision goes 1 -> 2, no VYQL-INJ-001 -- 1 -> 0 on the CVE. The
+# Accounts spelling goes 0 -> 5 at the vulnerable revision and 0 -> 4 at
+# the fixed revision, the single finding the fixed revision removes being VYQL-INJ-001 at
+# form_forgot.php:30. Across every subtree of the wbce checkout that
+# carries both the accessor and a sink (admin 57 -> 65, account 20 -> 20,
+# news_img 135 -> 135, droplets 30 -> 30, wbSeoTool 2 -> 3,
+# tool_account_settings 26 -> 38, SecureFormSwitcher 0 -> 0,
+# maintainance_mode 0 -> 0, sitemap 5 -> 5, framework 175 -> 175) the
+# added rows beyond the CVE all sit on real request reads reaching real
+# sinks whose guards are delegated validators or the framework's
+# add_slashes() -- the known function-local attribution gap -- and fire
+# on both revisions. ultimatemember, the only tree among ninety sibling
+# clones carrying the get_post token at all, is unchanged at 393.
+
+test "rank1938: the forgot-password email read through the framework accessor reaches the SELECT verbatim"
+  lang php
+  file wbce/admin/login/forgot/index.php
+  expect VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  require WB_PATH . '/framework/class.admin.php';
+  $admin = new admin('Start', 'start', false, false);
+
+  $oMsgBox = new MessageBox();
+
+  if (isset($_POST['email']) and $_POST['email'] != "") {
+      $email = strip_tags($wb->get_post('email'));
+      if ($admin->validate_email($email) == false) {
+          $oMsgBox->error($MESSAGE['USERS_INVALID_EMAIL']);
+          $email = '';
+      }
+
+      // Check if the email exists in the database
+      $sSql = "SELECT * FROM `{TP}users` WHERE `email` = '" . $email . "'";
+      $rRow = $database->query($sSql);
+      if ($rRow->numRows() > 0) {
+          $aUser = $rRow->fetchRow();
+      }
+  }
+  ```
+
+test "rank1938: the Accounts spelling of the same accessor is reported too"
+  lang php
+  file wbce/modules/tool_account_settings/account/form_forgot.php
+  expect VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  $oAccounts = new Accounts();
+
+  if (isset($_POST['email']) && $_POST['email'] != "") {
+      $sEmail = strip_tags($oAccounts->get_post('email'));
+      if ($admin->validate_email($sEmail) == false) {
+          $oMsgBox->error($MESSAGE['USERS_INVALID_EMAIL']);
+          $sEmail = '';
+      } else {
+          $sSql = "SELECT * FROM `{TP}users` WHERE `email`='" . $sEmail . "'";
+          if (($rRow = $database->query($sSql))) {
+              $aUser = $rRow->fetchRow(MYSQLI_ASSOC);
+          }
+      }
+  }
+  ```
+
+test "rank1938: the email wrapped in the database escaper before the SELECT is not reported"
+  lang php
+  file wbce/admin/login/forgot/index-patched.php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  require WB_PATH . '/framework/class.admin.php';
+  $admin = new admin('Start', 'start', false, false);
+
+  $oMsgBox = new MessageBox();
+
+  if (isset($_POST['email']) && $_POST['email'] != "") {
+      $email = strip_tags($wb->get_post('email'));
+      if ($email != '') {
+          if ($admin->validate_email($email) == false) {
+              $oMsgBox->error($MESSAGE['USERS_INVALID_EMAIL']);
+          }
+
+          $sSql = "SELECT * FROM `{TP}users` WHERE `email`='" . $database->escapeString($email) . "'";
+          $rRow = $database->query($sSql);
+          if ($rRow->numRows() > 0) {
+              $aUser = $rRow->fetchRow();
+          }
+      }
+  }
+  ```
+
+test "rank1938: WordPress's receiverless get_post() fetch of a post row is not request input"
+  lang php
+  file includes/core/class-external-integrations.php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  class External_Integrations {
+
+      function profile_slug($profile_id) {
+          $profile_id = UM()->options()->get('core_user');
+          $post = get_post($profile_id);
+
+          if (empty($post) || is_wp_error($post)) {
+              return;
+          }
+
+          global $wpdb;
+          $slug = $post->post_name;
+          $rows = $wpdb->query("SELECT * FROM {$wpdb->posts} WHERE post_name = '" . $slug . "'");
+          return $rows;
+      }
+  }
+  ```
+
+test "rank1938: a GET parameter read through the framework accessor reaches the WHERE clause"
+  lang php
+  file wbce/admin/pages/index.php
+  expect VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  require WB_PATH . '/framework/class.admin.php';
+  $admin = new admin('Pages', 'pages');
+
+  // filter the page list by the requested status
+  $sStatus = $admin->get_get('status');
+  $sSql = "SELECT * FROM `{TP}pages` WHERE `status` = '" . $sStatus . "' ORDER BY `position`";
+  $rRow = $database->query($sSql);
+  while ($aPage = $rRow->fetchRow()) {
+      $aPages[] = $aPage;
+  }
+  ```

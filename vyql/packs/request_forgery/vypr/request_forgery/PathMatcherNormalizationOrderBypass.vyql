@@ -1,0 +1,11 @@
+module vypr.request_forgery;
+
+rule PathMatcherNormalizationOrderBypass {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_601, CWE_22]
+    id: "VYQL-RF-011"
+    severity: medium
+  }
+  issue code.PathMatcherNormalizationOrderBypass as matcher
+}

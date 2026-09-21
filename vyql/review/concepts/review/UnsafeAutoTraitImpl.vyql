@@ -1,0 +1,7 @@
+module code;
+
+review code.UnsafeAutoTraitImpl {
+  category: concurrency
+  kind: attention
+  text: "review unsafe Send/Sync implementation and whether generic bounds preserve thread-safety invariants"
+}

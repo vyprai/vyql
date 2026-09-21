@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m5ab1ce64;
+
+binding filePathAccess0 {
+  requires {
+    dependency("org.easytesting:fest-assert")
+  }
+  query pattern callExpr where callee.method == "hasSameContentAs"
+  emit sink code.FilePathAccess at args[0]
+}

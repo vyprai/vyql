@@ -1,0 +1,9 @@
+module bindings.bash.generated.m64781939;
+
+binding commandExecution0 {
+  requires {
+    dependency("trash-cli")
+  }
+  query pattern callExpr where callee.path ~= "trash-cli"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,0 +1,186 @@
+# The safe-svg WordPress plugin decides which uploads are SVGs -- and so which
+# uploads its sanitiser processes -- from the type the uploader declared.
+# `check_for_svg` in safe-svg.php is registered on `wp_handle_upload_prefilter`,
+# whose argument is the single-file entry of the request's file array, and the
+# gate reads the entry's `type` key:
+#
+#     if ( $file['type'] === 'image/svg+xml' ) {
+#         if ( ! $this->sanitize( $file['tmp_name'] ) ) { ... reject ... }
+#     }
+#
+# The PHP manual documents that key as "the mime type of the file, as provided
+# by the browser", unchecked server-side, so a crafted file that announces any
+# other type (or a polyglot) steers itself out of the sanitisation path while
+# the plugin's own `allow_svg` filter admits `.svg` names by extension --
+# content-type confusion at the trust boundary, CWE-345/CWE-436, with the
+# stored-XSS impact of an unsanitised SVG (CWE-79). Fix 44752cf (merged as
+# 00cb9a8, PR #28) replaces the claimed value with one WordPress inspects:
+#
+#     $wp_filetype = wp_check_filetype_and_ext( $file['tmp_name'], $file['name'] );
+#     $type        = ! empty( $wp_filetype['type'] ) ? $wp_filetype['type'] : '';
+#     if ( $type === 'image/svg+xml' ) { ... }
+#
+# `wp_check_filetype_and_ext` is WordPress's own documented way to derive the
+# real type from the temporary file's content and name, so the patched gate
+# branches on inspected bytes rather than uploader metadata.
+#
+# ## Re-measured at the current tip
+#
+# Three `--cache off` runs per revision (timeout 180, --max-ram 6GB) over each
+# full checkout: 0 findings at 44752cf^'s tree and 0 at 00cb9a8, stable on all
+# six runs; the `-flags only` view is 0 flags at both, so the first-pass zero
+# was not a flags-replacement misread. `vyql match` labels no source on either
+# revision -- the sinks sit elsewhere (HtmlRender at :15, FileInclude at
+# :17-19, FilePathAccess at :126/:155) -- and the fixing call itself carries
+# no label: `wp_check_filetype_and_ext` is bound as neither control nor
+# anything else.
+#
+# ## The later-shipped upload-family vocabulary declines this code
+#
+# - `uploadContentSniffedExtensionAllowlistWithoutClientExtension`
+#   (VYQL-INJ-037) is the mirror trust decision on the extension axis: a
+#   CodeIgniter/Symfony handler admitting on the content-sniffed
+#   `guessExtension()` while never reading the client-supplied
+#   `getClientExtension()`. Both halves of its documented pair are calls, so
+#   the binding keys on `node.context.call`; here the untrusted half is the
+#   `['type']` subscript of a filter argument and the decision is a native
+#   comparison -- there is no call to key on.
+# - `jsUploadDeclaredResponseContentType` (VYQL-INJ-246) covers the serving
+#   side of the same metadata (a stored upload's declared content type echoed
+#   into a Response header), not the admission gate.
+# - `unsanitizedSvgUpload113/114/472` (VYQL-INJ-115) cover uploads stored with
+#   no observed SVG sanitiser, on Laravel/TYPO3/FuelPHP call paths. This
+#   plugin's sanitiser is present and called -- it is the gate in front of it
+#   that the uploader controls, which those negations (`no sanitizeSvg/
+#   svgSanitize/Sanitizer call in scope`) cannot express.
+#
+# ## What a binding would have to key on
+#
+# Throwaway probes emitting consumed concepts, measured on the real checkouts
+# and on the clone corpus:
+#
+# - The generic shape -- function scope, reads `['type']` and `['tmp_name']`
+#   (the documented file-array keys), no call to a content inspector
+#   (`wp_check_filetype_and_ext`, `wp_check_filetype`, `finfo_file`,
+#   `finfo_open`, `mime_content_type`, `exif_imagetype`, `getimagesize`) --
+#   does not discriminate: 1 finding at the parent and 1 at the fix, because
+#   the patched body reads `$wp_filetype['type']`, an inspected `['type']`.
+#   It is also the measured false-positive family of the absence shape: on
+#   osTicket's tree it flags 5 functions, of which the two inspected store the
+#   declared type as metadata (`array('type'=>$file['type'], ...)` in
+#   class.file.php's `upload()`, whose own docblock says "Function assumes the
+#   files types have been validated") rather than branch on it.
+# - Narrowing to the SVG domain -- the same reads plus a comparison naming
+#   svg, plus the inspector negation, emitting `code.UnsanitizedSvgUpload` --
+#   discriminates the real pair (1 at the parent, 0 at the fix, the negation
+#   doing all the work) but fails its own minimal pair: it reports 2 of 2 on a
+#   two-method file where the second method never branches on the declared
+#   type (an extension gate `if ($ext !== 'svg')` plus the type read kept only
+#   as metadata). The positive half cannot see the branch, so it cannot tell a
+#   gate from a mover, and the discrimination collapses into the fixing
+#   commit's own added call.
+# - Corpus enumeration for the generic reads: 170,782 non-vendor PHP files
+#   under the campaign clones, 535 reading `['tmp_name']`, 142 reading both
+#   keys with no inspector call, 48 of those with some in-file `['type']`
+#   comparison (mostly on unrelated database rows, not the file array).
+#
+# ## Why the branch is invisible
+#
+# Three facts, each measured with the probes above:
+#
+# - `phpStructuredContextTokens`'s walk (internal/extract/frontend/treesitter/
+#   php.go, switch from ~:560) emits no token for comparison expressions at
+#   all -- the gate's context carries the two `subscript:` reads and the
+#   `call:sanitize`, nothing about the `===`.
+# - `collectValTokens` (internal/extract/lowering/lowering.go:4224) has no
+#   `nir.Subscript` case, so a `code.BinOp`'s search text keeps the compared
+#   literal (`image/svg+xml`) but drops the operand: which value was compared
+#   -- the claimed `$file['type']` or the inspected `$type` -- is not in any
+#   fact.
+# - `splitBinaryPredicate` (internal/bindings/bindings_match.go:1097) splits
+#   a `binary:` needle on its first operator character, so a MIME literal can
+#   never match whole: a probe keyed on `binary contains "image/svg+xml"`
+#   emitted nothing on a tree whose BinOp search text contains exactly that
+#   string (the `/` and `+` parse as an operator spec). Only operator-free
+#   substrings such as "svg" match, which is what forces the domain narrowing
+#   that then fails the minimal pair.
+#
+# Emission-side provenance is a frontend fact, and reordering the needle parse
+# is shared-matcher behaviour change -- neither is a mechanical correction, so
+# this stays a vocabulary/engine gap rather than a workaround in data. When
+# comparisons carry their operand provenance, the first block below must flip
+# to expect VYQL-INJ-115: the construct is an SVG upload accepted unsanitised
+# on the path the declared type steers away from the sanitiser.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1609: the svg gate trusts the declared type"
+  lang php
+  file safe-svg.php
+  reject VYQL-INJ-115
+  code
+  ```
+  <?php
+
+  class safe_svg
+  {
+      public function allow_svg( $mimes ) {
+          $mimes['svg']  = 'image/svg+xml';
+          $mimes['svgz'] = 'image/svg+xml';
+
+          return $mimes;
+      }
+
+      /**
+       * Check if the file is an SVG, if so handle appropriately
+       */
+      public function check_for_svg( $file ) {
+
+          if ( $file['type'] === 'image/svg+xml' ) {
+              if ( ! $this->sanitize( $file['tmp_name'] ) ) {
+                  $file['error'] = __( "Sorry, this file couldn't be sanitized so for security reasons wasn't uploaded",
+                      'safe-svg' );
+              }
+          }
+
+          return $file;
+      }
+  }
+  ```
+
+test "rank1609: the fixed revision inspects the file before deciding"
+  lang php
+  file safe-svg.php
+  reject VYQL-INJ-115
+  code
+  ```
+  <?php
+
+  class safe_svg
+  {
+      public function allow_svg( $mimes ) {
+          $mimes['svg']  = 'image/svg+xml';
+          $mimes['svgz'] = 'image/svg+xml';
+
+          return $mimes;
+      }
+
+      /**
+       * Check if the file is an SVG, if so handle appropriately
+       */
+      public function check_for_svg( $file ) {
+
+          $wp_filetype = wp_check_filetype_and_ext( $file['tmp_name'], $file['name'] );
+          $type        = ! empty( $wp_filetype['type'] ) ? $wp_filetype['type'] : '';
+
+          if ( $type === 'image/svg+xml' ) {
+              if ( ! $this->sanitize( $file['tmp_name'] ) ) {
+                  $file['error'] = __( "Sorry, this file couldn't be sanitized so for security reasons wasn't uploaded",
+                      'safe-svg' );
+              }
+          }
+
+          return $file;
+      }
+  }
+  ```

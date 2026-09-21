@@ -1,0 +1,60 @@
+# Rank 1093 / CVE-2022-25044: Espruino's interpreter treats a returned prototype
+# name as a removable child of its parent, so `delete [].__proto__` corrupts the
+# reference-counted variable graph (CWE-787).
+#
+# ATTENTION: not mechanical. The invariant is graph membership inside
+# Espruino-internal JsVar APIs with no public pattern a binding can generalize
+# from. Both snippets reject VYQL-MEM-002 as a placeholder that never fires.
+#
+# verify_current_expected: attention-not-mechanical
+
+test "rank1093: a returned prototype name is deleted as if it were a plain child"
+  lang c
+  file src/jsparse.c
+  reject VYQL-MEM-002
+  code
+  ```
+  JsVar *jspGetNamedFieldInParents(JsVar *object, const char *name) {
+    const char *objName = jswGetBasicObjectName(object);
+    if (objName) {
+      return jspNewPrototype(objName);
+    }
+    return 0;
+  }
+
+  JsVar *jspeFactorDelete(JsVar *parent, JsVar *a) {
+    if (jsvHasChildren(parent)) {
+      jsvRemoveChild(parent, a);
+      return jsvNewFromBool(true);
+    }
+    return jsvNewFromBool(false);
+  }
+  ```
+
+test "rank1093: the fixed revision links the prototype as a real child and checks membership"
+  lang c
+  file src/jsparse.c
+  reject VYQL-MEM-002
+  code
+  ```
+  JsVar *jspGetNamedFieldInParents(JsVar *object, const char *name) {
+    const char *objName = jswGetBasicObjectName(object);
+    if (objName) {
+      JsVar *p = jsvSkipNameAndUnLock(jspNewPrototype(objName));
+      JsVar *i = jsvNewFromString(name);
+      JsVar *child = 0;
+      if (p) child = jsvCreateNewChild(object, i, p);
+      jsvUnLock(i);
+      return child;
+    }
+    return 0;
+  }
+
+  JsVar *jspeFactorDelete(JsVar *parent, JsVar *a) {
+    if (jsvHasChildren(parent) && jsvIsChild(parent, a)) {
+      jsvRemoveChild(parent, a);
+      return jsvNewFromBool(true);
+    }
+    return jsvNewFromBool(false);
+  }
+  ```

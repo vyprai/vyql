@@ -1,0 +1,26 @@
+module bindings.c.stack_fallback_stride_underalloc;
+
+// The dual-path buffer idiom keeps a fixed stack array as the common-case
+// scratch buffer -- declared with the product of a count bound and a per-unit
+// width -- aliases it to a pointer, and falls back to a heap allocation only
+// when a count exceeds the array's count bound. The write loop states the
+// width again as the stride the buffer pointer advances by per row, so the
+// fallback allocation has to size count*width elements. One that takes the
+// count alone holds count elements and every heap-path row past the first
+// writes past it.
+//
+// The fact is emitted by the C frontend
+// (ccStackFallbackStrideUnderallocObservations,
+// internal/extract/frontend/treesitter/c.go) from the syntax tree: the count
+// is a size argument the surrounding guard bounds by one factor of the
+// array's declared product, and the stride is the identifier a
+// buffer-aliased pointer advances by in a compound assignment, tracked
+// through reassignment so a pointer that later points elsewhere stops
+// contributing. Prose and identifiers unrelated to those pairings cannot
+// satisfy them, and naming the stride in any size argument -- including a
+// different width variable, as a column-resolved variant legitimately does
+// -- clears it.
+binding stackFallbackStrideUnderalloc {
+  query pattern presenceNode where node.kind == "any" and node.analysis == "alloc.stack_fallback_stride_underalloc"
+  emit issue code.StackFallbackStrideUnderallocation at node
+}

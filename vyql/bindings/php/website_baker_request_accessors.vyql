@@ -1,0 +1,31 @@
+module bindings.php.website_baker_request_accessors;
+
+// WebsiteBaker and its WBCE fork expose one documented request accessor pair
+// on the framework's wb object (framework/class.wb.php): get_post($field)
+// returns $_POST[$field] and get_get($field) returns $_GET[$field], both
+// raw, so a value read through them carries the same weight as the
+// superglobal itself. The paired get_post_escaped() spelling is deliberately
+// not labelled: it wraps get_post() in add_slashes() inside its own body, so
+// the call site never shows the escape and labelling it would report
+// properly escaped uses.
+//
+// get_post is matched on the receiver call spellings rather than the bare
+// method name because WordPress ships an unrelated receiverless get_post()
+// function that fetches a post row from the database by ID: labelling that
+// one as request input reports the database row it returns (measured: two
+// false positives on a WordPress plugin tree, HttpInput to HtmlRender and
+// to RegexCompileSink, both rooted at `$post = get_post( $profile_id )`).
+// $wb and $admin are the framework's documented global objects, $this covers
+// the class's own body, and $oAccounts is the account pages' instantiation
+// of Accounts, which extends Frontend, which extends wb. get_get has no
+// such collision and is matched by method on any receiver.
+
+binding httpInputWbGetPost {
+  query pattern callExpr where callee.path in ["$wb.get_post", "$admin.get_post", "$this.get_post", "$oAccounts.get_post"]
+  emit source code.HttpInput at call.result
+}
+
+binding httpInputWbGetGet {
+  query pattern callExpr where callee.method == "get_get"
+  emit source code.HttpInput at call.result
+}

@@ -1,0 +1,108 @@
+# Rank 1029 / CVE-2021-4119: BookStack's user-select search endpoint let any
+# caller harvest account details. It matched the supplied term against the email
+# column with a leading-wildcard LIKE and returned the matching users, and it
+# required no permission at all, so email addresses could be extracted a
+# fragment at a time (CWE-284). The fixed revision gates the endpoint behind
+# signedInUser() plus one of users-manage, restrictions-manage-own or
+# restrictions-manage-all, and drops email from the search so only the name is
+# matched.
+#
+# ATTENTION, held. The endpoint-without-authorization half is the shape
+# measured unshippable on this class: endpoints legitimately differ in whether
+# they need a guard, and keying the guard on this project's own helpers
+# (signedInUser, userCan, showPermissionError) names the incident rather than
+# the construct. The email half cannot be separated from that judgement: the
+# same fix keeps an email LIKE search in the admin listing
+# (UserRepo::getAllUsersPaginatedAndSorted) with a doc comment blessing it for
+# trusted callers, so the searched column is a data-sensitivity decision, not a
+# code shape.
+#
+# The taint route is pinned as a deliberate negative on both revisions. The
+# where() arguments carry a syntactic code.SqlExecution label, but the query
+# builder binds the value, so VYQL-INJ-001 firing on either form would be a
+# false positive; a scalar-concatenation argument of an unresolved builder call
+# also carries no flow today (an array-literal argument does), so this pair
+# fails if argument flow for unresolved callees is ever widened without a
+# parameterization control for builder queries. code.UserEnumSmell stays
+# rejected on both forms: it covers an authentication response that varies by
+# account existence, a login oracle rather than a search endpoint.
+#
+# verify_current_expected: attention-precision-cost
+
+test "rank1029: user search matches the email column for any caller"
+  lang php
+  file app/Http/Controllers/UserSearchController.php
+  reject VYQL-INJ-001
+  reject VYQL-SMELL-ENUM
+  code
+  ```
+  <?php
+
+  namespace BookStack\Http\Controllers;
+
+  use BookStack\Auth\User;
+  use Illuminate\Database\Eloquent\Builder;
+  use Illuminate\Http\Request;
+
+  class UserSearchController extends Controller
+  {
+      public function forSelect(Request $request)
+      {
+          $search = $request->get('search', '');
+          $query = User::query()->orderBy('name', 'desc')->take(20);
+
+          if (!empty($search)) {
+              $query->where(function (Builder $query) use ($search) {
+                  $query->where('email', 'like', '%' . $search . '%')
+                      ->orWhere('name', 'like', '%' . $search . '%');
+              });
+          }
+
+          $users = $query->get();
+
+          return view('form.user-select-list', compact('users'));
+      }
+  }
+  ```
+
+test "rank1029: fix requires a management permission and searches only the name"
+  lang php
+  file app/Http/Controllers/UserSearchController.php
+  reject VYQL-INJ-001
+  reject VYQL-SMELL-ENUM
+  code
+  ```
+  <?php
+
+  namespace BookStack\Http\Controllers;
+
+  use BookStack\Auth\User;
+  use Illuminate\Http\Request;
+
+  class UserSearchController extends Controller
+  {
+      public function forSelect(Request $request)
+      {
+          $hasPermission = signedInUser() && (
+                   userCan('users-manage')
+                  || userCan('restrictions-manage-own')
+                  || userCan('restrictions-manage-all')
+          );
+
+          if (!$hasPermission) {
+              $this->showPermissionError();
+          }
+
+          $search = $request->get('search', '');
+          $query = User::query()->orderBy('name', 'asc')->take(20);
+
+          if (!empty($search)) {
+              $query->where('name', 'like', '%' . $search . '%');
+          }
+
+          return view('form.user-select-list', [
+              'users' => $query->get(),
+          ]);
+      }
+  }
+  ```

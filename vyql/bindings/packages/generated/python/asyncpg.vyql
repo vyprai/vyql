@@ -1,0 +1,49 @@
+module bindings.python.generated.m4c31fa39;
+
+binding sqlExecution0 {
+  requires {
+    dependency("asyncpg")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution1 {
+  requires {
+    dependency("asyncpg")
+  }
+  query pattern callExpr where callee.method == "executemany"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution2 {
+  requires {
+    dependency("asyncpg")
+  }
+  query pattern callExpr where callee.method == "fetch"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution3 {
+  requires {
+    dependency("asyncpg")
+  }
+  query pattern callExpr where callee.method == "fetchval"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution4 {
+  requires {
+    dependency("asyncpg")
+  }
+  query pattern callExpr where callee.method == "fetchrow"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution5 {
+  requires {
+    dependency("asyncpg")
+  }
+  query pattern callExpr where callee.method == "fetchmany"
+  emit sink code.SqlExecution at args[0]
+}

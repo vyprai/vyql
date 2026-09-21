@@ -1,0 +1,295 @@
+module bindings.groovy.generated.mbfd454d1;
+
+binding httpInput0 {
+  requires {
+    dependency("grails")
+  }
+  query pattern callExpr where callee.path ~= "params"
+  emit source code.HttpInput at call.result
+}
+
+binding templateRender1 {
+  requires {
+    dependency("grails")
+  }
+  query pattern callExpr where callee.method == "render"
+  emit sink code.TemplateRender at args[0]
+}
+
+binding csrfProtection2 {
+  requires {
+    dependency("grails")
+  }
+  query pattern callExpr where callee.path ~= "withForm"
+  emit check core.CsrfProtection at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding httpInput3 {
+  requires {
+    dependency("javax.servlet")
+  }
+  query pattern callExpr where callee.method == "getParameter" and callee.receiver.type == "HttpServletRequest"
+  emit source code.HttpInput at call.result
+}
+
+binding secretValue4 {
+  requires {
+    dependency("groovy")
+  }
+  query pattern callExpr where callee.path ~= "System.getenv"
+  emit source code.SecretValue at call.result
+}
+
+binding commandExecution5 {
+  requires {
+    dependency("groovy")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding codeEval6 {
+  requires {
+    dependency("groovy")
+  }
+  query pattern callExpr where callee.path ~= "Eval.me"
+  emit sink code.CodeEval at args[0]
+}
+
+binding codeEval7 {
+  requires {
+    dependency("groovy")
+  }
+  query pattern callExpr where callee.method == "evaluate"
+  emit sink code.CodeEval at args[0]
+}
+
+binding externalApiResponse8 {
+  requires {
+    dependency("http-builder")
+  }
+  query pattern callExpr where callee.method == "getText"
+  emit source code.ExternalApiResponse at call.result
+}
+
+binding urlFetch9 {
+  requires {
+    dependency("http-builder")
+  }
+  query pattern callExpr where callee.path ~= "HTTPBuilder.request"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding sqlExecution10 {
+  requires {
+    dependency("groovy-sql")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution11 {
+  requires {
+    dependency("groovy-sql")
+  }
+  query pattern callExpr where callee.method == "rows"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution12 {
+  requires {
+    dependency("java.sql")
+  }
+  query pattern callExpr where callee.method == "executeQuery"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlParameterization13 {
+  requires {
+    dependency("java.sql")
+  }
+  query pattern callExpr where callee.method == "setParameter"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding nosqlQuery14 {
+  requires {
+    dependency("mongodb-driver-sync")
+  }
+  query pattern callExpr where callee.method == "find"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding deserialization15 {
+  requires {
+    dependency("java.io")
+  }
+  query pattern callExpr where callee.method == "readObject"
+  emit sink code.Deserialization at args[0]
+}
+
+binding filePathAccess16 {
+  requires {
+    dependency("java.io")
+  }
+  query pattern callExpr where callee.path ~= "File"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding deserialization17 {
+  requires {
+    dependency("snakeyaml")
+  }
+  query pattern callExpr where callee.path ~= "Yaml.load"
+  emit sink code.Deserialization at args[0]
+}
+
+binding safeDeserialization18 {
+  requires {
+    dependency("snakeyaml")
+  }
+  query pattern callExpr where callee.path ~= "Yaml.safeLoad"
+  emit check core.SafeDeserialization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding archiveEntryWrite19 {
+  requires {
+    dependency("commons-compress")
+  }
+  query pattern callExpr where callee.method == "extract"
+  emit sink code.ArchiveEntryWrite at args[0]
+}
+
+binding xmlParse20 {
+  requires {
+    dependency("groovy-xml")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlHardening21 {
+  requires {
+    dependency("groovy-xml")
+  }
+  query pattern callExpr where callee.path ~= "XmlSlurper" and args.any.literal contains "allowDocTypeDeclaration=false"
+  emit check core.XmlHardening at call {
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}
+
+binding xpathQuery22 {
+  requires {
+    dependency("javax.xml.xpath")
+  }
+  query pattern callExpr where callee.method == "evaluate"
+  emit sink code.XpathQuery at args[0]
+}
+
+binding ldapQuery23 {
+  requires {
+    dependency("spring-ldap")
+  }
+  query pattern callExpr where callee.method == "search"
+  emit sink code.LdapQuery at args[1]
+}
+
+binding ldapEscape24 {
+  requires {
+    dependency("spring-ldap")
+  }
+  query pattern callExpr where callee.path ~= "LdapEncoder.filterEncode"
+  emit check core.LdapEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding regexCompile25 {
+  requires {
+    dependency("java.util.regex")
+  }
+  query pattern callExpr where callee.path ~= "Pattern.compile"
+  emit sink code.RegexCompileSink at args[0]
+}
+
+binding htmlEscape26 {
+  requires {
+    dependency("commons-text")
+  }
+  query pattern callExpr where callee.path ~= "StringEscapeUtils.escapeHtml4"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape27 {
+  requires {
+    dependency("owasp-java-encoder")
+  }
+  query pattern callExpr where callee.path ~= "Encode.forHtml"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding pathCanonicalization28 {
+  requires {
+    dependency("commons-io")
+  }
+  query pattern callExpr where callee.path ~= "FilenameUtils.normalize"
+  emit check core.PathCanonicalization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding authenticationCheck29 {
+  requires {
+    dependency("grails-spring-security-core")
+  }
+  query pattern callExpr where callee.path ~= "springSecurityService.isLoggedIn"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck30 {
+  requires {
+    dependency("grails-spring-security-core")
+  }
+  query pattern callExpr where callee.path ~= "SpringSecurityUtils.ifAllGranted"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

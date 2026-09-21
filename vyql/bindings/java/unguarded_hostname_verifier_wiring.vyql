@@ -1,0 +1,50 @@
+module bindings.java.unguardedHostnameVerifierWiring;
+
+// Apache HttpClient wires hostname verification through an X509HostnameVerifier
+// handed to the SSL socket factory's constructor. The verifier is optional
+// everywhere else in the library -- HttpClientBuilder exposes it only through
+// `setHostnameVerifier`, and leaves the field null until a caller sets it --
+// while the 4.3 constructor a null verifier was handed to stored it verbatim
+// and ran its verify path only when the field was non-null. A builder or
+// helper that threads its possibly-null verifier straight into that
+// constructor therefore wires a connection factory whose hostname
+// verification is silently off for every caller that never configured one.
+// That is the same finding as the explicit opt-outs beside it in this family
+// (`setHostnameVerifier(true)`, `NoopHostnameVerifier`): hostname verification
+// not performed, discovered at the wiring site rather than at the switch.
+//
+// Three facts, all read off the wiring function's own body. The hand-off: a
+// `hostnameVerifier` reaching an `SSLConnectionSocketFactory` or the
+// deprecated `SSLSocketFactory` constructor, read off the call-argument pair,
+// which keeps the needle on the argument the constructor actually receives --
+// same-named getters, `TestX509HostnameVerifier` class references and other
+// bare mentions of the word elsewhere in the function do not pair with the
+// constructor and do not satisfy it. The null guard: no `hostnameVerifier ==
+// null` / `!= null` comparison in the function, the shape of every fix of
+// this weakness, which defaults the verifier before the hand-off. And the
+// provenance exclusions, each a way the verifier is known non-null: a call
+// naming a hostname verifier in the function -- a constructed
+// `BrowserCompatHostnameVerifier`, `DefaultHostnameVerifier`, or any project's
+// own `*HostnameVerifier` implementation, whose construction is the last
+// statement before the hand-off in the library's own documented example -- and
+// a `hostnameVerifier` parameter, the pass-through helper whose null-ness is
+// its caller's to settle. JDK `javax.net.ssl.HostnameVerifier` arguments ride
+// the same needles: the constructor spellings that take them belong to the
+// same library and treat null the same way.
+//
+// Residual, both directions. A verifier defaulted at its field declaration or
+// through `Objects.requireNonNull` in a helper the wiring function does not
+// name is invisible here, so a provably non-null verifier wired without a
+// local guard still reports -- the false-positive direction. And a function
+// that both wires an unguarded verifier and makes any other
+// hostname-verifier-named call is silenced by the provenance clause -- the
+// false-negative direction only.
+
+binding javaNullableHostnameVerifierWiredUnguarded {
+  query pattern presenceNode where node.scope == "function"
+    and containsAny(node.context.callArg, ["SSLConnectionSocketFactory:hostnameVerifier", "SSLSocketFactory:hostnameVerifier"])
+    and not containsAny(node.context.expr, ["hostnameVerifier==null", "hostnameVerifier!=null"])
+    and not containsAny(node.context.call, ["HostnameVerifier"])
+    and not containsAny(node.context.paramName, ["hostnameVerifier"])
+  emit issue code.CertValidationDisabled at node
+}

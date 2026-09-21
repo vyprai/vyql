@@ -1,0 +1,1130 @@
+# Rank 1251 / CVE-2024-28233 (GHSA-7r3h-4ph8-w38g): JupyterHub's
+# HubOAuth cookie-authentication path (jupyterhub/services/auth.py, used by
+# both the single-user server mixin and Hub-managed services) accepted any
+# request carrying a valid secure session cookie with no XSRF or Origin
+# check at all -- HubOAuth._get_token_cookie() calls
+# handler.get_secure_cookie(self.cookie_name) and HubOAuth._get_user_cookie()
+# hands the decoded token straight to user_for_token(), so a same-site
+# subdomain that tosses a cookie onto the Hub's path (or, in a
+# single-origin deployment, a user's own notebook content running under the
+# same origin) can drive state-changing Hub/API/service requests carrying
+# the ambient cookie (CWE-352/CWE-346). The fixing merge
+# (GHSA-7r3h-4ph8-w38g) has 3fa60e6849668ec1be35082d7f6e81f3db96222d
+# add jupyterhub/_xsrf_utils.py and thread check_xsrf_cookie() through
+# HubOAuth._get_user_cookie() (a new _needs_check_xsrf() gate on
+# Sec-Fetch-Mode/method) and through BaseHandler.prepare(), alongside
+# unrelated hardening (the __Host- cookie prefix, tightened
+# frame-ancestors, cookie_host_prefix_enabled, allow_token_in_url).
+#
+# ATTENTION, engine gap. The concept this needs ships:
+# code.CookieAuthHandlerMissingPrepareOriginCheck / VYQL-RF-044 (rank 1219,
+# CVE-2015-5607, vyql/bindings/python/cookie_auth_origin_check.vyql) is a
+# general Python binding, gated on dependency("tornado"), that fires at
+# node.scope == "module" whenever a module calls get_secure_cookie and
+# defines neither an Origin/Host netloc comparison (urlparse(...).netloc)
+# nor Tornado's own check_xsrf_cookie/xsrf_cookies alternative anywhere in
+# the file -- exactly what jupyterhub/services/auth.py's vulnerable
+# revision is: `grep -ni "xsrf\|urlparse"` on the real file at the fixed
+# revision's
+# parent commit (e2798a088f5ad45340fe79cdf1386198e664f77f^) returns nothing,
+# and the fixed revision adds both. Confirmed the binding logic is right by
+# copying the real, unmodified HubOAuth._get_token_cookie/_get_user_cookie
+# block (lines 750-767 of the vulnerable services/auth.py) to just after the
+# file's imports: VYQL-RF-044 fires there. Left at its real position, after
+# ~700 lines of HubAuth's own Traitlets Unicode/Dict/Bool config option
+# definitions (each with a multi-line help docstring), the identical,
+# byte-for-byte block is invisible -- confirmed with `vyql scan --cache off`
+# on a minimal repro (services/auth.py plus a requirements.txt declaring
+# tornado): 9 findings, none of them VYQL-RF-044.
+#
+# The cause is the same shape recorded for rank 1223's Java
+# class-scope gap, but for Python's module scope: pyModuleContext
+# (internal/extract/frontend/treesitter/python.go:81) builds
+# c.moduleTokens by walking the whole module with
+# pyStructuredContextTokensScoped, whose `add` closure
+# (python.go:797) and node walk (python.go:814) both hard-stop, mid-walk,
+# the instant len(out) reaches pyContextBaseTokenLimit (512,
+# python_context_control.go:10) -- not a per-output cap, a walk that never
+# reaches the rest of the tree. A module with enough distinct
+# identifiers/literals/call-paths ahead of the vulnerable call exhausts the
+# budget before the walk ever gets there, and every node.scope == "module"
+# Python presence binding, VYQL-RF-044 included, goes blind to everything
+# after that point -- not specific to this CVE, this binding, or
+# jupyterhub: any large, docstring/config-heavy Python module (Django
+# settings, Flask app factories, any Traitlets-configured class, which is
+# exactly HubAuth's own shape) can silently hide code past the cutoff from
+# every module-scope presence rule.
+#
+# Isolated CVE-independently, using the shipped VYQL-RF-044
+# pipeline and no jupyterhub vocabulary at all: rank 1219's own IPython
+# Notebook probe (AuthenticatedHandler.get_current_user calling
+# get_secure_cookie, no Origin/xsrf check anywhere in the module), padded
+# with unrelated PaddingHelper classes ahead of it, stops firing once
+# enough padding classes precede it. 37 padding classes still fires; 38
+# does not -- both below, as the test pair, confirming a general per-module
+# token budget rather than anything about jupyterhub's or IPython's own
+# class shape.
+#
+# Scanning the real checkout (bounded, timeout 180, --max-ram 4GB, --cache
+# off, docs/jsx/share/testing/onbuild/dockerfiles/ci/examples/demo-image
+# excluded so the scan finishes inside the bound) confirms the same absence
+# at scale: no VYQL-RF-044 finding names auth.py at the vulnerable parent
+# commit.
+#
+# Raising or removing the 512-token module-scope cap is two constants in
+# one file, mirroring rank 1223's recorded class-scope entry, but
+# not a bounded, risk-free change made inside one rank's review: an
+# unbounded (or much larger) per-module token budget changes what every
+# other shipped module-scope Python binding sees on every large
+# real module in the corpus, and needs a precision/perf pass across the
+# whole benchmark, not a bump here. Recorded rather than attempted; no
+# definition change ships with this rank.
+#
+# verify_current_expected: attention-engine-gap, isolating pair below.
+
+test "rank1251: cookie-authenticated handler, with 37 unrelated padding classes ahead of it, is still caught"
+  lang python
+  file handlers.py
+  expect VYQL-RF-044
+  expect_review code.CookieAuthHandlerMissingPrepareOriginCheck
+  code
+  ```
+  from tornado import web
+
+  class PaddingHelper0:
+      """Padding helper number 0 used only to grow the module token budget."""
+
+      def compute_value_0(self, arg_one, arg_two, arg_three):
+          local_sum_0 = arg_one + arg_two + arg_three
+          if local_sum_0 > 0:
+              return "branch_taken_0"
+          return "branch_not_taken_0"
+
+      def another_method_0(self, payload):
+          transformed_0 = payload.strip().lower()
+          return transformed_0
+
+  class PaddingHelper1:
+      """Padding helper number 1 used only to grow the module token budget."""
+
+      def compute_value_1(self, arg_one, arg_two, arg_three):
+          local_sum_1 = arg_one + arg_two + arg_three
+          if local_sum_1 > 1:
+              return "branch_taken_1"
+          return "branch_not_taken_1"
+
+      def another_method_1(self, payload):
+          transformed_1 = payload.strip().lower()
+          return transformed_1
+
+  class PaddingHelper2:
+      """Padding helper number 2 used only to grow the module token budget."""
+
+      def compute_value_2(self, arg_one, arg_two, arg_three):
+          local_sum_2 = arg_one + arg_two + arg_three
+          if local_sum_2 > 2:
+              return "branch_taken_2"
+          return "branch_not_taken_2"
+
+      def another_method_2(self, payload):
+          transformed_2 = payload.strip().lower()
+          return transformed_2
+
+  class PaddingHelper3:
+      """Padding helper number 3 used only to grow the module token budget."""
+
+      def compute_value_3(self, arg_one, arg_two, arg_three):
+          local_sum_3 = arg_one + arg_two + arg_three
+          if local_sum_3 > 3:
+              return "branch_taken_3"
+          return "branch_not_taken_3"
+
+      def another_method_3(self, payload):
+          transformed_3 = payload.strip().lower()
+          return transformed_3
+
+  class PaddingHelper4:
+      """Padding helper number 4 used only to grow the module token budget."""
+
+      def compute_value_4(self, arg_one, arg_two, arg_three):
+          local_sum_4 = arg_one + arg_two + arg_three
+          if local_sum_4 > 4:
+              return "branch_taken_4"
+          return "branch_not_taken_4"
+
+      def another_method_4(self, payload):
+          transformed_4 = payload.strip().lower()
+          return transformed_4
+
+  class PaddingHelper5:
+      """Padding helper number 5 used only to grow the module token budget."""
+
+      def compute_value_5(self, arg_one, arg_two, arg_three):
+          local_sum_5 = arg_one + arg_two + arg_three
+          if local_sum_5 > 5:
+              return "branch_taken_5"
+          return "branch_not_taken_5"
+
+      def another_method_5(self, payload):
+          transformed_5 = payload.strip().lower()
+          return transformed_5
+
+  class PaddingHelper6:
+      """Padding helper number 6 used only to grow the module token budget."""
+
+      def compute_value_6(self, arg_one, arg_two, arg_three):
+          local_sum_6 = arg_one + arg_two + arg_three
+          if local_sum_6 > 6:
+              return "branch_taken_6"
+          return "branch_not_taken_6"
+
+      def another_method_6(self, payload):
+          transformed_6 = payload.strip().lower()
+          return transformed_6
+
+  class PaddingHelper7:
+      """Padding helper number 7 used only to grow the module token budget."""
+
+      def compute_value_7(self, arg_one, arg_two, arg_three):
+          local_sum_7 = arg_one + arg_two + arg_three
+          if local_sum_7 > 7:
+              return "branch_taken_7"
+          return "branch_not_taken_7"
+
+      def another_method_7(self, payload):
+          transformed_7 = payload.strip().lower()
+          return transformed_7
+
+  class PaddingHelper8:
+      """Padding helper number 8 used only to grow the module token budget."""
+
+      def compute_value_8(self, arg_one, arg_two, arg_three):
+          local_sum_8 = arg_one + arg_two + arg_three
+          if local_sum_8 > 8:
+              return "branch_taken_8"
+          return "branch_not_taken_8"
+
+      def another_method_8(self, payload):
+          transformed_8 = payload.strip().lower()
+          return transformed_8
+
+  class PaddingHelper9:
+      """Padding helper number 9 used only to grow the module token budget."""
+
+      def compute_value_9(self, arg_one, arg_two, arg_three):
+          local_sum_9 = arg_one + arg_two + arg_three
+          if local_sum_9 > 9:
+              return "branch_taken_9"
+          return "branch_not_taken_9"
+
+      def another_method_9(self, payload):
+          transformed_9 = payload.strip().lower()
+          return transformed_9
+
+  class PaddingHelper10:
+      """Padding helper number 10 used only to grow the module token budget."""
+
+      def compute_value_10(self, arg_one, arg_two, arg_three):
+          local_sum_10 = arg_one + arg_two + arg_three
+          if local_sum_10 > 10:
+              return "branch_taken_10"
+          return "branch_not_taken_10"
+
+      def another_method_10(self, payload):
+          transformed_10 = payload.strip().lower()
+          return transformed_10
+
+  class PaddingHelper11:
+      """Padding helper number 11 used only to grow the module token budget."""
+
+      def compute_value_11(self, arg_one, arg_two, arg_three):
+          local_sum_11 = arg_one + arg_two + arg_three
+          if local_sum_11 > 11:
+              return "branch_taken_11"
+          return "branch_not_taken_11"
+
+      def another_method_11(self, payload):
+          transformed_11 = payload.strip().lower()
+          return transformed_11
+
+  class PaddingHelper12:
+      """Padding helper number 12 used only to grow the module token budget."""
+
+      def compute_value_12(self, arg_one, arg_two, arg_three):
+          local_sum_12 = arg_one + arg_two + arg_three
+          if local_sum_12 > 12:
+              return "branch_taken_12"
+          return "branch_not_taken_12"
+
+      def another_method_12(self, payload):
+          transformed_12 = payload.strip().lower()
+          return transformed_12
+
+  class PaddingHelper13:
+      """Padding helper number 13 used only to grow the module token budget."""
+
+      def compute_value_13(self, arg_one, arg_two, arg_three):
+          local_sum_13 = arg_one + arg_two + arg_three
+          if local_sum_13 > 13:
+              return "branch_taken_13"
+          return "branch_not_taken_13"
+
+      def another_method_13(self, payload):
+          transformed_13 = payload.strip().lower()
+          return transformed_13
+
+  class PaddingHelper14:
+      """Padding helper number 14 used only to grow the module token budget."""
+
+      def compute_value_14(self, arg_one, arg_two, arg_three):
+          local_sum_14 = arg_one + arg_two + arg_three
+          if local_sum_14 > 14:
+              return "branch_taken_14"
+          return "branch_not_taken_14"
+
+      def another_method_14(self, payload):
+          transformed_14 = payload.strip().lower()
+          return transformed_14
+
+  class PaddingHelper15:
+      """Padding helper number 15 used only to grow the module token budget."""
+
+      def compute_value_15(self, arg_one, arg_two, arg_three):
+          local_sum_15 = arg_one + arg_two + arg_three
+          if local_sum_15 > 15:
+              return "branch_taken_15"
+          return "branch_not_taken_15"
+
+      def another_method_15(self, payload):
+          transformed_15 = payload.strip().lower()
+          return transformed_15
+
+  class PaddingHelper16:
+      """Padding helper number 16 used only to grow the module token budget."""
+
+      def compute_value_16(self, arg_one, arg_two, arg_three):
+          local_sum_16 = arg_one + arg_two + arg_three
+          if local_sum_16 > 16:
+              return "branch_taken_16"
+          return "branch_not_taken_16"
+
+      def another_method_16(self, payload):
+          transformed_16 = payload.strip().lower()
+          return transformed_16
+
+  class PaddingHelper17:
+      """Padding helper number 17 used only to grow the module token budget."""
+
+      def compute_value_17(self, arg_one, arg_two, arg_three):
+          local_sum_17 = arg_one + arg_two + arg_three
+          if local_sum_17 > 17:
+              return "branch_taken_17"
+          return "branch_not_taken_17"
+
+      def another_method_17(self, payload):
+          transformed_17 = payload.strip().lower()
+          return transformed_17
+
+  class PaddingHelper18:
+      """Padding helper number 18 used only to grow the module token budget."""
+
+      def compute_value_18(self, arg_one, arg_two, arg_three):
+          local_sum_18 = arg_one + arg_two + arg_three
+          if local_sum_18 > 18:
+              return "branch_taken_18"
+          return "branch_not_taken_18"
+
+      def another_method_18(self, payload):
+          transformed_18 = payload.strip().lower()
+          return transformed_18
+
+  class PaddingHelper19:
+      """Padding helper number 19 used only to grow the module token budget."""
+
+      def compute_value_19(self, arg_one, arg_two, arg_three):
+          local_sum_19 = arg_one + arg_two + arg_three
+          if local_sum_19 > 19:
+              return "branch_taken_19"
+          return "branch_not_taken_19"
+
+      def another_method_19(self, payload):
+          transformed_19 = payload.strip().lower()
+          return transformed_19
+
+  class PaddingHelper20:
+      """Padding helper number 20 used only to grow the module token budget."""
+
+      def compute_value_20(self, arg_one, arg_two, arg_three):
+          local_sum_20 = arg_one + arg_two + arg_three
+          if local_sum_20 > 20:
+              return "branch_taken_20"
+          return "branch_not_taken_20"
+
+      def another_method_20(self, payload):
+          transformed_20 = payload.strip().lower()
+          return transformed_20
+
+  class PaddingHelper21:
+      """Padding helper number 21 used only to grow the module token budget."""
+
+      def compute_value_21(self, arg_one, arg_two, arg_three):
+          local_sum_21 = arg_one + arg_two + arg_three
+          if local_sum_21 > 21:
+              return "branch_taken_21"
+          return "branch_not_taken_21"
+
+      def another_method_21(self, payload):
+          transformed_21 = payload.strip().lower()
+          return transformed_21
+
+  class PaddingHelper22:
+      """Padding helper number 22 used only to grow the module token budget."""
+
+      def compute_value_22(self, arg_one, arg_two, arg_three):
+          local_sum_22 = arg_one + arg_two + arg_three
+          if local_sum_22 > 22:
+              return "branch_taken_22"
+          return "branch_not_taken_22"
+
+      def another_method_22(self, payload):
+          transformed_22 = payload.strip().lower()
+          return transformed_22
+
+  class PaddingHelper23:
+      """Padding helper number 23 used only to grow the module token budget."""
+
+      def compute_value_23(self, arg_one, arg_two, arg_three):
+          local_sum_23 = arg_one + arg_two + arg_three
+          if local_sum_23 > 23:
+              return "branch_taken_23"
+          return "branch_not_taken_23"
+
+      def another_method_23(self, payload):
+          transformed_23 = payload.strip().lower()
+          return transformed_23
+
+  class PaddingHelper24:
+      """Padding helper number 24 used only to grow the module token budget."""
+
+      def compute_value_24(self, arg_one, arg_two, arg_three):
+          local_sum_24 = arg_one + arg_two + arg_three
+          if local_sum_24 > 24:
+              return "branch_taken_24"
+          return "branch_not_taken_24"
+
+      def another_method_24(self, payload):
+          transformed_24 = payload.strip().lower()
+          return transformed_24
+
+  class PaddingHelper25:
+      """Padding helper number 25 used only to grow the module token budget."""
+
+      def compute_value_25(self, arg_one, arg_two, arg_three):
+          local_sum_25 = arg_one + arg_two + arg_three
+          if local_sum_25 > 25:
+              return "branch_taken_25"
+          return "branch_not_taken_25"
+
+      def another_method_25(self, payload):
+          transformed_25 = payload.strip().lower()
+          return transformed_25
+
+  class PaddingHelper26:
+      """Padding helper number 26 used only to grow the module token budget."""
+
+      def compute_value_26(self, arg_one, arg_two, arg_three):
+          local_sum_26 = arg_one + arg_two + arg_three
+          if local_sum_26 > 26:
+              return "branch_taken_26"
+          return "branch_not_taken_26"
+
+      def another_method_26(self, payload):
+          transformed_26 = payload.strip().lower()
+          return transformed_26
+
+  class PaddingHelper27:
+      """Padding helper number 27 used only to grow the module token budget."""
+
+      def compute_value_27(self, arg_one, arg_two, arg_three):
+          local_sum_27 = arg_one + arg_two + arg_three
+          if local_sum_27 > 27:
+              return "branch_taken_27"
+          return "branch_not_taken_27"
+
+      def another_method_27(self, payload):
+          transformed_27 = payload.strip().lower()
+          return transformed_27
+
+  class PaddingHelper28:
+      """Padding helper number 28 used only to grow the module token budget."""
+
+      def compute_value_28(self, arg_one, arg_two, arg_three):
+          local_sum_28 = arg_one + arg_two + arg_three
+          if local_sum_28 > 28:
+              return "branch_taken_28"
+          return "branch_not_taken_28"
+
+      def another_method_28(self, payload):
+          transformed_28 = payload.strip().lower()
+          return transformed_28
+
+  class PaddingHelper29:
+      """Padding helper number 29 used only to grow the module token budget."""
+
+      def compute_value_29(self, arg_one, arg_two, arg_three):
+          local_sum_29 = arg_one + arg_two + arg_three
+          if local_sum_29 > 29:
+              return "branch_taken_29"
+          return "branch_not_taken_29"
+
+      def another_method_29(self, payload):
+          transformed_29 = payload.strip().lower()
+          return transformed_29
+
+  class PaddingHelper30:
+      """Padding helper number 30 used only to grow the module token budget."""
+
+      def compute_value_30(self, arg_one, arg_two, arg_three):
+          local_sum_30 = arg_one + arg_two + arg_three
+          if local_sum_30 > 30:
+              return "branch_taken_30"
+          return "branch_not_taken_30"
+
+      def another_method_30(self, payload):
+          transformed_30 = payload.strip().lower()
+          return transformed_30
+
+  class PaddingHelper31:
+      """Padding helper number 31 used only to grow the module token budget."""
+
+      def compute_value_31(self, arg_one, arg_two, arg_three):
+          local_sum_31 = arg_one + arg_two + arg_three
+          if local_sum_31 > 31:
+              return "branch_taken_31"
+          return "branch_not_taken_31"
+
+      def another_method_31(self, payload):
+          transformed_31 = payload.strip().lower()
+          return transformed_31
+
+  class PaddingHelper32:
+      """Padding helper number 32 used only to grow the module token budget."""
+
+      def compute_value_32(self, arg_one, arg_two, arg_three):
+          local_sum_32 = arg_one + arg_two + arg_three
+          if local_sum_32 > 32:
+              return "branch_taken_32"
+          return "branch_not_taken_32"
+
+      def another_method_32(self, payload):
+          transformed_32 = payload.strip().lower()
+          return transformed_32
+
+  class PaddingHelper33:
+      """Padding helper number 33 used only to grow the module token budget."""
+
+      def compute_value_33(self, arg_one, arg_two, arg_three):
+          local_sum_33 = arg_one + arg_two + arg_three
+          if local_sum_33 > 33:
+              return "branch_taken_33"
+          return "branch_not_taken_33"
+
+      def another_method_33(self, payload):
+          transformed_33 = payload.strip().lower()
+          return transformed_33
+
+  class PaddingHelper34:
+      """Padding helper number 34 used only to grow the module token budget."""
+
+      def compute_value_34(self, arg_one, arg_two, arg_three):
+          local_sum_34 = arg_one + arg_two + arg_three
+          if local_sum_34 > 34:
+              return "branch_taken_34"
+          return "branch_not_taken_34"
+
+      def another_method_34(self, payload):
+          transformed_34 = payload.strip().lower()
+          return transformed_34
+
+  class PaddingHelper35:
+      """Padding helper number 35 used only to grow the module token budget."""
+
+      def compute_value_35(self, arg_one, arg_two, arg_three):
+          local_sum_35 = arg_one + arg_two + arg_three
+          if local_sum_35 > 35:
+              return "branch_taken_35"
+          return "branch_not_taken_35"
+
+      def another_method_35(self, payload):
+          transformed_35 = payload.strip().lower()
+          return transformed_35
+
+  class PaddingHelper36:
+      """Padding helper number 36 used only to grow the module token budget."""
+
+      def compute_value_36(self, arg_one, arg_two, arg_three):
+          local_sum_36 = arg_one + arg_two + arg_three
+          if local_sum_36 > 36:
+              return "branch_taken_36"
+          return "branch_not_taken_36"
+
+      def another_method_36(self, payload):
+          transformed_36 = payload.strip().lower()
+          return transformed_36
+
+
+  class AuthenticatedHandler(web.RequestHandler):
+      """A RequestHandler with an authenticated user."""
+
+      def get_current_user(self):
+          user_id = self.get_secure_cookie(self.cookie_name)
+          if user_id is None:
+              self.clear_cookie(self.cookie_name)
+              user_id = 'anonymous'
+          return user_id
+
+
+  class IPythonHandler(AuthenticatedHandler):
+      """IPython-specific extensions to authenticated handling"""
+
+      def get_origin(self):
+          if "Origin" in self.request.headers:
+              return self.request.headers.get("Origin")
+          return self.request.headers.get("Sec-Websocket-Origin", None)
+
+
+  class Template404(IPythonHandler):
+      """Render our 404 template"""
+      def prepare(self):
+          raise web.HTTPError(404)
+  ```
+
+test "rank1251: the identical handler, with 38 unrelated padding classes ahead of it, is invisible"
+  lang python
+  file handlers.py
+  reject VYQL-RF-044
+  reject_review code.CookieAuthHandlerMissingPrepareOriginCheck
+  code
+  ```
+  from tornado import web
+
+  class PaddingHelper0:
+      """Padding helper number 0 used only to grow the module token budget."""
+
+      def compute_value_0(self, arg_one, arg_two, arg_three):
+          local_sum_0 = arg_one + arg_two + arg_three
+          if local_sum_0 > 0:
+              return "branch_taken_0"
+          return "branch_not_taken_0"
+
+      def another_method_0(self, payload):
+          transformed_0 = payload.strip().lower()
+          return transformed_0
+
+  class PaddingHelper1:
+      """Padding helper number 1 used only to grow the module token budget."""
+
+      def compute_value_1(self, arg_one, arg_two, arg_three):
+          local_sum_1 = arg_one + arg_two + arg_three
+          if local_sum_1 > 1:
+              return "branch_taken_1"
+          return "branch_not_taken_1"
+
+      def another_method_1(self, payload):
+          transformed_1 = payload.strip().lower()
+          return transformed_1
+
+  class PaddingHelper2:
+      """Padding helper number 2 used only to grow the module token budget."""
+
+      def compute_value_2(self, arg_one, arg_two, arg_three):
+          local_sum_2 = arg_one + arg_two + arg_three
+          if local_sum_2 > 2:
+              return "branch_taken_2"
+          return "branch_not_taken_2"
+
+      def another_method_2(self, payload):
+          transformed_2 = payload.strip().lower()
+          return transformed_2
+
+  class PaddingHelper3:
+      """Padding helper number 3 used only to grow the module token budget."""
+
+      def compute_value_3(self, arg_one, arg_two, arg_three):
+          local_sum_3 = arg_one + arg_two + arg_three
+          if local_sum_3 > 3:
+              return "branch_taken_3"
+          return "branch_not_taken_3"
+
+      def another_method_3(self, payload):
+          transformed_3 = payload.strip().lower()
+          return transformed_3
+
+  class PaddingHelper4:
+      """Padding helper number 4 used only to grow the module token budget."""
+
+      def compute_value_4(self, arg_one, arg_two, arg_three):
+          local_sum_4 = arg_one + arg_two + arg_three
+          if local_sum_4 > 4:
+              return "branch_taken_4"
+          return "branch_not_taken_4"
+
+      def another_method_4(self, payload):
+          transformed_4 = payload.strip().lower()
+          return transformed_4
+
+  class PaddingHelper5:
+      """Padding helper number 5 used only to grow the module token budget."""
+
+      def compute_value_5(self, arg_one, arg_two, arg_three):
+          local_sum_5 = arg_one + arg_two + arg_three
+          if local_sum_5 > 5:
+              return "branch_taken_5"
+          return "branch_not_taken_5"
+
+      def another_method_5(self, payload):
+          transformed_5 = payload.strip().lower()
+          return transformed_5
+
+  class PaddingHelper6:
+      """Padding helper number 6 used only to grow the module token budget."""
+
+      def compute_value_6(self, arg_one, arg_two, arg_three):
+          local_sum_6 = arg_one + arg_two + arg_three
+          if local_sum_6 > 6:
+              return "branch_taken_6"
+          return "branch_not_taken_6"
+
+      def another_method_6(self, payload):
+          transformed_6 = payload.strip().lower()
+          return transformed_6
+
+  class PaddingHelper7:
+      """Padding helper number 7 used only to grow the module token budget."""
+
+      def compute_value_7(self, arg_one, arg_two, arg_three):
+          local_sum_7 = arg_one + arg_two + arg_three
+          if local_sum_7 > 7:
+              return "branch_taken_7"
+          return "branch_not_taken_7"
+
+      def another_method_7(self, payload):
+          transformed_7 = payload.strip().lower()
+          return transformed_7
+
+  class PaddingHelper8:
+      """Padding helper number 8 used only to grow the module token budget."""
+
+      def compute_value_8(self, arg_one, arg_two, arg_three):
+          local_sum_8 = arg_one + arg_two + arg_three
+          if local_sum_8 > 8:
+              return "branch_taken_8"
+          return "branch_not_taken_8"
+
+      def another_method_8(self, payload):
+          transformed_8 = payload.strip().lower()
+          return transformed_8
+
+  class PaddingHelper9:
+      """Padding helper number 9 used only to grow the module token budget."""
+
+      def compute_value_9(self, arg_one, arg_two, arg_three):
+          local_sum_9 = arg_one + arg_two + arg_three
+          if local_sum_9 > 9:
+              return "branch_taken_9"
+          return "branch_not_taken_9"
+
+      def another_method_9(self, payload):
+          transformed_9 = payload.strip().lower()
+          return transformed_9
+
+  class PaddingHelper10:
+      """Padding helper number 10 used only to grow the module token budget."""
+
+      def compute_value_10(self, arg_one, arg_two, arg_three):
+          local_sum_10 = arg_one + arg_two + arg_three
+          if local_sum_10 > 10:
+              return "branch_taken_10"
+          return "branch_not_taken_10"
+
+      def another_method_10(self, payload):
+          transformed_10 = payload.strip().lower()
+          return transformed_10
+
+  class PaddingHelper11:
+      """Padding helper number 11 used only to grow the module token budget."""
+
+      def compute_value_11(self, arg_one, arg_two, arg_three):
+          local_sum_11 = arg_one + arg_two + arg_three
+          if local_sum_11 > 11:
+              return "branch_taken_11"
+          return "branch_not_taken_11"
+
+      def another_method_11(self, payload):
+          transformed_11 = payload.strip().lower()
+          return transformed_11
+
+  class PaddingHelper12:
+      """Padding helper number 12 used only to grow the module token budget."""
+
+      def compute_value_12(self, arg_one, arg_two, arg_three):
+          local_sum_12 = arg_one + arg_two + arg_three
+          if local_sum_12 > 12:
+              return "branch_taken_12"
+          return "branch_not_taken_12"
+
+      def another_method_12(self, payload):
+          transformed_12 = payload.strip().lower()
+          return transformed_12
+
+  class PaddingHelper13:
+      """Padding helper number 13 used only to grow the module token budget."""
+
+      def compute_value_13(self, arg_one, arg_two, arg_three):
+          local_sum_13 = arg_one + arg_two + arg_three
+          if local_sum_13 > 13:
+              return "branch_taken_13"
+          return "branch_not_taken_13"
+
+      def another_method_13(self, payload):
+          transformed_13 = payload.strip().lower()
+          return transformed_13
+
+  class PaddingHelper14:
+      """Padding helper number 14 used only to grow the module token budget."""
+
+      def compute_value_14(self, arg_one, arg_two, arg_three):
+          local_sum_14 = arg_one + arg_two + arg_three
+          if local_sum_14 > 14:
+              return "branch_taken_14"
+          return "branch_not_taken_14"
+
+      def another_method_14(self, payload):
+          transformed_14 = payload.strip().lower()
+          return transformed_14
+
+  class PaddingHelper15:
+      """Padding helper number 15 used only to grow the module token budget."""
+
+      def compute_value_15(self, arg_one, arg_two, arg_three):
+          local_sum_15 = arg_one + arg_two + arg_three
+          if local_sum_15 > 15:
+              return "branch_taken_15"
+          return "branch_not_taken_15"
+
+      def another_method_15(self, payload):
+          transformed_15 = payload.strip().lower()
+          return transformed_15
+
+  class PaddingHelper16:
+      """Padding helper number 16 used only to grow the module token budget."""
+
+      def compute_value_16(self, arg_one, arg_two, arg_three):
+          local_sum_16 = arg_one + arg_two + arg_three
+          if local_sum_16 > 16:
+              return "branch_taken_16"
+          return "branch_not_taken_16"
+
+      def another_method_16(self, payload):
+          transformed_16 = payload.strip().lower()
+          return transformed_16
+
+  class PaddingHelper17:
+      """Padding helper number 17 used only to grow the module token budget."""
+
+      def compute_value_17(self, arg_one, arg_two, arg_three):
+          local_sum_17 = arg_one + arg_two + arg_three
+          if local_sum_17 > 17:
+              return "branch_taken_17"
+          return "branch_not_taken_17"
+
+      def another_method_17(self, payload):
+          transformed_17 = payload.strip().lower()
+          return transformed_17
+
+  class PaddingHelper18:
+      """Padding helper number 18 used only to grow the module token budget."""
+
+      def compute_value_18(self, arg_one, arg_two, arg_three):
+          local_sum_18 = arg_one + arg_two + arg_three
+          if local_sum_18 > 18:
+              return "branch_taken_18"
+          return "branch_not_taken_18"
+
+      def another_method_18(self, payload):
+          transformed_18 = payload.strip().lower()
+          return transformed_18
+
+  class PaddingHelper19:
+      """Padding helper number 19 used only to grow the module token budget."""
+
+      def compute_value_19(self, arg_one, arg_two, arg_three):
+          local_sum_19 = arg_one + arg_two + arg_three
+          if local_sum_19 > 19:
+              return "branch_taken_19"
+          return "branch_not_taken_19"
+
+      def another_method_19(self, payload):
+          transformed_19 = payload.strip().lower()
+          return transformed_19
+
+  class PaddingHelper20:
+      """Padding helper number 20 used only to grow the module token budget."""
+
+      def compute_value_20(self, arg_one, arg_two, arg_three):
+          local_sum_20 = arg_one + arg_two + arg_three
+          if local_sum_20 > 20:
+              return "branch_taken_20"
+          return "branch_not_taken_20"
+
+      def another_method_20(self, payload):
+          transformed_20 = payload.strip().lower()
+          return transformed_20
+
+  class PaddingHelper21:
+      """Padding helper number 21 used only to grow the module token budget."""
+
+      def compute_value_21(self, arg_one, arg_two, arg_three):
+          local_sum_21 = arg_one + arg_two + arg_three
+          if local_sum_21 > 21:
+              return "branch_taken_21"
+          return "branch_not_taken_21"
+
+      def another_method_21(self, payload):
+          transformed_21 = payload.strip().lower()
+          return transformed_21
+
+  class PaddingHelper22:
+      """Padding helper number 22 used only to grow the module token budget."""
+
+      def compute_value_22(self, arg_one, arg_two, arg_three):
+          local_sum_22 = arg_one + arg_two + arg_three
+          if local_sum_22 > 22:
+              return "branch_taken_22"
+          return "branch_not_taken_22"
+
+      def another_method_22(self, payload):
+          transformed_22 = payload.strip().lower()
+          return transformed_22
+
+  class PaddingHelper23:
+      """Padding helper number 23 used only to grow the module token budget."""
+
+      def compute_value_23(self, arg_one, arg_two, arg_three):
+          local_sum_23 = arg_one + arg_two + arg_three
+          if local_sum_23 > 23:
+              return "branch_taken_23"
+          return "branch_not_taken_23"
+
+      def another_method_23(self, payload):
+          transformed_23 = payload.strip().lower()
+          return transformed_23
+
+  class PaddingHelper24:
+      """Padding helper number 24 used only to grow the module token budget."""
+
+      def compute_value_24(self, arg_one, arg_two, arg_three):
+          local_sum_24 = arg_one + arg_two + arg_three
+          if local_sum_24 > 24:
+              return "branch_taken_24"
+          return "branch_not_taken_24"
+
+      def another_method_24(self, payload):
+          transformed_24 = payload.strip().lower()
+          return transformed_24
+
+  class PaddingHelper25:
+      """Padding helper number 25 used only to grow the module token budget."""
+
+      def compute_value_25(self, arg_one, arg_two, arg_three):
+          local_sum_25 = arg_one + arg_two + arg_three
+          if local_sum_25 > 25:
+              return "branch_taken_25"
+          return "branch_not_taken_25"
+
+      def another_method_25(self, payload):
+          transformed_25 = payload.strip().lower()
+          return transformed_25
+
+  class PaddingHelper26:
+      """Padding helper number 26 used only to grow the module token budget."""
+
+      def compute_value_26(self, arg_one, arg_two, arg_three):
+          local_sum_26 = arg_one + arg_two + arg_three
+          if local_sum_26 > 26:
+              return "branch_taken_26"
+          return "branch_not_taken_26"
+
+      def another_method_26(self, payload):
+          transformed_26 = payload.strip().lower()
+          return transformed_26
+
+  class PaddingHelper27:
+      """Padding helper number 27 used only to grow the module token budget."""
+
+      def compute_value_27(self, arg_one, arg_two, arg_three):
+          local_sum_27 = arg_one + arg_two + arg_three
+          if local_sum_27 > 27:
+              return "branch_taken_27"
+          return "branch_not_taken_27"
+
+      def another_method_27(self, payload):
+          transformed_27 = payload.strip().lower()
+          return transformed_27
+
+  class PaddingHelper28:
+      """Padding helper number 28 used only to grow the module token budget."""
+
+      def compute_value_28(self, arg_one, arg_two, arg_three):
+          local_sum_28 = arg_one + arg_two + arg_three
+          if local_sum_28 > 28:
+              return "branch_taken_28"
+          return "branch_not_taken_28"
+
+      def another_method_28(self, payload):
+          transformed_28 = payload.strip().lower()
+          return transformed_28
+
+  class PaddingHelper29:
+      """Padding helper number 29 used only to grow the module token budget."""
+
+      def compute_value_29(self, arg_one, arg_two, arg_three):
+          local_sum_29 = arg_one + arg_two + arg_three
+          if local_sum_29 > 29:
+              return "branch_taken_29"
+          return "branch_not_taken_29"
+
+      def another_method_29(self, payload):
+          transformed_29 = payload.strip().lower()
+          return transformed_29
+
+  class PaddingHelper30:
+      """Padding helper number 30 used only to grow the module token budget."""
+
+      def compute_value_30(self, arg_one, arg_two, arg_three):
+          local_sum_30 = arg_one + arg_two + arg_three
+          if local_sum_30 > 30:
+              return "branch_taken_30"
+          return "branch_not_taken_30"
+
+      def another_method_30(self, payload):
+          transformed_30 = payload.strip().lower()
+          return transformed_30
+
+  class PaddingHelper31:
+      """Padding helper number 31 used only to grow the module token budget."""
+
+      def compute_value_31(self, arg_one, arg_two, arg_three):
+          local_sum_31 = arg_one + arg_two + arg_three
+          if local_sum_31 > 31:
+              return "branch_taken_31"
+          return "branch_not_taken_31"
+
+      def another_method_31(self, payload):
+          transformed_31 = payload.strip().lower()
+          return transformed_31
+
+  class PaddingHelper32:
+      """Padding helper number 32 used only to grow the module token budget."""
+
+      def compute_value_32(self, arg_one, arg_two, arg_three):
+          local_sum_32 = arg_one + arg_two + arg_three
+          if local_sum_32 > 32:
+              return "branch_taken_32"
+          return "branch_not_taken_32"
+
+      def another_method_32(self, payload):
+          transformed_32 = payload.strip().lower()
+          return transformed_32
+
+  class PaddingHelper33:
+      """Padding helper number 33 used only to grow the module token budget."""
+
+      def compute_value_33(self, arg_one, arg_two, arg_three):
+          local_sum_33 = arg_one + arg_two + arg_three
+          if local_sum_33 > 33:
+              return "branch_taken_33"
+          return "branch_not_taken_33"
+
+      def another_method_33(self, payload):
+          transformed_33 = payload.strip().lower()
+          return transformed_33
+
+  class PaddingHelper34:
+      """Padding helper number 34 used only to grow the module token budget."""
+
+      def compute_value_34(self, arg_one, arg_two, arg_three):
+          local_sum_34 = arg_one + arg_two + arg_three
+          if local_sum_34 > 34:
+              return "branch_taken_34"
+          return "branch_not_taken_34"
+
+      def another_method_34(self, payload):
+          transformed_34 = payload.strip().lower()
+          return transformed_34
+
+  class PaddingHelper35:
+      """Padding helper number 35 used only to grow the module token budget."""
+
+      def compute_value_35(self, arg_one, arg_two, arg_three):
+          local_sum_35 = arg_one + arg_two + arg_three
+          if local_sum_35 > 35:
+              return "branch_taken_35"
+          return "branch_not_taken_35"
+
+      def another_method_35(self, payload):
+          transformed_35 = payload.strip().lower()
+          return transformed_35
+
+  class PaddingHelper36:
+      """Padding helper number 36 used only to grow the module token budget."""
+
+      def compute_value_36(self, arg_one, arg_two, arg_three):
+          local_sum_36 = arg_one + arg_two + arg_three
+          if local_sum_36 > 36:
+              return "branch_taken_36"
+          return "branch_not_taken_36"
+
+      def another_method_36(self, payload):
+          transformed_36 = payload.strip().lower()
+          return transformed_36
+
+  class PaddingHelper37:
+      """Padding helper number 37 used only to grow the module token budget."""
+
+      def compute_value_37(self, arg_one, arg_two, arg_three):
+          local_sum_37 = arg_one + arg_two + arg_three
+          if local_sum_37 > 37:
+              return "branch_taken_37"
+          return "branch_not_taken_37"
+
+      def another_method_37(self, payload):
+          transformed_37 = payload.strip().lower()
+          return transformed_37
+
+
+  class AuthenticatedHandler(web.RequestHandler):
+      """A RequestHandler with an authenticated user."""
+
+      def get_current_user(self):
+          user_id = self.get_secure_cookie(self.cookie_name)
+          if user_id is None:
+              self.clear_cookie(self.cookie_name)
+              user_id = 'anonymous'
+          return user_id
+
+
+  class IPythonHandler(AuthenticatedHandler):
+      """IPython-specific extensions to authenticated handling"""
+
+      def get_origin(self):
+          if "Origin" in self.request.headers:
+              return self.request.headers.get("Origin")
+          return self.request.headers.get("Sec-Websocket-Origin", None)
+
+
+  class Template404(IPythonHandler):
+      """Render our 404 template"""
+      def prepare(self):
+          raise web.HTTPError(404)
+  ```

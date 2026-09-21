@@ -1,0 +1,9 @@
+module bindings.java.generated.m1fb2e4b1;
+
+binding codeEval0 {
+  requires {
+    dependency("cglib:cglib")
+  }
+  query pattern callExpr where callee.method == "defineClass"
+  emit sink code.CodeEval at args[0]
+}

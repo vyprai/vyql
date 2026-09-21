@@ -1,0 +1,63 @@
+module bindings.javascript.fail_open_policy_declaration_guard;
+
+// An authorization dispatcher consults the permission a resource requires
+// through a membership test over the collection the caller was actually
+// granted -- `!token.permission.some(p => p === ep.meta.kind)`,
+// `!user.scopes.includes(route.scope)`, `!client.claims.has(scope.claim)` --
+// and conjoins that test with the bare presence of the requirement itself:
+// `if (token && ep.meta.kind && !token.permission.some(...))`. The conjunction
+// is the defect. Wherever the requirement was never declared the guard is
+// false, so the check it guards is skipped rather than failed, and a caller
+// whose grant covers nothing reaches the operation. The remediation names the
+// undeclared case instead: `... || (!ep.meta.kind && deny)`, or
+// `ep.meta.kind == null` in that branch, and either spelling clears the
+// report.
+//
+// Both facts are structural and produced by the JavaScript frontend for this
+// purpose. `fail_open_policy_declaration_guard` is the relation between the
+// sibling conjuncts -- one is the bare read X of a declared field, another is
+// a negated membership call comparing against X, and no operand of the same
+// condition tests X's absence -- so nothing here names what any application
+// calls its requirement field. The collection half is the documented
+// permission-collection vocabulary -- OAuth's `scope`/`scopes`, RBAC `roles`,
+// Spring Security's `authorities`, OIDC's `claims`, and the `permissions`,
+// `grants`, `privileges`, `entitlements`, `capabilities` and `accessRights`
+// that authorization frameworks and token libraries use for the granted set --
+// crossed with the membership calls that answer "is this element in that
+// collection". Requiring the noun on the membership call itself, rather than
+// anywhere in the function, keeps a function that merely reads a permissions
+// object elsewhere from pairing with an unrelated guarded allowlist.
+//
+// Residual, stated: a granted collection named outside that vocabulary (an
+// application that calls it `token.flags`) is invisible, which is the
+// false-negative direction; a requirement held in a plain identifier rather
+// than a field (`if (scope && !token.scopes.includes(scope))`), or spelled
+// only inside a presence test (`ep.meta.kind != null && ...`), does not carry
+// the fact, since the fact keys on a bare declared-field conjunct; the
+// membership test inside the guard is not itself verified to deny, only to
+// be skipped when the requirement is absent; and the pairing is with a
+// permission-collection membership call anywhere in the same function, not
+// necessarily the guard's own membership call, so a fail-open-shaped guard
+// over an unrelated collection in a function that also calls
+// `user.permissions.includes(...)` elsewhere reports. Across the clone
+// corpus no other file carrying the shape contains a permission-collection
+// membership call at all, so that direction is unobserved in practice.
+binding failOpenPolicyDeclarationGuard {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript"
+    and node.context.failOpenPolicyDeclarationGuard == "true"
+    and containsAny(node.context.callPath, [
+      ".permission.some", ".permission.includes", ".permission.has", ".permission.contains",
+      ".permissions.some", ".permissions.includes", ".permissions.has", ".permissions.contains",
+      ".scope.some", ".scope.includes", ".scope.has", ".scope.contains",
+      ".scopes.some", ".scopes.includes", ".scopes.has", ".scopes.contains",
+      ".roles.some", ".roles.includes", ".roles.has", ".roles.contains",
+      ".authorities.some", ".authorities.includes", ".authorities.has", ".authorities.contains",
+      ".grants.some", ".grants.includes", ".grants.has", ".grants.contains",
+      ".privileges.some", ".privileges.includes", ".privileges.has", ".privileges.contains",
+      ".claims.some", ".claims.includes", ".claims.has", ".claims.contains",
+      ".entitlements.some", ".entitlements.includes", ".entitlements.has", ".entitlements.contains",
+      ".capabilities.some", ".capabilities.includes", ".capabilities.has", ".capabilities.contains",
+      ".accessRights.some", ".accessRights.includes", ".accessRights.has", ".accessRights.contains"
+    ])
+  emit issue code.UndeclaredScopeSkipsEnforcement at node
+}

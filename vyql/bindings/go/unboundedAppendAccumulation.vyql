@@ -1,0 +1,17 @@
+module bindings.go.unboundedAppendAccumulation;
+
+// A `for {}` loop that keeps growing a slice through `x = append(x, ...)`
+// runs until its input ends, and each iteration grows the output by whatever
+// the input says: the peer chooses the total allocation (CWE-400/CWE-770).
+// This is the shape of every hand-rolled decode loop that expands compressed
+// data -- the accumulated slice is the decompressed output and the loop is
+// the decoder -- and of every reader that buffers an unbounded stream. The
+// frontend records the construct only where the accumulated slice is not
+// itself declared or reset inside the loop -- a slice recreated every
+// iteration cannot keep growing -- and the enclosing function never compares
+// its len or cap against anything, so a bound check anywhere in the function
+// (`if len(x) > lim { return ... }`) means no fact and no report.
+binding goUnboundedAppendAccumulation {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "go.unbounded_append_accumulation"
+  emit issue code.UnboundedAllocationReview at node
+}

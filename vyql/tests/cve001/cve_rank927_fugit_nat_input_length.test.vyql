@@ -1,0 +1,62 @@
+# Rank 927 / CVE-2024-43380: fugit parsed natural-language schedule text
+# with Raabro before enforcing a maximum input length.
+
+test "rank927: natural-language schedule parser lacks an input length cap"
+  lang ruby
+  file nat.rb
+  expect VYQL-DOS-038
+  expect_review code.UnboundedNaturalLanguageScheduleParse
+  code
+  ```
+  module Fugit
+    module Nat
+      class << self
+        def parse(s, opts={})
+          return s if s.is_a?(Fugit::Cron) || s.is_a?(Fugit::Duration)
+          return nil unless s.is_a?(String)
+
+          s = s.strip
+
+          if slots = Parser.parse(s)
+            slots.to_crons(opts.merge(_s: s))
+          else
+            nil
+          end
+        end
+      end
+    end
+  end
+  ```
+
+test "rank927: natural-language schedule parser bounds input before parsing"
+  lang ruby
+  file nat.rb
+  reject VYQL-DOS-038
+  reject_review code.UnboundedNaturalLanguageScheduleParse
+  code
+  ```
+  module Fugit
+    module Nat
+      MAX_INPUT_LENGTH = 256
+
+      class << self
+        def parse(s, opts={})
+          return s if s.is_a?(Fugit::Cron) || s.is_a?(Fugit::Duration)
+          return nil unless s.is_a?(String)
+
+          s = s.strip
+
+          if s.length > MAX_INPUT_LENGTH
+            return nil
+          end
+
+          if slots = Parser.parse(s)
+            slots.to_crons(opts.merge(_s: s))
+          else
+            nil
+          end
+        end
+      end
+    end
+  end
+  ```

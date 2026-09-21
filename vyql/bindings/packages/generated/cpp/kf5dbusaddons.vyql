@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m4854d0fe;
+
+binding userControlledData0 {
+  requires {
+    dependency("kf5dbusaddons")
+  }
+  query pattern callExpr where callee.method == "CommandLine"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,243 @@
+# pypdf's DictionaryObject.read_from_stream parses dictionary key/value
+# pairs in an unbounded `while True` loop over the PDF byte stream, and
+# its recovery policy converts every parsing error into warn-and-continue
+# in non-strict mode: the broad `except Exception` handler logs, returns
+# partial data, and the key-parse `except PdfReadError` handler logs and
+# continues. Two guards raise on attacker-driven non-progress -- the
+# reader's self-reference cycle guard over _known_objects, and
+# RecursionError on deeply nested objects -- and in non-strict mode the
+# broad handler absorbs both: the failing parse consumed nothing, so the
+# retry re-reads the same bytes, raises the same error, and the loop
+# never reaches an exit (CWE-835/CWE-400; GHSA-87mj-5ggw-8qc3, shipped
+# in 6.9.2). The fix has two halves: the reader's cycle guard raises
+# LimitReachedError instead of PdfReadError, and the dictionary parser
+# adds `except (RecursionError, LimitReachedError): raise
+# PdfReadError(...)` ahead of the broad handler, so those two classes
+# always propagate. The ordinary-malformed-input PdfReadError handler
+# stays in both revisions -- lenient recovery for correctable input is
+# the library's non-strict design, not the defect. Pool commit 02b1345
+# is the fix (PR #3693); the release commit da867f49 names it in its
+# changelog, and the advisory's own reference (COMMIT_NONE, no commit
+# cited) resolves to it. No pool correction.
+#
+# Held ATTENTION, lenient-recovery family (the unbounded-parse group
+# with 1517, 1554, 1572, 1586 and 1612), rechecked at the span tip.
+# Fresh 3 x --cache off scans of the pypdf package at 02b1345^ and
+# 02b1345 report 65 findings at both revisions with identical rule
+# tallies (54 VYQL-AUTH-099, 8 VYQL-PATH-001, 8 VYQL-CRY-001, 4
+# VYQL-DOS-001, 4 VYQL-CRY-002, 3 VYQL-INJ-015, 1 VYQL-INJ-003, 1
+# VYQL-DOS-042, 1 VYQL-DESER-002); a whole-checkout scan passes the
+# 180s bound, and the package subtree holds both changed files. The
+# rows reaching into read_from_stream are two AUTH-099 mass-assignment
+# findings -- source the stream parameter, sink retval.update(data)
+# inside the recovery handler -- present at both revisions (the sink
+# shifts two lines); they judge bulk assignment, not the loop. `vyql
+# match` on the file reports 143 ExternalEntryInput parameter labels
+# and a MassAssignmentSink; no loop, exception, raise or restart label
+# exists, and the Python frontend emits no such fact: the generic
+# function-context tokens are assign:/assign_item:/assign_call:/
+# call_path:/call:/selector:/identifier:/subscript:/literal:, and the
+# control-facts machinery carries session provenance and guard
+# correlation only.
+#
+# The vocabulary verdict holds against the current knowledge base.
+# VYQL-DOS-029's concept is bound in C only. VYQL-DOS-050
+# (LoopRestartWithoutProgress) is the CWE-835 progress rule shipped
+# after the family entries were written, and its binding is
+# JavaScript-only; its frontend fact is not emitted for a condition
+# that reads no variable (`while (true)`, javascript.go jsLoopRestart),
+# and its judgement analyses restart structure, which this fix does
+# not change: the `except PdfReadError` continue is present at both
+# revisions, and the restart the CVE turns on is covered evidence in
+# the fact's own sense anyway -- the loop head re-assigns the break
+# guard's variable (`tok = read_non_whitespace(stream)`) on every path
+# to every restart, so a ported fact sees progress and stays silent at
+# both revisions. What the fact cannot model is that the re-read yields
+# the same bytes because the failing parse consumed nothing, which is
+# error-class semantics: the discriminating question is which error
+# classes a recovery handler must not absorb, and the only textual
+# difference between the revisions is the added except clause naming
+# them, the fixing commit's own layout. A compact-body-text route
+# (`exceptException` plus `continue`) is silenceable by a comment and
+# fires on every broad-except retry loop in ordinary code; a binding
+# on pypdf's logger_warning detects this library rather than weakness.
+# No standalone ENGINE-GAPS.md entry: no taint path is involved and no
+# single construct is mishandled. No definition change shipped. This
+# spec pins both revisions of both halves of the fix, rejecting
+# VYQL-DOS-029 and VYQL-DOS-050: when lenient-recovery vocabulary
+# lands, the swallowed-limit form must flip to expect on whichever
+# fires.
+
+test "rank1627: the lenient dictionary parser absorbs the limit errors"
+  lang python
+  file pypdf/generic/_data_structures.py
+  reject VYQL-DOS-029
+  reject VYQL-DOS-050
+  code
+  ```
+  class DictionaryObject(dict):
+      @staticmethod
+      def read_from_stream(stream, pdf, forced_encoding=None):
+          tmp = stream.read(2)
+          if tmp != b"<<":
+              raise PdfReadError(STREAM_TRUNCATED_PREMATURELY)
+          data = {}
+          while True:
+              tok = read_non_whitespace(stream)
+              if tok == b"\x00":
+                  continue
+              if tok == b"%":
+                  stream.seek(-1, 1)
+                  skip_over_comment(stream)
+                  continue
+              if not tok:
+                  raise PdfStreamError(STREAM_TRUNCATED_PREMATURELY)
+              if tok == b">":
+                  stream.read(1)
+                  break
+              stream.seek(-1, 1)
+              try:
+                  try:
+                      key = read_object(stream, pdf)
+                      if isinstance(key, NullObject):
+                          break
+                      if not isinstance(key, NameObject):
+                          raise PdfReadError(
+                              f"Expecting a NameObject for key but found {key!r}"
+                          )
+                  except PdfReadError as exc:
+                      if pdf is not None and pdf.strict:
+                          raise
+                      logger_warning(exc.__repr__(), __name__)
+                      continue
+                  tok = read_non_whitespace(stream)
+                  stream.seek(-1, 1)
+                  value = read_object(stream, pdf, forced_encoding)
+              except Exception as exc:
+                  if pdf is not None and pdf.strict:
+                      raise PdfReadError(exc.__repr__())
+                  logger_warning(exc.__repr__(), __name__)
+                  retval = DictionaryObject()
+                  retval.update(data)
+                  return retval  # return partial data
+              if not data.get(key):
+                  data[key] = value
+          return DictionaryObject(data)
+  ```
+
+test "rank1627: recursion and limit errors are hard errors"
+  lang python
+  file pypdf/generic/_data_structures.py
+  reject VYQL-DOS-029
+  reject VYQL-DOS-050
+  code
+  ```
+  class DictionaryObject(dict):
+      @staticmethod
+      def read_from_stream(stream, pdf, forced_encoding=None):
+          tmp = stream.read(2)
+          if tmp != b"<<":
+              raise PdfReadError(STREAM_TRUNCATED_PREMATURELY)
+          data = {}
+          while True:
+              tok = read_non_whitespace(stream)
+              if tok == b"\x00":
+                  continue
+              if tok == b"%":
+                  stream.seek(-1, 1)
+                  skip_over_comment(stream)
+                  continue
+              if not tok:
+                  raise PdfStreamError(STREAM_TRUNCATED_PREMATURELY)
+              if tok == b">":
+                  stream.read(1)
+                  break
+              stream.seek(-1, 1)
+              try:
+                  try:
+                      key = read_object(stream, pdf)
+                      if isinstance(key, NullObject):
+                          break
+                      if not isinstance(key, NameObject):
+                          raise PdfReadError(
+                              f"Expecting a NameObject for key but found {key!r}"
+                          )
+                  except PdfReadError as exc:
+                      if pdf is not None and pdf.strict:
+                          raise
+                      logger_warning(exc.__repr__(), __name__)
+                      continue
+                  tok = read_non_whitespace(stream)
+                  stream.seek(-1, 1)
+                  value = read_object(stream, pdf, forced_encoding)
+              except (RecursionError, LimitReachedError) as exc:
+                  raise PdfReadError(exc.__repr__())
+              except Exception as exc:
+                  if pdf is not None and pdf.strict:
+                      raise PdfReadError(exc.__repr__())
+                  logger_warning(exc.__repr__(), __name__)
+                  retval = DictionaryObject()
+                  retval.update(data)
+                  return retval  # return partial data
+              if not data.get(key):
+                  data[key] = value
+          return DictionaryObject(data)
+  ```
+
+test "rank1627: the cycle guard raises the class the parser absorbs"
+  lang python
+  file pypdf/_reader.py
+  reject VYQL-DOS-029
+  reject VYQL-DOS-050
+  code
+  ```
+  class PdfReader(PdfDocCommon):
+      def get_object(self, indirect_reference):
+          retval = self.cache_get_indirect_object(
+              indirect_reference.generation, indirect_reference.idnum
+          )
+          if retval is not None:
+              return retval
+          if (
+              indirect_reference.generation != 0
+              and indirect_reference.generation not in self.xref_entry
+          ):
+              if self.strict:
+                  raise PdfReadError(f"Object {indirect_reference!r} not found.")
+          current_object = (indirect_reference.idnum, indirect_reference.generation)
+          if current_object in self._known_objects:
+              raise PdfReadError(f"Detected loop with self reference for {indirect_reference!r}.")
+          self._known_objects.add(current_object)
+          retval = read_object(self.stream, self)
+          self._known_objects.remove(current_object)
+          return retval
+  ```
+
+test "rank1627: the cycle guard raises the class the parser propagates"
+  lang python
+  file pypdf/_reader.py
+  reject VYQL-DOS-029
+  reject VYQL-DOS-050
+  code
+  ```
+  class PdfReader(PdfDocCommon):
+      def get_object(self, indirect_reference):
+          retval = self.cache_get_indirect_object(
+              indirect_reference.generation, indirect_reference.idnum
+          )
+          if retval is not None:
+              return retval
+          if (
+              indirect_reference.generation != 0
+              and indirect_reference.generation not in self.xref_entry
+          ):
+              if self.strict:
+                  raise PdfReadError(f"Object {indirect_reference!r} not found.")
+          current_object = (indirect_reference.idnum, indirect_reference.generation)
+          if current_object in self._known_objects:
+              raise LimitReachedError(f"Detected loop with self reference for {indirect_reference!r}.")
+          self._known_objects.add(current_object)
+          retval = read_object(self.stream, self)
+          self._known_objects.remove(current_object)
+          return retval
+  ```

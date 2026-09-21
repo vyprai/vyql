@@ -1,0 +1,11 @@
+module code;
+
+concept PointerOffsetBoundsCheck : issue {
+  cwe: [CWE_20, CWE_125, CWE_190]
+  reviewAssumption: "a walk's stated end can be left behind -- an encoded length moves the pointer outside the valid buffer before the check, or a range-bounded loop advances its cursor past the end parameter without comparing against it"
+  reviewCategory: numeric
+  reviewCondition: "a pointer is advanced past the end the code stated for it -- by an encoded length before the bounds comparison is made, or by a loop that relates the cursor to no bound of its own"
+  reviewConfidence: medium
+  reviewEvidence: "pointer-offset bounds context {pattern} compares the walk's cursor against its stated end"
+  vulnerableTo: [validation.ImproperInputValidation, memory.OobRead, memory.IntegerOverflow]
+}

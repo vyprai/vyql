@@ -1,0 +1,30 @@
+module bindings.python.streaming_decompression_output_without_cap;
+
+// A streaming decompressor hands the peer control of the expansion ratio:
+// the transport bounds only the compressed bytes, while the decompressed
+// size is whatever the stream says. Every Python decompressor whose step
+// is a method documents the same escape hatch on that step: zlib's
+// Decompress.decompress takes max_length (and hands the rest back through
+// unconsumed_tail), lzma's and bz2's decompress take max_length, brotli's
+// Decompressor.process takes output_buffer_limit, and zstandard's
+// decompress takes max_output_size. A total-size check that runs after
+// the step does not bound the step: a 64 KiB input chunk handed to an
+// unbounded decompress call expands to whatever the stream says before
+// any caller-side accumulator is compared, which is the decompression
+// bomb. The anchor is the step itself, any spelling whose receiver is a
+// decompressor object or the zlib/lzma/bz2/brotli module-level one-shot;
+// the discriminator is the documented bounding vocabulary -- any
+// max_length / output_buffer_limit / max_output_size identifier in the
+// same function suppresses, and so does unconsumed_tail, the leftover
+// handle the bounded protocol returns (a step bounded positionally,
+// decompress(data, cap), is indistinguishable from an unbounded one by
+// keyword, but code that bounds the step reads the tail back), because
+// the finding is about the step being unbounded rather than about which
+// construct applies the bound. Every spelling is stdlib or
+// decompressor-API vocabulary, so a capped implementation written
+// differently -- reading a chunk-bounded stream_reader instead --
+// suppresses the same way.
+binding streamingDecompressionOutputWithoutCap {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "python" and node.context.call == "decompress" and not (containsAny(node.context.identifier, ["max_length", "max_output_size", "output_buffer_limit", "unconsumed_tail"]))
+  emit issue code.UnboundedResourceOperation at node
+}

@@ -1,0 +1,11 @@
+module code;
+
+concept AssumedLineTerminatorWidthScan : issue {
+  cwe: [CWE_193, CWE_125]
+  reviewAssumption: "the received data can carry fewer delimiter bytes than the fixed width the arithmetic charges against it, so the measured length already spans the whole buffer and every position derived from that width sits past the bytes actually present"
+  reviewCategory: memory
+  reviewCondition: "a byte offset or scan bound is derived from a measured length plus or minus a fixed delimiter width that no byte inspection in the function confirms"
+  reviewConfidence: high
+  reviewEvidence: "length-derived offset context {pattern} adds or subtracts a constant delimiter width to a measured length and never reads or searches for the byte at that width-relative position to confirm the delimiter"
+  vulnerableTo: [memory.OobRead, memory.IntegerOverflow]
+}

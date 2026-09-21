@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m0f162836;
+
+binding weakHash0 {
+  requires {
+    dependency("devise")
+  }
+  query pattern presenceNode where node.path ~= "devise.hash"
+  emit issue code.WeakHash at node
+}

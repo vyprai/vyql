@@ -1,0 +1,135 @@
+# Rank 1567 / CVE-2019-16993: phpBB's bbcodes ACP module read submitted
+# bbcode definitions from request_var() and wrote them through the DBAL
+# without validating the form key, so a page crafted elsewhere could make
+# an administrator's browser add or edit a BBCode token (cross-site
+# request forgery on an admin endpoint, CWE-352; SECURITY-188; the task
+# list's repo! flag resolves as an umbrella naming: the advisory names
+# phpbb/phpbb-app while the code lives in phpbb/phpbb, the pool row's
+# target). main() in phpBB/includes/acp/acp_bbcodes.php called
+# add_form_key() to issue the token but never check_form_key() to verify
+# it -- the check every sibling module that acts on a submit runs. Pool
+# commit 18abef716e is the real fix (COMMIT_OK -- "[ticket/security-188]
+# Check form key in acp_bbcodes", +6 lines): the module reads
+# $submit = $request->is_set_post('submit') and refuses to act when
+# $submit && !check_form_key($form_key).
+
+test "rank1567: a submitted bbcode is written without the form key check"
+  lang php
+  expect VYQL-RF-003
+  code
+  ```
+  <?php
+
+  class acp_bbcodes
+  {
+  	var $u_action;
+
+  	function main($id, $mode)
+  	{
+  		global $db, $user, $request, $template;
+
+  		$action		= request_var('action', '');
+  		$bbcode_id	= request_var('bbcode', 0);
+
+  		$form_key = 'acp_bbcodes';
+  		add_form_key($form_key);
+
+  		$bbcode_match	= request_var('bbcode_match', '');
+  		$bbcode_tpl	= request_var('bbcode_tpl', '');
+
+  		$sql_ary = array(
+  			'bbcode_match'	=> $bbcode_match,
+  			'bbcode_tpl'	=> $bbcode_tpl,
+  			'bbcode_id'	=> (int) $bbcode_id,
+  		);
+
+  		$db->sql_query('INSERT INTO ' . BBCODES_TABLE . $db->sql_build_array('INSERT', $sql_ary));
+  		$cache->destroy('sql', BBCODES_TABLE);
+  		add_log('admin', 'LOG_BBCODE_ADD', $bbcode_match);
+
+  		trigger_error($user->lang['BBCODE_ADDED'] . adm_back_link($this->u_action));
+  	}
+  }
+  ```
+
+test "rank1567: the fixed module refuses a submit whose form key is invalid"
+  lang php
+  reject VYQL-RF-003
+  code
+  ```
+  <?php
+
+  class acp_bbcodes
+  {
+  	var $u_action;
+
+  	function main($id, $mode)
+  	{
+  		global $db, $user, $request, $template;
+
+  		$action		= request_var('action', '');
+  		$bbcode_id	= request_var('bbcode', 0);
+
+  		$form_key = 'acp_bbcodes';
+  		add_form_key($form_key);
+
+  		$submit = $request->is_set_post('submit');
+
+  		if ($submit && !check_form_key($form_key))
+  		{
+  			trigger_error($user->lang['FORM_INVALID'] . adm_back_link($this->u_action), E_USER_WARNING);
+  		}
+
+  		$bbcode_match	= request_var('bbcode_match', '');
+  		$bbcode_tpl	= request_var('bbcode_tpl', '');
+
+  		$sql_ary = array(
+  			'bbcode_match'	=> $bbcode_match,
+  			'bbcode_tpl'	=> $bbcode_tpl,
+  			'bbcode_id'	=> (int) $bbcode_id,
+  		);
+
+  		$db->sql_query('INSERT INTO ' . BBCODES_TABLE . $db->sql_build_array('INSERT', $sql_ary));
+  		$cache->destroy('sql', BBCODES_TABLE);
+  		add_log('admin', 'LOG_BBCODE_ADD', $bbcode_match);
+
+  		trigger_error($user->lang['BBCODE_ADDED'] . adm_back_link($this->u_action));
+  	}
+  }
+  ```
+
+test "rank1567: a submitted value read back through a select is not a state change"
+  lang php
+  reject VYQL-RF-003
+  code
+  ```
+  <?php
+
+  class acp_bbcodes
+  {
+  	var $u_action;
+
+  	function main($id, $mode)
+  	{
+  		global $db, $user, $request, $template;
+
+  		$form_key = 'acp_bbcodes';
+  		add_form_key($form_key);
+
+  		$bbcode_id	= request_var('bbcode', 0);
+  		$bbcode_match	= request_var('bbcode_match', '');
+
+  		$sql = 'SELECT bbcode_match, bbcode_tpl
+  			FROM ' . BBCODES_TABLE . '
+  			WHERE bbcode_id = ' . (int) $bbcode_id . "
+  				AND bbcode_match = '" . $db->sql_escape($bbcode_match) . "'";
+  		$result = $db->sql_query($sql);
+  		$row = $db->sql_fetchrow($result);
+  		$db->sql_freeresult($result);
+
+  		$template->assign_vars(array(
+  			'BBCODE_MATCH'	=> $row['bbcode_match'],
+  		));
+  	}
+  }
+  ```

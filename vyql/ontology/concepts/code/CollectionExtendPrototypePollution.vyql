@@ -1,0 +1,11 @@
+module code;
+
+concept CollectionExtendPrototypePollution : issue {
+  cwe: [CWE_1321]
+  reviewAssumption: "a caller can pass attacker-controlled objects containing __proto__ keys to collection.extend"
+  reviewCategory: prototype_pollution
+  reviewCondition: "Collection.js extend recursively copies source object keys into target objects without skipping prototype-mutating keys"
+  reviewConfidence: high
+  reviewEvidence: "Collection.js extend context {pattern} iterates object keys, resolves target slots with byLink, recurses into nested values, and writes setVal(data, key, val)"
+  vulnerableTo: [injection.PrototypePollution]
+}

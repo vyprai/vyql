@@ -1,0 +1,17 @@
+module bindings.python.generated.m2f5fe833;
+
+binding deserialization0 {
+  requires {
+    dependency("pytoml")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("pytoml")
+  }
+  query pattern callExpr where callee.method == "loads"
+  emit sink code.Deserialization at args[0]
+}

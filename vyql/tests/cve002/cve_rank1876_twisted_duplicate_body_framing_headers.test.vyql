@@ -1,0 +1,205 @@
+# Rank 1876 / CVE-2020-10108 (twisted 4a7d22e4): HTTPChannel.headerReceived
+# stored every header line it parsed and chose the body framing from it, with
+# no reconciliation between the two ways a header block can declare a body
+# length:
+#
+#   if header == b'content-length':
+#       self.length = int(data)
+#       self._transferDecoder = _IdentityTransferDecoder(...)
+#   elif header == b'transfer-encoding' and data.lower() == b'chunked':
+#       self.length = None
+#       self._transferDecoder = _ChunkedTransferDecoder(...)
+#
+# A request with two Content-Length headers went through the branch twice and
+# kept the last one; a request with Content-Length and Transfer-Encoding kept
+# whichever came first; a Transfer-Encoding value other than "chunked" (or
+# "identity") matched neither branch and left the request with no framing
+# decision at all. Each reading is self-consistent on twisted's own bytes and
+# disagrees with whatever else parses the same connection -- a front-end proxy
+# resolving the ambiguity the other way draws the message boundary elsewhere,
+# so the tail of one request becomes the head of the next: request smuggling,
+# CWE-444. Fix 4a7d22e4 moves the framing decision into
+# _maybeChooseTransferDecoder, which refuses the request when a transfer
+# decoder is installed and when the Transfer-Encoding value is neither
+# chunked nor identity.
+#
+# code.AmbiguousMessageBodyFraming and rule VYQL-INJ-249 judge it, the same
+# pair as netty's readHeaders (rank 1434). The Python binding names the method
+# by what the reconciliation needs in one place: it consults the header store
+# (getRawHeaders/setRawHeaders on twisted's documented Headers), it decides the
+# fixed-length framing by comparing a header name against content-length, and
+# it decides the chunked framing by comparing against chunked. All three are
+# required: the response writer in the same file asks the store for
+# content-length and appends a chunked Transfer-Encoding without ever comparing
+# against the header names, and the fixed revision's framing helper compares all the
+# names but never touches the store, so neither is reported. The negation is
+# the refuse-the-message remedy -- constructing the error it raises, or the
+# framework error response (send_error/write_error) -- which is why the
+# inlined-raise spelling below is also silent: the binding is not keyed on the
+# fix's own helper split, and a fix that had refused the message inline would
+# be recognised as discharged too.
+#
+# Measured bounded (timeout 180, --max-ram 6GB, --cache off), identical across
+# three runs; src/twisted/web as a whole does not finish inside the bound, so
+# the measurement is a bounded scan plus an exhaustive enumeration of the
+# shape's reachable set. Enumeration first: across every python file in the
+# tree, only four (http.py, _newclient.py, test_http.py, test_newclient.py)
+# hold a RawHeaders call together with both framing literals, and only two
+# functions hold all three in one body -- http.py's headerReceived (the CVE
+# method) and Request.write, which compares against content-length but never
+# against chunked, so the expr legs leave it out. Bounded scans then:
+# http.py at 4a7d22e4^: 11 findings, exactly one VYQL-INJ-249, at http.py:2175,
+# headerReceived; at 4a7d22e4: 10 findings and no VYQL-INJ-249 -- the row is
+# the only finding that moved; _newclient.py, test_http.py and test_newclient.py
+# report none. The header-store leg names twisted's Headers API, so it is
+# structurally unreachable elsewhere: no file in the tornado, transformers or
+# trix trees contains any of the four method names (verified by grep, plus a
+# bounded scan of tornado's httpserver/http1connection/httputil: 7 findings,
+# no VYQL-INJ-249). In /tmp/bench/BenchmarkPython the only occurrence of any
+# needle is the bare string "content-length" in a list in helpers/utils.py,
+# with no RawHeaders call and no chunked comparison anywhere in the corpus, so
+# the conjunction cannot fire and the negation only suppresses.
+
+test "rank1876: a header reader that stores each framing header and chooses the body framing with no reconciliation"
+  lang python
+  file src/twisted/web/http.py
+  expect VYQL-INJ-249
+  expect_review code.AmbiguousMessageBodyFraming
+  code
+  ```
+  class HTTPChannel:
+
+      def headerReceived(self, line):
+          """
+          Do pre-processing (for content-length) and store this header away.
+          """
+          try:
+              header, data = line.split(b':', 1)
+          except ValueError:
+              self._respondToBadRequestAndDisconnect()
+              return False
+
+          header = header.lower()
+          data = data.strip()
+          if header == b'content-length':
+              try:
+                  self.length = int(data)
+              except ValueError:
+                  self._respondToBadRequestAndDisconnect()
+                  self.length = None
+                  return False
+              self._transferDecoder = _IdentityTransferDecoder(
+                  self.length, self.requests[-1].handleContentChunk, self._finishRequestBody)
+          elif header == b'transfer-encoding' and data.lower() == b'chunked':
+              self.length = None
+              self._transferDecoder = _ChunkedTransferDecoder(
+                  self.requests[-1].handleContentChunk, self._finishRequestBody)
+          reqHeaders = self.requests[-1].requestHeaders
+          values = reqHeaders.getRawHeaders(header)
+          if values is not None:
+              values.append(data)
+          else:
+              reqHeaders.setRawHeaders(header, [data])
+
+          self._receivedHeaderCount += 1
+          if self._receivedHeaderCount > self.maxHeaders:
+              self._respondToBadRequestAndDisconnect()
+              return False
+
+          return True
+  ```
+
+test "rank1876: the fixed revision moves the framing decision out of the header reader and refuses the request a decoder is chosen for"
+  lang python
+  file src/twisted/web/http.py
+  reject VYQL-INJ-249
+  code
+  ```
+  class HTTPChannel:
+
+      def _maybeChooseTransferDecoder(self, header, data):
+          def fail():
+              self._respondToBadRequestAndDisconnect()
+              self.length = None
+
+          if header == b'content-length':
+              try:
+                  length = int(data)
+              except ValueError:
+                  fail()
+                  return False
+              newTransferDecoder = _IdentityTransferDecoder(
+                  length, self.requests[-1].handleContentChunk, self._finishRequestBody)
+          elif header == b'transfer-encoding':
+              if data.lower() == b'chunked':
+                  length = None
+                  newTransferDecoder = _ChunkedTransferDecoder(
+                      self.requests[-1].handleContentChunk, self._finishRequestBody)
+              elif data.lower() == b'identity':
+                  return True
+              else:
+                  fail()
+                  return False
+          else:
+              return True
+
+          if self._transferDecoder is not None:
+              fail()
+              return False
+          else:
+              self.length = length
+              self._transferDecoder = newTransferDecoder
+              return True
+
+      def headerReceived(self, line):
+          try:
+              header, data = line.split(b':', 1)
+          except ValueError:
+              self._respondToBadRequestAndDisconnect()
+              return False
+
+          header = header.lower()
+          data = data.strip()
+          if not self._maybeChooseTransferDecoder(header, data):
+              return False
+          reqHeaders = self.requests[-1].requestHeaders
+          values = reqHeaders.getRawHeaders(header)
+          if values is not None:
+              values.append(data)
+          else:
+              reqHeaders.setRawHeaders(header, [data])
+          return True
+  ```
+
+test "rank1876: a header reader that refuses the conflicting message inline is discharged"
+  lang python
+  file src/twisted/web/http.py
+  reject VYQL-INJ-249
+  code
+  ```
+  class HTTPChannel:
+
+      def headerReceived(self, line):
+          header, data = line.split(b':', 1)
+          header = header.lower()
+          data = data.strip()
+          if header == b'content-length':
+              if self._transferDecoder is not None:
+                  raise ValueError("conflicting body framing")
+              self.length = int(data)
+              self._transferDecoder = _IdentityTransferDecoder(
+                  self.length, self.requests[-1].handleContentChunk, self._finishRequestBody)
+          elif header == b'transfer-encoding' and data.lower() == b'chunked':
+              if self._transferDecoder is not None:
+                  raise ValueError("conflicting body framing")
+              self.length = None
+              self._transferDecoder = _ChunkedTransferDecoder(
+                  self.requests[-1].handleContentChunk, self._finishRequestBody)
+          reqHeaders = self.requests[-1].requestHeaders
+          values = reqHeaders.getRawHeaders(header)
+          if values is not None:
+              values.append(data)
+          else:
+              reqHeaders.setRawHeaders(header, [data])
+          return True
+  ```

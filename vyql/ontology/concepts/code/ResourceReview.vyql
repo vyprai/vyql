@@ -1,0 +1,6 @@
+module code;
+
+concept ResourceReview : issue {
+  cwe: [CWE_400]
+  vulnerableTo: [dos.UncontrolledResourceConsumption]
+}

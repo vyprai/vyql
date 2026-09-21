@@ -1,0 +1,11 @@
+module code;
+
+concept UncanonicalizedPathContainmentCheck : issue {
+  cwe: [CWE_22, CWE_184]
+  reviewAssumption: "the candidate path is composed from caller-supplied input that can carry parent-directory segments"
+  reviewCategory: path
+  reviewCondition: "a path containment check compares a candidate against its base directory without canonicalizing either, so lexical dot segments survive the comparison"
+  reviewConfidence: high
+  reviewEvidence: "path containment context {pattern} joins a candidate under a base directory and compares them with a lexical containment operator, with no normalization or resolution of the joined path in the same scope"
+  vulnerableTo: [path.PathTraversal, validation.ImproperInputValidation]
+}

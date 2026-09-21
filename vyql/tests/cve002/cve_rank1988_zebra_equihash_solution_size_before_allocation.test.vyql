@@ -1,0 +1,329 @@
+# Rank 1988 / CVE-2026-44500 (GHSA-438q-jx8f-cccv; the pool row records
+# CVE-2026-44497 against this commit, which is the sighash advisory fixed by
+# the parent commit fead158 / #10524 — correction reported, not applied):
+# Zebra's equihash Solution deserializer read the solution field as a generic
+# length-prefixed `Vec<u8>`:
+#
+#   impl ZcashDeserialize for Solution {
+#       fn zcash_deserialize<R: io::Read>(mut reader: R) -> Result<Self, SerializationError> {
+#           let solution: Vec<u8> = (&mut reader).zcash_deserialize_into()?;
+#           Self::from_bytes(&solution)          // size checked here, allocated above
+#       }
+#   }
+#
+# The peer types the CompactSize length prefix, and the generic Vec<u8> read
+# allocates `vec![0u8; len]` straight from it, bounded only by
+# MAX_U8_ALLOCATION (MAX_PROTOCOL_MESSAGE_LEN - 5, ~2 MiB) in the shared
+# zcash_deserialize_bytes_external_count helper. `Self::from_bytes` matches the
+# length against SOLUTION_SIZE (1344) or REGTEST_SOLUTION_SIZE (36) -- after
+# the allocation. A five-byte prefix claiming a two-megabyte vector made the
+# node allocate and zero two megabytes per header before any consensus rule
+# ran: allocation amplification in an inbound network deserializer
+# (CWE-400/CWE-789). a638235 "fix(chain): validate solution size before
+# allocating" (#10525) reads the length first, rejects `len > SOLUTION_SIZE`
+# before allocating, and only then hands the externally-counted read to
+# zcash_deserialize_bytes_external_count.
+#
+# What fired before: nothing on the shape. `timeout 180 ./bin/vyql scan
+# --cache off --max-ram 6GB` over zebra-chain/src at <fix>^ reports 203
+# findings (194 VYQL-MEM-006, 8 VYQL-DOS-040, 1 VYQL-CRY-006); the only rows
+# in work/equihash.rs are two VYQL-MEM-006 NullableDerefs at unrelated lines
+# (163, 244), and neither the CompactSize read nor the allocation it sizes is
+# labelled. Findings in the file are not coverage.
+#
+# code.LengthDerivedAllocation is reused, not minted: its review condition
+# "parsed length controls allocation before the available input bytes are
+# proven" is this weakness stated exactly, and rule VYQL-DOS-006 consumes it.
+# The concept's bindings are C, C++ and Go; this adds the Rust one. Rank 1076
+# rejected a JavaScript presence over this concept because `new Array(n)` is
+# how every dynamically sized array in the language is written, so a presence
+# reports the idiom rather than the weakness. The Rust shape here is the other
+# case: the positive anchor is a pair of API facts, not a language idiom --
+#
+#   - a call into zebra's ZcashDeserialize length-prefixed read
+#     (zcash_deserialize_into / zcash_deserialize, whose Vec<u8> impl sizes
+#     the allocation from the wire CompactSize per the trait's own
+#     TrustedPreallocate documentation: "Blind preallocation of a generic
+#     Vec<T> ... is a DOS vector"), and
+#   - the same function narrowing the deserialized bytes into its own
+#     fixed-size representation through a Self-qualified conversion
+#     (Self::from_bytes / Self::try_from / Self::try_into / Self::from_slice)
+#     -- the narrowing is what proves the field is consensus-fixed-size, and
+#     the Self qualification is what keeps another type's constructor from
+#     counting (zebra-state's backup reader narrows with Amount::from_bytes
+#     off a local disk file and must not match; a bare `from_bytes` needle
+#     would also substring-hit from_bytes_in_display_order in zebra-rpc).
+#
+# The bound is policy-negated, not name-matched: any comparison in the
+# function suppresses, and so does a min/clamp call, because the finding is
+# about the read being unbounded rather than about which construct bounds it.
+# The patched revision discriminates through that negation (its
+# `len > SOLUTION_SIZE` is a lowered comparison) and not through the fixed revision's own
+# helper name: rewriting the patched form with
+# zcash_deserialize_bytes_external_count renamed still reports 0, because the
+# comparison carries the rejection. A fix that instead switches to the other
+# correct idiom -- read_exact into a stack array of constant size, the form
+# every other fixed-size consensus type in zebra uses -- drops the
+# length-prefixed read entirely and so fails the first positive clause.
+#
+# Reachable set, enumerated exhaustively rather than sampled: across every
+# function in the zebra tree at <fix>^ (tests included), the
+# length-prefixed-read + Self-qualified-narrowing pair occurs in exactly one
+# function, work/equihash.rs Solution::zcash_deserialize. The sibling shape
+# in transparent/serialize.rs (coinbase data) reads the same Vec<u8> path but
+# carries its own data.len() bounds, so the negation covers it;
+# zebra-network's addrv2 read is the correct pattern this fix copies (bound
+# then external-count) and also does not match. No other repository cloned
+# for this campaign contains the ZcashDeserialize API at all, so collateral
+# outside zebra-family trees is structurally zero.
+
+test "rank1988: the equihash solution read delegates a fixed-size field to the peer-sized length-prefixed read"
+  lang rust
+  file equihash.rs
+  expect VYQL-DOS-006
+  expect_review code.LengthDerivedAllocation
+  code
+  ```
+  //! Equihash Solution and related items.
+
+  use std::io;
+
+  use crate::serialization::{
+      SerializationError, ZcashDeserialize, ZcashDeserializeInto, ZcashSerialize,
+  };
+
+  /// The size of an Equihash solution in bytes (always 1344).
+  pub(crate) const SOLUTION_SIZE: usize = 1344;
+
+  /// The size of an Equihash solution in bytes on Regtest (always 36).
+  pub(crate) const REGTEST_SOLUTION_SIZE: usize = 36;
+
+  pub enum Solution {
+      Common([u8; SOLUTION_SIZE]),
+      Regtest([u8; REGTEST_SOLUTION_SIZE]),
+  }
+
+  impl Solution {
+      pub fn from_bytes(bytes: &[u8]) -> Result<Self, SerializationError> {
+          match bytes.len() {
+              SOLUTION_SIZE => {
+                  let mut bytes = [0; SOLUTION_SIZE];
+                  bytes.copy_from_slice(bytes.as_ref());
+                  Ok(Solution::Common(bytes))
+              }
+              REGTEST_SOLUTION_SIZE => {
+                  let mut bytes = [0; REGTEST_SOLUTION_SIZE];
+                  bytes.copy_from_slice(bytes.as_ref());
+                  Ok(Solution::Regtest(bytes))
+              }
+              length => Err(SerializationError::Parse(
+                  "incorrect equihash solution size",
+              )),
+          }
+      }
+  }
+
+  impl ZcashDeserialize for Solution {
+      fn zcash_deserialize<R: io::Read>(mut reader: R) -> Result<Self, SerializationError> {
+          let solution: Vec<u8> = (&mut reader).zcash_deserialize_into()?;
+          Self::from_bytes(&solution)
+      }
+  }
+  ```
+
+test "rank1988: the same field bounded against the consensus size before the allocating read"
+  lang rust
+  file equihash.rs
+  reject VYQL-DOS-006
+  reject_review code.LengthDerivedAllocation
+  code
+  ```
+  //! Equihash Solution and related items.
+
+  use std::io;
+
+  use crate::serialization::{
+      zcash_deserialize_bytes_external_count, CompactSizeMessage, SerializationError,
+      ZcashDeserialize, ZcashDeserializeInto, ZcashSerialize,
+  };
+
+  /// The size of an Equihash solution in bytes (always 1344).
+  pub(crate) const SOLUTION_SIZE: usize = 1344;
+
+  /// The size of an Equihash solution in bytes on Regtest (always 36).
+  pub(crate) const REGTEST_SOLUTION_SIZE: usize = 36;
+
+  pub enum Solution {
+      Common([u8; SOLUTION_SIZE]),
+      Regtest([u8; REGTEST_SOLUTION_SIZE]),
+  }
+
+  impl Solution {
+      pub fn from_bytes(bytes: &[u8]) -> Result<Self, SerializationError> {
+          match bytes.len() {
+              SOLUTION_SIZE => {
+                  let mut bytes = [0; SOLUTION_SIZE];
+                  bytes.copy_from_slice(bytes.as_ref());
+                  Ok(Solution::Common(bytes))
+              }
+              REGTEST_SOLUTION_SIZE => {
+                  let mut bytes = [0; REGTEST_SOLUTION_SIZE];
+                  bytes.copy_from_slice(bytes.as_ref());
+                  Ok(Solution::Regtest(bytes))
+              }
+              length => Err(SerializationError::Parse(
+                  "incorrect equihash solution size",
+              )),
+          }
+      }
+  }
+
+  impl ZcashDeserialize for Solution {
+      fn zcash_deserialize<R: io::Read>(mut reader: R) -> Result<Self, SerializationError> {
+          let len: CompactSizeMessage = (&mut reader).zcash_deserialize_into()?;
+          let len: usize = len.into();
+
+          // Validate the length against the consensus-required sizes before
+          // allocating, so an attacker-controlled CompactSize cannot force a
+          // multi-megabyte allocation.
+          if len > SOLUTION_SIZE {
+              return Err(SerializationError::Parse(
+                  "incorrect equihash solution size",
+              ));
+          }
+
+          let solution = zcash_deserialize_bytes_external_count(len, &mut reader)?;
+          Self::from_bytes(&solution)
+      }
+  }
+  ```
+
+test "rank1988: the same narrowing through a renamed external-count helper, bound kept"
+  lang rust
+  file equihash.rs
+  reject VYQL-DOS-006
+  reject_review code.LengthDerivedAllocation
+  code
+  ```
+  //! Equihash Solution and related items.
+
+  use std::io;
+
+  use crate::serialization::{
+      CompactSizeMessage, SerializationError, ZcashDeserialize, ZcashDeserializeInto,
+      ZcashSerialize,
+  };
+
+  /// The size of an Equihash solution in bytes (always 1344).
+  pub(crate) const SOLUTION_SIZE: usize = 1344;
+
+  /// The size of an Equihash solution in bytes on Regtest (always 36).
+  pub(crate) const REGTEST_SOLUTION_SIZE: usize = 36;
+
+  pub enum Solution {
+      Common([u8; SOLUTION_SIZE]),
+      Regtest([u8; REGTEST_SOLUTION_SIZE]),
+  }
+
+  impl Solution {
+      pub fn from_bytes(bytes: &[u8]) -> Result<Self, SerializationError> {
+          match bytes.len() {
+              SOLUTION_SIZE => Ok(Solution::Common(bytes.try_into().unwrap())),
+              REGTEST_SOLUTION_SIZE => Ok(Solution::Regtest(bytes.try_into().unwrap())),
+              length => Err(SerializationError::Parse(
+                  "incorrect equihash solution size",
+              )),
+          }
+      }
+  }
+
+  impl ZcashDeserialize for Solution {
+      fn zcash_deserialize<R: io::Read>(mut reader: R) -> Result<Self, SerializationError> {
+          let len: CompactSizeMessage = (&mut reader).zcash_deserialize_into()?;
+          let len: usize = len.into();
+
+          if len > SOLUTION_SIZE {
+              return Err(SerializationError::Parse(
+                  "incorrect equihash solution size",
+              ));
+          }
+
+          // the fix's helper renamed: the comparison, not the name, must carry
+          let solution = read_zcash_byte_vector(len, &mut reader)?;
+          Self::from_bytes(&solution)
+      }
+  }
+  ```
+
+test "rank1988: the fixed-size read every other consensus type uses, with no length prefix at all"
+  lang rust
+  file equihash.rs
+  reject VYQL-DOS-006
+  reject_review code.LengthDerivedAllocation
+  code
+  ```
+  //! Equihash Solution and related items.
+
+  use std::io;
+
+  use crate::serialization::{SerializationError, ZcashDeserialize, ZcashSerialize};
+
+  /// The size of an Equihash solution in bytes (always 1344).
+  pub(crate) const SOLUTION_SIZE: usize = 1344;
+
+  /// The size of an Equihash solution in bytes on Regtest (always 36).
+  pub(crate) const REGTEST_SOLUTION_SIZE: usize = 36;
+
+  pub enum Solution {
+      Common([u8; SOLUTION_SIZE]),
+      Regtest([u8; REGTEST_SOLUTION_SIZE]),
+  }
+
+  impl ZcashDeserialize for Solution {
+      fn zcash_deserialize<R: io::Read>(mut reader: R) -> Result<Self, SerializationError> {
+          let mut bytes = [0u8; SOLUTION_SIZE];
+          reader.read_exact(&mut bytes)?;
+          Ok(Solution::Common(bytes))
+      }
+  }
+  ```
+
+test "rank1988: a byte vector narrowed by another type's constructor is not this shape"
+  lang rust
+  file backup.rs
+  reject VYQL-DOS-006
+  reject_review code.LengthDerivedAllocation
+  code
+  ```
+  use std::{io, sync::Arc};
+
+  use crate::{amount::Amount, block::Block, serialization::ZcashDeserializeInto};
+
+  pub struct NonFinalizedBlockBackup {
+      pub block: Arc<Block>,
+      pub deferred_pool_balance_change: Amount,
+  }
+
+  impl NonFinalizedBlockBackup {
+      /// Constructs a new backup from a vector of bytes read off local disk.
+      fn from_bytes(bytes: Vec<u8>) -> Result<Self, io::Error> {
+          let (deferred_pool_balance_change_bytes, block_bytes) = bytes
+              .split_at_checked(std::mem::size_of::<Amount>())
+              .ok_or(io::Error::new(io::ErrorKind::InvalidInput, "input is too short"))?;
+
+          Ok(Self {
+              block: Arc::new(
+                  block_bytes
+                      .zcash_deserialize_into()
+                      .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))?,
+              ),
+              deferred_pool_balance_change: Amount::from_bytes(
+                  deferred_pool_balance_change_bytes
+                      .try_into()
+                      .expect("slice from `split_at_checked()` should fit in [u8; 8]"),
+              )
+              .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))?,
+          })
+      }
+  }
+  ```

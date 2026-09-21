@@ -1,0 +1,9 @@
+module bindings.java.generated.m354e52ca;
+
+binding codeEval0 {
+  requires {
+    dependency("com.badlogicgames.gdx:gdx-box2d")
+  }
+  query pattern callExpr where callee.method == "b2DynamicTree_Query"
+  emit sink code.CodeEval at args[0]
+}

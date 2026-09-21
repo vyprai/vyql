@@ -1,0 +1,48 @@
+module bindings.c.dest_capacity_unchecked_copy;
+
+// strcpy(3) and strcat(3) copy without any bound, so a function that writes
+// one of them into a caller-supplied buffer is safe only by knowing the
+// buffer is always large enough for what it copies. The one place that
+// knowledge is stated is the capacity the caller hands over separately, and
+// a function that already relies on it -- zeroing the buffer with
+// memset(dst, c, n), filling it with fgets(dst, n, s) or fread(dst, sz, n, s),
+// formatting into it with snprintf(dst, n, fmt), bounding another copy with
+// strncpy(dst, src, n) -- has declared that parameter to be exactly that
+// destination's byte count. An unbounded copy in the same function that never
+// relates any length to that parameter copies by its own internal limit
+// instead, and overflows the caller's buffer whenever the internal buffer is
+// the larger of the two.
+//
+// The fact is emitted by the C frontend (ccDestCapacityUncheckedObservations
+// and ccDestCapacityUncheckedCursorPairObservations,
+// internal/extract/frontend/treesitter/c.go) from the syntax tree: the
+// capacity join and the guard scan both run over the compacted function body,
+// so prose and identifiers unrelated to the pairing cannot satisfy them. The
+// guard is semantic, not a spelling: any relational comparison naming the
+// capacity parameter clears it, so the clamp the fix introduces
+// (`if (j >= lineSize) j = lineSize-1;`), an early return, and the mirrored
+// operand orders all read as consulting the capacity.
+//
+// The second frontend fact pairs a capacity the code states itself rather than
+// one the caller hands over: a walk that advances a destination field and
+// decrements a same-object counter field by one length, in one block, has
+// declared that counter to be the destination's remaining byte count, so a
+// transfer of that length whose bound never mentions the counter -- a length
+// taken from the source side, or clamped by a constant -- is bounded by the
+// source and not by the destination. The counter must be the one counter of
+// that object the length is charged to, and the counter reaching the transfer
+// call, or entering the length's own assignment, reads as consulting it just
+// as a comparison does.
+//
+// Residuals, all false-negative: a comparison on either side of a branch
+// boundary clears every copy in the function, so a clamp that bounds one
+// branch's copy also vouches for a sibling branch's; the compacted body keeps
+// comments, so a commented-out capacity check still clears; and a wrapper
+// around a capacity-taking libc call (a project's own prefixed spelling) is
+// not paired, so only the standard names identify the capacity. The cursor
+// form adds that the destination and its length must reach the transfer call
+// as bare arguments, so a cast around either leaves the copy unpaired.
+binding destCapacityUncheckedCopy {
+  query pattern presenceNode where node.kind == "any" and node.analysis == "copy.dest_capacity_unchecked"
+  emit issue code.DestCapacityUncheckedCopy at node
+}

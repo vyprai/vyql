@@ -1,0 +1,11 @@
+module vypr.memory;
+
+rule AssertOnlyLengthCopy {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_120, CWE_787]
+    id: "VYQL-MEM-079"
+    severity: medium
+  }
+  issue code.AssertOnlyLengthCopy as c
+}

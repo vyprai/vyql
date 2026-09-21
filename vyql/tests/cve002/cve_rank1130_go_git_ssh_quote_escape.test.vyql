@@ -1,0 +1,307 @@
+# Rank 1130 / CVE-2026-45570: go-git's SSH transport wraps the repository path
+# and each transport argument in literal single quotes with no escaping of a
+# single quote embedded in the value, so a repository path containing `'` breaks
+# out of the quoted region on any SSH server that runs the exec request through
+# a shell (CWE-116).
+#
+#   plumbing/transport/ssh/ssh.go (v6 line, fix 5aee0b92dd08):
+#     fmt.Fprintf(&b, "%s '%s'", req.Command, req.URL.Path)
+#     for _, arg := range req.Args { fmt.Fprintf(&b, " '%s'", arg) }
+#   plumbing/transport/ssh/common.go (v5 line, backport 1eeb64bb91):
+#     return fmt.Sprintf("%s '%s'", cmd, ep.Path)
+#
+# The fix ports canonical Git's sq_quote_buf into a writeShellQuote helper that
+# escapes `'` and `!` with the POSIX close-escape-reopen idiom and routes the
+# path and every arg through it. First fixed releases: v5.19.1 on the v5 module,
+# v6.0.0-alpha.4 on the v6 module, and the v4 module
+# (github.com/go-git/go-git) has no fixed release at all.
+#
+# The weakness is inside the library: an application cloning a user-supplied
+# repository URL through go-git is correct code, and what it hands the library
+# becomes the wire bytes go-git puts on the SSH exec request. The report that
+# belongs to this CVE is therefore the dependency finding on a pin below the
+# first fixed release, the same route the feed takes for other library
+# releases. The library-side discrimination is untouched on purpose -- a
+# format string that wraps an interpolated value in quote characters with no
+# escape call between them is not a shape any Go context feature states, and
+# keying on writeShellQuote or buildCommand names this project rather than the
+# weakness -- so both revisions of the library's own command assembly stay
+# rejected below.
+
+test "rank1130: a go-git v5 pin below the first fixed release is a dependency finding"
+  lang go
+  file git.go
+  code
+  ```
+  package git
+
+  import (
+      "context"
+
+      gogit "github.com/go-git/go-git/v5"
+      "github.com/go-git/go-billy/v5/osfs"
+  )
+
+  type CloneOptions struct {
+      RepositoryURL string
+  }
+
+  type gitClient struct{}
+
+  func (c *gitClient) Download(ctx context.Context, dst string, opt *CloneOptions) error {
+      wt := osfs.New(dst)
+      _, err := gogit.CloneContext(ctx, nil, wt, &gogit.CloneOptions{
+          URL: opt.RepositoryURL,
+      })
+      return err
+  }
+  ```
+  file go.mod
+  code
+  ```
+  module example.com/gitimport
+
+  go 1.25
+
+  require (
+      github.com/go-git/go-billy/v5 v5.6.0
+      github.com/go-git/go-git/v5 v5.19.0
+  )
+  ```
+  expect VYQL-SCA-001
+  expect_evidence VYQL-SCA-001 CVE-2026-45570
+
+test "rank1130: a go-git v5 pin at the first fixed release is clean"
+  lang go
+  file git.go
+  code
+  ```
+  package git
+
+  import (
+      "context"
+
+      gogit "github.com/go-git/go-git/v5"
+      "github.com/go-git/go-billy/v5/osfs"
+  )
+
+  type CloneOptions struct {
+      RepositoryURL string
+  }
+
+  type gitClient struct{}
+
+  func (c *gitClient) Download(ctx context.Context, dst string, opt *CloneOptions) error {
+      wt := osfs.New(dst)
+      _, err := gogit.CloneContext(ctx, nil, wt, &gogit.CloneOptions{
+          URL: opt.RepositoryURL,
+      })
+      return err
+  }
+  ```
+  file go.mod
+  code
+  ```
+  module example.com/gitimport
+
+  go 1.25
+
+  require (
+      github.com/go-git/go-billy/v5 v5.6.0
+      github.com/go-git/go-git/v5 v5.19.1
+  )
+  ```
+  reject VYQL-SCA-001
+
+test "rank1130: a go-git v6 pin below the first fixed alpha is a dependency finding"
+  lang go
+  file git.go
+  code
+  ```
+  package git
+
+  import (
+      "context"
+
+      gogit "github.com/go-git/go-git/v6"
+  )
+
+  type CloneOptions struct {
+      RepositoryURL string
+  }
+
+  type gitClient struct{}
+
+  func (c *gitClient) Download(ctx context.Context, opt *CloneOptions) error {
+      _, err := gogit.CloneContext(ctx, nil, nil, &gogit.CloneOptions{
+          URL: opt.RepositoryURL,
+      })
+      return err
+  }
+  ```
+  file go.mod
+  code
+  ```
+  module example.com/gitimport
+
+  go 1.25
+
+  require github.com/go-git/go-git/v6 v6.0.0-alpha.3
+  ```
+  expect VYQL-SCA-001
+  expect_evidence VYQL-SCA-001 CVE-2026-45570
+
+test "rank1130: a go-git v6 pin at the first fixed alpha is clean"
+  lang go
+  file git.go
+  code
+  ```
+  package git
+
+  import (
+      "context"
+
+      gogit "github.com/go-git/go-git/v6"
+  )
+
+  type CloneOptions struct {
+      RepositoryURL string
+  }
+
+  type gitClient struct{}
+
+  func (c *gitClient) Download(ctx context.Context, opt *CloneOptions) error {
+      _, err := gogit.CloneContext(ctx, nil, nil, &gogit.CloneOptions{
+          URL: opt.RepositoryURL,
+      })
+      return err
+  }
+  ```
+  file go.mod
+  code
+  ```
+  module example.com/gitimport
+
+  go 1.25
+
+  require github.com/go-git/go-git/v6 v6.0.0-alpha.4
+  ```
+  reject VYQL-SCA-001
+
+# The v4 module has no fixed release: the same unquoted endpointToCommand is
+# present at its last tag (v4.13.1) and the line is end-of-life, so every pin
+# of it carries the advisory and there is no min_safe to compare against.
+
+test "rank1130: a go-git v4 pin carries the advisory with no fixed release"
+  lang go
+  file git.go
+  code
+  ```
+  package git
+
+  import (
+      "github.com/go-git/go-git"
+      "github.com/go-git/go-billy/osfs"
+  )
+
+  type CloneOptions struct {
+      RepositoryURL string
+  }
+
+  type gitClient struct{}
+
+  func (c *gitClient) Download(dst string, opt *CloneOptions) error {
+      wt := osfs.New(dst)
+      _, err := git.Clone(nil, wt, &git.CloneOptions{
+          URL: opt.RepositoryURL,
+      })
+      return err
+  }
+  ```
+  file go.mod
+  code
+  ```
+  module example.com/gitimport
+
+  go 1.13
+
+  require github.com/go-git/go-git v4.13.1+incompatible
+  ```
+  expect VYQL-SCA-001
+  expect_evidence VYQL-SCA-001 CVE-2026-45570
+
+# Both revisions of the library's own command assembly, kept so a later reader
+# can see what the patch changes rather than inferring it from the advisory
+# text: the unpatched form wraps the path and each arg in literal single
+# quotes, the patched form routes them through writeShellQuote. Neither
+# reports today, which is the honest state -- the quoting relation inside a
+# format string is not a shape any Go context feature states.
+
+test "rank1130: the unpatched transport wraps the path in literal single quotes"
+  lang go
+  file ssh.go
+  code
+  ```
+  package ssh
+
+  import (
+      "fmt"
+      "strings"
+
+      "github.com/go-git/go-git/v6/plumbing/transport"
+  )
+
+  func buildCommand(req *transport.Request) string {
+      var b strings.Builder
+      fmt.Fprintf(&b, "%s '%s'", req.Command, req.URL.Path)
+      for _, arg := range req.Args {
+          fmt.Fprintf(&b, " '%s'", arg)
+      }
+      return b.String()
+  }
+  ```
+  reject_review code.CommandLineAssemblyReview
+
+test "rank1130: the patched transport escapes the path before wrapping it"
+  lang go
+  file ssh.go
+  code
+  ```
+  package ssh
+
+  import (
+      "strings"
+
+      "github.com/go-git/go-git/v6/plumbing/transport"
+  )
+
+  func buildCommand(req *transport.Request) string {
+      var b strings.Builder
+      b.WriteString(req.Command)
+      b.WriteByte(' ')
+      writeShellQuote(&b, req.URL.Path)
+      for _, arg := range req.Args {
+          b.WriteByte(' ')
+          writeShellQuote(&b, arg)
+      }
+      return b.String()
+  }
+
+  func writeShellQuote(b *strings.Builder, s string) {
+      b.WriteByte('\'')
+      for i := 0; i < len(s); i++ {
+          c := s[i]
+          if c == '\'' || c == '!' {
+              b.WriteString(`'\`)
+              b.WriteByte(c)
+              b.WriteByte('\'')
+              continue
+          }
+          b.WriteByte(c)
+      }
+      b.WriteByte('\'')
+  }
+  ```
+  reject_review code.CommandLineAssemblyReview
+
+# verify_current_expected: fixed-dependency-route

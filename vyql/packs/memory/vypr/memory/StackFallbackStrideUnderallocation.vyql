@@ -1,0 +1,11 @@
+module vypr.memory;
+
+rule StackFallbackStrideUnderallocation {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_119, CWE_787]
+    id: "VYQL-MEM-072"
+    severity: medium
+  }
+  issue code.StackFallbackStrideUnderallocation as c
+}

@@ -1,0 +1,9 @@
+module bindings.groovy.generated.mb145863f;
+
+binding secretValue0 {
+  requires {
+    dependency("org.apache.activemq:activemq-all")
+  }
+  query pattern callExpr where callee.method == "if"
+  emit source code.SecretValue at call.result
+}

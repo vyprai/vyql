@@ -1,0 +1,367 @@
+# Rank 1889 / CVE-2026-42960 (recorded language c, recorded CWE-349 --
+# the fixed revision). nlnetlabs/unbound scrubs every referral
+# response in iterator/iter_scrub.c scrub_normalize (lines 473-783 at the
+# fix parent). The function walks the AUTHORITY section and, at the bottom
+# of the loop body (iter_scrub.c:780), hands every RRset that survived
+# scrubbing to mark_additional_rrset (iter_scrub.c:151), which looks up the
+# owner names in that RRset's rdata and sets RRSET_SCRUB_OK on any
+# ADDITIONAL-section A/AAAA record under those names. Only marked
+# additional-section address records survive the following walk
+# (iter_scrub.c:789) and reach the cache. has_additional() accepts NS, MX,
+# KX, SRV, MB, MD and MF rdata, so a referral whose authority section
+# carries, say, an MX record for a name the attacker chooses also
+# whitelists the A/AAAA records the attacker placed under that name in the
+# additional section -- arbitrary address records cached as a side effect
+# of the query, i.e. cache poisoning while following delegation. The
+# protocol admits that marking for NS only: glue belongs to the
+# delegation's NS records. The fixing change,
+# 8ae4b4545dccaaabd30b597b0dcb0d9640c8cc39, wraps the one call in the
+# authority walk in `if(rrset->type==LDNS_RR_TYPE_NS)` and touches nothing
+# else; the answer-section call at iter_scrub.c:649, guarded by a qname
+# comparison, stays as it is, because additional records referenced from
+# answer-section RRsets are legitimate. The remediation is present at the
+# fixed revision (:785-:786) and the construct at its parent (:780).
+#
+# The pool row's nocommit flag reads REPO_UNKNOWN with no commit -- the GHSA
+# (x7f7-rggg-4jvv) is unreviewed with no verified source location, so the
+# SHA is never checked, not wrong: git show reads it first try and its
+# message names the CVE. Row correct as recorded.
+#
+# ATTENTION, re-measured end to end at the current definitions state
+# (concepts=1018 rules=890 bindings=33025). Three --cache off runs per
+# revision (timeout 180, --max-ram 6GB) report byte-identical output on
+# both sides: 6667 findings and 1565 at or above high on every run, 4992
+# distinct rule@location keys per side, and the only difference between
+# the unions is seven VYQL-MEM-006 rows in iter_scrub.c that move with the
+# fix's six inserted lines (:843 -> :849, :915 -> :921, :916 -> :923,
+# :917 -> :928, :933 -> :939, :934 -> :941, :935 -> :946). The findings
+# view with review flags included (-flags with) names iter_scrub.c only at
+# :67-:86, :136-:144, :201-:246, :261-:315, :418-:456, :768-:777, :843,
+# :848 and :878-:940 -- the flags nearest the vulnerable call are the
+# DS-referral fixup's code.OwnerFieldClear rows at :769-:777 and an
+# IntegerSizeArithmetic at :768 -- and nothing falls at :780 or names the
+# marking. `vyql match` on the file prints "(none)" under source;
+# `vyql resolve` recognises 130 call sites and lists no sink for the
+# marking.
+#
+# The fixed revision is invisible to every route, and that is measured
+# rather than assumed. (a) Both mark_additional_rrset call sites -- the
+# correct answer-section one at :649 and the vulnerable authority-section
+# one at :780 -- sit inside the same function, so no function-scoped fact
+# can separate them: a probe binding keying on the callee labels 2 call
+# sites at both revisions (:649+:780 and :649+:786). (b) The
+# discriminating token is the fixed revision's own guard, and the
+# vulnerable function compares rrset->type against LDNS_RR_TYPE_NS three
+# times earlier in the same body (:621, :640, :676, plus :805 after the
+# call), so a probe keying the marking on that token's presence labels
+# the scrub_normalize context node once at both revisions and its negated
+# form 0 -> 0 across the revision pair. What does differ is the call
+# node's region scope chain, measured with `vyql query`: the vulnerable
+# call is fn64/loop90@5276, the fixed call fn64/loop90/if104.t@5281, and
+# the answer-section call fn64/loop66/if89.t@4908 -- but no binding
+# predicate reads a node's region chain (`node.scope` on a presence
+# binding only selects the context node kind, compile_presence.go:190),
+# and the chain is consumed internally for coverage, so that correlation
+# is the guard-vs-call family on file at ENGINE-GAPS (the 1370
+# write-length/capacity entry and the 1837 check-side sibling). (c) The
+# judgement itself -- that whitelisting additional records from non-NS
+# authority rdata poisons the cache -- is DNS delegation semantics carried
+# by a private static helper with no library documentation, so the
+# genericity test fails by construction: no one writes this binding from
+# docs, because there are no docs, and the 1380 counterweight does not
+# apply (the fixed revision adds a guard around an internal call; it
+# delegates nothing and leaves no documented API call inside the guarded
+# region). This is the C instance of the admission-decided-by-wiring
+# family (1514, 1535, 1540, 1556, 1557, 1593): a policy check invisible
+# to taint.
+#
+# Reuse is checked before concluding. DnsUdpResponseValidationAfterLoop
+# is a DoS datagram loop, UnpinnedResolvedAddressCheck is TOCTOU name
+# resolution, DnsInterfaceNewlineValidationMissing is resolver-config
+# injection, PrototypeKeyCachePoisoning is the JS prototype-key family --
+# none is "response-supplied records admitted to the cache whitelist
+# without the type restriction the protocol places on that admission".
+# code.TrustBoundary (VYQL-CFG-014, CWE-501) is the generic crossing
+# judgement and the rule these cases pin; its C, C++ and ObjC sink
+# bindings are the OWASP benchmark corpus only (benchmarkTrustBoundarySink
+# on `callee.analysis == "module.context"`), so nothing labels a
+# response-buffer read as a source or a whitelist flag-write as a sink in
+# real C code, and no taint route exists to either revision.
+#
+# The last case keeps the pin honest: the same judgement -- untrusted data
+# written into a trusted store -- reports VYQL-CFG-014 in Python, where
+# both halves are labelled (python.input on the request read,
+# trustBoundary371 on the session write, measured 1 MEDIUM on a directory
+# holding exactly that snippet), and reports nothing in C where neither
+# half is. The first case is the one that must flip to expect when C
+# guard/call correlation and an admission labelling land; the patched,
+# answer-section and renamed-helper cases stay rejected.
+#
+# verify_current_expected: attention-engine-gap, the C tests rejected as
+# written and the Python pair expected.
+
+test "rank1889: authority-section walk marks additional records for every surviving rrset"
+  lang c
+  file iterator/iter_scrub.c
+  reject VYQL-CFG-014
+  code
+  ```
+  struct msg_parse;
+  struct query_info;
+
+  #define LDNS_SECTION_ANSWER 1
+  #define LDNS_SECTION_AUTHORITY 2
+  #define LDNS_SECTION_ADDITIONAL 3
+  #define LDNS_RR_TYPE_NS 2
+  #define RRSET_SCRUB_OK 0x1
+
+  struct rrset_parse {
+      int section;
+      int type;
+      unsigned flags;
+      struct rrset_parse* rrset_all_next;
+  };
+
+  struct msg_parse_state {
+      struct rrset_parse* rrset_first;
+  };
+
+  /* Place mark on rrsets in additional section they are OK. */
+  static void
+  mark_additional_rrset(struct msg_parse_state* msg,
+      struct rrset_parse* rrset)
+  {
+      /* whitelist A/AAAA in the additional section whose owner
+       * name appears in this rrset's rdata */
+      rrset->flags |= RRSET_SCRUB_OK;
+  }
+
+  static int
+  sub_of_pkt(struct query_info* qinfo, struct rrset_parse* rrset)
+  {
+      return 1;
+  }
+
+  static int
+  scrub_normalize(struct msg_parse_state* msg, struct query_info* qinfo)
+  {
+      struct rrset_parse* rrset = msg->rrset_first;
+
+      /* Mark additional names from AUTHORITY */
+      while(rrset && rrset->section == LDNS_SECTION_AUTHORITY) {
+          /* only one NS set allowed in authority section */
+          if(rrset->type==LDNS_RR_TYPE_NS) {
+              /* NS set must be pertinent to the query */
+              if(!sub_of_pkt(qinfo, rrset)) {
+                  rrset = rrset->rrset_all_next;
+                  continue;
+              }
+          }
+          mark_additional_rrset(msg, rrset);
+          rrset = rrset->rrset_all_next;
+      }
+
+      /* additional-section records survive only when marked OK */
+      while(rrset && rrset->section == LDNS_SECTION_ADDITIONAL) {
+          if(!(rrset->flags & RRSET_SCRUB_OK)) {
+              rrset = rrset->rrset_all_next;
+              continue;
+          }
+          rrset = rrset->rrset_all_next;
+      }
+      return 1;
+  }
+  ```
+
+test "rank1889: patched authority-section walk marks additional records for NS only"
+  lang c
+  file iterator/iter_scrub.c
+  reject VYQL-CFG-014
+  code
+  ```
+  struct msg_parse;
+  struct query_info;
+
+  #define LDNS_SECTION_AUTHORITY 2
+  #define LDNS_SECTION_ADDITIONAL 3
+  #define LDNS_RR_TYPE_NS 2
+  #define RRSET_SCRUB_OK 0x1
+
+  struct rrset_parse {
+      int section;
+      int type;
+      unsigned flags;
+      struct rrset_parse* rrset_all_next;
+  };
+
+  struct msg_parse_state {
+      struct rrset_parse* rrset_first;
+  };
+
+  static void
+  mark_additional_rrset(struct msg_parse_state* msg,
+      struct rrset_parse* rrset)
+  {
+      rrset->flags |= RRSET_SCRUB_OK;
+  }
+
+  static int
+  sub_of_pkt(struct query_info* qinfo, struct rrset_parse* rrset)
+  {
+      return 1;
+  }
+
+  static int
+  scrub_normalize(struct msg_parse_state* msg, struct query_info* qinfo)
+  {
+      struct rrset_parse* rrset = msg->rrset_first;
+
+      while(rrset && rrset->section == LDNS_SECTION_AUTHORITY) {
+          if(rrset->type==LDNS_RR_TYPE_NS) {
+              if(!sub_of_pkt(qinfo, rrset)) {
+                  rrset = rrset->rrset_all_next;
+                  continue;
+              }
+          }
+          /* only mark glue as allowed for type NS in the authority
+           * section */
+          if(rrset->type==LDNS_RR_TYPE_NS)
+              mark_additional_rrset(msg, rrset);
+          rrset = rrset->rrset_all_next;
+      }
+
+      while(rrset && rrset->section == LDNS_SECTION_ADDITIONAL) {
+          if(!(rrset->flags & RRSET_SCRUB_OK)) {
+              rrset = rrset->rrset_all_next;
+              continue;
+          }
+          rrset = rrset->rrset_all_next;
+      }
+      return 1;
+  }
+  ```
+
+test "rank1889: answer-section marking guarded by the query-name match stays legitimate"
+  lang c
+  file iterator/iter_scrub.c
+  reject VYQL-CFG-014
+  code
+  ```
+  struct msg_parse;
+  struct query_info;
+
+  #define LDNS_SECTION_ANSWER 1
+  #define LDNS_SECTION_AUTHORITY 2
+  #define LDNS_RR_TYPE_NS 2
+  #define RRSET_SCRUB_OK 0x1
+
+  struct rrset_parse {
+      int section;
+      int type;
+      unsigned flags;
+      struct rrset_parse* rrset_all_next;
+  };
+
+  struct msg_parse_state {
+      struct rrset_parse* rrset_first;
+  };
+
+  static void
+  mark_additional_rrset(struct msg_parse_state* msg,
+      struct rrset_parse* rrset)
+  {
+      rrset->flags |= RRSET_SCRUB_OK;
+  }
+
+  static int
+  dname_pkt_compare(struct query_info* qinfo, struct rrset_parse* rrset)
+  {
+      return 0;
+  }
+
+  static int
+  scrub_normalize(struct msg_parse_state* msg, struct query_info* qinfo)
+  {
+      struct rrset_parse* rrset = msg->rrset_first;
+
+      /* Mark the additional names from relevant rrset as OK.
+       * only for RRsets that match the query name */
+      while(rrset && rrset->section == LDNS_SECTION_ANSWER) {
+          if(rrset->type == LDNS_RR_TYPE_NS) {
+              /* shorten oversized NS sets */
+              ;
+          }
+          if(dname_pkt_compare(qinfo, rrset) == 0)
+              mark_additional_rrset(msg, rrset);
+          rrset = rrset->rrset_all_next;
+      }
+
+      while(rrset && rrset->section == LDNS_SECTION_AUTHORITY) {
+          if(rrset->type==LDNS_RR_TYPE_NS)
+              mark_additional_rrset(msg, rrset);
+          rrset = rrset->rrset_all_next;
+      }
+      return 1;
+  }
+  ```
+
+test "rank1889: the vulnerable shape under a helper the fixed revision never names reports nothing either"
+  lang c
+  file iterator/iter_scrub.c
+  reject VYQL-CFG-014
+  code
+  ```
+  struct msg_parse;
+  struct query_info;
+
+  #define LDNS_SECTION_AUTHORITY 2
+  #define LDNS_RR_TYPE_NS 2
+  #define RRSET_SCRUB_OK 0x1
+
+  struct rrset_parse {
+      int section;
+      int type;
+      unsigned flags;
+      struct rrset_parse* rrset_all_next;
+  };
+
+  struct msg_parse_state {
+      struct rrset_parse* rrset_first;
+  };
+
+  static void
+  whitelist_referral_targets(struct msg_parse_state* msg,
+      struct rrset_parse* rrset)
+  {
+      rrset->flags |= RRSET_SCRUB_OK;
+  }
+
+  static int
+  scrub_normalize(struct msg_parse_state* msg, struct query_info* qinfo)
+  {
+      struct rrset_parse* rrset = msg->rrset_first;
+
+      while(rrset && rrset->section == LDNS_SECTION_AUTHORITY) {
+          if(rrset->type==LDNS_RR_TYPE_NS) {
+              ;
+          }
+          whitelist_referral_targets(msg, rrset);
+          rrset = rrset->rrset_all_next;
+      }
+      return 1;
+  }
+  ```
+
+test "rank1889 pair: untrusted data written into a trusted store reports where both halves are labelled"
+  lang python
+  file pair.py
+  expect VYQL-CFG-014
+  code
+  ```
+  session = {}
+
+  def handler(request):
+      name = request.args.get("name")
+      session["user"] = name
+      return "ok"
+  ```

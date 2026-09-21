@@ -1,0 +1,8 @@
+module code;
+
+review code.ApiScanFoundActionCommandExecution {
+  category: command
+  expected: [core.InputValidation, core.AuthenticationCheck]
+  kind: attention
+  text: "review API scan handlers that bind request options and forward found-action command settings into the scan engine"
+}

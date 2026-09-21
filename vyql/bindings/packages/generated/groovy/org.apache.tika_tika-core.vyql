@@ -1,0 +1,25 @@
+module bindings.groovy.generated.mb2ebb885;
+
+binding deserialization0 {
+  requires {
+    dependency("org.apache.tika:tika-core")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("org.apache.tika:tika-core")
+  }
+  query pattern callExpr where callee.method == "parseToString"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("org.apache.tika:tika-core")
+  }
+  query pattern callExpr where callee.method == "detect"
+  emit sink code.Deserialization at args[0]
+}

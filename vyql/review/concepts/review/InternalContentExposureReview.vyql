@@ -1,0 +1,8 @@
+module code;
+
+review code.InternalContentExposureReview {
+  category: secret
+  expected: [core.AuthorizationCheck]
+  kind: attention
+  text: "verify generated internal content has hidden or restricted visibility before it is saved"
+}

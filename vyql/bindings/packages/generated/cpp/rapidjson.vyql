@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m80de0fe9;
+
+binding deserialization0 {
+  requires {
+    dependency("rapidjson")
+  }
+  query pattern callExpr where callee.method == "Parse"
+  emit sink code.Deserialization at args[0]
+}

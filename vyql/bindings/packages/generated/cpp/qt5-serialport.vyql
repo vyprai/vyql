@@ -1,0 +1,34 @@
+module bindings.cpp.generated.m247f06f3;
+
+binding networkConnect0 {
+  requires {
+    dependency("qt5-serialport")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit issue code.NetworkConnect at call
+  emit sink code.NetworkConnectSink at call
+}
+
+binding networkData1 {
+  requires {
+    dependency("qt5-serialport")
+  }
+  query pattern callExpr where callee.method == "readData"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData2 {
+  requires {
+    dependency("qt5-serialport")
+  }
+  query pattern callExpr where callee.method == "readLineData"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend3 {
+  requires {
+    dependency("qt5-serialport")
+  }
+  query pattern callExpr where callee.method == "writeData"
+  emit sink code.NetworkSend at args[0]
+}

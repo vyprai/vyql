@@ -1,0 +1,238 @@
+# Rank 1526 / CVE-2023-41887: OpenRefine's database extension
+# assembled its JDBC URLs by concatenation, so connection settings
+# carrying URL metacharacters injected structure and connector
+# parameters into the connection string (improper neutralization of
+# special elements in a URL, CWE-74/CWE-150 family; fixed in 3.7.4).
+# DatabaseCommand.getJdbcConfiguration fills a DatabaseConfiguration
+# straight from the database-connection form
+# (`jdbcConfig.setDatabaseName(request.getParameter("initialDatabase"))`
+# and five siblings), and every connection manager then built
+# `return "jdbc:" + dbConfig.getDatabaseType().toLowerCase() + "://" +
+# dbConfig.getDatabaseHost() + ((port == 0) ? "" : (":" + port)) + "/"
+# + dbConfig.getDatabaseName();` -- a name like
+# "db?allowLoadLocalInfile=true" changes what the connector connects
+# to. Pool commit 693fde606d is the real fix (COMMIT_OK -- "Properly
+# escape JDBC URL components in database extension"):
+# DatabaseConfiguration gains toURI(), which builds the URL through
+# java.net.URI's five-argument constructor -- each component in its
+# syntactic slot, percent-encoded by URI -- and every manager calls
+# databaseConfiguration.toURI().toString() instead of concatenating.
+# No pool correction.
+#
+# ## What fires, both revisions
+#
+# Three --cache off runs per revision over extensions/database (54
+# java files) report **30 findings each, deterministically, with
+# byte-identical by-rule sets on the vulnerable parent and the fixed
+# 693fde606d**: 23 VYQL-INJ-009, 3 VYQL-INJ-001, 2 VYQL-INJ-134,
+# 1 VYQL-PATH-055, 1 VYQL-CRY-003 -- all in module/scripts/index/*.js
+# and in the servlet commands (HttpInput -> LogOutput), none on any
+# connection manager. Scanned alone, all four connection managers
+# report **zero findings at both revisions**. The full findings view
+# was read, not the `-flags` only view. The 1st pass's zero was real.
+#
+# ## Why nothing ships
+#
+# The 1st pass called this a vocabulary gap ("no binding labels
+# object-field reads as input"). It is an engine gap, and no binding
+# can close it, because the store emits no node at all.
+#
+# * `jvConv.exprStmt` (internal/extract/frontend/treesitter/java.go:296)
+#   lowers `assignment_expression` to `nir.Assign` **only when the
+#   left side is an identifier**; every other left side --
+#   `this.name = x`, `dbConfig.name = x`, `c.name = x` -- falls
+#   through to `nir.ExprStmt{Value: right}`, keeping the right-hand
+#   side and discarding the store target entirely. `vyql graph` on
+#   `this.name = request.getParameter("x"); exec("ls " + this.name)`
+#   shows the read lowering to `Attr path=this.name` with an edge
+#   into the sink argument, and the source `Call` with no outgoing
+#   edge -- the write side produced nothing to carry it.
+# * `nir.Assign.Targets` is `[]string` (internal/extract/nir/nir.go:179),
+#   so the IR has no form for an attribute-targeted store. Carrying
+#   taint from a field store to a later field load is a new dataflow
+#   relation -- at minimum path-keyed, and in this rank's real shape
+#   interprocedural through `setDatabaseName`/`getDatabaseName` on
+#   `this` -- not a localized correction to a known construct.
+#
+# Probe A/B, binding edited into the tree and then reverted (the
+# `-bindings` overlay is not a usable route): a sink binding
+# `callee.method == "getConnection"` emitting `sink code.UrlFetch at
+# args[0]` is enough to make the local-variable hop report
+# VYQL-RF-001 HIGH. With that probe loaded the real
+# extensions/database tree still reports the same 30 findings and
+# **zero VYQL-RF-001 at both revisions** -- the taint dies inside
+# DatabaseConfiguration's fields. The probe is also inert on
+# artemis-unit-test-support (0 of 29+ findings) and opennms-tools
+# (0 of 29), both of which concatenate `"jdbc:" +` values into
+# DriverManager.getConnection: no UserControlledData reaches that
+# argument on real code, so the sink binding alone would be an inert
+# definition change, and a presence binding on the `"jdbc:" +
+# concatenation shape has no provenance signal at all -- 154 files
+# across the clone set carry that literal concatenation, essentially
+# all of them ordinary hostnames, constants and test databases.
+#
+# Minimal pair, probe in place, same source and same sink labels in
+# both: `String url = "jdbc:mysql://" + request.getParameter(..) +
+# "/" + request.getParameter(..); DriverManager.getConnection(url, ..)`
+# reports VYQL-RF-001 HIGH; the identical code with the value hops
+# through `setDatabaseName(..)`/`getDatabaseName()` reports nothing.
+# Only the field hop differs, so the construct is isolated. When
+# attribute-targeted stores lower and a connection-string sink lands,
+# the first and third blocks below must flip to expect.
+#
+# No definition change shipped. ENGINE-GAPS.md entry proposed: the
+# field-store discard in jvConv.exprStmt, shared with the member-store
+# pseudo-call the 1521 recheck traced in JavaScript, and with Python,
+# whose apparent field-hop coverage is the DynamicSqlQuery /
+# DynamicCommandExec pattern rules rather than taint.
+#
+# ## Recheck measurements (knowledge base tip d4e83b98f)
+#
+# Baseline 3x3 over extensions/database: 30/30/30 vulnerable,
+# 30/30/30 fixed, identical by-rule sets. Connection managers scanned
+# alone: 0 at both revisions, all four. Probe A/B: local hop 1
+# VYQL-RF-001, field hop 0, real tree 0 VYQL-RF-001 at both
+# revisions, artemis-unit-test-support 0, opennms-tools 0. Narrow
+# spec passing with -v. Rank stays ATTENTION.
+
+test "rank1526: form values hop the config object into the connection url"
+  lang java
+  file extensions/database/src/com/google/refine/extension/database/mysql/MySQLConnectionManager.java
+  reject VYQL-RF-001
+  code
+  ```
+  package com.google.refine.extension.database.mysql;
+
+  import java.sql.Connection;
+  import java.sql.DriverManager;
+  import javax.servlet.http.HttpServletRequest;
+
+  public class MySQLConnectionManager {
+
+      public Connection getConnection(DatabaseConfiguration dbConfig) throws Exception {
+          String dbURL = getDatabaseUrl(dbConfig);
+          return DriverManager.getConnection(dbURL, dbConfig.getDatabaseUser(), dbConfig.getDatabasePassword());
+      }
+
+      private String getDatabaseUrl(DatabaseConfiguration dbConfig) {
+          int port = dbConfig.getDatabasePort();
+          return "jdbc:" + dbConfig.getDatabaseType().toLowerCase() + "://" + dbConfig.getDatabaseHost()
+                  + ((port == 0) ? "" : (":" + port)) + "/" + dbConfig.getDatabaseName();
+      }
+
+      public DatabaseConfiguration getJdbcConfiguration(HttpServletRequest request) {
+          DatabaseConfiguration jdbcConfig = new DatabaseConfiguration();
+          jdbcConfig.setDatabaseHost(request.getParameter("databaseServer"));
+          jdbcConfig.setDatabaseName(request.getParameter("initialDatabase"));
+          return jdbcConfig;
+      }
+  }
+
+  class DatabaseConfiguration {
+
+      private String databaseHost;
+      private String databaseName;
+
+      void setDatabaseHost(String host) {
+          this.databaseHost = host;
+      }
+
+      void setDatabaseName(String name) {
+          this.databaseName = name;
+      }
+
+      String getDatabaseHost() {
+          return this.databaseHost;
+      }
+
+      String getDatabaseName() {
+          return this.databaseName;
+      }
+
+      String getDatabaseType() {
+          return "mysql";
+      }
+
+      int getDatabasePort() {
+          return 0;
+      }
+
+      String getDatabaseUser() {
+          return "refine";
+      }
+
+      String getDatabasePassword() {
+          return "refine";
+      }
+  }
+  ```
+
+test "rank1526: the fixed revision builds the url through uri components"
+  lang java
+  file extensions/database/src/com/google/refine/extension/database/mysql/MySQLConnectionManager.java
+  reject VYQL-RF-001
+  code
+  ```
+  package com.google.refine.extension.database.mysql;
+
+  import java.net.URI;
+  import java.net.URISyntaxException;
+  import java.sql.Connection;
+  import java.sql.DriverManager;
+
+  public class MySQLConnectionManager {
+
+      public Connection getConnection(DatabaseConfiguration dbConfig) throws Exception {
+          String dbURL = dbConfig.toURI().toString();
+          return DriverManager.getConnection(dbURL, dbConfig.getDatabaseUser(), dbConfig.getDatabasePassword());
+      }
+  }
+
+  class DatabaseConfiguration {
+      public URI toURI() {
+          try {
+              return new URI(
+                      "jdbc:" + databaseType.toLowerCase(),
+                      databaseHost + ((databasePort == 0) ? "" : (":" + databasePort)),
+                      "/" + databaseName,
+                      useSSL ? "useSSL=true" : null,
+                      null
+              );
+          } catch (URISyntaxException e) {
+              throw new IllegalArgumentException(e);
+          }
+      }
+  }
+  ```
+
+test "rank1526: a field store carries the parameter into the url argument"
+  lang java
+  file extensions/database/src/com/google/refine/extension/database/mysql/MySQLConnectionManager.java
+  reject VYQL-RF-001
+  code
+  ```
+  package com.google.refine.extension.database.mysql;
+
+  import java.sql.Connection;
+  import java.sql.DriverManager;
+  import javax.servlet.http.HttpServletRequest;
+
+  public class FieldHopConnectionManager {
+
+      private String databaseName;
+
+      public Connection connect(HttpServletRequest request) throws Exception {
+          setDatabaseName(request.getParameter("initialDatabase"));
+          String dbURL = "jdbc:mysql://localhost/" + getDatabaseName();
+          return DriverManager.getConnection(dbURL, "refine", "refine");
+      }
+
+      void setDatabaseName(String name) {
+          this.databaseName = name;
+      }
+
+      String getDatabaseName() {
+          return this.databaseName;
+      }
+  }
+  ```

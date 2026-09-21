@@ -1,0 +1,11 @@
+module code;
+
+concept ClientLightboxOptionXss : issue {
+  cwe: [CWE_79]
+  reviewAssumption: "widget, shortcode, CMS, or editor content can control the lightbox option bag and is later viewed by a privileged user"
+  reviewCategory: xss
+  reviewCondition: "browser lightbox or media viewer code renders caller-controlled HTML, media URLs, or element option bags without sanitization"
+  reviewConfidence: high
+  reviewEvidence: "lightbox context {pattern} writes HTML/options into modal, video, image, or slideshow elements before observed HTML sanitization, event-attribute filtering, or URL protocol allowlisting"
+  vulnerableTo: [injection.Xss]
+}

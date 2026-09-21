@@ -1,0 +1,7 @@
+module code;
+
+review code.StringCopyWithoutTerminatorReserve {
+  category: memory
+  kind: attention
+  text: "review whether a string copy whose bound can equal the destination's capacity leaves the destination unterminated"
+}

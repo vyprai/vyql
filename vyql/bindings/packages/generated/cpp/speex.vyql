@@ -1,0 +1,17 @@
+module bindings.cpp.generated.ma9962ec0;
+
+binding filePathAccess0 {
+  requires {
+    dependency("speex")
+  }
+  query pattern callExpr where callee.method == "read_wav_header"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding fileUse1 {
+  requires {
+    dependency("speex")
+  }
+  query pattern callExpr where callee.method == "write_wav_header"
+  emit sink code.FileUseSink at args[0]
+}

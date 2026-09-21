@@ -1,0 +1,362 @@
+# Rank 1486 / CVE-2026-42248 (CWE-494): Ollama's desktop app downloads its own
+# updates and installs them silently. `Updater.DownloadNewRelease` writes the
+# release payload into a staging directory and then calls the package-level hook
+# `VerifyDownload()`; on failure it removes the staged file and refuses the
+# update. Each platform installs its own implementation of that hook in `init()`:
+#
+#   app/updater/updater_darwin.go:  VerifyDownload = verifyDownload  // codesign
+#   app/updater/updater_windows.go: VerifyDownload = verifyDownload  // stub
+#
+# The Windows implementation, at `app/updater/updater_windows.go:186` in the
+# vulnerable tree, is the whole of the weakness:
+#
+#   func verifyDownload() error {
+#     return nil
+#   }
+#
+# Nothing is checked. Every staged executable verifies, and `DoUpgrade` then
+# renames the bundle over `runningInstaller` and runs it with `/VERYSILENT
+# /SUPPRESSMSGBOXES` -- so an attacker who can answer the update request supplies
+# an executable that is installed without a prompt. The macOS sibling is a real
+# implementation (it extracts the bundle and runs the platform verifier), which
+# is what makes the Windows one read as a placeholder rather than a decision.
+#
+# The fixed revision, `3d5a011a2e79aced5f0adea79bd06159eb04f587` ("app: harden update
+# flows", PR #16100), fills the routine in with Authenticode verification and
+# also adds the call to `DoUpgrade`, which had none:
+#
+#   func verifyDownload() error {
+#     bundle := getStagedUpdate()
+#     if bundle == "" { return fmt.Errorf("failed to lookup downloads") }
+#     if err := verifyWindowsInstallerSignature(bundle); err != nil {
+#       return fmt.Errorf("signature verification failed: %w", err)
+#     }
+#     return nil
+#   }
+#
+# where `verifyWindowsInstallerSignature` calls `windows.WinVerifyTrustEx` and
+# then re-reads the signer certificate through `windows.CryptQueryObject` to
+# require the subject organisation `Ollama Inc.`.
+#
+# ## The pool row
+#
+# **Wrong, and a correction is proposed.** The row names
+# `86513cb697c9842265863b03ba1e916b959a63c0`, "runner: add token history sampling
+# parameters to ollama runner (#14537)" -- eight files under `sample/`, `runner/`
+# and `api/`, a sampling feature with no security content at all, matching the
+# corpus's `nocommit` flag. GHSA-5fjh-wjgp-25ph references only NVD, cert.pl and
+# ollama.com; it names no commit, so the fixing change is located from the described
+# behaviour. `verifyDownload` reads `return nil` at every tag from v0.17.5
+# through v0.23.0 and carries Authenticode verification from v0.23.4 onward; the
+# single commit touching `app/updater/updater_windows.go` in between is
+# `3d5a011a2e79aced5f0adea79bd06159eb04f587`, whose parent
+# `c2f2d90a679317e443b0c35aa6d6d747cdd6c57b` is the vulnerable tree. The
+# advisory's tested range (0.12.10 to 0.17.5) sits inside that window.
+#
+# ## What ships
+#
+# The weakness stated language-neutrally is "the routine that verifies an
+# artifact's signature reports success without checking anything". That is a
+# vocabulary the ontology did not have. Considered for reuse and rejected:
+# `code.EmptyVerifierAcceptance` (a verifier that compares a looked-up value to a
+# supplied answer and accepts the empty case -- a comparison exists here, none
+# does there); `code.OptionalClientSignatureVerification` (verification runs, but
+# only on the branch where a signature is supplied); `code.InsecureExecutableDownload`
+# (CWE-494 as well, but its condition is a cleartext-HTTP download, and this
+# download is over TLS); `code.AuthenticodeSignaturePathBindingBypass` (real
+# Authenticode verification whose result is bound to the wrong path);
+# `code.CertValidationDisabled` (a TLS setting switched off, not a routine).
+# Every one of them describes verification that happens and is wrong; none
+# describes verification that does not happen. `code.UnconditionalVerificationSuccess`
+# is minted for it, with `VYQL-CRY-055`.
+#
+# The binding is the one shape where a routine's name is the anchor rather than a
+# library call, necessarily so: the weakness is that no library call is present.
+# What makes it a statement rather than a guess is the four negations -- the body
+# invokes nothing (`callPath`), compares nothing (`binary`), computes nothing
+# (`assign`), and returns no error or false atom -- which together mean the body
+# is exactly `return nil`. Rank 1394's rename test passes trivially: none of the
+# fix's new identifiers (`verifyWindowsInstallerSignature`,
+# `windowsInstallerSignerSubject`, `cryptMsgGetParam`) appears in the binding,
+# and renaming all three leaves the patched form declined, because it is declined
+# by calling *anything* at all.
+#
+# ## Measured
+#
+# `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB` over `app/updater`
+# (6 Go files) reports 3 findings at the parent and 4 at the fixed revision without this
+# change, byte-identical across three runs each; with the binding, 4 and 4, the
+# one that moves being `VYQL-CRY-055 @ updater_windows.go:186`, exactly the
+# function the fixed revision rewrites.
+#
+# Collateral is enumerated rather than sampled. Across the 212 checkouts under
+# `/tmp/cve-work/rank*/` -- 57,432 Go files -- a function whose name carries any
+# of the eighteen verification tokens, whose body contains no call, and which
+# returns `nil` or `true` occurs **once**: this CVE. Loosening the name family to
+# any `verify`/`validate`/`authenticate`/`signature`/`checksum`/`integrity`
+# spelling with a body of exactly `return nil` finds **385** across the same
+# trees -- generated `ContextValidate` model stubs in grpc-gateway, `backend_mock`
+# and `driver_mock` no-ops in lxd -- which is why the name family is the
+# artifact-verification one and not the general validation one.
+#
+# ## What is not covered, and why
+#
+# The same fix repairs a second weakness: `DownloadNewRelease` built the staging
+# path as `filepath.Join(UpdateStageDir, etag, filename)` from the response's own
+# `ETag` and `Content-Disposition` headers, and the fixed revision routes both through
+# `safeUpdateFilename`/`ensurePathInDir`. `VYQL-PATH-001` reports that
+# flow at both revisions -- 3 rows at the parent, 4 at the fixed revision -- and does not
+# discriminate, because the containment check lives in `ensurePathInDir`, a
+# sibling function: `explain` prints "no neutralizing control dominates the path;
+# nearest on a sibling path: core.PathCanonicalization @ updater.go:273". That is
+# the `endpointGuarded` function-local attribution family recorded for Go
+# at ranks 1377, 1389 and 1399; it is restated, not filed anew. The last case
+# below pins that row as a known non-discriminating true positive.
+#
+# verify_current_expected: fixed
+
+test "rank1486: the Windows implementation of the update verification hook returns success without checking anything"
+  lang go
+  file app/updater/updater_windows.go
+  expect VYQL-CRY-055
+  code
+  ```
+  package updater
+
+  import (
+  	"log/slog"
+  	"os"
+  	"os/exec"
+  	"path/filepath"
+  )
+
+  var runningInstaller string
+
+  func init() {
+  	VerifyDownload = verifyDownload
+  }
+
+  func verifyDownload() error {
+  	return nil
+  }
+
+  func DoUpgrade(interactive bool) error {
+  	bundle := getStagedUpdate()
+  	if bundle == "" {
+  		return errNoDownload
+  	}
+
+  	// We move the installer to ensure we don't race with multiple apps starting in quick succession
+  	if err := os.Rename(bundle, runningInstaller); err != nil {
+  		return err
+  	}
+
+  	installArgs := []string{
+  		"/CLOSEAPPLICATIONS",
+  		"/LOG=" + filepath.Base(UpgradeLogFile),
+  		"/SP",
+  		"/NOCANCEL",
+  		"/SILENT",
+  	}
+  	if !interactive {
+  		installArgs = append(installArgs, "/VERYSILENT", "/SUPPRESSMSGBOXES")
+  	}
+
+  	slog.Info("starting upgrade", "installer", runningInstaller, "args", installArgs)
+  	cmd := exec.Command(runningInstaller, installArgs...)
+  	return cmd.Start()
+  }
+  ```
+
+test "rank1486: the filled-in routine runs Authenticode verification over the staged bundle before reporting success"
+  lang go
+  file app/updater/updater_windows.go
+  reject VYQL-CRY-055
+  code
+  ```
+  package updater
+
+  import (
+  	"crypto/x509"
+  	"fmt"
+  	"log/slog"
+  	"unsafe"
+
+  	"golang.org/x/sys/windows"
+  )
+
+  func verifyDownload() error {
+  	bundle := getStagedUpdate()
+  	if bundle == "" {
+  		return fmt.Errorf("failed to lookup downloads")
+  	}
+  	slog.Debug("verifying update", "bundle", bundle)
+
+  	if err := verifyWindowsInstallerSignature(bundle); err != nil {
+  		return fmt.Errorf("signature verification failed: %w", err)
+  	}
+  	return nil
+  }
+
+  func verifyWindowsInstallerSignature(filename string) error {
+  	filename16, err := windows.UTF16PtrFromString(filename)
+  	if err != nil {
+  		return err
+  	}
+
+  	data := &windows.WinTrustData{
+  		Size:             uint32(unsafe.Sizeof(windows.WinTrustData{})),
+  		UIChoice:         windows.WTD_UI_NONE,
+  		RevocationChecks: windows.WTD_REVOKE_WHOLECHAIN,
+  		UnionChoice:      windows.WTD_CHOICE_FILE,
+  		StateAction:      windows.WTD_STATEACTION_VERIFY,
+  		UIContext:        windows.WTD_UICONTEXT_INSTALL,
+  		FileOrCatalogOrBlobOrSgnrOrCert: unsafe.Pointer(&windows.WinTrustFileInfo{
+  			Size:     uint32(unsafe.Sizeof(windows.WinTrustFileInfo{})),
+  			FilePath: filename16,
+  		}),
+  	}
+
+  	verifyErr := windows.WinVerifyTrustEx(windows.InvalidHWND, &windows.WINTRUST_ACTION_GENERIC_VERIFY_V2, data)
+  	data.StateAction = windows.WTD_STATEACTION_CLOSE
+  	closeErr := windows.WinVerifyTrustEx(windows.InvalidHWND, &windows.WINTRUST_ACTION_GENERIC_VERIFY_V2, data)
+  	if verifyErr != nil {
+  		return verifyErr
+  	}
+  	if closeErr != nil {
+  		return fmt.Errorf("close WinVerifyTrust state: %w", closeErr)
+  	}
+
+  	subject, err := windowsInstallerSignerSubject(filename)
+  	if err != nil {
+  		return err
+  	}
+  	slog.Debug("verified update signature", "subject", subject)
+  	return nil
+  }
+
+  func windowsInstallerSignerSubject(filename string) (string, error) {
+  	parsed := &x509.Certificate{}
+  	for _, org := range parsed.Subject.Organization {
+  		if org == "Ollama Inc." {
+  			return parsed.Subject.String(), nil
+  		}
+  	}
+  	return "", fmt.Errorf("unexpected signer: %s", parsed.Subject.String())
+  }
+  ```
+
+test "rank1486: the macOS sibling of the same hook performs real work and is not a stub"
+  lang go
+  file app/updater/updater_darwin.go
+  reject VYQL-CRY-055
+  code
+  ```
+  package updater
+
+  import (
+  	"fmt"
+  	"log/slog"
+  	"os"
+  	"path/filepath"
+  )
+
+  func verifyDownload() error {
+  	bundle := getStagedUpdate()
+  	if bundle == "" {
+  		return fmt.Errorf("failed to lookup downloads")
+  	}
+  	slog.Debug("verifying update", "bundle", bundle)
+
+  	dir, err := os.MkdirTemp("", "ollama_update_verify")
+  	if err != nil {
+  		return err
+  	}
+  	defer os.RemoveAll(dir)
+
+  	if err := unzip(bundle, dir); err != nil {
+  		return err
+  	}
+  	return verifyExtractedBundle(filepath.Join(dir, "Ollama.app"))
+  }
+  ```
+
+test "rank1486: a call-free routine that still rejects on a branch is not an unconditional success"
+  lang go
+  file app/updater/updater_windows.go
+  reject VYQL-CRY-055
+  code
+  ```
+  package updater
+
+  import "errors"
+
+  var errUnsigned = errors.New("unsigned bundle")
+
+  func verifyChecksum(staged []byte, expected []byte) error {
+  	if len(staged) != len(expected) {
+  		return errUnsigned
+  	}
+  	for i := range staged {
+  		if staged[i] != expected[i] {
+  			return errUnsigned
+  		}
+  	}
+  	return nil
+  }
+  ```
+
+test "rank1486: the staging path built from the response's own ETag and Content-Disposition headers"
+  lang go
+  file app/updater/updater.go
+  expect VYQL-PATH-001
+  code
+  ```
+  package updater
+
+  import (
+  	"io"
+  	"mime"
+  	"net/http"
+  	"os"
+  	"path/filepath"
+  	"strings"
+  )
+
+  func (u *Updater) DownloadNewRelease(req *http.Request) error {
+  	resp, err := http.DefaultClient.Do(req)
+  	if err != nil {
+  		return err
+  	}
+  	resp.Body.Close()
+
+  	etag := strings.Trim(resp.Header.Get("etag"), "\"")
+  	if etag == "" {
+  		etag = "_"
+  	}
+  	filename := Installer
+  	_, params, err := mime.ParseMediaType(resp.Header.Get("content-disposition"))
+  	if err == nil {
+  		filename = params["filename"]
+  	}
+
+  	stageFilename := filepath.Join(UpdateStageDir, etag, filename)
+  	if err := os.MkdirAll(filepath.Dir(stageFilename), 0o755); err != nil {
+  		return err
+  	}
+
+  	payload, err := io.ReadAll(resp.Body)
+  	if err != nil {
+  		return err
+  	}
+  	fp, err := os.OpenFile(stageFilename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o755)
+  	if err != nil {
+  		return err
+  	}
+  	defer fp.Close()
+  	if _, err := fp.Write(payload); err != nil {
+  		return err
+  	}
+  	return VerifyDownload()
+  }
+  ```

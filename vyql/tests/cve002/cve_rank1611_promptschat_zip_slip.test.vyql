@@ -1,0 +1,124 @@
+# Rank 1611 / CVE-2026-22661: prompts.chat packaged uploaded skill
+# files into a ZIP using the user-supplied filenames verbatim, so an
+# entry named ../[..]/webhook.js traversed out of the extraction
+# directory when the archive's consumer writes attacker content
+# anywhere the process could reach (Zip Slip to remote code
+# execution, CWE-22/CWE-409; PR #1101 "fix-path-traversal-rce"; the
+# task list's commit? flag resolves to a merge that carries the
+# change, and the merge is the fix). The skill export in
+# src/app/api/prompts/[id]/skill/route.ts did
+# `zip.file(file.filename, file.content)` -- the filename comes from
+# the uploaded skill definition. Pool commit 7707781f0f is the real
+# fix: each filename is normalised (backslashes to slashes,
+# empty/./.. segments filtered) and passed through a new
+# sanitizeFilename (a server-side character allowlist returning null
+# for invalid names, documented "Use this on all server-side write and
+# read paths to prevent path traversal"), and null results skip the
+# entry.
+#
+# Caught by rule, rechecked at the span tip. The JSZip entry write is
+# a bound sink (filePathAccess357 labels `zip.file` a
+# code.FilePathAccess on its first argument), and the archive-entry
+# name reaches it from a labelled source: a full-checkout scan of the
+# vulnerable parent reports [HIGH] VYQL-PATH-001 with the sink at
+# route.ts:58 -- the `zip.file(file.filename, file.content)` line --
+# sourced from code.HttpInput at
+# src/lib/plugins/media-generators/wiro.ts:68, the `event.data`
+# WebSocket message parsed there and carried through the skill
+# editor's value into parseSkillFiles and back out as the entry name.
+# Three `--cache off` runs per revision (timeout 180, --max-ram 6GB):
+# 317 findings at the parent with this row in every run, 316 at the
+# fix with nothing on the route in any run, and a full
+# rule-at-location diff of the two revisions shows no difference but
+# this finding and three line-number shifts in skill-files.ts.
+# Scanning route.ts alone also reports the row, through the handler's
+# own params entry. The first pass's "zero findings at both
+# revisions" does not reproduce: at the definitions state that pass
+# shipped, the same full-checkout scan already reports this finding.
+#
+# The clear at the fixed revision rests on the control, not on the
+# path: `vyql trace` there shows taint still running through
+# file.filename's replace/split/filter/join chain into the sink at
+# :67, while `sanitizeFilename(candidate)` at :63 is bound as
+# core.PathCanonicalization (pathCanonicalization523), which satisfies
+# VYQL-PATH-001's `unless path coveredBy core.PathCanonicalization`.
+# Residuals, stated rather than hidden: the control binding keys on
+# the helper's name, so an equivalent sanitiser spelled differently
+# keeps the finding (the character-level normalisation alone does not
+# clear it, per the trace); and the source side connects through the
+# broad `.data` member-read label, which is what makes the stored
+# second-order flow visible at all.
+#
+# verify_current_expected: caught-by-rule VYQL-PATH-001, the verbatim
+# entry form expects and the sanitised form rejects.
+
+test "rank1611: skill filenames enter the zip verbatim"
+  lang javascript
+  file src/app/api/prompts/[id]/skill/route.ts
+  expect VYQL-PATH-001
+  code
+  ```
+  import JSZip from "jszip";
+  import { parseSkillFiles } from "@/lib/skill-files";
+
+  export async function GET(request, { params }) {
+    const { id } = await params;
+    const skill = await getSkill(id);
+
+    const zip = new JSZip();
+    const files = parseSkillFiles(skill.content);
+
+    // Add each file to the zip
+    for (const file of files) {
+      zip.file(file.filename, file.content);
+    }
+
+    const buffer = await zip.generateAsync({ type: "nodebuffer" });
+    return new Response(buffer, {
+      headers: {
+        "Content-Type": "application/zip",
+        "Content-Disposition": `attachment; filename="skill.zip"`,
+      },
+    });
+  }
+  ```
+
+test "rank1611: the fixed revision sanitises every entry name"
+  lang javascript
+  file src/app/api/prompts/[id]/skill/route.ts
+  reject VYQL-PATH-001
+  code
+  ```
+  import JSZip from "jszip";
+  import { parseSkillFiles, sanitizeFilename } from "@/lib/skill-files";
+
+  export async function GET(request, { params }) {
+    const { id } = await params;
+    const skill = await getSkill(id);
+
+    const zip = new JSZip();
+    const files = parseSkillFiles(skill.content);
+
+    // Add each file to the zip (sanitize filenames to prevent Zip Slip)
+    for (const file of files) {
+      const candidate = file.filename
+        .replace(/\\/g, "/")
+        .split("/")
+        .filter((segment) => segment && segment !== "." && segment !== "..")
+        .join("/");
+      const safeName = sanitizeFilename(candidate);
+      if (!safeName) {
+        continue;
+      }
+      zip.file(safeName, file.content);
+    }
+
+    const buffer = await zip.generateAsync({ type: "nodebuffer" });
+    return new Response(buffer, {
+      headers: {
+        "Content-Type": "application/zip",
+        "Content-Disposition": `attachment; filename="skill.zip"`,
+      },
+    });
+  }
+  ```

@@ -1,0 +1,11 @@
+module code;
+
+concept LogoutWithoutSessionInvalidation : issue {
+  cwe: [CWE_613]
+  reviewAssumption: "the session identifier can be held by a party the logout does not clear, such as a cookie copied before logout, and the server reuses the same identifier for the account's next login"
+  reviewCategory: auth
+  reviewCondition: "a logout handler clears the session's stored data without destroying or regenerating the session identifier, so the identifier itself stays valid server-side and a captured cookie is revived by the next login"
+  reviewConfidence: high
+  reviewEvidence: "logout handler {pattern} clears session data through a session flush while no session destroy, session regeneration, or token revocation appears in the same function"
+  vulnerableTo: [authentication.ImproperAuthentication]
+}

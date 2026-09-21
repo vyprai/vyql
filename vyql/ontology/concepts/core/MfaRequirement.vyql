@@ -1,0 +1,7 @@
+module core;
+
+concept MfaRequirement : check {
+  applies: endpoint
+  cwe: [CWE_287]
+  neutralizes: [authentication.ImproperAuthentication]
+}

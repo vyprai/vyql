@@ -1,0 +1,73 @@
+module bindings.rust.generated.m227b985b;
+
+binding networkData0 {
+  requires {
+    dependency("mio")
+  }
+  query pattern callExpr where callee.method == "recv"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData1 {
+  requires {
+    dependency("mio")
+  }
+  query pattern callExpr where callee.method == "recv_from"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData2 {
+  requires {
+    dependency("mio")
+  }
+  query pattern callExpr where callee.method == "peek_from"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData3 {
+  requires {
+    dependency("mio")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData4 {
+  requires {
+    dependency("mio")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData5 {
+  requires {
+    dependency("mio")
+  }
+  query pattern callExpr where callee.method == "send_to"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData6 {
+  requires {
+    dependency("mio")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit source code.NetworkData at call.result
+}
+
+binding networkConnect7 {
+  requires {
+    dependency("mio")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkBind8 {
+  requires {
+    dependency("mio")
+  }
+  query pattern callExpr where callee.method == "bind"
+  emit sink code.NetworkBind at args[0]
+}

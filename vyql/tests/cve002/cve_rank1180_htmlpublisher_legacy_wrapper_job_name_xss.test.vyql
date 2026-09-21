@@ -1,0 +1,78 @@
+test "rank1180: HTML Publisher legacy wrapper concatenates job name into single-quoted HTML attributes"
+  lang java
+  file HtmlPublisher.java
+  expect VYQL-INJ-207
+  expect_review code.JenkinsHtmlPublisherLegacyWrapperXss
+  code
+  ```
+  package htmlpublisher;
+
+  import hudson.model.AbstractBuild;
+  import hudson.model.Job;
+  import hudson.model.Run;
+  import hudson.model.TaskListener;
+  import jenkins.model.Jenkins;
+
+  import static hudson.Functions.htmlAttributeEscape;
+
+  public class HtmlPublisher {
+
+      public static boolean publishReports(Run<?, ?> build, TaskListener listener,
+              List<HtmlPublisherTarget> reportTargets) throws IOException {
+          List<String> reportLines = new ArrayList<>();
+          for (HtmlPublisherTarget reportTarget : reportTargets) {
+              // Every other field on this span is already escaped before the fix:
+              // the miss is specific to job.getName, hudsonUrl, job.getUrl and
+              // getSanitizedName, not to htmlAttributeEscape being unused in this
+              // method altogether.
+              String tabItem = "<li id=\"tab1\" class=\"unselected\" value=\"" + htmlAttributeEscape(reportTarget.getReportFiles()) + "\">" +
+                      htmlAttributeEscape(reportTarget.getReportTitles()) + "</li>";
+              reportLines.add(tabItem);
+
+              String hudsonUrl = Jenkins.get().getRootUrl();
+              Job job = build.getParent();
+              reportLines.add("<span class='links-data-holder' data-back-to-name='" + job.getName() + "' data-root-url='" +
+                      hudsonUrl + "' data-job-url='" + job.getUrl() + "' data-zip-link='" + reportTarget.getSanitizedName() + "'/>");
+          }
+          return true;
+      }
+  }
+  ```
+
+test "rank1180: HTML Publisher legacy wrapper escapes the job name before writing the span attributes"
+  lang java
+  file HtmlPublisher.java
+  reject VYQL-INJ-207
+  reject_review code.JenkinsHtmlPublisherLegacyWrapperXss
+  code
+  ```
+  package htmlpublisher;
+
+  import hudson.model.AbstractBuild;
+  import hudson.model.Job;
+  import hudson.model.Run;
+  import hudson.model.TaskListener;
+  import jenkins.model.Jenkins;
+  import org.apache.commons.lang.StringUtils;
+
+  import static hudson.Functions.htmlAttributeEscape;
+
+  public class HtmlPublisher {
+
+      public static boolean publishReports(Run<?, ?> build, TaskListener listener,
+              List<HtmlPublisherTarget> reportTargets) throws IOException {
+          List<String> reportLines = new ArrayList<>();
+          for (HtmlPublisherTarget reportTarget : reportTargets) {
+              String tabItem = "<li id=\"tab1\" class=\"unselected\" value=\"" + htmlAttributeEscape(reportTarget.getReportFiles()) + "\">" +
+                      htmlAttributeEscape(reportTarget.getReportTitles()) + "</li>";
+              reportLines.add(tabItem);
+
+              String hudsonUrl = StringUtils.defaultString(Jenkins.get().getRootUrl());
+              Job job = build.getParent();
+              reportLines.add("<span class=\"links-data-holder\" data-back-to-name=\"" + htmlAttributeEscape(job.getName()) + "\" data-root-url=\"" +
+                      htmlAttributeEscape(hudsonUrl) + "\" data-job-url=\"" + htmlAttributeEscape(job.getUrl()) + "\" data-zip-link=\"" + htmlAttributeEscape(StringUtils.defaultString(reportTarget.getSanitizedName())) + "\"/>");
+          }
+          return true;
+      }
+  }
+  ```

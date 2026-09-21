@@ -1,0 +1,9 @@
+module bindings.rust.generated.m628596d3;
+
+binding filePathAccess0 {
+  requires {
+    dependency("libsecp256k1-gen-ecmult")
+  }
+  query pattern callExpr where callee.method == "generate_to"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,57 @@
+module bindings.groovy.generated.m05476c43;
+
+binding deserialization0 {
+  requires {
+    dependency("javax.activation:activation")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("javax.activation:activation")
+  }
+  query pattern callExpr where callee.method == "setPrimaryType"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("javax.activation:activation")
+  }
+  query pattern callExpr where callee.method == "setSubType"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("javax.activation:activation")
+  }
+  query pattern callExpr where callee.method == "match"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("javax.activation:activation")
+  }
+  query pattern callExpr where callee.method == "getCommandObject"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("javax.activation:activation")
+  }
+  query pattern callExpr where callee.method == "writeTo"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization6 {
+  requires {
+    dependency("javax.activation:activation")
+  }
+  query pattern callExpr where callee.method == "readExternal"
+  emit sink code.Deserialization at args[0]
+}

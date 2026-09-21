@@ -1,0 +1,94 @@
+test "rank735: client lightbox renders option HTML and media attributes without sanitizers"
+  lang javascript
+  file lightbox.js
+  expect VYQL-INJ-161
+  expect_review code.ClientLightboxOptionXss
+  code
+  ```
+  module.exports = elementorModules.ViewModule.extend( {
+    setHTMLContent( html ) {
+      this.getModal().setMessage( html );
+    },
+
+    setVideoContent( options ) {
+      const $ = jQuery;
+      let $videoElement;
+      if ( 'hosted' === options.videoType ) {
+        const videoParams = $.extend( { src: options.url, autoplay: '' }, options.videoParams );
+        $videoElement = $( '<video>', videoParams );
+      }
+    },
+
+    setSlideshowContent( options ) {
+      options.slides.forEach( ( slide ) => {
+        const $slide = $( '<div>' );
+        if ( slide.video ) {
+          $slide.attr( 'data-elementor-slideshow-video', slide.video );
+        } else {
+          const imageAttributes = {
+            'data-src': slide.image,
+            alt: slide.title,
+          };
+          $( '<img>', imageAttributes );
+        }
+      } );
+    },
+  } );
+  ```
+
+test "rank735: client lightbox sanitizes HTML, event attributes, and dangerous URLs"
+  lang javascript
+  file lightbox.js
+  reject VYQL-INJ-161
+  reject_review code.ClientLightboxOptionXss
+  code
+  ```
+  import DOMPurify from 'dompurify';
+
+  module.exports = elementorModules.ViewModule.extend( {
+    setHTMLContent( html ) {
+      this.getModal().setMessage( DOMPurify.sanitize( html ) );
+    },
+
+    setVideoContent( options ) {
+      const $ = jQuery;
+      let $videoElement;
+      if ( 'hosted' === options.videoType ) {
+        const videoParams = $.extend( { src: options.url, autoplay: '' }, options.videoParams );
+        const paramKeys = Object.keys( videoParams );
+        paramKeys.forEach( ( key ) => {
+          if ( key.toLowerCase().startsWith( 'on' ) ) {
+            delete videoParams[ key ];
+          }
+        } );
+        $videoElement = $( '<video>', videoParams );
+      }
+    },
+
+    isValidUrl( url ) {
+      const dangerous = [ 'javascript:', 'data:', 'vbscript:', 'file:' ];
+      const urlLower = url.toLowerCase().trim();
+      return ! dangerous.some( ( protocol ) => urlLower.startsWith( protocol ) );
+    },
+
+    setSlideshowContent( options ) {
+      options.slides.forEach( ( slide ) => {
+        const isVideo = !! slide.video;
+        const isValidSlideUrl = isVideo ? this.isValidUrl( slide.video ) : this.isValidUrl( slide.image );
+        if ( ! isValidSlideUrl ) {
+          return;
+        }
+        const $slide = $( '<div>' );
+        if ( isVideo ) {
+          $slide.attr( 'data-elementor-slideshow-video', slide.video );
+        } else {
+          const imageAttributes = {
+            'data-src': slide.image,
+            alt: slide.title,
+          };
+          $( '<img>', imageAttributes );
+        }
+      } );
+    },
+  } );
+  ```

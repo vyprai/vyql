@@ -1,0 +1,41 @@
+test "rank182: Axis JWS missing file can leak absolute realpath"
+  lang java
+  expect VYQL-SEC-004
+  file JWSHandler.java
+  code
+  ```
+  import java.io.FileReader;
+
+  class JWSHandler {
+    void setupService(MessageContext msgContext) throws Exception {
+      String realpath = msgContext.getStrProp(Constants.MC_REALPATH);
+      String jwsFile = realpath;
+      String rel = msgContext.getStrProp(Constants.MC_RELATIVE_PATH);
+      FileReader fr = new FileReader(jwsFile);
+    }
+  }
+  ```
+
+test "rank182: Axis JWS missing file reports relative path"
+  lang java
+  reject VYQL-SEC-004
+  file JWSHandler.java
+  code
+  ```
+  import java.io.File;
+  import java.io.FileNotFoundException;
+  import java.io.FileReader;
+
+  class JWSHandler {
+    void setupService(MessageContext msgContext) throws Exception {
+      String realpath = msgContext.getStrProp(Constants.MC_REALPATH);
+      String jwsFile = realpath;
+      String rel = msgContext.getStrProp(Constants.MC_RELATIVE_PATH);
+      File f2 = new File(jwsFile);
+      if (!f2.exists()) {
+        throw new FileNotFoundException(rel);
+      }
+      FileReader fr = new FileReader(jwsFile);
+    }
+  }
+  ```

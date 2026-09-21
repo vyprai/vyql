@@ -1,0 +1,41 @@
+module bindings.groovy.generated.m51a6149b;
+
+binding urlFetch0 {
+  requires {
+    dependency("org.eclipse.jgit:org.eclipse.jgit")
+  }
+  query pattern callExpr where callee.method == "cloneRepository"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding archiveEntryWrite1 {
+  requires {
+    dependency("org.eclipse.jgit:org.eclipse.jgit")
+  }
+  query pattern callExpr where callee.method == "cloneRepository"
+  emit sink code.ArchiveEntryWrite at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("org.eclipse.jgit:org.eclipse.jgit")
+  }
+  query pattern callExpr where callee.method == "add"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding urlFetch3 {
+  requires {
+    dependency("org.eclipse.jgit:org.eclipse.jgit")
+  }
+  query pattern callExpr where callee.method == "submoduleAdd"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding archiveEntryWrite4 {
+  requires {
+    dependency("org.eclipse.jgit:org.eclipse.jgit")
+  }
+  query pattern callExpr where callee.method == "submoduleAdd"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

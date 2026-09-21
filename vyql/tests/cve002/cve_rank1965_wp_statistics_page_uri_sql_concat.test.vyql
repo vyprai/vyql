@@ -1,0 +1,135 @@
+# wp-statistics/wp-statistics (CVE-2019-13275): the page-recording
+# path built its SQL by concatenating the request URI into the
+# statement text. Pages::get_page_uri() reads
+# $_SERVER["REQUEST_URI"] (or, for search pages, get_search_query()),
+# and FILTER_SANITIZE_STRING strips tags but leaves quotes, so the
+# single-quoted `uri` literal in Pages::record()'s SELECT and UPDATE
+# is injectable: `"AND `uri` = '" . $page_uri . "'"` inside both
+# $wpdb->get_row(...) and the format string handed to $wpdb->prepare
+# -- the interpolation happens while PHP builds that string, so the
+# %d placeholder never sees the URI. The fixed revision
+# bd46721b97794a1b1520e24ff5023b6da738dd75 wraps both interpolations
+# in esc_sql().
+#
+# esc_sql() is WordPress's documented SQL escaper -- the value leaving
+# the call cannot carry SQL text, the same transform as
+# mysqli_real_escape_string -- but no binding credited it, so the
+# patched concatenation kept reporting identically to the vulnerable
+# one: the minimal pair built from record() fired VYQL-INJ-001 at both
+# revisions until sqlEscapeParameterization920
+# (vyql/bindings/php/mfbe84119.vyql) labelled the call as
+# core.SqlParameterization. In the same tree the unbound escaper kept
+# a real false positive alive too: template-functions.php:439 assigns
+# $page_uri_sql = esc_sql( $page_uri ) before splicing it into the
+# WHERE clause at line 448, and VYQL-INJ-001 reported sink :482
+# through the esc_sql call at both revisions.
+#
+# The reject cases are the fixed revision's exact shape: esc_sql() inline in the
+# concatenation, which the path-level check covers without extracting
+# the value to a variable first.
+
+test "wp-statistics: the recorded page uri is concatenated into the select unescaped"
+  lang php
+  file includes/class-wp-statistics-pages.php
+  expect VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  class Pages {
+
+      public static function get_page_uri() {
+          $site_uri     = parse_url( site_url(), PHP_URL_PATH );
+          $site_uri_len = strlen( $site_uri );
+          $page_uri     = $_SERVER["REQUEST_URI"];
+          if ( substr( $page_uri, 0, $site_uri_len ) == $site_uri ) {
+              $page_uri = substr( $page_uri, $site_uri_len );
+          }
+          $page_uri = filter_var( $page_uri, FILTER_SANITIZE_STRING );
+          return apply_filters( 'wp_statistics_page_uri', $page_uri );
+      }
+
+      public static function sanitize_page_uri() {
+          $current_page = self::get_page_type();
+          $page_uri     = Pages::get_page_uri();
+          if ( array_key_exists( "search_query", $current_page ) and ! empty( $current_page["search_query"] ) ) {
+              $page_uri = "?s=" . $current_page['search_query'];
+          }
+          return substr( $page_uri, 0, 255 );
+      }
+
+      public static function record() {
+          global $wpdb;
+          $current_page = self::get_page_type();
+          if ( $current_page['type'] == "unknown" ) {
+              return false;
+          }
+          $page_uri = self::sanitize_page_uri();
+          $exist    = $wpdb->get_row( "SELECT `page_id` FROM `" . DB::table( 'pages' ) . "` WHERE `date` = '" . TimeZone::getCurrentDate( 'Y-m-d' ) . "' " . ( array_key_exists( "search_query", $current_page ) === true ? "AND `uri` = '" . $page_uri . "'" : "" ) . "AND `type` = '{$current_page['type']}' AND `id` = {$current_page['id']}", ARRAY_A );
+          return $exist;
+      }
+  }
+  ```
+
+test "wp-statistics: the recorded page uri is concatenated into the update's prepare format string unescaped"
+  lang php
+  file includes/class-wp-statistics-pages.php
+  expect VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  class Pages {
+
+      public static function get_page_uri() {
+          $page_uri = $_SERVER["REQUEST_URI"];
+          $page_uri = filter_var( $page_uri, FILTER_SANITIZE_STRING );
+          return apply_filters( 'wp_statistics_page_uri', $page_uri );
+      }
+
+      public static function sanitize_page_uri() {
+          $page_uri = Pages::get_page_uri();
+          return substr( $page_uri, 0, 255 );
+      }
+
+      public static function record() {
+          global $wpdb;
+          $current_page = self::get_page_type();
+          $page_uri     = self::sanitize_page_uri();
+          $wpdb->query( $wpdb->prepare( "UPDATE `" . DB::table( 'pages' ) . "` SET `count` = `count` + 1 WHERE `date` = '" . TimeZone::getCurrentDate( 'Y-m-d' ) . "' " . ( array_key_exists( "search_query", $current_page ) === true ? "AND `uri` = '" . $page_uri . "'" : "" ) . "AND `type` = '{$current_page['type']}' AND `id` = %d", $current_page['id'] ) );
+          return true;
+      }
+  }
+  ```
+
+test "wp-statistics: esc_sql around the uri closes both statements"
+  lang php
+  file includes/class-wp-statistics-pages.php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  class Pages {
+
+      public static function get_page_uri() {
+          $page_uri = $_SERVER["REQUEST_URI"];
+          $page_uri = filter_var( $page_uri, FILTER_SANITIZE_STRING );
+          return apply_filters( 'wp_statistics_page_uri', $page_uri );
+      }
+
+      public static function sanitize_page_uri() {
+          $page_uri = Pages::get_page_uri();
+          return substr( $page_uri, 0, 255 );
+      }
+
+      public static function record() {
+          global $wpdb;
+          $current_page = self::get_page_type();
+          $page_uri     = self::sanitize_page_uri();
+          $exist        = $wpdb->get_row( "SELECT `page_id` FROM `" . DB::table( 'pages' ) . "` WHERE `date` = '" . TimeZone::getCurrentDate( 'Y-m-d' ) . "' " . ( array_key_exists( "search_query", $current_page ) === true ? "AND `uri` = '" . esc_sql( $page_uri ) . "'" : "" ) . "AND `type` = '{$current_page['type']}' AND `id` = {$current_page['id']}", ARRAY_A );
+          $wpdb->query( $wpdb->prepare( "UPDATE `" . DB::table( 'pages' ) . "` SET `count` = `count` + 1 WHERE `date` = '" . TimeZone::getCurrentDate( 'Y-m-d' ) . "' " . ( array_key_exists( "search_query", $current_page ) === true ? "AND `uri` = '" . esc_sql( $page_uri ) . "'" : "" ) . "AND `type` = '{$current_page['type']}' AND `id` = %d", $current_page['id'] ) );
+          return $exist;
+      }
+  }
+  ```

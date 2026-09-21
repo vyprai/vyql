@@ -1,0 +1,17 @@
+module bindings.objc.generated.meb529b3f;
+
+binding urlFetch0 {
+  requires {
+    dependency("DKPhotoGallery")
+  }
+  query pattern callExpr where callee.method == "DKPhotoImageWebDownloader.downloadImage"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding networkConnect1 {
+  requires {
+    dependency("DKPhotoGallery")
+  }
+  query pattern callExpr where callee.method == "SDWebImageDownloader.downloadImage"
+  emit sink code.NetworkConnectSink at args[0]
+}

@@ -1,0 +1,8 @@
+module core;
+
+concept LoopProgressCallSideEffect : check {
+  applies: sameScope
+  covers: [sameScope]
+  cwe: [CWE_835, CWE_400]
+  neutralizes: [dos.UncontrolledResourceConsumption]
+}

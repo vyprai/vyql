@@ -1,0 +1,7 @@
+module code;
+
+review code.UnionMemberOverwriteWithoutClear {
+  category: memory
+  kind: attention
+  text: "review tagged-union member initialization for the union clear that releases the active member before constructing over its storage"
+}

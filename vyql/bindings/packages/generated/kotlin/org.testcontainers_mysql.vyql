@@ -1,0 +1,41 @@
+module bindings.kotlin.generated.m41ec4d0a;
+
+binding databaseRead0 {
+  requires {
+    dependency("org.testcontainers:mysql")
+  }
+  query pattern callExpr where callee.method == "getJdbcUrl"
+  emit sink code.DatabaseReadSink at args[0]
+}
+
+binding databaseRead1 {
+  requires {
+    dependency("org.testcontainers:mysql")
+  }
+  query pattern callExpr where callee.method == "constructUrlForConnection"
+  emit sink code.DatabaseReadSink at args[0]
+}
+
+binding secretValue2 {
+  requires {
+    dependency("org.testcontainers:mysql")
+  }
+  query pattern callExpr where callee.method == "withPassword"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue3 {
+  requires {
+    dependency("org.testcontainers:mysql")
+  }
+  query pattern callExpr where callee.method == "withDatabaseName"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue4 {
+  requires {
+    dependency("org.testcontainers:mysql")
+  }
+  query pattern callExpr where callee.method == "withUsername"
+  emit source code.SecretValue at call.result
+}

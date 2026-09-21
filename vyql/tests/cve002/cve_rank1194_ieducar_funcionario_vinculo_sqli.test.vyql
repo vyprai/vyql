@@ -1,0 +1,185 @@
+# i-Educar's funcionario_vinculo_det.php read cod_func straight from $_GET
+# and interpolated it into a SQL string literal:
+#
+#   $cod_func = $_GET['cod_func'] ?? null;
+#   $db = new clsBanco();
+#   $db->Consulta(consulta: "SELECT nm_vinculo, abreviatura FROM portal.funcionario_vinculo WHERE cod_funcionario_vinculo = '$cod_func'");
+#
+# clsBanco (clsBancoSQL_ in clsBancoPgSql.inc.php) is the application's own
+# database wrapper; its Consulta() method runs the string it is given as SQL
+# (CWE-89, GHSA-2v4w-7xqr-hxmr). The advisory names funcionario_vinculo_det.php:17
+# and the cod_func GET parameter; the fix (7cd2edf52c, "Refatora para evitar
+# parâmetro direto") replaces the raw query with an Eloquent lookup,
+# LegacyBondType::findOrFail(request('cod_func')), removing the interpolated
+# string and the wrapper call entirely.
+#
+# Detection sits on two pieces. bindings.php.db_wrapper_consulta_sql_execution
+# labels the wrapper's query method -- Portuguese "Consulta", documented as
+# "@param string $consulta Consulta SQL" -- as code.SqlExecution at args[0],
+# the same method-name-only form the wpdb family (query, get_results, get_var)
+# and db_query/RunQuery already use; parameter binding is the wrapper's second
+# parameter, so request-derived text in the first is the raw-string shape the
+# SQL injection rules judge. And the PHP frontend now extracts anonymous class
+# bodies: `return new class extends clsDetalhe { ... };` is the controller
+# shape of this whole application (and of Laravel-style Migration classes
+# elsewhere), so without that extraction no source or sink inside a controller
+# is ever built. The extraction routes the anonymous_class child of an
+# object_creation_expression through the same class-body walk class_declaration
+# uses, hoisting the statements after the expression's own statement; named and
+# anonymous wrappers are treated alike (cases 3 and 4).
+#
+# Discrimination, three --cache off runs per revision over
+# ieducar/intranet (350 php files; the full 3038-file checkout exceeds the
+# 180s scan bound), identical every run: 90 VYQL-INJ-001 rows on 7cd2edf52c^
+# and 89 on 7cd2edf52c, whose fingerprint sets differ by exactly
+# fp=371a37993b595f9c -- the target row, source code.HttpInput @
+# funcionario_vinculo_det.php:13, sink code.SqlExecution @
+# funcionario_vinculo_det.php:17 -- with zero rows only on the fixed revision.
+# With the wrapper binding held out the same vulnerable tree reports 29
+# VYQL-INJ-001 rows, all in bundled JavaScript, so the binding contributes
+# every PHP row; with the frontend change held out (definitions constant) the
+# tree reports 52, so the anonymous-class extraction adds the 38 rows that live
+# in anonymous controllers and removes none. The Consulta call is absent from
+# every other clone under /tmp/cve-work and from both benchmark corpora, and
+# spot-checks of the added rows land on the application's signature pattern
+# (educar_turma_xml.php interpolates $_GET['cur'] verbatim; funcionario_vinculo_lst.php
+# builds LIMIT clauses from an unvalidated pagina GET parameter), with
+# is_numeric-guarded branches reported the same way the rule already treats
+# them on this tree's other sinks.
+#
+# Collateral for the frontend change, same three-run method: codeigniter4
+# (2966 php files, 74 carrying anonymous classes) and the rank-42 PHP tree are
+# fingerprint-identical before and after; coolify (598 anonymous-class files)
+# gains 73 rows -- 72 VYQL-RF-043 and 1 VYQL-AUTH-079, all inside
+# database/migrations anonymous classes -- and loses none, while the same
+# rules already fire 856 times on that tree's named-class code, so the delta
+# is previously-invisible code becoming visible to unchanged judgements.
+#
+# verify_current_expected: fixed, 1 -> 0 on the real revision pair.
+test "rank1194: cod_func is interpolated into a raw SQL string inside i-Educar's anonymous-class controller shape"
+  lang php
+  file funcionario_vinculo_det.php
+  expect VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  return new class extends clsDetalhe
+  {
+      public $cod_usuario;
+
+      public function Gerar()
+      {
+          $this->cod_usuario = $this->pessoa_logada;
+
+          $this->titulo = 'Detalhe do Vínculo';
+
+          $cod_func = $_GET['cod_func'] ?? null;
+
+          $db = new clsBanco();
+
+          $db->Consulta(consulta: "SELECT nm_vinculo, abreviatura FROM portal.funcionario_vinculo WHERE cod_funcionario_vinculo = '$cod_func'");
+
+          if ($db->ProximoRegistro()) {
+              [$nm_vinculo, $abreviatura] = $db->Tupla();
+              $this->addDetalhe(detalhe: ['Nome', $nm_vinculo]);
+              $this->addDetalhe(detalhe: ['Abreviatura', $abreviatura]);
+          }
+
+          $this->url_novo = 'funcionario_vinculo_cad.php';
+          $this->url_editar = "funcionario_vinculo_cad.php?cod_funcionario_vinculo={$cod_func}";
+          $this->url_cancelar = 'funcionario_vinculo_lst.php';
+          $this->largura = '100%';
+      }
+
+      public function Formular()
+      {
+          $this->title = 'Vínculo Funcionários';
+          $this->processoAp = '190';
+      }
+  };
+  ```
+
+test "rank1194: the fixed revision replaces the raw query with an Eloquent lookup"
+  lang php
+  file funcionario_vinculo_det.php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  use App\Models\LegacyBondType;
+
+  return new class extends clsDetalhe
+  {
+      public function Gerar()
+      {
+          $legacyBondType = LegacyBondType::findOrFail(request('cod_func'));
+
+          $this->addDetalhe(detalhe: ['Nome', $legacyBondType->nm_vinculo]);
+          $this->addDetalhe(detalhe: ['Abreviatura', $legacyBondType->abreviatura]);
+
+          $this->url_novo = 'funcionario_vinculo_cad.php';
+          $this->url_editar = 'funcionario_vinculo_cad.php?cod_funcionario_vinculo=' . request('cod_func');
+          $this->url_cancelar = 'funcionario_vinculo_lst.php';
+          $this->largura = '100%';
+      }
+  };
+  ```
+
+test "rank1194: the same GET-to-system() flow inside a named class"
+  lang php
+  file named.php
+  expect VYQL-INJ-002
+  code
+  ```
+  <?php
+
+  class Foo extends Base
+  {
+      public function run()
+      {
+          $cmd = $_GET['cmd'] ?? null;
+          system($cmd);
+      }
+  }
+  ```
+
+test "rank1194: the same flow, wrapped in an anonymous class"
+  lang php
+  file anon.php
+  expect VYQL-INJ-002
+  code
+  ```
+  <?php
+
+  return new class extends Base
+  {
+      public function run()
+      {
+          $cmd = $_GET['cmd'] ?? null;
+          system($cmd);
+      }
+  };
+  ```
+
+test "rank1194: the interpolated query inside an anonymous class assigned to a variable"
+  lang php
+  file assigned.php
+  expect VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  $detalhe = new class extends clsDetalhe
+  {
+      public function Gerar()
+      {
+          $cod_func = $_GET['cod_func'] ?? null;
+
+          $db = new clsBanco();
+
+          $db->Consulta(consulta: "SELECT nm_vinculo FROM portal.funcionario_vinculo WHERE cod_funcionario_vinculo = '$cod_func'");
+      }
+  };
+  ```

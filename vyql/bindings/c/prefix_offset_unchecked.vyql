@@ -1,0 +1,37 @@
+module bindings.c.prefix_offset_unchecked;
+
+// The C library's bounded prefix-comparison contract: strncmp(3) and
+// strncasecmp(3), and the library wrappers named for them, verify only the n
+// bytes they are asked to compare, so after a comparison succeeds the last
+// byte the code may read on the compared pointer is the one at offset n --
+// for the shortest input the guard admits, the string's own terminator. A
+// branch that advances the pointer further reads bytes the comparison did not
+// prove present and, for that shortest input, steps past the end of the
+// buffer.
+//
+// The fact is emitted by the C frontend (ccPrefixOffsetObservations,
+// internal/extract/frontend/treesitter/c.go) from the syntax tree: the
+// comparison in an if's condition pairs only with arithmetic in that if's own
+// consequence, the arithmetic must name the compared pointer itself, and the
+// offset must be a literal beyond the longest prefix the condition compares
+// on that pointer -- the fact fires only when no arm of the condition can
+// have verified the bytes the advance reads, so a disjunction of unequal
+// lengths leaves the shorter arm's own over-read unreported. A nested if
+// comparing the same pointer again tightens the bound inside its own
+// guarded body -- an if's consequence, and a while's or for's body, whose
+// condition is checked before every iteration -- and a guard that
+// subscripts the compared pointer at or past
+// the compared length consults that byte itself and clears the fact.
+//
+// Residuals, all false-negative except the last: only the `== 0` and `!call`
+// success spellings and decimal compared lengths establish a bound, the
+// pointer must be spelled identically at the comparison and the arithmetic
+// with the offset on its right, and only an if's consequence counts as the
+// pairing scope, so a loop that is itself the outermost guard comparing a
+// prefix, with a body that advances the pointer, is not labelled. The
+// pairing is by spelling, so a branch that reassigns
+// the compared pointer and then advances the name still reports.
+binding prefixOffsetUnchecked {
+  query pattern presenceNode where node.kind == "any" and node.analysis == "prefix_length.offset_past_verified"
+  emit issue code.UncheckedPrefixOffsetArithmetic at node
+}

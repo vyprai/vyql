@@ -1,0 +1,68 @@
+# Rank 1525 / CVE-2026-34717: OpenProject's reporting =n operator
+# interpolated a user-supplied number string straight into its SQL
+# WHERE clause, so a crafted filter value injected SQL (SQL injection,
+# CWE-89; GHSA-5rrm-6qmq-2364, patched in 17.2.3; the task list's
+# nocommit flag reflects advisory-side absence -- the advisory names the
+# file and line, and the fixing commit fixes exactly that line). The
+# operator block in modules/reporting/lib/report/operator.rb did
+# `def modify(query, field, value); query.where "#{field} =
+# #{parse_number_string(value)}"; query; end` -- field and value
+# arrive from the report filter (request parameters through the
+# query builder), and the string interpolation bypasses every
+# placeholder. The fixing commit (confirmed --
+# "Correctly evaluate parse number string in =n operator"): the where
+# call becomes the array form `query.where ["#{field} = ?",
+# parse_number_string_to_number(value)]` -- placeholder
+# parameterisation plus a numeric-coercion helper. No pool
+# correction.
+#
+# CAUGHT by VYQL-INJ-001. The ruby path rule covers the shape end to
+# end: modify's parameters are labelled code.ExternalEntryInput by
+# library.param-source, the interpolated query.where is the
+# code.SqlExecution sink, and the array form is credited as
+# core.SqlParameterization. Measured on the real code: at the fixed revision
+# parent operator.rb carries ten INJ-001 HIGH rows (:96 :111 :119
+# :123 :132 :177 :206 :234 :240 :244 -- the file's other operators
+# interpolate the same way), and at the fixed revision the row on :177 -- the
+# advisory's exact line -- is gone while the nine untouched operators
+# keep reporting: the rule discriminates the parameterised form from
+# the interpolated one in the real file. No definition change
+# shipped, no benchmark impact. Spec cve_rank1525 records the
+# interpolated =n expecting VYQL-INJ-001 and the array-form rejecting
+# it.
+
+test "rank1525: the number operator interpolates its value"
+  lang ruby
+  file modules/reporting/lib/report/operator.rb
+  expect VYQL-INJ-001
+  code
+  ```
+  class Report::FilterController < ApplicationController
+    def apply
+      field = params[:f]
+      value = params[:v]
+
+      query = Report::Query.new
+      query.where "#{field} = #{parse_number_string(value)}"
+      render json: query.all
+    end
+  end
+  ```
+
+test "rank1525: the fixed revision parameterises the comparison"
+  lang ruby
+  file modules/reporting/lib/report/operator.rb
+  reject VYQL-INJ-001
+  code
+  ```
+  class Report::FilterController < ApplicationController
+    def apply
+      field = params[:f]
+      value = params[:v]
+
+      query = Report::Query.new
+      query.where ["#{field} = ?", parse_number_string_to_number(value)]
+      render json: query.all
+    end
+  end
+  ```

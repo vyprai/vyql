@@ -1,0 +1,6 @@
+module runtime;
+
+concept HttpRequest : source {
+  coverageReservedSource: true
+  taint: [taint.UntrustedData]
+}

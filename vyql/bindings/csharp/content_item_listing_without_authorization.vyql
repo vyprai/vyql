@@ -1,0 +1,40 @@
+module bindings.csharp.contentItemListingWithoutAuthorization;
+
+// OrchardCore keeps its protected resources in content items, and the
+// documented way to read them directly is a YesSql session query over the
+// content item itself -- `session.Query<ContentItem, ContentItemIndex>()` --
+// whose generic argument names exactly what is being pulled. An action that
+// answers such a query with MVC's serialize-and-return vocabulary
+// (Controller.Json, an ObjectResult, a JsonResult) is serving content-item
+// data to the caller, and a content item is the unit the permission system
+// decides on: one query returns both items the caller may view and items it
+// may not, so the listing is only as authorized as the decision the action
+// makes per item.
+//
+// The decision the ecosystem documents for that is
+// IAuthorizationService.AuthorizeAsync -- in an OrchardCore controller it
+// takes the user, a Permission/CommonPermissions object and the item itself
+// -- and the spellings that mean the same thing at function scope are
+// collected generously: authorize/permission/forbid calls and receivers, a
+// permission object passed anywhere, a role test. For a negation, generosity
+// costs recall rather than precision: an action that so much as names its
+// permission gate is one whose gating has to be read by a human rather than
+// guessed at here.
+//
+// Scope is the action, not the loop. The per-item property of the decision
+// is not expressible in function-scope facts, so a gate consulted once for
+// the whole listing suppresses the same as a gate consulted per item, and a
+// gate that lives in a helper, a route middleware or an [Authorize]
+// attribute -- none of which leave a token in the action body -- reports.
+// Both residuals point away from precision: the first can hide a
+// partially-gated listing, the second asks for a read of an action whose
+// gate is declared elsewhere.
+binding csContentItemListedToCallerWithoutAuthorization {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "csharp"
+    and containsAny(node.context.callPath, ["Query<ContentItem"])
+    and containsAny(node.context.call, ["ObjectResult", "Json"])
+    and not (containsAny(node.context.call, ["Authorize", "Permission", "Permitted", "Forbid", "IsInRole", "HasAccess"]))
+    and not (containsAny(node.context.callPath, ["Authorize", "authorize", "Permission", "permission", "Forbid", "forbid"]))
+    and not (containsAny(node.context.selector, ["Permissions", "permissions", "Authorize", "authorize"]))
+  emit issue code.SensitiveOperation at node
+}

@@ -1,0 +1,11 @@
+module code;
+
+concept StackFallbackStrideUnderallocation : issue {
+  cwe: [CWE_119, CWE_787]
+  reviewAssumption: "the write loop advances the fallback buffer by a width the allocation omits"
+  reviewCategory: memory
+  reviewCondition: "a heap fallback allocation sizes the buffer by its count bound alone while the function's own write loop advances the buffer by a per-unit width"
+  reviewConfidence: medium
+  reviewEvidence: "fallback context {pattern} sizes a stack buffer's heap path by its count bound alone while the write loop advances the buffer by a per-unit width the allocation omits"
+  vulnerableTo: [memory.OobWrite]
+}

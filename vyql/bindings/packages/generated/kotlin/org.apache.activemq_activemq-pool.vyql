@@ -1,0 +1,33 @@
+module bindings.kotlin.generated.m388c9efd;
+
+binding codeEval0 {
+  requires {
+    dependency("org.apache.activemq:activemq-pool")
+  }
+  query pattern callExpr where callee.method == "onCommand"
+  emit sink code.CodeEval at args[0]
+}
+
+binding urlFetch1 {
+  requires {
+    dependency("org.apache.activemq:activemq-pool")
+  }
+  query pattern callExpr where callee.method == "setBrokerUrl"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("org.apache.activemq:activemq-pool")
+  }
+  query pattern callExpr where callee.method == "setProperties"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("org.apache.activemq:activemq-pool")
+  }
+  query pattern callExpr where callee.method == "setConnectionFactory"
+  emit source core.UserControlledData at call.result
+}

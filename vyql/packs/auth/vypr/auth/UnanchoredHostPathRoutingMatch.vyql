@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule UnanchoredHostPathRoutingMatch {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_20, CWE_187]
+    id: "VYQL-AUTH-110"
+    severity: high
+  }
+  issue code.UnanchoredHostPathRoutingMatch as route
+}

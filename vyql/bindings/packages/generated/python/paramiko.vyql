@@ -1,0 +1,9 @@
+module bindings.python.generated.m3b661d34;
+
+binding commandExecution0 {
+  requires {
+    dependency("paramiko")
+  }
+  query pattern callExpr where callee.method == "exec_command"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,0 +1,10 @@
+module vypr.sca;
+
+rule HttpRequestSmugglingDependency {
+  meta {
+    cwe: [CWE_444]
+    id: "VYQL-SCA-005"
+    severity: high
+  }
+  issue sbom.HttpRequestSmugglingDependency as p
+}

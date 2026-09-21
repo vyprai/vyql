@@ -1,0 +1,61 @@
+# Rank 91 / CVE-2019-11247: the CRD handler dispatched custom-resource
+# requests without comparing the request's namespace scope to the CRD's
+# declared scope, so cluster-scoped CRDs were reachable per-namespace and
+# vice versa. The fix adds the scope comparison and delegates mismatches.
+
+test "rank91: CRD handler dispatches without a request-scope comparison"
+  lang go
+  expect VYQL-AUTH-173
+  code
+  ```
+  package apiserver
+
+  import (
+	  "net/http"
+  )
+
+  func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	  requestInfo, ok := RequestInfoFrom(req.Context())
+	  if !ok {
+		  r.delegate.ServeHTTP(w, req)
+		  return
+	  }
+	  crd, err := r.crds.Get(requestInfo.Resource)
+	  if err != nil {
+		  r.delegate.ServeHTTP(w, req)
+		  return
+	  }
+	  r.serveResource(w, req, requestInfo, crd)
+  }
+  ```
+
+test "rank91: CRD handler compares request scope with the CRD scope"
+  lang go
+  reject VYQL-AUTH-173
+  code
+  ```
+  package apiserver
+
+  import (
+	  "net/http"
+  )
+
+  func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	  requestInfo, ok := RequestInfoFrom(req.Context())
+	  if !ok {
+		  r.delegate.ServeHTTP(w, req)
+		  return
+	  }
+	  crd, err := r.crds.Get(requestInfo.Resource)
+	  if err != nil {
+		  r.delegate.ServeHTTP(w, req)
+		  return
+	  }
+	  namespacedCRD, namespacedReq := crd.Spec.Scope == apiextensions.NamespaceScoped, len(requestInfo.Namespace) > 0
+	  if !namespacedCRD && namespacedReq {
+		  r.delegate.ServeHTTP(w, req)
+		  return
+	  }
+	  r.serveResource(w, req, requestInfo, crd)
+  }
+  ```

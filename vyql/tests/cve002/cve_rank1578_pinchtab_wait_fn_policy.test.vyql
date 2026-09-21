@@ -1,0 +1,174 @@
+# Rank 1578 / CVE-2026-33622: PinchTab's /wait endpoint accepted a
+# user-controlled fn expression and evaluated it in the browser
+# context without consulting the security.allowEvaluate policy its
+# sibling endpoint /evaluate enforces, so a tokened caller executed
+# arbitrary JavaScript even where the operator had explicitly
+# disabled evaluation (security-policy bypass, CWE-94/CWE-284;
+# GHSA-w5pc-m664-r62v). handleWaitCore in internal/handlers/wait.go
+# dispatched the request's mode and, for "fn", interpolated req.Fn
+# raw into a JavaScript expression (`js = fmt.Sprintf(
+# `!!(function(){try{return %s}catch(e){return false}})()`, req.Fn)`)
+# and sank it into the documented chromedp API chromedp.Evaluate --
+# the same sink the guarded /evaluate endpoint uses -- with no
+# evaluateEnabled() check. Pool commit d0032c5a5e is an MCP
+# snapshot-params merge (the nocommit flag holds); the fixing commit
+# is c619c43a, "fix: dashboard security hardening (#363)", whose
+# bullet reads "fix: gate wait fn behind evaluate access" (+6 lines
+# on wait.go): `if mode == "fn" && !h.evaluateEnabled() {
+# httpx.ErrorCode(w, 403, "evaluate_disabled", ...); return; }` --
+# the same policy boundary as /evaluate, applied to the wait path.
+#
+# ATTENTION, sibling-policy completeness, held on recheck. The guard
+# exists on the evaluate route and is absent on the wait route that
+# reaches the same capability -- the same per-resource
+# decision-completeness family as ranks 1556 (sibling route groups)
+# and 1540 (permission branches): nothing can ask "does every path
+# to an execution capability enforce the capability's policy",
+# because the shared capability (evaluate-in-tab) is reached through
+# different handlers. Measured on the real code at the span tip
+# (3 x --cache off per revision, timeout 180, --max-ram 6GB):
+# 361 findings / 162 at or above high on c619c43a^ and 360 / 162 on
+# c619c43a, stable across all runs, the only inter-revision diffs
+# line-number shifts from the bundled dashboard hardening, and
+# exactly zero findings in internal/handlers/wait.go and
+# internal/handlers/evaluate.go at both revisions. Fresh diagnosis:
+# `vyql match` labels the handler sources (code.HttpInput on the
+# handler params, r.Body at the decode) but wait.go's only sink
+# label is ResponseHeaderWrite at the header write, the JSON decode
+# is labelled core.SafeDeserialization (a control), and no Go
+# binding emits code.CodeEval at all -- chromedp appears nowhere in
+# the knowledge base -- so `vyql trace -from code.HttpInput -to
+# code.CodeEval` reports the source reaching no sink. A binding on
+# chromedp.Evaluate would be answerable to chromedp's own
+# documentation but converts nothing here: the fix adds a policy
+# gate, not a sanitizer, so the taint source-to-sink path is
+# identical at both revisions and such a binding fires equally on
+# the deliberately gated /evaluate endpoint (evaluate.go:65) and on
+# action_pointer.go's selector interpolation -- the
+# authorization-signal family measured unshippable at rank 1331.
+# Binding the gate itself (evaluateEnabled, a project-internal
+# method) detects this server rather than the weakness. No engine
+# construct is mishandled -- taint flows from the handler source and
+# only vocabulary is missing -- so no ENGINE-GAPS.md entry. No
+# definition change shipped. Spec cve_rank1578 records the ungated
+# fn mode and the evaluateEnabled-gated form modelled on the real
+# file (fmt.Sprintf into chromedp.Evaluate, not a bridge call),
+# both asserting reject VYQL-INJ-003: when capability-gate
+# vocabulary lands, the ungated form must flip to expect.
+
+test "rank1578: the wait fn mode skips the evaluate policy"
+  lang go
+  file internal/handlers/wait.go
+  reject VYQL-INJ-003
+  code
+  ```
+  package handlers
+
+  import (
+      "fmt"
+      "net/http"
+
+      "github.com/chromedp/chromedp"
+      "github.com/pinchtab/pinchtab/internal/httpx"
+  )
+
+  func (h *Handlers) handleWaitCore(w http.ResponseWriter, r *http.Request, req waitRequest) {
+      mode := req.mode()
+      if mode == "" {
+          httpx.Error(w, 400, fmt.Errorf("one of selector, text, url, load, fn, or ms is required"))
+          return
+      }
+
+      h.recordActivity(r, activityUpdate("wait."+mode, req.TabID))
+
+      ctx, resolvedTabID, err := h.tabContext(r, req.TabID)
+      if err != nil {
+          httpx.Error(w, 404, err)
+          return
+      }
+
+      var js string
+
+      switch mode {
+      case "text":
+          js = fmt.Sprintf(`document.body && document.body.innerText.includes(%s)`, jsonStr(req.Text))
+      case "fn":
+          js = fmt.Sprintf(`!!(function(){try{return %s}catch(e){return false}})()`, req.Fn)
+      }
+
+      // Poll loop
+      for {
+          var result bool
+          evalErr := chromedp.Run(ctx, chromedp.Evaluate(js, &result))
+          if evalErr == nil && result {
+              httpx.JSON(w, 200, waitResponse{
+                  Waited:  true,
+                  Match:   mode,
+              })
+              return
+          }
+      }
+  }
+  ```
+
+test "rank1578: the fixed revision gates fn behind the evaluate policy"
+  lang go
+  file internal/handlers/wait.go
+  reject VYQL-INJ-003
+  code
+  ```
+  package handlers
+
+  import (
+      "fmt"
+      "net/http"
+
+      "github.com/chromedp/chromedp"
+      "github.com/pinchtab/pinchtab/internal/httpx"
+  )
+
+  func (h *Handlers) handleWaitCore(w http.ResponseWriter, r *http.Request, req waitRequest) {
+      mode := req.mode()
+      if mode == "" {
+          httpx.Error(w, 400, fmt.Errorf("one of selector, text, url, load, fn, or ms is required"))
+          return
+      }
+
+      if mode == "fn" && !h.evaluateEnabled() {
+          httpx.ErrorCode(w, 403, "evaluate_disabled", httpx.DisabledEndpointMessage("evaluate", "security.allowEvaluate"), false, map[string]any{
+              "setting": "security.allowEvaluate",
+          })
+          return
+      }
+
+      h.recordActivity(r, activityUpdate("wait."+mode, req.TabID))
+
+      ctx, resolvedTabID, err := h.tabContext(r, req.TabID)
+      if err != nil {
+          httpx.Error(w, 404, err)
+          return
+      }
+
+      var js string
+
+      switch mode {
+      case "text":
+          js = fmt.Sprintf(`document.body && document.body.innerText.includes(%s)`, jsonStr(req.Text))
+      case "fn":
+          js = fmt.Sprintf(`!!(function(){try{return %s}catch(e){return false}})()`, req.Fn)
+      }
+
+      // Poll loop
+      for {
+          var result bool
+          evalErr := chromedp.Run(ctx, chromedp.Evaluate(js, &result))
+          if evalErr == nil && result {
+              httpx.JSON(w, 200, waitResponse{
+                  Waited:  true,
+                  Match:   mode,
+              })
+              return
+          }
+      }
+  }
+  ```

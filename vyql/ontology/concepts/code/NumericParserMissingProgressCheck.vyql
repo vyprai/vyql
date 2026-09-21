@@ -1,0 +1,11 @@
+module code;
+
+concept NumericParserMissingProgressCheck : issue {
+  cwe: [CWE_400, CWE_835]
+  reviewAssumption: "malformed numeric input can leave the parse cursor unchanged and cause repeated parser work or an infinite loop"
+  reviewCategory: resource
+  reviewCondition: "a numeric parser can retry parsing without verifying that the parse cursor advanced"
+  reviewConfidence: high
+  reviewEvidence: "numeric parser context {pattern} calls integer and floating-point parsers and checks numeral-class continuation without a tmp == pos progress guard"
+  vulnerableTo: [dos.UncontrolledResourceConsumption]
+}

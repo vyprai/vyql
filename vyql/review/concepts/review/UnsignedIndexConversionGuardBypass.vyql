@@ -1,0 +1,7 @@
+module code;
+
+review code.UnsignedIndexConversionGuardBypass {
+  category: numeric
+  kind: attention
+  text: "review unsigned-to-signed index conversion guards; compare the converted value before later index use"
+}

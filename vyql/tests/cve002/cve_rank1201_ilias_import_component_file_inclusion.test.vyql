@@ -1,0 +1,109 @@
+# Rank 1201 / CVE-2020-23996: ILIAS builds an importer class file path from
+# the "component" attribute of an uploaded personal-data export's manifest
+# and checks the include's own return value before trusting it:
+#
+#   $class = "il" . $a_component . "Importer";
+#   if (is_file("./" . $a_component . "/classes/class." . $class . ".php")) {
+#       if (include_once "./" . $a_component . "/classes/class." . $class . ".php") {
+#           return $class;
+#       }
+#   }
+#
+# is_file only confirms a file exists at the attacker-influenced path; it does
+# not restrict which file that can be, so a component value walking outside
+# the intended directory reaches include_once (CWE-98). Fix 6717c4ecc6 drops
+# the include_once call entirely: the method now only confirms the file
+# exists and returns the class name, relying on the class being
+# autoloaded rather than pulling in a file from an attacker-chosen path.
+#
+# `expr()` (php.go) now carries the same include_expression/include_once_expression/
+# require_expression/require_once_expression case exprStmt has, so the include's
+# position -- its own statement, an if-condition testing its return value, or an assignment's
+# right-hand side does not change whether it becomes a code.FileInclude sink. The success
+# check around include_once's own return value tests whether the file loaded, not which file it
+# was, so it is not a core.PathAccessCheck and the finding holds.
+
+test "rank1201: an uploaded manifest's component name reaches include_once through its own success check"
+  lang php
+  expect VYQL-PATH-002
+  code
+  ```
+  <?php
+  class ilImportExportFactory
+  {
+      public static function getImporterClass($a_component)
+      {
+          $class = "il" . $a_component . "Importer";
+
+          if (is_file("./" . $a_component . "/classes/class." . $class . ".php")) {
+              if (include_once "./" . $a_component . "/classes/class." . $class . ".php") {
+                  return $class;
+              }
+          }
+
+          throw new InvalidArgumentException('Invalid importer type given');
+      }
+  }
+
+  function importFromManifest()
+  {
+      $expfile = ['component' => $_POST['component']];
+      $comp = $expfile['component'];
+      return ilImportExportFactory::getImporterClass($comp);
+  }
+  ```
+
+test "rank1201: the fixed factory returns the class without including it"
+  lang php
+  reject VYQL-PATH-002
+  code
+  ```
+  <?php
+  class ilImportExportFactory
+  {
+      public static function getImporterClass($a_component)
+      {
+          $class = "il" . $a_component . "Importer";
+
+          if (is_file("./" . $a_component . "/classes/class." . $class . ".php")) {
+              return $class;
+          }
+
+          throw new InvalidArgumentException('Invalid importer type given');
+      }
+  }
+
+  function importFromManifest()
+  {
+      $expfile = ['component' => $_POST['component']];
+      $comp = $expfile['component'];
+      return ilImportExportFactory::getImporterClass($comp);
+  }
+  ```
+
+# Same source ($_GET), same include-family construct, same tainted path expression, whether the
+# include's return value is consumed by a statement or by a surrounding expression.
+
+test "rank1201: a dynamic include reports when it is its own statement"
+  lang php
+  file loader.php
+  expect VYQL-PATH-002
+  code
+  ```
+  <?php
+  $path = "./modules/" . $_GET['name'] . "/loader.php";
+  include_once $path;
+  ```
+
+test "rank1201: the identical include reports the same way once its result feeds a condition"
+  lang php
+  file loader.php
+  expect VYQL-PATH-002
+  code
+  ```
+  <?php
+  $path = "./modules/" . $_GET['name'] . "/loader.php";
+  if (include_once $path) {
+      echo "loaded";
+  }
+  ```

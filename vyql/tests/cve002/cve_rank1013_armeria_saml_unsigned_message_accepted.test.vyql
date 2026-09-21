@@ -1,0 +1,108 @@
+# Rank 1013 / CVE-2024-1735: Armeria SAML authentication bypass. When the
+# binding protocol is HTTP POST, SamlMessageUtil.validateSignature returned
+# early for a message carrying no signature:
+#
+#   // Skip signature validation if the object is not signed.
+#   if (!signableObj.isSigned()) {
+#       return;
+#   }
+#
+# Returning normally means "valid", so an attacker forges an unsigned SAML
+# assertion and authenticates as any user (CWE-304, CWE-347). The fixed
+# revision adds a signatureRequired property (default true) and throws
+# InvalidSamlRequestException when the signature is absent.
+#
+# ATTENTION, engine gap: no fail-open branch fact. The right concept exists and
+# covers this weakness, code.OptionalClientSignatureVerification
+# (VYQL-AUTH-072, CWE-287/347): "client authentication verifies a signature only
+# when a supplied signature value is non-null". Its only Java binding
+# (optionalClientSignatureVerification378, vyql/bindings/java/m420f6b67.vyql)
+# requires raw JCA vocabulary -- Signature.getInstance, initVerify, verify --
+# which OpenSAML code never contains, so nothing labels the file at all
+# (vyql match on the vulnerable file reports no source, sink or control, and
+# full scans of the real checkout report 1556 findings / 1003 at or above high
+# on both the vulnerable and the fixed revision with none on SamlMessageUtil).
+# The binding layer cannot express the discriminator:
+#  - Both revisions call isSigned and getSignature, and both contain a bare
+#    return and a throw; only the branch each sits in differs.
+#  - The one textual asymmetry inverts: the fixed guard is a binary expression
+#    (expr token "signature==null||!signableObj.isSigned()") while the
+#    vulnerable guard is a bare unary negation that produces no expr token, so
+#    keying on expr reports the patched code and stays silent on the flaw. The
+#    same key would also flag the fail-closed form
+#    "if (!signableObj.isSigned()) throw ...", which produces no expr token
+#    either -- four genuinely-enforcing spellings would fire.
+#  - The remaining differences (isSigned now called after getSignature, the
+#    signatureRequired parameter, the new message literals) are the fixing
+#    commit's own layout.
+# The JCA binding's workaround (require "signature!=null", forbid
+# "signature==null") does not transfer: the vulnerable function already
+# contains "signature == null" in the later check that does throw.
+#
+# What is missing is a control-flow fact linking a guard condition to whether
+# its branch terminates in a throw or in a plain return: the Java function
+# token walk has no throw_statement case and a bare "return;" contributes no
+# token at all. That one fact would cover a whole family beyond this CVE:
+# optional signature verification, optional authorization checks, and verifiers
+# that return success on error. It is the same flat-bag-of-text limitation the
+# engine-gap record states for the negation-cancellation pattern, and it needs
+# the one-time structured-context sweep there, not a per-rank token.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1013: SAML signature validation returns early for an unsigned message"
+  lang java
+  file saml/src/main/java/com/linecorp/armeria/server/saml/SamlMessageUtil.java
+  reject VYQL-AUTH-072
+  code
+  ```
+  final class SamlMessageUtil {
+      static void validateSignature(Credential validationCredential, SignableSAMLObject signableObj) {
+          // Skip signature validation if the object is not signed.
+          if (!signableObj.isSigned()) {
+              return;
+          }
+
+          final Signature signature = signableObj.getSignature();
+          if (signature == null) {
+              throw new InvalidSamlRequestException("failed to validate a signature because no signature exists");
+          }
+
+          try {
+              signatureProfileValidator.validate(signature);
+              SignatureValidator.validate(signature, validationCredential);
+          } catch (SignatureException e) {
+              throw new InvalidSamlRequestException("failed to validate a signature", e);
+          }
+      }
+  }
+  ```
+
+test "rank1013: fix rejects an unsigned message unless signatures are explicitly optional"
+  lang java
+  file saml/src/main/java/com/linecorp/armeria/server/saml/SamlMessageUtil.java
+  reject VYQL-AUTH-072
+  code
+  ```
+  final class SamlMessageUtil {
+      static void validateSignature(Credential validationCredential, SignableSAMLObject signableObj,
+                                    boolean signatureRequired) {
+          // Reject the object if signature is missing, unless allowed explicitly.
+          final Signature signature = signableObj.getSignature();
+          if (signature == null || !signableObj.isSigned()) {
+              if (signatureRequired) {
+                  throw new InvalidSamlRequestException("rejecting due to a missing signature");
+              } else {
+                  return;
+              }
+          }
+
+          try {
+              signatureProfileValidator.validate(signature);
+              SignatureValidator.validate(signature, validationCredential);
+          } catch (SignatureException e) {
+              throw new InvalidSamlRequestException("failed to validate a signature", e);
+          }
+      }
+  }
+  ```

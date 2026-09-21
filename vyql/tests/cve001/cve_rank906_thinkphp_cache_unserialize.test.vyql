@@ -1,0 +1,61 @@
+# Rank 906 / CVE-2021-23592: ThinkPHP's cache driver unserialize wrapper
+# used a vulnerable restrictive signature while dispatching a configured
+# unserializer over cache data.
+
+test "rank906: ThinkPHP cache driver uses typed configurable unserialize wrapper"
+  lang php
+  file Driver.php
+  expect VYQL-DESER-019
+  expect_review code.ConfigurableCacheUnserializeWrapper
+  code
+  ```
+  <?php
+  declare (strict_types = 1);
+
+  namespace think\cache;
+
+  abstract class Driver
+  {
+      protected $options = [];
+
+      protected function unserialize(string $data)
+      {
+          if (is_numeric($data)) {
+              return $data;
+          }
+
+          $unserialize = $this->options['serialize'][1] ?? "unserialize";
+
+          return $unserialize($data);
+      }
+  }
+  ```
+
+test "rank906: ThinkPHP cache driver removes vulnerable unserialize type restriction"
+  lang php
+  file Driver.php
+  reject VYQL-DESER-019
+  reject_review code.ConfigurableCacheUnserializeWrapper
+  code
+  ```
+  <?php
+  declare (strict_types = 1);
+
+  namespace think\cache;
+
+  abstract class Driver
+  {
+      protected $options = [];
+
+      protected function unserialize($data)
+      {
+          if (is_numeric($data)) {
+              return $data;
+          }
+
+          $unserialize = $this->options['serialize'][1] ?? "unserialize";
+
+          return $unserialize($data);
+      }
+  }
+  ```

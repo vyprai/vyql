@@ -1,0 +1,29 @@
+module bindings.ruby.generated.m220f41eb;
+
+binding nosqlQuery0 {
+  requires {
+    dependency("moped")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery1 {
+  requires {
+    dependency("moped")
+  }
+  query pattern callExpr where callee.method == "command"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding authenticationCheck2 {
+  requires {
+    dependency("moped")
+  }
+  query pattern callExpr where callee.method == "login"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

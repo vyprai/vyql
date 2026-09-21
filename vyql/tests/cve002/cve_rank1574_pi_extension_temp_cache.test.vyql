@@ -1,0 +1,125 @@
+# Rank 1574 / CVE-2026-54328: pi's coding agent unpacked extension
+# packages into a predictable folder under the system temp directory,
+# so another local user could pre-plant or race the cache path and
+# have the agent load attacker-chosen code (insecure temporary
+# directory, CWE-377/CWE-424; PR #5345). getTemporaryDir in
+# packages/coding-agent/src/core/package-manager.ts did `const root =
+# this.resolveManagedPath(join(tmpdir(), "pi-extensions"), prefix)`
+# -- /tmp is world-writable and world-readable, the subpath is a
+# fixed name, and the payload hash derives from known strings. The
+# fixing commit ea3465a8e3 ("fix (coding-agent): move temporary
+# extension cache"): a getExtensionTempFolder helper places the cache
+# at join(agentDir, "tmp", "extensions") -- inside the agent's own
+# state directory -- created with `mkdirSync(tempFolder, { recursive:
+# true, mode: 0o700 })` plus an explicit chmodSync(0o700) for
+# pre-existing directories, and getTemporaryDir builds on it.
+#
+# Detection is the joined-path fact: a function that joins further
+# segments onto os.tmpdir() -- the shared directory Node documents as
+# the operating system's default for temporary files -- without a
+# documented unique-name generator (fs.mkdtemp, crypto.randomUUID)
+# anywhere in the function builds a predictable path for content a
+# local attacker can pre-plant or read. The path is reported where it
+# is built, not at the mkdir that later creates it, because the two
+# live in different functions here and the joined path is the whole
+# defect. VYQL-PATH-003 (code.InsecureTempFile, the corpus's
+# insecure-temp-file rule, already bound for ten other languages)
+# reports it and stays quiet on the fixed agent-dir form and on the
+# two documented safe idioms: mkdtemp over a joined prefix, and a
+# randomUUID segment in the joined name. A hash of known strings
+# (the CVE's own payload hash) and a Date.now() segment stay
+# predictable and stay reported.
+
+test "rank1574: the extension cache path joins onto the shared temp directory"
+  lang javascript
+  file packages/coding-agent/src/core/package-manager.ts
+  expect VYQL-PATH-003
+  reject VYQL-PATH-001
+  code
+  ```
+  import { createHash } from "node:crypto";
+  import { tmpdir } from "node:os";
+  import { join, resolve, sep } from "node:path";
+
+  export class DefaultPackageManager {
+    private agentDir: string;
+
+    private getTemporaryDir(prefix: string, suffix?: string): string {
+      const root = this.resolveManagedPath(join(tmpdir(), "pi-extensions"), prefix);
+      const hash = createHash("sha256")
+        .update(`${prefix}-${suffix ?? ""}`)
+        .digest("hex")
+        .slice(0, 8);
+      return this.resolveManagedPath(root, hash, suffix ?? "");
+    }
+
+    private resolveManagedPath(root: string, ...parts: string[]): string {
+      const resolvedRoot = resolve(root);
+      const resolvedPath = resolve(resolvedRoot, ...parts);
+      if (resolvedPath !== resolvedRoot && !resolvedPath.startsWith(`${resolvedRoot}${sep}`)) {
+        throw new Error(`Refusing to use path outside package install root: ${resolvedPath}`);
+      }
+      return resolvedPath;
+    }
+  }
+  ```
+
+test "rank1574: the fixed revision caches under the agent dir with 0700"
+  lang javascript
+  file packages/coding-agent/src/core/package-manager.ts
+  reject VYQL-PATH-003
+  code
+  ```
+  import { chmodSync, mkdirSync } from "node:fs";
+  import { createHash } from "node:crypto";
+  import { join, resolve, sep } from "node:path";
+
+  export function getExtensionTempFolder(agentDir: string): string {
+    const tempFolder = join(agentDir, "tmp", "extensions");
+    mkdirSync(tempFolder, { recursive: true, mode: 0o700 });
+    chmodSync(tempFolder, 0o700);
+    return tempFolder;
+  }
+
+  export class DefaultPackageManager {
+    private agentDir: string;
+
+    private getTemporaryDir(prefix: string, suffix?: string): string {
+      const root = this.resolveManagedPath(getExtensionTempFolder(this.agentDir), prefix);
+      const hash = createHash("sha256")
+        .update(`${prefix}-${suffix ?? ""}`)
+        .digest("hex")
+        .slice(0, 8);
+      return this.resolveManagedPath(root, hash, suffix ?? "");
+    }
+
+    private resolveManagedPath(root: string, ...parts: string[]): string {
+      const resolvedRoot = resolve(root);
+      const resolvedPath = resolve(resolvedRoot, ...parts);
+      if (resolvedPath !== resolvedRoot && !resolvedPath.startsWith(`${resolvedRoot}${sep}`)) {
+        throw new Error(`Refusing to use path outside package install root: ${resolvedPath}`);
+      }
+      return resolvedPath;
+    }
+  }
+  ```
+
+test "rank1574: the documented unique-name generators stay quiet"
+  lang javascript
+  file packages/coding-agent/src/utils/tmp-helpers.ts
+  reject VYQL-PATH-003
+  code
+  ```
+  import { mkdtempSync } from "node:fs";
+  import { randomUUID } from "node:crypto";
+  import { tmpdir } from "node:os";
+  import { join } from "node:path";
+
+  export function uniqueTempDir(): string {
+    return mkdtempSync(join(tmpdir(), "pi-tools-"));
+  }
+
+  export function unguessableTempFile(): string {
+    return join(tmpdir(), `pi-clip-${randomUUID()}.png`);
+  }
+  ```

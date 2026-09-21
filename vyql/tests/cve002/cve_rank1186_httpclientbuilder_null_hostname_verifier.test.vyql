@@ -1,0 +1,333 @@
+# Apache HttpComponents HttpClient's fluent builder wires hostname
+# verification through an X509HostnameVerifier handed to the SSL socket
+# factory's constructor, and the verifier is optional everywhere else in the
+# library: HttpClientBuilder exposes it only through setHostnameVerifier and
+# leaves the field null until a caller sets it, while the 4.3
+# SSLConnectionSocketFactory constructor it was handed to stored the argument
+# verbatim and ran its verify path only when the field was non-null. A build()
+# that threads this.hostnameVerifier straight into that constructor therefore
+# wires a connection factory whose hostname verification is silently off for
+# every caller that builds a client the ordinary way (CWE-20; the effect is
+# CWE-295). GHSA-pqwh-44jj-p5rm/NVD state it directly: "does not ensure that
+# X509HostnameVerifier is not null." The fix (08140864, svn trunk@1528614)
+# reads the field into a local and defaults it to
+# SSLConnectionSocketFactory.BROWSER_COMPATIBLE_HOSTNAME_VERIFIER when null,
+# before any of the three constructor branches.
+#
+# Vocabulary. bindings.java.unguardedHostnameVerifierWiring reads three facts
+# off the wiring function's body: the hand-off -- a hostnameVerifier argument
+# reaching an SSLConnectionSocketFactory or the deprecated SSLSocketFactory
+# constructor, read off the call-argument pair that flagScopeCallArgHit
+# computes from argument flow, which is what keeps a same-named getter, a
+# TestX509HostnameVerifier class reference or other bare mentions of the word
+# from satisfying the clause; the null guard -- no hostnameVerifier == null /
+# != null comparison in the function, the shape of the fix; and the
+# provenance exclusions -- no hostname-verifier-named call (a constructed
+# BrowserCompatHostnameVerifier, DefaultHostnameVerifier or any project's own
+# *HostnameVerifier implementation is known non-null) and no hostnameVerifier
+# parameter (a pass-through helper's null-ness is its caller's to settle).
+# The concept is reused: code.CertValidationDisabled (VYQL-CFG-004) already
+# carries the hostname-verification-off judgement for the explicit opt-outs
+# (setHostnameVerifier(true), NoopHostnameVerifier); this binding reaches the
+# same finding at the wiring site, so no concept or rule is minted.
+#
+# Discrimination, three --cache off scans of the whole checkout per revision,
+# identical every run: 266 findings with exactly 1 VYQL-CFG-004 at
+# HttpClientBuilder.java:692 (build()) on 08140864^, and 265 findings with 0
+# VYQL-CFG-004 on 08140864 -- the fingerprint sets differ by exactly that one
+# row (fp=7b4fe0963ae8964b), and the pre-binding baseline on the vulnerable
+# revision is the same 265, so the binding adds the target and nothing else.
+# The grep-enumerated
+# reachable set -- every SSLConnectionSocketFactory/SSLSocketFactory
+# construction in the tree and in the /tmp/cve-work clones -- holds no other
+# site the binding reports: the internal static factories and ClientCustomSSL
+# pass the BROWSER_COMPATIBLE/ALLOW_ALL constants (not the paired argument),
+# TestSSLSocketFactory passes hostVerifier or a literal null, the documented
+# ClientConfiguration example constructs its verifier in the same function,
+# gradle's HttpClientConfigurer threads a parameter, hive constructs a
+# DefaultHostnameVerifier, and the artemis guard spells the parameter's own
+# null check. Measured on the clone trees: gradle resources-http 30 findings
+# with 0 from this binding, artemis WebServerComponentTest unchanged (its two
+# CFG-004 rows are the pre-existing NoopHostnameVerifier binding's), hive
+# HiveConnection and SecurityUtils 0, undertow TestHttpClient 0. The needles
+# are absent from BenchmarkPython; BenchmarkJava's one construction
+# (Utils.getSSLFactory) passes NoopHostnameVerifier.INSTANCE, which the paired
+# argument clause does not read, and its pre-existing CFG-004 row is
+# unchanged.
+#
+# verify_current_expected: fixed, 1 -> 0 on the real revision pair.
+test "rank1186: build() threads its possibly-null hostnameVerifier straight into the SSL socket factory"
+  lang java
+  file HttpClientBuilder.java
+  expect VYQL-CFG-004
+  expect_review code.CertValidationDisabled
+  code
+  ```
+  package org.apache.http.impl.client;
+
+  import org.apache.http.conn.HttpClientConnectionManager;
+  import org.apache.http.conn.socket.LayeredConnectionSocketFactory;
+  import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
+  import org.apache.http.conn.ssl.SSLContexts;
+  import org.apache.http.conn.ssl.X509HostnameVerifier;
+
+  public class HttpClientBuilder {
+
+      private HttpClientConnectionManager connManager;
+      private LayeredConnectionSocketFactory sslSocketFactory;
+      private X509HostnameVerifier hostnameVerifier;
+      private SSLContext sslcontext;
+      private boolean systemProperties;
+
+      public final HttpClientBuilder setHostnameVerifier(final X509HostnameVerifier hostnameVerifier) {
+          this.hostnameVerifier = hostnameVerifier;
+          return this;
+      }
+
+      public CloseableHttpClient build() {
+          HttpClientConnectionManager connManager = this.connManager;
+          if (connManager == null) {
+              LayeredConnectionSocketFactory sslSocketFactory = this.sslSocketFactory;
+              if (sslSocketFactory == null) {
+                  if (sslcontext != null) {
+                      sslSocketFactory = new SSLConnectionSocketFactory(sslcontext, hostnameVerifier);
+                  } else {
+                      if (systemProperties) {
+                          sslSocketFactory = new SSLConnectionSocketFactory(
+                                  (javax.net.ssl.SSLSocketFactory) javax.net.ssl.SSLSocketFactory.getDefault(),
+                                  split(System.getProperty("https.protocols")),
+                                  split(System.getProperty("https.cipherSuites")),
+                                  hostnameVerifier);
+                      } else {
+                          sslSocketFactory = new SSLConnectionSocketFactory(
+                                  SSLContexts.createDefault(),
+                                  hostnameVerifier);
+                      }
+                  }
+              }
+          }
+          return null;
+      }
+  }
+  ```
+
+test "rank1186: build() defaults a null hostnameVerifier before the hand-off"
+  lang java
+  file HttpClientBuilder.java
+  reject VYQL-CFG-004
+  reject_review code.CertValidationDisabled
+  code
+  ```
+  package org.apache.http.impl.client;
+
+  import org.apache.http.conn.HttpClientConnectionManager;
+  import org.apache.http.conn.socket.LayeredConnectionSocketFactory;
+  import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
+  import org.apache.http.conn.ssl.SSLContexts;
+  import org.apache.http.conn.ssl.X509HostnameVerifier;
+
+  public class HttpClientBuilder {
+
+      private HttpClientConnectionManager connManager;
+      private LayeredConnectionSocketFactory sslSocketFactory;
+      private X509HostnameVerifier hostnameVerifier;
+      private SSLContext sslcontext;
+
+      public final HttpClientBuilder setHostnameVerifier(final X509HostnameVerifier hostnameVerifier) {
+          this.hostnameVerifier = hostnameVerifier;
+          return this;
+      }
+
+      public CloseableHttpClient build() {
+          HttpClientConnectionManager connManager = this.connManager;
+          if (connManager == null) {
+              LayeredConnectionSocketFactory sslSocketFactory = this.sslSocketFactory;
+              if (sslSocketFactory == null) {
+                  X509HostnameVerifier hostnameVerifier = this.hostnameVerifier;
+                  if (hostnameVerifier == null) {
+                      hostnameVerifier = SSLConnectionSocketFactory.BROWSER_COMPATIBLE_HOSTNAME_VERIFIER;
+                  }
+                  if (sslcontext != null) {
+                      sslSocketFactory = new SSLConnectionSocketFactory(sslcontext, hostnameVerifier);
+                  } else {
+                      sslSocketFactory = new SSLConnectionSocketFactory(
+                              SSLContexts.createDefault(),
+                              hostnameVerifier);
+                  }
+              }
+          }
+          return null;
+      }
+  }
+  ```
+
+test "rank1186: a non-null guard around the hand-off is the same fix"
+  lang java
+  file HttpClientBuilder.java
+  reject VYQL-CFG-004
+  reject_review code.CertValidationDisabled
+  code
+  ```
+  package org.apache.http.impl.client;
+
+  import org.apache.http.conn.HttpClientConnectionManager;
+  import org.apache.http.conn.socket.LayeredConnectionSocketFactory;
+  import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
+  import org.apache.http.conn.ssl.X509HostnameVerifier;
+
+  public class HttpClientBuilder {
+
+      private HttpClientConnectionManager connManager;
+      private LayeredConnectionSocketFactory sslSocketFactory;
+      private X509HostnameVerifier hostnameVerifier;
+      private SSLContext sslcontext;
+
+      public CloseableHttpClient build() {
+          HttpClientConnectionManager connManager = this.connManager;
+          if (connManager == null) {
+              LayeredConnectionSocketFactory sslSocketFactory = this.sslSocketFactory;
+              if (sslSocketFactory == null && hostnameVerifier != null) {
+                  sslSocketFactory = new SSLConnectionSocketFactory(sslcontext, hostnameVerifier);
+              }
+          }
+          return null;
+      }
+  }
+  ```
+
+test "rank1186: a verifier constructed in the wiring function is known non-null"
+  lang java
+  file ClientConfiguration.java
+  reject VYQL-CFG-004
+  reject_review code.CertValidationDisabled
+  code
+  ```
+  package org.apache.http.examples.client;
+
+  import org.apache.http.conn.ssl.BrowserCompatHostnameVerifier;
+  import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
+  import org.apache.http.conn.ssl.SSLContexts;
+  import org.apache.http.conn.ssl.X509HostnameVerifier;
+
+  public class ClientConfiguration {
+
+      public final static void main(String[] args) throws Exception {
+          SSLContext sslcontext = SSLContexts.createSystemDefault();
+          // Use custom hostname verifier to customize SSL hostname verification.
+          X509HostnameVerifier hostnameVerifier = new BrowserCompatHostnameVerifier();
+          RegistryBuilder.<ConnectionSocketFactory>create()
+              .register("https", new SSLConnectionSocketFactory(sslcontext, hostnameVerifier))
+              .build();
+      }
+  }
+  ```
+
+test "rank1186: a pass-through helper's parameter is its caller's to settle"
+  lang java
+  file HttpClientConfigurer.java
+  reject VYQL-CFG-004
+  reject_review code.CertValidationDisabled
+  code
+  ```
+  package org.gradle.internal.resource.transport.http;
+
+  import javax.net.ssl.HostnameVerifier;
+
+  public class HttpClientConfigurer {
+
+      private void configureSslSocketConnectionFactory(HttpClientBuilder builder, SslContextFactory sslContextFactory, HostnameVerifier hostnameVerifier) {
+          builder.setSSLSocketFactory(new SSLConnectionSocketFactory(sslContextFactory.createSslContext(), null, null, hostnameVerifier));
+      }
+  }
+  ```
+
+test "rank1186: a comment claiming a default does not guard the hand-off"
+  lang java
+  file HttpClientBuilder.java
+  expect VYQL-CFG-004
+  expect_review code.CertValidationDisabled
+  code
+  ```
+  package org.apache.http.impl.client;
+
+  import org.apache.http.conn.HttpClientConnectionManager;
+  import org.apache.http.conn.socket.LayeredConnectionSocketFactory;
+  import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
+  import org.apache.http.conn.ssl.X509HostnameVerifier;
+
+  public class HttpClientBuilder {
+
+      private HttpClientConnectionManager connManager;
+      private LayeredConnectionSocketFactory sslSocketFactory;
+      private X509HostnameVerifier hostnameVerifier;
+      private SSLContext sslcontext;
+
+      public CloseableHttpClient build() {
+          HttpClientConnectionManager connManager = this.connManager;
+          if (connManager == null) {
+              LayeredConnectionSocketFactory sslSocketFactory = this.sslSocketFactory;
+              if (sslSocketFactory == null) {
+                  // hostnameVerifier is defaulted to the browser-compatible verifier when unset
+                  sslSocketFactory = new SSLConnectionSocketFactory(sslcontext, hostnameVerifier);
+              }
+          }
+          return null;
+      }
+  }
+  ```
+
+test "rank1186: a null guard living in a sibling method does not reach the wiring function"
+  lang java
+  file HttpClientBuilder.java
+  expect VYQL-CFG-004
+  expect_review code.CertValidationDisabled
+  code
+  ```
+  package org.apache.http.impl.client;
+
+  import org.apache.http.conn.socket.LayeredConnectionSocketFactory;
+  import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
+  import org.apache.http.conn.ssl.X509HostnameVerifier;
+
+  public class HttpClientBuilder {
+
+      private LayeredConnectionSocketFactory sslSocketFactory;
+      private X509HostnameVerifier hostnameVerifier;
+      private SSLContext sslcontext;
+
+      private boolean verifierConfigured() {
+          return hostnameVerifier != null;
+      }
+
+      public CloseableHttpClient build() {
+          LayeredConnectionSocketFactory sslSocketFactory = this.sslSocketFactory;
+          if (sslSocketFactory == null) {
+              sslSocketFactory = new SSLConnectionSocketFactory(sslcontext, hostnameVerifier);
+          }
+          return null;
+      }
+  }
+  ```
+
+test "rank1186: a differently-named verifier argument is not the paired hand-off"
+  lang java
+  file TestSSLSocketFactory.java
+  reject VYQL-CFG-004
+  reject_review code.CertValidationDisabled
+  code
+  ```
+  package org.apache.http.conn.ssl;
+
+  public class TestSSLSocketFactory {
+
+      static class TestX509HostnameVerifier implements X509HostnameVerifier {
+          public void verify(String host, SSLSocket ssl) {}
+      }
+
+      public void test() throws Exception {
+          final SSLContext clientSSLContext = SSLContexts.createSystemDefault();
+          final TestX509HostnameVerifier hostVerifier = new TestX509HostnameVerifier();
+          final SSLConnectionSocketFactory socketFactory = new SSLConnectionSocketFactory(clientSSLContext, hostVerifier);
+      }
+  }
+  ```

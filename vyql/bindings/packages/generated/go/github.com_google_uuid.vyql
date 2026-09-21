@@ -1,0 +1,41 @@
+module bindings.go.generated.m000d1d82;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/google/uuid")
+  }
+  query pattern callExpr where callee.method == "Parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/google/uuid")
+  }
+  query pattern callExpr where callee.method == "ParseBytes"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("github.com/google/uuid")
+  }
+  query pattern callExpr where callee.method == "MustParse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding weakHash3 {
+  requires {
+    dependency("github.com/google/uuid")
+  }
+  query pattern callExpr where callee.method == "NewMD5"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash4 {
+  requires {
+    dependency("github.com/google/uuid")
+  }
+  query pattern callExpr where callee.method == "NewSHA1"
+  emit issue code.WeakHash at call
+}

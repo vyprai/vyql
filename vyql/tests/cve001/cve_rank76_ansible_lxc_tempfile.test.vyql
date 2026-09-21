@@ -1,0 +1,8 @@
+# Rank 76 / CVE-2016-3096: Ansible LXC predictable temp script/log path.
+
+test "rank76: insecure temporary file is a CVE anchor"
+  expect VYQL-PATH-003
+  graph
+  ```
+  node path code.InsecureTempFile
+  ```

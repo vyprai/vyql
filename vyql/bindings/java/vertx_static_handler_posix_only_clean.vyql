@@ -1,0 +1,46 @@
+module bindings.java.vertx_static_handler_posix_only_clean;
+
+// vert.x-web's StaticHandler resolves a request path against the web root:
+// it reads the router's documented path accessor (RoutingContext
+// .normalisedPath(), the URI-decoded form the route matched on), percent-
+// decodes whatever that still carries with URIDecoder.decodeURIComponent,
+// and then removes dot segments with HttpUtils.removeDots -- which the
+// project documents as RFC 3986 section 5.2.4, an algorithm defined over
+// slash-separated segments. A percent-encoded backslash survives the decode
+// and the removal untouched, and on Windows the filesystem accepts it as a
+// separator, so a /\..\ request keeps its parent segment into the file
+// resolution. The handler's own fix canonicalises the separator
+// (replace('\\', '/')) ahead of the dot-segment removal, which is the
+// platform-aware spelling the Go twin of this shape gets from filepath.Clean.
+//
+// The shape is function-scoped: the accessor read, the decode and the
+// dot-segment removal all sit in the handler method. The neutraliser is a
+// replace call that carries a backslash literal -- separator
+// canonicalisation needs both. The presence predicate cannot conjoin the
+// two negations in one clause, so the pair is spelled as two sibling
+// bindings whose union reports unless both halves are present: one silent
+// when any replace call exists, one silent when any backslash literal
+// exists, so only the function carrying both is treated as canonicalised.
+// Each half alone is not neutralising: an unrelated regex literal such as
+// "\\d+" does not canonicalise separators, and neither does a replace that
+// rewrites spaces.
+//
+// The evidence is node-level -- call paths and literals come from AST
+// nodes, so prose in a comment satisfies neither direction -- and the
+// literal tokens are confined to the method, so a sibling method's
+// backslash cannot discharge this one. Residual: a function carrying a
+// backslash-bearing replace for an unrelated purpose together with any
+// other replace call is silent (false-negative direction only).
+//
+// The judgement is the pack rule's; this binding recognises the shape of
+// the handler.
+
+binding vertxSlashOnlyCleanNoBackslashLiteral {
+  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "normalisedPath" and node.context.callPath contains "decodeURIComponent" and node.context.callPath contains "removeDots" and not (containsAny(node.context.literal, ["\\", "\\\\"]))
+  emit issue code.StaticServerPosixOnlyCleanWindowsTraversal at node
+}
+
+binding vertxSlashOnlyCleanNoReplaceCall {
+  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "normalisedPath" and node.context.callPath contains "decodeURIComponent" and node.context.callPath contains "removeDots" and not (node.context.callPath contains "replace")
+  emit issue code.StaticServerPosixOnlyCleanWindowsTraversal at node
+}

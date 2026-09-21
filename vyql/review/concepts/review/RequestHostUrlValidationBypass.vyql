@@ -1,0 +1,8 @@
+module code;
+
+review code.RequestHostUrlValidationBypass {
+  category: request_forgery
+  expected: [core.AllowlistValidation]
+  kind: attention
+  text: "review URL host validation that trusts request Host or server-name metadata instead of a configured allowlist"
+}

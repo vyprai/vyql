@@ -1,0 +1,31 @@
+# P5 framework depth (python): asyncpg raw, graphene resolver args.
+
+test "python: graphene resolver arg -> cursor.execute is SQLi"
+  lang python
+  expect VYQL-INJ-001
+  code
+  ```
+  class Query:
+      def resolve_user(self, info, name):
+          cur.execute("SELECT * FROM users WHERE name = '" + name + "'")
+  ```
+
+test "python: a graphene resolver with a constant query is clean"
+  lang python
+  reject VYQL-INJ-001
+  code
+  ```
+  class Query:
+      def resolve_user(self, info, name):
+          cur.execute("SELECT * FROM users")
+  ```
+
+test "python: FastAPI param -> asyncpg fetch is SQLi"
+  lang python
+  expect VYQL-INJ-001
+  code
+  ```
+  @app.get("/u")
+  async def get_user(name: str):
+      await conn.fetch("SELECT * FROM users WHERE name = '" + name + "'")
+  ```

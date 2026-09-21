@@ -1,0 +1,116 @@
+# CVE-2019-10744: lodash routed every property read in its deep merge through
+# safeGet, a helper whose denylist held only "__proto__". `constructor` passed
+# straight through, so baseMergeDeep read `object.constructor` — `Object` for a
+# plain destination — decides it is a mergeable target, and recurses into it,
+# writing the source's nested keys onto `Object` itself. `_.defaultsDeep({},
+# JSON.parse('{"constructor":{"a":1}}'))` therefore polluted every object in
+# the process. The fixed revision returns nothing for a `constructor` key whose value is a
+# function, so the recursion never reaches a constructor's prototype.
+
+test "rank1337: guarded merge property read denies only __proto__ and returns the constructor"
+  lang javascript
+  file lodash.js
+  expect VYQL-INJ-244
+  expect_review code.IncompleteKeyDenylistGuardedReadPrototypePollution
+  code
+  ```
+  function safeGet(object, key) {
+    if (key == '__proto__') {
+      return;
+    }
+
+    return object[key];
+  }
+
+  function baseMergeDeep(object, source, key, srcIndex, mergeFunc, customizer, stack) {
+    var objValue = safeGet(object, key),
+        srcValue = safeGet(source, key),
+        stacked = stack.get(srcValue);
+
+    if (stacked) {
+      assignMergeValue(object, key, stacked);
+      return;
+    }
+    var newValue = srcValue,
+        isCommon = true;
+
+    if (isPlainObject(srcValue) || isArguments(srcValue)) {
+      newValue = objValue;
+      if (!isObject(objValue) || isFunction(objValue)) {
+        newValue = initCloneObject(srcValue);
+      }
+    }
+    if (isCommon) {
+      stack.set(srcValue, newValue);
+      mergeFunc(newValue, srcValue, srcIndex, customizer, stack);
+      stack['delete'](srcValue);
+    }
+    assignMergeValue(object, key, newValue);
+  }
+  ```
+
+test "rank1337: guarded merge property read rejects a constructor key holding a function"
+  lang javascript
+  file lodash.js
+  reject VYQL-INJ-244
+  reject_review code.IncompleteKeyDenylistGuardedReadPrototypePollution
+  code
+  ```
+  function safeGet(object, key) {
+    if (key === 'constructor' && typeof object[key] === 'function') {
+      return;
+    }
+
+    if (key == '__proto__') {
+      return;
+    }
+
+    return object[key];
+  }
+
+  function baseMergeDeep(object, source, key, srcIndex, mergeFunc, customizer, stack) {
+    var objValue = safeGet(object, key),
+        srcValue = safeGet(source, key),
+        stacked = stack.get(srcValue);
+
+    if (stacked) {
+      assignMergeValue(object, key, stacked);
+      return;
+    }
+    var newValue = srcValue,
+        isCommon = true;
+
+    if (isPlainObject(srcValue) || isArguments(srcValue)) {
+      newValue = objValue;
+      if (!isObject(objValue) || isFunction(objValue)) {
+        newValue = initCloneObject(srcValue);
+      }
+    }
+    if (isCommon) {
+      stack.set(srcValue, newValue);
+      mergeFunc(newValue, srcValue, srcIndex, customizer, stack);
+      stack['delete'](srcValue);
+    }
+    assignMergeValue(object, key, newValue);
+  }
+  ```
+
+# A single-level setter needs no more than a __proto__ denylist: assigning
+# obj.constructor replaces one own property and reaches no prototype, so the
+# same guard in a function that does its own dynamic property write is
+# complete, not partial.
+test "rank1337: single-level setter guarding __proto__ is not a partial denylist"
+  lang javascript
+  file set.js
+  reject VYQL-INJ-244
+  reject_review code.IncompleteKeyDenylistGuardedReadPrototypePollution
+  code
+  ```
+  function safeSet(object, key, value) {
+    if (key === '__proto__') {
+      return;
+    }
+
+    object[key] = value;
+  }
+  ```

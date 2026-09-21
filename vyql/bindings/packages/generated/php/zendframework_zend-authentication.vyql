@@ -1,0 +1,17 @@
+module bindings.php.generated.mbcadae5e;
+
+binding httpInput0 {
+  requires {
+    dependency("zendframework/zend-authentication")
+  }
+  query pattern callExpr where callee.method == "Session"
+  emit source code.HttpInput at call.result
+}
+
+binding weakHash1 {
+  requires {
+    dependency("zendframework/zend-authentication")
+  }
+  query pattern presenceNode where node.path ~= "zendframework.zend.authentication.hash"
+  emit issue code.WeakHash at node
+}

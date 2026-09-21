@@ -1,0 +1,6 @@
+module code;
+
+concept PatternOptionInput : source {
+  refines: core.UserControlledData
+  taint: [taint.UntrustedData]
+}

@@ -1,0 +1,25 @@
+module bindings.ruby.generated.m1d9c0c0a;
+
+binding htmlRender0 {
+  requires {
+    dependency("libnotify")
+  }
+  query pattern callExpr where callee.method == "new"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender1 {
+  requires {
+    dependency("libnotify")
+  }
+  query pattern callExpr where callee.method == "show"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender2 {
+  requires {
+    dependency("libnotify")
+  }
+  query pattern callExpr where callee.method == "update"
+  emit sink code.HtmlRender at args[0]
+}

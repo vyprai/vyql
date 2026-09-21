@@ -1,0 +1,8 @@
+module code;
+
+review code.ZikulaThemeNameReflectedXss {
+  category: xss
+  expected: [core.HtmlEscape, core.InputValidation]
+  kind: attention
+  text: "review Zikula Theme admin themename handling for request filtering or escaping before confirmation template rendering"
+}

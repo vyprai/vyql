@@ -1,0 +1,9 @@
+module bindings.objc.generated.m1ca2de1f;
+
+binding userControlledData0 {
+  requires {
+    dependency("GoogleUserMessagingPlatform")
+  }
+  query pattern callExpr where callee.method == "requestConsentInfoUpdateWithParameters"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,83 @@
+# Rank 424 / CVE-2020-21146: Feehi CMS stored XSS in username rendering.
+
+test "rank424: Feehi frontend user model exposes usernames without afterFind encoding"
+  lang php
+  file User.php
+  expect VYQL-INJ-081
+  expect_review code.FeehiUsernameStoredXss
+  code
+  ```
+  <?php
+  namespace frontend\models;
+
+  class User extends \common\models\User
+  {
+    public function rules()
+    {
+      return [
+        [['username', 'password', 'repassword'], 'string'],
+        [['username', 'email'], 'unique'],
+      ];
+    }
+
+    public function attributeLabels()
+    {
+      return [
+        'username' => Yii::t('app', 'Username'),
+      ];
+    }
+
+    public function beforeSave($insert)
+    {
+      if ($insert) {
+        $this->setPassword($this->password);
+      }
+      return parent::beforeSave($insert);
+    }
+  }
+  ```
+
+test "rank424: Feehi frontend user model encodes usernames after find"
+  lang php
+  file User.php
+  reject VYQL-INJ-081
+  reject_review code.FeehiUsernameStoredXss
+  code
+  ```
+  <?php
+  namespace frontend\models;
+
+  use yii\helpers\Html;
+
+  class User extends \common\models\User
+  {
+    public function rules()
+    {
+      return [
+        [['username', 'password', 'repassword'], 'string'],
+        [['username', 'email'], 'unique'],
+      ];
+    }
+
+    public function attributeLabels()
+    {
+      return [
+        'username' => Yii::t('app', 'Username'),
+      ];
+    }
+
+    public function beforeSave($insert)
+    {
+      if ($insert) {
+        $this->setPassword($this->password);
+      }
+      return parent::beforeSave($insert);
+    }
+
+    public function afterFind()
+    {
+      parent::afterFind();
+      $this->username = Html::encode($this->username);
+    }
+  }
+  ```

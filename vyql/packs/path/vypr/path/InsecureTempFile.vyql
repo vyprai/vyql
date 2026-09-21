@@ -1,0 +1,10 @@
+module vypr.path;
+
+rule InsecureTempFile {
+  meta {
+    cwe: [CWE_377, CWE_59]
+    id: "VYQL-PATH-003"
+    severity: low
+  }
+  issue code.InsecureTempFile as t
+}

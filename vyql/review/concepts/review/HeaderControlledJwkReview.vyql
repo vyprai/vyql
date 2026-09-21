@@ -1,0 +1,7 @@
+module code;
+
+review code.HeaderControlledJwkReview {
+  category: crypto
+  kind: attention
+  text: "review signature or decryption key selection for fallback to attacker-controlled JWK header data"
+}

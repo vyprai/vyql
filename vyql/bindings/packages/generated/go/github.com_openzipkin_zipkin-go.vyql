@@ -1,0 +1,25 @@
+module bindings.go.generated.m74bd0025;
+
+binding weakRandomValue0 {
+  requires {
+    dependency("github.com/openzipkin/zipkin-go")
+  }
+  query pattern callExpr where callee.method == "NewRandom64"
+  emit issue code.WeakRandomValue at call
+}
+
+binding weakRandomValue1 {
+  requires {
+    dependency("github.com/openzipkin/zipkin-go")
+  }
+  query pattern callExpr where callee.method == "NewRandom128"
+  emit issue code.WeakRandomValue at call
+}
+
+binding weakRandomValue2 {
+  requires {
+    dependency("github.com/openzipkin/zipkin-go")
+  }
+  query pattern callExpr where callee.method == "NewRandomTimestamped"
+  emit issue code.WeakRandomValue at call
+}

@@ -1,0 +1,142 @@
+# Rank 1359 / CVE-2023-36460 (GHSA-9928-3cp5-93fm): Mastodon's Attachmentable
+# concern wrapped Paperclip's `has_attached_file` and forced
+# `validate_media_type: false` onto every attachment in the application, which
+# is the option that removes Paperclip's MediaTypeSpoofDetectionValidator from
+# the record's validation chain. The substitute ran instead inside
+# `before_<name>_post_process`:
+#
+#   options = { validate_media_type: false }.merge(options)
+#   super(name, options)
+#   send(:"before_#{name}_post_process") do
+#     ...
+#     Paperclip::Validators::MediaTypeSpoofDetectionValidator.new(attributes: [name]).validate(self)
+#   end
+#
+# An ActiveModel validator's `validate(record)` only appends to `record.errors`;
+# it returns no verdict and halts nothing. Invoked from a post-processing
+# callback, its errors are never consulted, so a file whose real type disagreed
+# with its claimed one hands to the ImageMagick and ffmpeg post-processors
+# anyway. Crafted media then drove those processors into writing and deleting
+# files outside the attachment directory -- arbitrary file creation, and from
+# there remote code execution (CWE-434).
+#
+# Fix dc8f1fbd97, the merge of the advisory's private branch, drops the
+# `validate_media_type: false` default so Paperclip validates the media type
+# itself, and moves the remaining callbacks to `before_<name>_validate` so they
+# run before anything is processed. It also raises instead of returning the
+# original file from lib/paperclip/transcoder.rb and ships an ImageMagick
+# policy. The pool row's commit is that merge: it carries the four advisory
+# fixes and no release bump, and the advisory records 4.1.3/4.0.5/3.5.9 as the
+# releases it went out in.
+#
+# FIXED. The vulnerability is a security control switched off by configuration,
+# so nothing is tainted and nothing resolves -- baseline reports only
+# VYQL-RES-001 resource-handle findings on the same trees. The Ruby class
+# context carries the option as the structured fact
+# `field:validate_media_type=false`, so a binding is all that is missing;
+# code.UncheckedUploadedImageProcessing and rule VYQL-INJ-043 (CWE-434)
+# judge an uploaded image reaching a processor unchecked, and are reused rather
+# than minted.
+#
+# The option name is what keeps this off ordinary code: `validate_media_type` is
+# Paperclip's own switch for spoof detection and means nothing elsewhere, and
+# the binding requires it set to false by exact token match rather than by
+# substring, so an attachment that leaves the validator in place is not
+# reported. Class scope, not module scope, keeps the fact inside the declaring
+# class's own body.
+#
+# Measured bounded (timeout 180, --max-ram 6GB, --cache off) over
+# app/models/concerns, app/models/media_attachment.rb and lib/paperclip: at
+# dc8f1fbd97^ 4 findings before the binding and 5 after, the extra one being
+# VYQL-INJ-043 at attachmentable.rb:5; at dc8f1fbd97 3 findings with no
+# VYQL-INJ-043. Whole-tree mastodon at dc8f1fbd97^ reports 390 findings, four of
+# them VYQL-INJ-043, and every one is a real `validate_media_type: false` --
+# attachmentable.rb plus custom_emoji.rb, preview_card.rb and
+# preview_card_provider.rb, which pass the option directly and which the fixed revision
+# leaves alone because those attachments are fetched by the server rather than
+# uploaded. No other site in the tree is reported. loofah, rack, sanitize and
+# mail report no VYQL-INJ-043, and the spec suite is unchanged at 4757 passing
+# specs.
+
+test "rank1359: an attachment declaration that disables Paperclip's media-type validation and re-runs the spoof detector after processing has begun"
+  lang ruby
+  file app/models/concerns/attachmentable.rb
+  expect VYQL-INJ-043
+  code
+  ```
+  module Attachmentable
+    extend ActiveSupport::Concern
+
+    included do
+      def self.has_attached_file(name, options = {})
+        options = { validate_media_type: false }.merge(options)
+        super(name, options)
+        send(:"before_#{name}_post_process") do
+          attachment = send(name)
+          check_image_dimension(attachment)
+          set_file_content_type(attachment)
+          obfuscate_file_name(attachment)
+          set_file_extension(attachment)
+          Paperclip::Validators::MediaTypeSpoofDetectionValidator.new(attributes: [name]).validate(self)
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1359: the fixed revision leaves Paperclip's media-type validation on and moves the callbacks ahead of processing"
+  lang ruby
+  file app/models/concerns/attachmentable.rb
+  reject VYQL-INJ-043
+  code
+  ```
+  module Attachmentable
+    extend ActiveSupport::Concern
+
+    included do
+      def self.has_attached_file(name, options = {})
+        super(name, options)
+
+        send(:"before_#{name}_validate") do
+          attachment = send(name)
+          check_image_dimension(attachment)
+          set_file_content_type(attachment)
+          obfuscate_file_name(attachment)
+          set_file_extension(attachment)
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1359: a model that declares an attachment without touching the media-type option is not reported"
+  lang ruby
+  file app/models/media_attachment.rb
+  reject VYQL-INJ-043
+  code
+  ```
+  class MediaAttachment < ApplicationRecord
+    IMAGE_MIME_TYPES = %w(image/jpeg image/png image/gif).freeze
+
+    has_attached_file :file,
+                      styles: ->(f) { file_styles f },
+                      processors: ->(f) { file_processors f },
+                      convert_options: { all: '-quality 90 +profile "!icc,*" +set modify-date +set create-date' }
+
+    validates_attachment_content_type :file, content_type: IMAGE_MIME_TYPES
+    validates_attachment_size :file, less_than: IMAGE_LIMIT
+  end
+  ```
+
+test "rank1359: an attachment that keeps media-type validation enabled is not reported"
+  lang ruby
+  file app/models/import.rb
+  reject VYQL-INJ-043
+  code
+  ```
+  class Import < ApplicationRecord
+    has_attached_file :data, validate_media_type: true
+
+    validates_attachment_content_type :data, content_type: ['text/csv', 'text/plain']
+  end
+  ```

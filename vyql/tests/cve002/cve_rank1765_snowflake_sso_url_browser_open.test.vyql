@@ -1,0 +1,281 @@
+# Rank 1765 / CVE-2023-34233: the Snowflake connector's external-browser
+# SSO flow asked the server for its SSO URL and handed the answer straight
+# to the user's default browser. AuthByWebBrowser.prepare in
+# src/snowflake/connector/auth/webbrowser.py called _get_sso_url, which
+# POSTs /session/authenticator-request through SnowflakeRestful's
+# _post_request -> fetch -> _request_exec chain and returns
+# ret["data"]["ssoUrl"]; prepare then called self._webbrowser.open_new(
+# sso_url) with no validation, so whatever URL the response carried -- a
+# malicious or hijacked endpoint, a redirect the connector never asked for
+# -- is where the user's browser went (CWE-601). The fixing commit 1cdbd3b1
+# (confirmed) carries the change: it adds url_util.is_valid_url, an http/https
+# scheme-and-charset regex, and prepare now returns an ER_INVALID_VALUE
+# failure when the SSO URL does not pass it before opening the browser. No
+
+#
+# Two definitions close the gap. webbrowser_navigation binds the
+# standard-library browser handoff (open/open_new/open_new_tab) as a
+# code.RedirectTargetSink -- the same treatment res.redirect,
+# sendRedirect and location.assign get; nothing labelled it in any
+# language. ExternalResponseRedirectTarget (VYQL-RF-050) judges the
+# labelled-but-never-consumed code.ExternalApiResponse source --
+# .json()/.text()/.body()/decoded_content reads across six language
+# bindings -- against that sink: a URL the server chose is a redirect
+# target this program did not compute. redirectAllowlist1000 adds
+# is_valid_url to the recognised validator-name family beside
+# is_safe_url and is_safe_redirect_url, which is what makes the patched
+# form suppress.
+#
+# Known residual, stated rather than hidden: the shipped
+# method-name .json() bindings also label the bare json module name
+# (a callExpr binding evaluates the receiver expressions of dotted
+# calls, and `json` exposes itself as a zero-argument callee), so
+# serialized-JSON output can reach a redirect sink labelled as response
+# data -- probe-verified on open_new(json.dumps(x)). No rule consumed
+# code.ExternalApiResponse before, so the defect is inert; VYQL-RF-050
+# makes it visible only for a browser/redirect destination fed by
+# json.dumps/json.loads output. The ontology route (ExternalApiResponse
+# refining UserControlledData) is measured and rejected: it would feed
+# the same mislabel into forty-six rules and taint every json.dumps and
+# json.loads result in requests-dependent projects.
+#
+# Measured, timeout 180 / --max-ram 6GB / --cache off, the two files that
+# carry the chain (auth/webbrowser.py + network.py; the full tree does not
+# finish in 180s): the vulnerable parent reports VYQL-RF-050 exactly once,
+# webbrowser.py:394 -> webbrowser.py:148, stable across three runs with
+# one fingerprint; at the fixed revision commit the same pair reports zero RF-050
+# across three runs (16 findings -> 14, the other delta a VYQL-RF-002 on
+# the same new sink, also suppressed by the validator, plus three findings
+# that only moved lines). Collateral, enumerated exhaustively by grep over
+# the ~500 rank clones: the webbrowser sink's reachable set is 46 files;
+# scanned individually they add 10 VYQL-RF-002 findings (parameter-,
+# CLI- and request-derived URLs handed to webbrowser.open/open_new/
+# open_new_tab -- the class the sink declares; constant URLs report
+# nothing) and 1 VYQL-RF-050 (llama-index's sec-filings fetch.py, whose
+# response content genuinely reaches the opened URL through json.loads).
+# Response-.json()-to-framework-redirect co-occurrence enumerated
+# precisely across the clones yields 15 candidate files which report zero
+# RF-050; no ruby faraday-and-redirect tree exists. BenchmarkPython
+# contains no webbrowser, open_new, open_new_tab or is_valid_url, so the
+# +0.90 gate cannot move, and no Java binding emits
+# code.ExternalApiResponse, so the +1.00 gate cannot move either.
+
+test "rank1765: SSO URL taken from the server response opened in the browser"
+  lang python
+  file src/snowflake/connector/auth/webbrowser.py
+  expect VYQL-RF-050
+  code
+  ```
+  import json
+
+  import requests
+
+
+  class SnowflakeRestful:
+      def _request_exec(self, session, method, full_url, headers, data):
+          raw_ret = session.request(
+              method=method,
+              url=full_url,
+              headers=headers,
+              data=data,
+              timeout=45,
+              verify=True,
+          )
+          if raw_ret.status_code == 200:
+              ret = raw_ret.json()
+              return ret
+          raise FailedRequestError(raw_ret.status_code)
+
+      def fetch(self, method, full_url, headers, data):
+          session = requests.Session()
+          ret = self._request_exec(session, method, full_url, headers, data)
+          return ret
+
+      def _post_request(self, url, headers, body):
+          full_url = f"https://example.com{url}"
+          ret = self.fetch("post", full_url, headers, body)
+          return ret
+
+
+  class AuthByWebBrowser:
+      def _get_sso_url(self, conn, account, user, callback_port):
+          url = "/session/authenticator-request"
+          headers = {"content-type": "application/json"}
+          body = {"data": {"LOGIN_NAME": user, "ACCOUNT_NAME": account}}
+          body["data"]["BROWSER_MODE_REDIRECT_PORT"] = str(callback_port)
+          ret = conn._rest._post_request(url, headers, json.dumps(body))
+          if not ret["success"]:
+              self._handle_failure(conn=conn, ret=ret)
+          data = ret["data"]
+          sso_url = data["ssoUrl"]
+          self._proof_key = data["proofKey"]
+          return sso_url
+
+      def prepare(self, conn, account, user):
+          sso_url = self._get_sso_url(conn, account, user, callback_port=0)
+          print(f"Going to open: {sso_url} to authenticate...")
+          if not self._webbrowser.open_new(sso_url):
+              url = input("Enter the URL the SSO URL redirected you to: ")
+              self._process_get_url(url)
+          else:
+              self._receive_saml_token(conn)
+  ```
+
+test "rank1765: the fixed revision rejects an SSO URL that fails the validator"
+  lang python
+  file src/snowflake/connector/auth/webbrowser.py
+  reject VYQL-RF-050
+  code
+  ```
+  import json
+
+  import requests
+
+  from url_util import is_valid_url
+
+
+  class SnowflakeRestful:
+      def _request_exec(self, session, method, full_url, headers, data):
+          raw_ret = session.request(
+              method=method,
+              url=full_url,
+              headers=headers,
+              data=data,
+              timeout=45,
+              verify=True,
+          )
+          if raw_ret.status_code == 200:
+              ret = raw_ret.json()
+              return ret
+          raise FailedRequestError(raw_ret.status_code)
+
+      def fetch(self, method, full_url, headers, data):
+          session = requests.Session()
+          ret = self._request_exec(session, method, full_url, headers, data)
+          return ret
+
+      def _post_request(self, url, headers, body):
+          full_url = f"https://example.com{url}"
+          ret = self.fetch("post", full_url, headers, body)
+          return ret
+
+
+  class AuthByWebBrowser:
+      def _get_sso_url(self, conn, account, user, callback_port):
+          url = "/session/authenticator-request"
+          headers = {"content-type": "application/json"}
+          body = {"data": {"LOGIN_NAME": user, "ACCOUNT_NAME": account}}
+          body["data"]["BROWSER_MODE_REDIRECT_PORT"] = str(callback_port)
+          ret = conn._rest._post_request(url, headers, json.dumps(body))
+          if not ret["success"]:
+              self._handle_failure(conn=conn, ret=ret)
+          data = ret["data"]
+          sso_url = data["ssoUrl"]
+          self._proof_key = data["proofKey"]
+          return sso_url
+
+      def prepare(self, conn, account, user):
+          sso_url = self._get_sso_url(conn, account, user, callback_port=0)
+          if not is_valid_url(sso_url):
+              self._handle_failure(
+                  conn=conn,
+                  ret={
+                      "code": -1,
+                      "message": (f"The SSO URL provided {sso_url} is invalid"),
+                  },
+              )
+              return
+          print(f"Going to open: {sso_url} to authenticate...")
+          if not self._webbrowser.open_new(sso_url):
+              url = input("Enter the URL the SSO URL redirected you to: ")
+              self._process_get_url(url)
+          else:
+              self._receive_saml_token(conn)
+  ```
+
+test "rank1765: a program-authored constant destination is the documented quickstart form"
+  lang python
+  file src/snowflake/connector/auth/webbrowser.py
+  reject VYQL-RF-050
+  code
+  ```
+  import webbrowser
+
+
+  def open_docs():
+      webbrowser.open_new("https://docs.snowflake.com/")
+  ```
+
+# The two cases below are the minimal pair for an engine gap the connector's
+# own chain runs into: a response URL returned from another module reaches
+# the browser when the caller holds the service in a simple receiver
+# (`rest.fetch(...)` -- the unique-method-name cross-file fallback resolves
+# it, the return taint connects, expect passes), but not through an
+# attribute-chain receiver (`conn._rest.fetch(...)` -- resolveCallee's
+# nir.Attr arm in internal/extract/lowering/lowering.go returns nil for any
+# base that is not a bare Name before that fallback is reached, so the
+# callee's return taint never reaches the call result; only the
+# conservative argument-to-result edge survives). The connector's
+# webbrowser.py calls `conn._rest._post_request(...)`, so its finding rides
+# the argument-side edge and the mislabel above; the true response path
+# dead-ends at `analysis.function.return` (vyql trace names six stops).
+# The reject case must flip to expect when chained-attribute receivers
+# reach the fallback -- not a data-level workaround.
+
+test "rank1765: response URL returned across modules reaches the browser through a simple receiver"
+  lang python
+  file src/snowflake/connector/auth/webbrowser.py
+  expect VYQL-RF-050
+  code
+  ```
+  import requests
+
+
+  class Rest:
+      def fetch(self, full_url):
+          session = requests.Session()
+          raw_ret = session.request(method="post", url=full_url)
+          ret = raw_ret.json()
+          return ret
+  ```
+
+  ```
+  import webbrowser
+
+
+  def open_it(rest):
+      ret = rest.fetch("/req")
+      webbrowser.open_new(ret["data"]["ssoUrl"])
+  ```
+
+test "rank1765: the same call through an attribute-chain receiver does not resolve"
+  lang python
+  file src/snowflake/connector/auth/webbrowser.py
+  reject VYQL-RF-050
+  code
+  ```
+  import requests
+
+
+  class Rest:
+      def fetch(self, full_url):
+          session = requests.Session()
+          raw_ret = session.request(method="post", url=full_url)
+          ret = raw_ret.json()
+          return ret
+  ```
+
+  ```
+  import webbrowser
+
+
+  class Conn:
+      def __init__(self):
+          self._rest = Rest()
+
+
+  def open_it(conn):
+      ret = conn._rest.fetch("/req")
+      webbrowser.open_new(ret["data"]["ssoUrl"])
+  ```
+

@@ -1,0 +1,57 @@
+module bindings.ruby.generated.m9ec18a80;
+
+binding networkSend0 {
+  requires {
+    dependency("fog-brightbox")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("fog-brightbox")
+  }
+  query pattern callExpr where callee.method == "wrapped_request"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend2 {
+  requires {
+    dependency("fog-brightbox")
+  }
+  query pattern callExpr where callee.method == "make_request"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend3 {
+  requires {
+    dependency("fog-brightbox")
+  }
+  query pattern callExpr where callee.method == "authenticated_request"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding secretValue4 {
+  requires {
+    dependency("fog-brightbox")
+  }
+  query pattern callExpr where callee.method == "request_access_token"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue5 {
+  requires {
+    dependency("fog-brightbox")
+  }
+  query pattern callExpr where callee.method == "update_tokens"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue6 {
+  requires {
+    dependency("fog-brightbox")
+  }
+  query pattern callExpr where callee.method == "update_credentials_from_response"
+  emit source code.SecretValue at call.result
+}

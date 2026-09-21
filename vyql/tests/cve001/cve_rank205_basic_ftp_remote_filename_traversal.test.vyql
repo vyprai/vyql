@@ -1,0 +1,70 @@
+test "rank205: basic-ftp joins remote listing filenames into local paths"
+  lang javascript
+  expect VYQL-PATH-006
+  code
+  ```
+  import { join } from "path"
+
+  export class Client {
+    async list() {
+      return []
+    }
+
+    async cd(path) {}
+    async cdup() {}
+    async downloadTo(localPath, remoteName) {}
+
+    async _downloadFromWorkingDir(localDirPath) {
+      for (const file of await this.list()) {
+        const localPath = join(localDirPath, file.name)
+        if (file.isDirectory) {
+          await this.cd(file.name)
+          await this._downloadFromWorkingDir(localPath)
+          await this.cdup()
+        }
+        else if (file.isFile) {
+          await this.downloadTo(localPath, file.name)
+        }
+      }
+    }
+  }
+  ```
+
+test "rank205: basic-ftp rejects remote listing names with path components"
+  lang javascript
+  reject VYQL-PATH-006
+  code
+  ```
+  import { basename, join } from "path"
+
+  export class Client {
+    ftp = { log(message) {} }
+
+    async list() {
+      return []
+    }
+
+    async cd(path) {}
+    async cdup() {}
+    async downloadTo(localPath, remoteName) {}
+
+    async _downloadFromWorkingDir(localDirPath) {
+      for (const file of await this.list()) {
+        const hasInvalidName = !file.name || basename(file.name) !== file.name
+        if (hasInvalidName) {
+          this.ftp.log(`Invalid filename from server listing, will skip file. (${JSON.stringify(file.name)})`)
+          continue
+        }
+        const localPath = join(localDirPath, file.name)
+        if (file.isDirectory) {
+          await this.cd(file.name)
+          await this._downloadFromWorkingDir(localPath)
+          await this.cdup()
+        }
+        else if (file.isFile) {
+          await this.downloadTo(localPath, file.name)
+        }
+      }
+    }
+  }
+  ```

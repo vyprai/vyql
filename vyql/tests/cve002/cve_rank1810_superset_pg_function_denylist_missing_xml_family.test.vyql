@@ -1,0 +1,246 @@
+# Rank 1810 / CVE-2024-53947 (recorded CWE-89; the axis is CWE-184, an
+# incomplete list of disallowed values): apache/superset executes SQL Lab and
+# chart SQL behind a function-name denylist. BaseEngineSpec.execute
+# (superset/db_engine_specs/base.py:1825) reads
+# current_app.config["DISALLOWED_SQL_FUNCTIONS"], asks
+# sql_parse.check_sql_functions_exist(query, disallowed, engine) whether the
+# statement calls any named function, raises DisallowedSQLFunction when it
+# does, and otherwise runs cursor.execute(query). The denylist
+# (superset/config.py:1278) named four postgresql functions -- version,
+# query_to_xml, inet_server_addr, inet_client_addr -- and omitted the rest of
+# PostgreSQL's documented XML-producing family: query_to_xml_and_xmlschema,
+# table_to_xml, table_to_xml_and_xmlschema and their siblings all take a
+# query/table/database (or serialize one opened) and return it as XML, so
+# query_to_xml_and_xmlschema('select ...') executes the attacker's nested
+# query text through a spelling the screen never consults. The fixed revision
+# 0e002826 adds four strings to the set literal (the advisory names
+# query_to_xml_and_xmlschema, table_to_xml and table_to_xml_and_xmlschema;
+# the commit adds database_to_xml as well) and touches no code path. This is
+# the second pass over the same list (CVE-2024-39887 added the first four),
+# which is the shape's own character: the project enumerates the family one
+# advisory at a time.
+#
+# Measured on both revisions, three --cache off runs apiece over
+# superset/config.py + superset/db_engine_specs + superset/sql_parse.py:
+# 30 findings and 37 review flags on the vulnerable parent and the same 30
+# and 37 on the fixed revision, deterministic within a revision, and the
+# only differences between the two reports are the config.py
+# hardcoded-secret rows shifting nine lines down because the fix adds nine
+# lines to the file. The full findings view was read both ways -- the
+# default report, `-flags with` and `-flags only` -- and none of the 37
+# flags touches the denylist or the consult. The consumer's
+# cursor.execute(query) is labelled code.SqlExecution at base.py:1831
+# (python.sinks, syntactic) and VYQL-INJ-203 fires on sixteen other engine
+# specs' dynamic SQL in this tree, but not on base.py, because on the real
+# tree the request payload -> Query model -> execute_sql_statements ->
+# spec.execute chain severs taint at the ORM persistence boundary, and that
+# path is identical in both revisions either way -- running user SQL is SQL
+# Lab's purpose, and the guard call is present in both. The denylist has
+# exactly one non-test consumer (grep over the tree), and the 1380
+# counterweight test fails: the fixed revision touches no guarded function,
+# only the config set's contents.
+#
+# Reuse is checked before minting. The ontology's denylist-gap vocabulary
+# (code.IncompleteDangerousUploadExtensionBlocklist,
+# code.SandboxHostObjectMemberDenylistGap, code.IncompleteIpDenylist,
+# code.H2oJdbcDisallowedParameterDenylistGap,
+# code.IncompleteShellSubstitutionDenylist,
+# code.IncompleteKeyDenylistGuardedReadPrototypePollution) is the right class
+# of judgement but each concept's vulnerableTo threat and reviewCondition
+# name a different surface (upload extensions, sandbox members, IP ranges,
+# JDBC connection parameters, shell substitutions, prototype-pollution
+# keys), so reuse would mis-file this finding. The siblings minted since the
+# first pass are the same pattern one surface at a time, none of them SQL.
+#
+# Minting a SQL-function-denylist sibling does not discriminate, and the
+# reason is set arithmetic rather than judgement: PostgreSQL documents
+# fifteen members of the XML-producing family (query_, cursor_, table_,
+# database_ and schema_ each as _to_xml, _to_xmlschema and
+# _to_xml_and_xmlschema); the vulnerable set names one of them and the
+# patched set names five, so a documentation-faithful completeness predicate
+# is false on both revisions -- ten documented spellings, among them the
+# whole cursor_ and schema_ branches, are still absent from the patched set.
+# The only list that separates the two trees is the fixing commit's own
+# four strings. That is the 1394 trap in data form, and dropping the
+# patched-form reject from the spec to ship the documentation-derived
+# version would report the fixed revision, which is a false positive against
+# the fix on the very tree this corpus pins. The corpus sweep is also
+# empty: across the clones under /tmp/cve-work no other file names any
+# XML-family member or declares any SQL-function denylist (cross-checked
+# pg_read_file/pg_sleep/dblink/lo_import; the only hits are the ace-builds
+# pgsql syntax-highlighting mode files and two lexer/test fixtures), so the
+# binding would fire on one product's one config file.
+#
+# Held, the configuration-content family (1514, 1535, 1540, 1556, 1557,
+# 1593; missing-entry vocabulary like 1609/1614), not an engine gap: no
+# construct is mishandled -- config.py parses, the set literal is simply not
+# vocabulary, and the distinguishing information is four strings in it.
+#
+# All cases assert reject VYQL-INJ-001 (the taint rule consuming
+# code.SqlExecution): nothing fires today because the query arrives as a
+# parameter behind the ORM boundary and the denylist's contents carry no
+# label. When SQL-function-denylist vocabulary lands, the first case must
+# flip to expect while the patched, documentation-complete and
+# no-consult-override cases stay reject -- and landing it requires the
+# vocabulary to state which family members a screen must name, not which
+# ones one advisory happened to list.
+
+test "rank1810: pg function denylist consult runs user SQL through a screen that names one family member"
+  lang python
+  reject VYQL-INJ-001
+  file superset/config.py
+  code
+  ```
+  DISALLOWED_SQL_FUNCTIONS: dict[str, set[str]] = {
+      "postgresql": {"version", "query_to_xml", "inet_server_addr", "inet_client_addr"},
+      "clickhouse": {"url"},
+      "mysql": {"version"},
+  }
+  ```
+  file superset/db_engine_specs/base.py
+  code
+  ```
+  from flask import current_app
+
+  from superset import sql_parse
+
+
+  class DisallowedSQLFunction(Exception):
+      def __init__(self, functions):
+          super().__init__(f"disallowed SQL functions: {functions}")
+
+
+  class BaseEngineSpec:
+      engine = "postgresql"
+
+      @classmethod
+      def execute(cls, cursor, query, database, **kwargs):
+          disallowed_functions = current_app.config["DISALLOWED_SQL_FUNCTIONS"].get(
+              cls.engine, set()
+          )
+          if sql_parse.check_sql_functions_exist(query, disallowed_functions, cls.engine):
+              raise DisallowedSQLFunction(disallowed_functions)
+
+          cursor.execute(query)
+  ```
+
+test "rank1810: the patched denylist adds the rest of the family the advisory names"
+  lang python
+  reject VYQL-INJ-001
+  file superset/config.py
+  code
+  ```
+  DISALLOWED_SQL_FUNCTIONS: dict[str, set[str]] = {
+      "postgresql": {
+          "database_to_xml",
+          "inet_client_addr",
+          "inet_server_addr",
+          "query_to_xml",
+          "query_to_xml_and_xmlschema",
+          "table_to_xml",
+          "table_to_xml_and_xmlschema",
+          "version",
+      },
+      "clickhouse": {"url"},
+      "mysql": {"version"},
+  }
+  ```
+  file superset/db_engine_specs/base.py
+  code
+  ```
+  from flask import current_app
+
+  from superset import sql_parse
+
+
+  class DisallowedSQLFunction(Exception):
+      def __init__(self, functions):
+          super().__init__(f"disallowed SQL functions: {functions}")
+
+
+  class BaseEngineSpec:
+      engine = "postgresql"
+
+      @classmethod
+      def execute(cls, cursor, query, database, **kwargs):
+          disallowed_functions = current_app.config["DISALLOWED_SQL_FUNCTIONS"].get(
+              cls.engine, set()
+          )
+          if sql_parse.check_sql_functions_exist(query, disallowed_functions, cls.engine):
+              raise DisallowedSQLFunction(disallowed_functions)
+
+          cursor.execute(query)
+  ```
+
+test "rank1810: the documentation-complete denylist names the whole XML-producing family"
+  lang python
+  reject VYQL-INJ-001
+  file superset/config.py
+  code
+  ```
+  DISALLOWED_SQL_FUNCTIONS: dict[str, set[str]] = {
+      "postgresql": {
+          "cursor_to_xml",
+          "cursor_to_xml_and_xmlschema",
+          "cursor_to_xmlschema",
+          "database_to_xml",
+          "database_to_xml_and_xmlschema",
+          "database_to_xmlschema",
+          "inet_client_addr",
+          "inet_server_addr",
+          "query_to_xml",
+          "query_to_xml_and_xmlschema",
+          "query_to_xmlschema",
+          "schema_to_xml",
+          "schema_to_xml_and_xmlschema",
+          "schema_to_xmlschema",
+          "table_to_xml",
+          "table_to_xml_and_xmlschema",
+          "table_to_xmlschema",
+          "version",
+      },
+      "clickhouse": {"url"},
+      "mysql": {"version"},
+  }
+  ```
+  file superset/db_engine_specs/base.py
+  code
+  ```
+  from flask import current_app
+
+  from superset import sql_parse
+
+
+  class DisallowedSQLFunction(Exception):
+      def __init__(self, functions):
+          super().__init__(f"disallowed SQL functions: {functions}")
+
+
+  class BaseEngineSpec:
+      engine = "postgresql"
+
+      @classmethod
+      def execute(cls, cursor, query, database, **kwargs):
+          disallowed_functions = current_app.config["DISALLOWED_SQL_FUNCTIONS"].get(
+              cls.engine, set()
+          )
+          if sql_parse.check_sql_functions_exist(query, disallowed_functions, cls.engine):
+              raise DisallowedSQLFunction(disallowed_functions)
+
+          cursor.execute(query)
+  ```
+
+test "rank1810: an engine override that skips the consult runs its SQL unscreened"
+  lang python
+  reject VYQL-INJ-001
+  file superset/db_engine_specs/hive.py
+  code
+  ```
+  class HiveEngineSpec(BaseEngineSpec):
+      engine = "hive"
+
+      @staticmethod
+      def execute(cursor, query, database, async_=False):
+          kwargs = {"async": async_}
+          cursor.execute(query, **kwargs)
+  ```

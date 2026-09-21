@@ -1,0 +1,197 @@
+# Rank 1102 / CVE-2025-62799: Fast DDS reserves a payload buffer for the
+# declared CDR size, then writes a four-byte fragment index at an offset from
+# fragment size and index rounded up to four bytes, so a DATA_FRAG that chooses
+# the fragment size can write past the allocation (CWE-122, CWE-787).
+#
+# ATTENTION: engine gap. Index-guard analysis does not relate an allocation
+# size decided in one translation unit to an offset computed in another from a
+# different attacker-chosen parameter; the write site itself is identical at
+# both revisions.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1102: the fragment index is written at an aligned offset with no bound"
+  lang cpp
+  file include/fastdds/rtps/common/CacheChange.h
+  reject VYQL-MEM-002
+  code
+  ```
+  #include <cstdint>
+  #include <cstring>
+
+  struct SerializedPayload_t
+  {
+      uint32_t length;
+      uint32_t max_size;
+      unsigned char* data;
+  };
+
+  struct CacheChange_t
+  {
+      SerializedPayload_t serializedPayload;
+      uint16_t fragment_size_;
+      uint32_t fragment_count_;
+
+      void setFragmentSize(
+              uint16_t fragment_size)
+      {
+          fragment_size_ = fragment_size;
+          fragment_count_ = 0;
+
+          if (fragment_size > 0)
+          {
+              fragment_count_ = (serializedPayload.length + fragment_size - 1) / fragment_size;
+
+              size_t offset = 0;
+              for (uint32_t i = 1; i <= fragment_count_; i++, offset += fragment_size_)
+              {
+                  set_next_missing_fragment(i - 1, i);
+              }
+          }
+      }
+
+      void set_next_missing_fragment(
+              uint32_t fragment_index,
+              uint32_t next_fragment_index)
+      {
+          uint32_t* ptr = next_fragment_pointer(fragment_index);
+          *ptr = next_fragment_index;
+      }
+
+      uint32_t* next_fragment_pointer(
+              uint32_t fragment_index)
+      {
+          size_t offset = fragment_size_;
+          offset *= fragment_index;
+          offset = (offset + 3u) & ~3u;
+          return reinterpret_cast<uint32_t*>(&serializedPayload.data[offset]);
+      }
+  };
+  ```
+
+test "rank1102: the reader reserves the declared payload size"
+  lang cpp
+  file src/cpp/rtps/reader/RTPSReader.cpp
+  reject VYQL-MEM-002
+  code
+  ```
+  #include <cstdint>
+
+  bool RTPSReader::reserveCache(
+          CacheChange_t** change,
+          uint32_t dataCdrSerializedSize)
+  {
+      std::lock_guard<RecursiveTimedMutex> guard(mp_mutex);
+
+      *change = nullptr;
+
+      CacheChange_t* reserved_change = nullptr;
+      if (!change_pool_->reserve_cache(reserved_change))
+      {
+          return false;
+      }
+
+      uint32_t payload_size = fixed_payload_size_ ? fixed_payload_size_ : dataCdrSerializedSize;
+      if (!payload_pool_->get_payload(payload_size, *reserved_change))
+      {
+          change_pool_->release_cache(reserved_change);
+          return false;
+      }
+
+      *change = reserved_change;
+      return true;
+  }
+  ```
+
+test "rank1102: the reader reserves room for the aligned index write"
+  lang cpp
+  file src/cpp/rtps/reader/RTPSReader.cpp
+  reject VYQL-MEM-002
+  code
+  ```
+  #include <cstdint>
+  #include <limits>
+
+  static bool calculate_required_fragmented_payload_size(
+          uint32_t payload_size,
+          uint16_t fragment_size,
+          uint32_t& min_required_size)
+  {
+      if ((0 == fragment_size) || (payload_size <= fragment_size))
+      {
+          min_required_size = payload_size;
+          return true;
+      }
+
+      constexpr uint32_t MAX_PAYLOAD_SIZE = std::numeric_limits<uint32_t>::max() - 4u - 3u;
+      if (payload_size > MAX_PAYLOAD_SIZE)
+      {
+          return false;
+      }
+
+      if (fragment_size < 4u)
+      {
+          return false;
+      }
+
+      uint32_t fragment_count = payload_size / fragment_size;
+      if (0 != (payload_size % fragment_size))
+      {
+          ++fragment_count;
+      }
+
+      uint32_t last_fragment_offset = (fragment_count - 1) * fragment_size;
+
+      min_required_size = (last_fragment_offset + 3u) & ~3u;
+      min_required_size += 4u;
+
+      if (min_required_size < payload_size)
+      {
+          min_required_size = payload_size;
+      }
+
+      return true;
+  }
+
+  bool RTPSReader::reserve_cache(
+          uint32_t cdr_payload_size,
+          uint16_t fragment_size,
+          CacheChange_t*& change)
+  {
+      std::lock_guard<RecursiveTimedMutex> guard(mp_mutex);
+
+      change = nullptr;
+
+      uint32_t reserve_size = fixed_payload_size_ > 0 ? fixed_payload_size_ : cdr_payload_size;
+      uint32_t payload_size = std::min(reserve_size, cdr_payload_size);
+      uint32_t min_required_size = 0;
+      if (!calculate_required_fragmented_payload_size(payload_size, fragment_size, min_required_size))
+      {
+          return false;
+      }
+
+      if (min_required_size > reserve_size)
+      {
+          if (fixed_payload_size_ > 0)
+          {
+              return false;
+          }
+          reserve_size = min_required_size;
+      }
+
+      CacheChange_t* reserved_change = nullptr;
+      if (!change_pool_->reserve_cache(reserved_change))
+      {
+          return false;
+      }
+
+      if (!payload_pool_->get_payload(reserve_size, *reserved_change))
+      {
+          change_pool_->release_cache(reserved_change);
+          return false;
+      }
+
+      change = reserved_change;
+      return true;
+  }
+  ```

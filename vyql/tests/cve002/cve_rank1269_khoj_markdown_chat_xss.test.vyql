@@ -1,0 +1,62 @@
+# Rank 1269 / CVE-2024-25639: Khoj's web chat client fetched the assistant's
+# reply as JSON, rendered it through markdown-it, and assigned the result
+# straight to an element's innerHTML with no sanitization step.
+
+test "rank1269: khoj chat response markdown renders unsanitized into innerHTML"
+  lang javascript
+  expect VYQL-INJ-004
+  code
+  ```
+  function formatHTMLMessage(message, raw=false) {
+      var md = window.markdownit();
+      let newHTML = message;
+
+      newHTML = newHTML.replace(/\\\(/g, 'LEFTPAREN').replace(/\\\)/g, 'RIGHTPAREN');
+
+      newHTML = raw ? newHTML : md.render(newHTML);
+
+      newHTML = newHTML.replace(/LEFTPAREN/g, '\\(').replace(/RIGHTPAREN/g, '\\)');
+
+      let element = document.createElement('div');
+      element.innerHTML = newHTML;
+      element.className = "chat-message-text-response";
+      return element;
+  }
+
+  async function renderChatResponse(url, newResponseText) {
+      let response = await fetch(url);
+      const responseAsJson = await response.json();
+      let rawResponse = responseAsJson.response;
+      newResponseText.appendChild(formatHTMLMessage(rawResponse));
+  }
+  ```
+
+test "rank1269: khoj chat response sanitized with DOMPurify before rendering"
+  lang javascript
+  reject VYQL-INJ-004
+  code
+  ```
+  function formatHTMLMessage(message, raw=false) {
+      var md = window.markdownit();
+      let newHTML = message;
+
+      newHTML = newHTML.replace(/\\\(/g, 'LEFTPAREN').replace(/\\\)/g, 'RIGHTPAREN');
+
+      newHTML = raw ? newHTML : md.render(newHTML);
+
+      newHTML = newHTML.replace(/LEFTPAREN/g, '\\(').replace(/RIGHTPAREN/g, '\\)');
+      newHTML = DOMPurify.sanitize(newHTML);
+
+      let element = document.createElement('div');
+      element.innerHTML = newHTML;
+      element.className = "chat-message-text-response";
+      return element;
+  }
+
+  async function renderChatResponse(url, newResponseText) {
+      let response = await fetch(url);
+      const responseAsJson = await response.json();
+      let rawResponse = responseAsJson.response;
+      newResponseText.appendChild(formatHTMLMessage(rawResponse));
+  }
+  ```

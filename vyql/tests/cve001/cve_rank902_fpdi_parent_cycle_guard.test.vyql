@@ -1,0 +1,102 @@
+# Rank 902 / CVE-2026-45802: FPDI resolved PDF page-tree Parent links
+# without passing a shared visited-object list, allowing cyclic page trees to
+# drive repeated resolver recursion.
+
+test "rank902: FPDI inherited parent traversal resolves parents without a cycle guard"
+  lang php
+  expect VYQL-DOS-035
+  expect_review code.RecursiveObjectParentResolveWithoutCycleGuard
+  code
+  ```
+  <?php
+
+  class Page
+  {
+      public function getAttribute($name, $inherited = true)
+      {
+          $dict = $this->getPageDictionary();
+          $inheritedKeys = ['Resources', 'MediaBox', 'CropBox', 'Rotate'];
+
+          if ($inherited && \in_array($name, $inheritedKeys, true)) {
+              $inheritedKeys = \array_filter($inheritedKeys, static function ($key) use ($dict) {
+                  return !isset($dict->value[$key]);
+              });
+
+              if (\count($inheritedKeys) > 0) {
+                  $parentDict = PdfType::resolve(PdfDictionary::get($dict, 'Parent'), $this->parser);
+                  while ($parentDict instanceof PdfDictionary) {
+                      foreach ($inheritedKeys as $index => $key) {
+                          if (isset($parentDict->value[$key])) {
+                              $this->inheritedAttributes[$key] = $parentDict->value[$key];
+                              unset($inheritedKeys[$index]);
+                          }
+                      }
+
+                      if (isset($parentDict->value['Parent']) && \count($inheritedKeys) > 0) {
+                          $parentDict = PdfType::resolve(PdfDictionary::get($parentDict, 'Parent'), $this->parser);
+                      } else {
+                          break;
+                      }
+                  }
+              }
+          }
+
+          return null;
+      }
+  }
+  ```
+
+test "rank902: FPDI inherited parent traversal shares resolver cycle guard"
+  lang php
+  reject VYQL-DOS-035
+  reject_review code.RecursiveObjectParentResolveWithoutCycleGuard
+  code
+  ```
+  <?php
+
+  class Page
+  {
+      public function getAttribute($name, $inherited = true)
+      {
+          $dict = $this->getPageDictionary();
+          $inheritedKeys = ['Resources', 'MediaBox', 'CropBox', 'Rotate'];
+
+          if ($inherited && \in_array($name, $inheritedKeys, true)) {
+              $inheritedKeys = \array_filter($inheritedKeys, static function ($key) use ($dict) {
+                  return !isset($dict->value[$key]);
+              });
+
+              if (\count($inheritedKeys) > 0) {
+                  $ensuredObjectList = [];
+                  $parentDict = PdfType::resolve(
+                      PdfDictionary::get($dict, 'Parent'),
+                      $this->parser,
+                      false,
+                      $ensuredObjectList
+                  );
+                  while ($parentDict instanceof PdfDictionary) {
+                      foreach ($inheritedKeys as $index => $key) {
+                          if (isset($parentDict->value[$key])) {
+                              $this->inheritedAttributes[$key] = $parentDict->value[$key];
+                              unset($inheritedKeys[$index]);
+                          }
+                      }
+
+                      if (isset($parentDict->value['Parent']) && \count($inheritedKeys) > 0) {
+                          $parentDict = PdfType::resolve(
+                              PdfDictionary::get($parentDict, 'Parent'),
+                              $this->parser,
+                              false,
+                              $ensuredObjectList
+                          );
+                      } else {
+                          break;
+                      }
+                  }
+              }
+          }
+
+          return null;
+      }
+  }
+  ```

@@ -1,0 +1,157 @@
+# CVE-2023-3975: draw.io's Electron main process hands a renderer-supplied
+# file name to an external program as one argv element, so a value beginning
+# with a dash reaches that program as an option rather than as a file name
+# (CWE-78 as the advisory classifies it; the shape is argument injection,
+# CWE-88).
+#
+#   ipcMain.on("rendererReq", async (event, args) => { ... })
+#     case 'saveDraft': ret = await saveDraft(args.fileObject, args.data);
+#   async function saveDraft(fileObject, data) {
+#     var draftFileName = fileObject.draftFileName || getDraftFileName(fileObject);
+#     ...
+#     var child = spawn('attrib', ['+h', draftFileName]);
+#
+# The renderer is not trusted: a diagram opened from anywhere can issue a
+# rendererReq, and `fileObject.draftFileName` is that object's own field, taken
+# as given. `attrib` is not a shell -- spawn hands it one argv element per array
+# entry and nothing reinterprets the line -- so this is not command injection;
+# it is the target program parsing the element itself, and a name beginning
+# with `-` or `/` is an attrib switch rather than the file meant to be hidden.
+# The same release carries a second identical call in saveFile's backup path
+# (`spawn('attrib', ['+h', bkpPath])`, bkpPath built from fileObject.path).
+#
+# Fix 8ec95cb03e (21.5.0) does not patch either call: it deletes electron.js
+# and electron-preload.js from this repository and moves the Electron main
+# process to jgraph/drawio-desktop, so there is no in-repo before/after pair.
+# An exhaustive grep over the first-party source of this tree at the fix's
+# parent finds exactly those two spawn-family calls and nothing else, so the
+# deletion is the whole reachable set. In drawio-desktop today the same two
+# calls are still present, guarded by `assertWritablePath(draftFileName)`
+# (realpath plus containment, which turns a relative dash-leading name into an
+# absolute path before it reaches attrib) -- a repo-local async validator no
+# generic control concept names, so that guard does not clear the finding.
+#
+# Detection is the taint route over the argument-injection sink.
+# spawnArgvOptionValue (vyql/bindings/javascript/spawn_argv_option_value.vyql)
+# labels the argv elements of a non-shell spawn, spawnSync, execFile or
+# execFileSync as code.CommandOptionInjectionSink -- node:child_process
+# documents those four as handing each array element to the new process as one
+# argv entry -- and VYQL-INJ-280 judges user-controlled data reaching one. The
+# taint path resolves end to end on the real file: ipcMain.on's callback
+# parameter is code.HttpInput, `args.fileObject` flows into saveDraft's
+# parameter, `fileObject.draftFileName` into the argv array element. This is
+# the rule the orphaned-sink finding named: code.CommandOptionInjectionSink
+# existed with CWE_88 and vulnerableTo injection.ArgumentInjection and no rule
+# in vyql/packs consumed it, so argument injection could not be reported by
+# taint in any language; the presence route (VYQL-INJ-031 on a shape binding)
+# carried ranks 1050 and 1085 instead.
+#
+# Residuals, none of them closed here. No control concept declares
+# `neutralizes: [injection.ArgumentInjection]`, so the rule carries no
+# `coveredBy` clause and correctly validated code still reports -- the
+# drawio-desktop guard above, and a leading-dash rejection such as dulwich's
+# `if host.startswith('-'): raise`, which is why the rank-1087 control work
+# pairs with this one. The end-of-options element is honoured where the sink is
+# bound instead: an argv carrying `--` is not labelled, which also skips a
+# vector whose only dash-bearing element is a long option. The shell-target
+# exclusion names cmd.exe, powershell, /bin/sh, /bin/bash and any `-c` element,
+# the same set the command-execution bindings gate; a shell named by a spelling
+# outside that set is still reported here, as argument injection at high
+# rather than as command injection.
+#
+# Measured on the real checkout, 3 x --cache off, timeout 180, --max-ram 6GB
+# (whole-tree scans abort at the 6GB ceiling on this repository, so the scope
+# is the file holding the shape): the fix's parent reports VYQL-INJ-280 twice,
+# electron.js:1964 and :2071, all three runs, 8 findings in total against 6
+# before; the fixed revision reports none, all three runs, and no first-party
+# file in the tree holds a spawn-family call at all. Across the corpus clones
+# the rule adds nothing on 27 of 31 spawn-bearing trees scanned; the four that
+# do report (3 x runs, union) carry nine rows between them -- codex's sandbox
+# raw-exec and its two action wrappers, whose argv is the caller's own command,
+# wrangler's CLI front ends and a test helper, whose source is the process's
+# own argv or a vendored library, and current drawio-desktop's two guarded
+# attrib calls.
+#
+# verify_current_expected: fixed-taint-route
+
+test "rank1086: a renderer-supplied file name reaches attrib as one argv element"
+  lang javascript
+  file src/main/webapp/electron.js
+  expect VYQL-INJ-280
+  code
+  ```
+  const { spawn } = require('child_process');
+  const path = require('path');
+  const { ipcMain } = require('electron');
+
+  async function saveDraft(fileObject, data)
+  {
+  	var draftFileName = fileObject.draftFileName || getDraftFileName(fileObject);
+
+  	if (!checkFileContent(data) || path.resolve(draftFileName).startsWith(__dirname))
+  	{
+  		throw new Error('Invalid file data');
+  	}
+  	else
+  	{
+  		await fsProm.writeFile(draftFileName, data, 'utf8');
+
+  		if (isWin)
+  		{
+  			try
+  			{
+  				// Add Hidden attribute:
+  				var child = spawn('attrib', ['+h', draftFileName]);
+  				child.on('error', function(err)
+  				{
+  					console.log('hiding draft file error: ' + err);
+  				});
+  			} catch(e) {}
+  		}
+
+  		return draftFileName;
+  	}
+  }
+
+  ipcMain.on("rendererReq", async (event, args) =>
+  {
+  	switch (args.action)
+  	{
+  		case 'saveDraft':
+  			return await saveDraft(args.fileObject, args.data);
+  	}
+
+  	return null;
+  });
+  ```
+
+test "rank1086: an end-of-options element means no later element is an option"
+  lang javascript
+  file git-clone.js
+  reject VYQL-INJ-280
+  code
+  ```
+  const { spawn } = require('child_process');
+  const { ipcMain } = require('electron');
+
+  ipcMain.on("rendererReq", async (event, args) =>
+  {
+  	const targetDir = args.targetDir;
+  	spawn('git', ['clone', '--', args.repoUrl, targetDir]);
+  });
+  ```
+
+test "rank1086: the same argv element under a shell target is command injection"
+  lang javascript
+  file shell-target.js
+  expect VYQL-INJ-002
+  reject VYQL-INJ-280
+  code
+  ```
+  const { spawn } = require('child_process');
+
+  function handler(req, res) {
+    const path = req.query.path;
+    spawn('cmd.exe', ['/c', path]);
+  }
+  ```

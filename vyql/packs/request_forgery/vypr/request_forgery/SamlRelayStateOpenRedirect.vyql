@@ -1,0 +1,11 @@
+module vypr.request_forgery;
+
+rule SamlRelayStateOpenRedirect {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_601]
+    id: "VYQL-RF-024"
+    severity: medium
+  }
+  issue code.SamlRelayStateOpenRedirect as redirect
+}

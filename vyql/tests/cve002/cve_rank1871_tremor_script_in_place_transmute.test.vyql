@@ -1,0 +1,151 @@
+# tremor-script's interpreter had two `in place` fast paths for patch and
+# merge (tremor-script/src/interpreter/expr.rs). `let event = patch event of
+# ... end` normally clones the target, applies the operations, and assigns the
+# result back; when the assignment target and the change target are the same
+# path, the `up` pass in ast/raw.rs rewrote the expression to PatchInPlace /
+# MergeInPlace, and the interpreter skipped the clone: it resolved the target
+# to a `Cow<Value>` it had just asserted is borrowed, takes `&Value` out of
+# it, and turned that shared reference into `&mut Value` with
+# `mem::transmute` so the change operations could mutate the event, state,
+# metadata or local storage in place. A shared reference carries no
+# exclusivity, so the `&mut` is a mutable alias to storage the compiler may
+# have assumed immutable -- undefined behaviour, and the memory unsafety the
+# advisory reports. The change operations are user script, so a script running
+# inside one operator could observe or race another reader of the same
+# storage. The fixed revision deletes both fast paths: the rewrite in raw.rs always
+# produces a plain assignment now, and the interpreter clones the target and
+# patches the owned copy, exactly like every other assignment.
+#
+# The same transmute shape remains elsewhere in that file (assign_nested, the
+# state/event assignment path, tracked separately upstream) and in the kafka
+# source (`let s: &mut MessageStream = mem::transmute(self)`), all of them
+# promoting a shared reference behind inference; the binding is keyed on the
+# class, not on the two functions this advisory removed.
+#
+# The turbofish spelling and the `&mut`-annotated let are both real: the
+# patch/merge fast paths used the annotated let (the source type is erased by
+# inference), assign_nested writes through `mem::transmute::<&Value, &mut
+# Value>(current)`. A `&mut`-to-`&mut` reinterpretation (same exclusivity,
+# only the layout changes) and a lifetime-erasure transmute (`Script<'_>` to
+# `Script<'static>`, no reference promotion) stay unlabelled.
+
+test "tremor-script: patch_in_place transmutes a borrowed &Value into &mut"
+  lang rust
+  file patch_in_place.rs
+  expect VYQL-MEM-009
+  expect_review code.UnsafeMutableAlias
+  code
+  ```
+  use std::borrow::Cow;
+  use std::mem;
+
+  fn patch_value<'run, 'event>(
+      v: &'run mut Value<'event>,
+      expr: &'run Patch<'event>,
+  ) -> Result<()> {
+      Ok(())
+  }
+
+  impl<'script> Expr<'script> {
+      fn patch_in_place<'run, 'event>(
+          expr: &'run Patch<'event>,
+      ) -> Result<Cow<'run, Value<'event>>> {
+          let value: Cow<'run, Value<'event>> = stry!(expr.target.run());
+          debug_assert!(
+              !matches!(value, Cow::Owned(_)),
+              "We should never see a owned value here as patch_in_place is only ever called on existing data in event, state, meta or local"
+          );
+          let v: &Value<'event> = value.borrow();
+          // ALLOW: https://github.com/tremor-rs/tremor-runtime/issues/1032
+          #[allow(mutable_transmutes, clippy::transmute_ptr_to_ptr)]
+          let v: &mut Value<'event> = unsafe { mem::transmute(v) };
+          stry!(patch_value(v, expr));
+          Ok(value)
+      }
+  }
+  ```
+
+test "tremor-script: assignment clones the target and patches the owned copy"
+  lang rust
+  file patch_assign.rs
+  reject VYQL-MEM-009
+  code
+  ```
+  use std::borrow::Cow;
+
+  fn patch_value<'run, 'event>(
+      v: &'run mut Value<'event>,
+      expr: &'run Patch<'event>,
+  ) -> Result<()> {
+      Ok(())
+  }
+
+  impl<'script> Expr<'script> {
+      fn patch_expr<'run, 'event>(
+          expr: &'run Patch<'event>,
+      ) -> Result<Cow<'run, Value<'event>>> {
+          let value: Cow<'run, Value<'event>> = stry!(expr.target.run());
+          let mut owned: Value<'event> = value.into_owned();
+          stry!(patch_value(&mut owned, expr));
+          Ok(Cow::Owned(owned))
+      }
+  }
+  ```
+
+test "tremor-script: a state assignment writes through a transmuted &mut"
+  lang rust
+  file assign_nested.rs
+  expect VYQL-MEM-009
+  expect_review code.UnsafeMutableAlias
+  code
+  ```
+  use std::mem;
+
+  impl<'script> Expr<'script> {
+      fn assign_nested<'run, 'event>(
+          current: &'run Value<'event>,
+          mut value: Value<'event>,
+      ) -> Result<()> {
+          unsafe {
+              // ALLOW: https://github.com/tremor-rs/tremor-runtime/issues/1033
+              *mem::transmute::<&Value<'event>, &mut Value<'event>>(current) = value;
+          }
+          Ok(())
+      }
+  }
+  ```
+
+test "a &mut-to-&mut reinterpretation keeps its exclusivity and stays clean"
+  lang rust
+  file header_bytes.rs
+  reject VYQL-MEM-009
+  code
+  ```
+  #[repr(C)]
+  struct Header {
+      magic: u64,
+      length: u32,
+  }
+
+  fn as_bytes_mut(header: &mut Header) -> &mut [u8; 128] {
+      unsafe { std::mem::transmute::<&mut Header, &mut [u8; 128]>(header) }
+  }
+  ```
+
+test "a lifetime-erasure transmute promotes no reference and stays clean"
+  lang rust
+  file script_static.rs
+  reject VYQL-MEM-009
+  code
+  ```
+  use std::mem;
+
+  struct Script<'script> {
+      nodes: Vec<&'script str>,
+  }
+
+  fn into_static<'script>(structured: Script<'script>) -> Script<'static> {
+      let structured = unsafe { mem::transmute::<Script<'_>, Script<'static>>(structured) };
+      structured
+  }
+  ```

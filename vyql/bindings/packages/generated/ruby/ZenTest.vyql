@@ -1,0 +1,25 @@
+module bindings.ruby.generated.m488f1ef7;
+
+binding cliArgument0 {
+  requires {
+    dependency("ZenTest")
+  }
+  query pattern callExpr where callee.method == "parse_input"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument1 {
+  requires {
+    dependency("ZenTest")
+  }
+  query pattern callExpr where callee.method == "unit_diff"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument2 {
+  requires {
+    dependency("ZenTest")
+  }
+  query pattern callExpr where callee.path ~= "bin/unit_diff"
+  emit source code.CliArgument at call.result
+}

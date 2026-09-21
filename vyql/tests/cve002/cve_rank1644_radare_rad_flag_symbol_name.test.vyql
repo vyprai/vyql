@@ -1,0 +1,124 @@
+# radare2's `is*` family prints symbol definitions as live r2 command lines
+# for scripts to source. In `bin_symbols()` (libr/core/cbin.c) the RAD branch
+# filters a *copy* of the parsed name through `r_name_filter` (radare2's
+# flag-name sanitizer) but then prints the flag command with the raw accessor:
+#
+#   char *name = strdup (sn.demname? sn.demname: r_symbol_name);
+#   r_name_filter (name, -1);
+#   ...
+#   r_cons_printf ("f sym.%s %u 0x%08" PFMT64x "\n",
+#       r_bin_symbol_name (symbol), symbol->size, addr);
+#
+# `r_bin_symbol_name()` returns `symbol->name` verbatim, so a crafted binary
+# carries shell syntax (`! cmd`, backticks) straight into a printed `f` line.
+# The printed lines are evaluated as commands by the `.` sourcing prefix --
+# `r_core_file_reopen_debug()` runs `r_core_cmd0 (core, ".is*")` -- so `ood`
+# on a hostile executable executes the payload with the analyst's permissions
+# (CWE-77). Fix commit 7d30ff52fc1be6f9698b166107b8981eab6ec7ba ("bin_symbols:
+# Add quoting", #14690) wraps both `f` prints in double quotes inside the
+# format literal; nothing else in the call changes.
+#
+# ATTENTION, precision limit, rechecked. Re-measured on the real checkout over
+# three --cache off runs per revision (libr/core, 71 C files, ~23s and 1.7GB
+# each): 7833/7833/7833 findings at the parent and 7833/7833/7833 at the fix
+# with identical rule+severity fingerprints, and the `-flags only` view's 265
+# flags naming cbin.c identical at both revisions -- all
+# NullableDeref/PointerFree/IntegerSize/IndexAccess/RawMemoryCopySize noise,
+# none on the two `f` prints. `vyql match` reports no label on `r_cons_printf`
+# (279 call sites in that file, 2179 tree-wide) and none on
+# `r_bin_symbol_name`; the semantic family this needs -- untrusted data
+# written into a line-oriented command stream an interpreter consumes --
+# exists as `code.LineProtocolCommandWrite`, but its bindings are the Ruby
+# IMAP and JavaScript IRC protocol clients, and `r_cons_printf` is a generic
+# console print, so labelling it a command write fails the documentation test
+# and fires 1 = 1 at both revisions anyway (measured with a throwaway probe at
+# the first pass, since removed: a callExpr binding on `r_cons_printf` with
+# `args.any.literal contains "f sym.%s"` labels the vulnerable print, the
+# patched print and the later quoted print alike).
+#
+# The only pair-separating key is the quote characters at the edges of the
+# format literal -- the fixed revision's own quoting -- and it is unsound in
+# both directions, verified against radare2's own history:
+#
+#   * the quoted form stays injectable. Release 3.9.0 keeps the
+#     `"\"f %s%s%s ...\""` literal and adds `__filterQuotedShell()`, which
+#     escapes shell-significant characters before the print (the advisory for
+#     CVE-2019-16718, same function): a symbol name containing `"` walks out
+#     of the quoting. A marker that treats quoting as the control suppresses
+#     a genuinely vulnerable revision.
+#   * the remediated current tip prints unquoted -- `r_cons_printf (core->cons,
+#     "'f %s%s%s %u 0x%08" PFMT64x "\n", ..., flagname, ...)`, with `flagname`
+#     from `construct_symbol_flagname()` (`r_name_filter` +
+#     `__filterQuotedShell`) and the display name from `r_str_escape_utf8`.
+#     A marker that treats the missing quotes as the defect fires on the
+#     remediation.
+#
+# The sound discriminator -- whether the printed name passed through
+# `construct_symbol_flagname`/`r_name_filter`, the route 3.9.0 took -- does
+# not separate this pair either: both revisions print the raw accessor, and
+# both call `r_name_filter` on a copy the print never uses. Keying
+# "identifier argument is safe" is not an option: an unfiltered local defeats
+# it.
+#
+# Not an engine gap: the literal tokens are readable (the probe above reads
+# them) and the argument shapes are extracted; the missing fact is a
+# correlation (which sanitized variable feeds which printed argument) that is
+# absent from both revisions of this pair by construction.
+#
+# The three cases below pin the miss. When detection lands -- the likely shape
+# is a binding labelling RAD-command emission through an unfiltered parsed
+# name -- case 1 must flip to expect VYQL-INJ-002, case 2 (this fix's quoting)
+# must keep rejecting *because the quoting is bypassable*, and case 3 must keep
+# rejecting on the flagname route.
+#
+# verify_current_expected: attention-precision-limit, both revisions fire identically.
+
+test "rank1644: the rad-mode flag print interpolates the raw parsed symbol name into a printed r2 command"
+  lang c
+  file libr/core/cbin.c
+  reject VYQL-INJ-002
+  code
+  ```
+  static void print_symbol_flag(RCore *r, const RBinSymbol *symbol, ut64 addr) {
+  	const char *r_symbol_name = symbol->name;
+  	char *name = strdup (r_symbol_name);
+  	r_name_filter (name, -1);
+  	if (*name) {
+  		r_cons_printf ("f sym.%s %u 0x%08" PFMT64x "\n",
+  			r_bin_symbol_name (symbol), symbol->size, addr);
+  	}
+  	free (name);
+  }
+  ```
+
+test "rank1644: the fixed revision quotes the printed command line inside the format literal"
+  lang c
+  file libr/core/cbin.c
+  reject VYQL-INJ-002
+  code
+  ```
+  static void print_symbol_flag(RCore *r, const RBinSymbol *symbol, ut64 addr) {
+  	const char *r_symbol_name = symbol->name;
+  	char *name = strdup (r_symbol_name);
+  	r_name_filter (name, -1);
+  	if (*name) {
+  		r_cons_printf ("\"f sym.%s %u 0x%08" PFMT64x "\"\n",
+  			r_bin_symbol_name (symbol), symbol->size, addr);
+  	}
+  	free (name);
+  }
+  ```
+
+test "rank1644: the flagname-construction route prints a sanitized name without quoting"
+  lang c
+  file libr/core/cbin.c
+  reject VYQL-INJ-002
+  code
+  ```
+  static void print_symbol_flag(RCore *r, const RBinSymbol *symbol, ut64 addr) {
+  	const char *nameflag = construct_symbol_flagname ("sym",
+  		r_bin_symbol_name (symbol), MAXFLAG_LEN_DEFAULT);
+  	r_cons_printf ("f %s %u 0x%08" PFMT64x "\n",
+  		nameflag, symbol->size, addr);
+  }
+  ```

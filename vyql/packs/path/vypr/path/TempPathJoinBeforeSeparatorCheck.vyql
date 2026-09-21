@@ -1,0 +1,11 @@
+module vypr.path;
+
+rule TempPathJoinBeforeSeparatorCheck {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_22]
+    id: "VYQL-PATH-036"
+    severity: high
+  }
+  issue code.TempPathJoinBeforeSeparatorCheck as sink
+}

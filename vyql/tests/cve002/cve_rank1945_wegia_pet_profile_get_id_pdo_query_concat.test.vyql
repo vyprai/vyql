@@ -1,0 +1,61 @@
+# WeGIA's pet profile page reads the pet id straight from the query
+# string and concatenates it into a PDO query
+# (html/pet/profile_pet.php:1079 at the parent of 176733543):
+#
+#   $idPet = $_GET['id_pet'];
+#   $pd = $pdo->query("SELECT id_ficha_medica FROM pet_ficha_medica WHERE id_pet =" . $idPet);
+#
+# where $pdo is the shared PDO connection from dao/Conexao.php's
+# Conexao::connect(). The page itself never re-reads $idPet from the
+# filtered copy used elsewhere; this inner table block re-fetches the
+# raw superglobal. The fixed revision takes id_pet once through
+# filter_input(INPUT_GET, 'id_pet', FILTER_SANITIZE_NUMBER_INT),
+# rejects non-numeric ids, and rewrites the block as a prepared
+# statement with bindParam, so no request value is concatenated into
+# SQL text anymore.
+#
+# The second vulnerable query in the same block concatenates a row
+# value from the first query's result ($p['id_ficha_medica']), which is
+# a database read rather than request input; the spec models only the
+# request-shaped half.
+
+test "rank1945: pet id from the query string concatenated into a PDO query"
+  lang php
+  file profile_pet.php
+  expect VYQL-INJ-001
+  code
+  ```
+  <?php
+  require_once "../../dao/Conexao.php";
+  $pdo = Conexao::connect();
+
+  $idPet = $_GET['id_pet'];
+  $pd = $pdo->query("SELECT id_ficha_medica FROM pet_ficha_medica WHERE id_pet =" . $idPet);
+  $p = $pd->fetch();
+  if ($p != false) {
+      $id_ficha_medica = $p['id_ficha_medica'];
+      echo $id_ficha_medica;
+  }
+  ```
+
+test "rank1945: prepared statement with a bound parameter reports nothing"
+  lang php
+  file profile_pet.php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php
+  require_once "../../dao/Conexao.php";
+  $pdo = Conexao::connect();
+
+  $id_pet = filter_input(INPUT_GET, 'id_pet', FILTER_SANITIZE_NUMBER_INT);
+
+  $stmt1 = $pdo->prepare("SELECT id_ficha_medica FROM pet_ficha_medica WHERE id_pet =:idPet");
+  $stmt1->bindParam(':idPet', $id_pet);
+  $stmt1->execute();
+  $p = $stmt1->fetch();
+  if ($p != false) {
+      $id_ficha_medica = $p['id_ficha_medica'];
+      echo $id_ficha_medica;
+  }
+  ```

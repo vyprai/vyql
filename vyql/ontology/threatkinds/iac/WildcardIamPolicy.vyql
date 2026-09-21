@@ -1,0 +1,6 @@
+module iac;
+
+threat WildcardIamPolicy {
+  cwe: [CWE_284]
+  desc: "IAM policy grants wildcard action or resource"
+}

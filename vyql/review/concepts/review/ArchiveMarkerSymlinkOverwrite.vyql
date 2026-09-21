@@ -1,0 +1,8 @@
+module code;
+
+review code.ArchiveMarkerSymlinkOverwrite {
+  category: path
+  expected: [core.PathAccessCheck]
+  kind: attention
+  text: "review archive extraction marker files for symlink-safe creation and explicit marker-entry filtering"
+}

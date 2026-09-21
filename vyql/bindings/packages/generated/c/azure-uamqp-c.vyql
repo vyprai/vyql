@@ -1,0 +1,9 @@
+module bindings.c.generated.m328f277b;
+
+binding secretValue0 {
+  requires {
+    dependency("azure-uamqp-c")
+  }
+  query pattern callExpr where callee.method == "cbs_put_token_async"
+  emit source code.SecretValue at call.result
+}

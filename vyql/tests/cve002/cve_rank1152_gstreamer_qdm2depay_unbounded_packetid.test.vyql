@@ -1,0 +1,135 @@
+# Rank 1152 / CVE-2026-3083: the GStreamer RTP QDM2 depayloader indexes a
+# fixed-size array with a byte taken straight from the network. Each
+# shuffled packet in an X-QDM RTP payload starts with a single-byte
+# packetid, and gst_rtp_qdm2_depay_process() reads it with `payload[pos++]`
+# and hands it to add_packet() as `pid`, which writes `depay->packets[pid]
+# = ...` with no check against MAX_SCRAMBLED_PACKETS (64): a payload naming
+# packetid 64-255 writes the allocation pointer past the end of the array,
+# corrupting adjacent struct fields and heap memory (CWE-129, CWE-787).
+#
+# The upstream fix disables the element outright: the parsing code sits
+# behind `#if 0`/`#endif` and gst_rtp_qdm2_depay_process returns NULL
+# immediately. The spec's reject case models that same effect without the
+# preprocessor guard, since VyQL parses C syntactically and does not
+# evaluate `#if 0` as dead code, so keeping the guard verbatim would leave
+# the disabled body visible to the engine and say nothing about the
+# binding under test.
+#
+# The sink is labelled at the vulnerable revision (`depay.packets.__subscript`
+# as code.IndexAccessSink at every add_packet call site) but no source
+# reaches it: nothing calls out gst_rtp_buffer_get_payload as
+# attacker-controlled, so code.HttpInput (the label this corpus uses for
+# recv/recvfrom/fread in C) never reaches the array write. Four bindings
+# emit code.HttpInput at the result of gst_rtp_buffer_get_payload,
+# _buffer, _subbuffer and _bytes — the whole documented payload-accessor
+# family in gstrtpbuffer.h, not just the one overload this depayloader
+# happens to call, since any other depayloader reading its own RTP payload
+# through these entry points is exactly as network-controlled. A scan of
+# the vulnerable revision reports VYQL-MEM-005 at the three
+# depay->packets[pid] writes (gstrtpqdmdepay.c:211, 212, 215) with a full
+# source-to-sink path through add_packet's pid parameter.
+#
+# verify_current_expected: current-behavior
+
+test "rank1152: packetid is read straight from the RTP payload and indexes packets[] unchecked"
+  lang c
+  file gstrtpqdmdepay.c
+  expect VYQL-MEM-005
+  code
+  ```
+  #define MAX_SCRAMBLED_PACKETS 64
+
+  typedef struct {
+    guint8 *data;
+    guint offs;
+  } QDM2Packet;
+
+  typedef struct {
+    QDM2Packet *packets[MAX_SCRAMBLED_PACKETS];
+    guint packetsize;
+    gboolean configured;
+  } GstRtpQDM2Depay;
+
+  static void
+  add_packet (GstRtpQDM2Depay * depay, guint32 pid, guint32 len, guint8 * data)
+  {
+    QDM2Packet *packet;
+
+    if (!depay->configured)
+      return;
+
+    if (depay->packets[pid] == NULL) {
+      depay->packets[pid] = g_malloc0 (sizeof (QDM2Packet));
+    }
+    packet = depay->packets[pid];
+
+    memcpy (packet->data + packet->offs, data, len);
+    packet->offs += len;
+  }
+
+  static GstBuffer *
+  gst_rtp_qdm2_depay_process (GstRTPBaseDepayload * depayload, GstRTPBuffer * rtp)
+  {
+    GstRtpQDM2Depay *rtpqdm2depay = GST_RTP_QDM2_DEPAY (depayload);
+    guint8 *payload = gst_rtp_buffer_get_payload (rtp);
+    gint payload_len = gst_rtp_buffer_get_payload_len (rtp);
+    guint pos = 0;
+
+    while (pos < payload_len) {
+      guint packetid = payload[pos++];
+      guint packettype = payload[pos++];
+      guint packlen = payload[pos++];
+
+      add_packet (rtpqdm2depay, packetid, packlen, payload + pos);
+      pos += packlen;
+    }
+
+    return NULL;
+  }
+  ```
+
+test "rank1152: the depayloader returns before it ever reads a payload byte or calls add_packet"
+  lang c
+  file gstrtpqdmdepay.c
+  reject VYQL-MEM-005
+  code
+  ```
+  #define MAX_SCRAMBLED_PACKETS 64
+
+  typedef struct {
+    guint8 *data;
+    guint offs;
+  } QDM2Packet;
+
+  typedef struct {
+    QDM2Packet *packets[MAX_SCRAMBLED_PACKETS];
+    guint packetsize;
+    gboolean configured;
+  } GstRtpQDM2Depay;
+
+  static void
+  add_packet (GstRtpQDM2Depay * depay, guint32 pid, guint32 len, guint8 * data)
+  {
+    QDM2Packet *packet;
+
+    if (!depay->configured)
+      return;
+
+    if (depay->packets[pid] == NULL) {
+      depay->packets[pid] = g_malloc0 (sizeof (QDM2Packet));
+    }
+    packet = depay->packets[pid];
+
+    memcpy (packet->data + packet->offs, data, len);
+    packet->offs += len;
+  }
+
+  static GstBuffer *
+  gst_rtp_qdm2_depay_process (GstRTPBaseDepayload * depayload, GstRTPBuffer * rtp)
+  {
+    /* This element is disabled: the format has not been in active use in
+     * over a decade and its packet-shuffling code cannot be verified
+     * without a sample stream. */
+    return NULL;
+  }
+  ```

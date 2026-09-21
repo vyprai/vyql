@@ -1,0 +1,55 @@
+# Rank 910 / CVE-2026-4247: FreeBSD tcp_send_challenge_ack leaked the mbuf
+# when the challenge-ACK rate limiter suppressed tcp_respond().
+
+test "rank910: rate-limited challenge ACK path leaks mbuf"
+  lang c
+  file tcp_subr.c
+  expect VYQL-RES-005
+  expect_review code.RateLimitedMbufResponseLeak
+  code
+  ```
+  struct tcpcb { int rcv_nxt; int snd_nxt; int last_ack_sent; };
+  struct tcphdr {};
+  struct mbuf {};
+
+  int tcp_challenge_ack_check(int *epoch_end, int *counter);
+  void tcp_respond(struct tcpcb *tp, void *ipgen, struct tcphdr *th,
+      struct mbuf *m, int ack, int seq, int flags);
+
+  void
+  tcp_send_challenge_ack(struct tcpcb *tp, struct tcphdr *th, struct mbuf *m)
+  {
+      if (tcp_challenge_ack_check(&tp->rcv_nxt, &tp->snd_nxt)) {
+          tcp_respond(tp, m, th, m, tp->rcv_nxt, tp->snd_nxt, 0x10);
+          tp->last_ack_sent = tp->rcv_nxt;
+      }
+  }
+  ```
+
+test "rank910: suppressed challenge ACK path frees mbuf"
+  lang c
+  file tcp_subr.c
+  reject VYQL-RES-005
+  reject_review code.RateLimitedMbufResponseLeak
+  code
+  ```
+  struct tcpcb { int rcv_nxt; int snd_nxt; int last_ack_sent; };
+  struct tcphdr {};
+  struct mbuf {};
+
+  int tcp_challenge_ack_check(int *epoch_end, int *counter);
+  void tcp_respond(struct tcpcb *tp, void *ipgen, struct tcphdr *th,
+      struct mbuf *m, int ack, int seq, int flags);
+  void m_freem(struct mbuf *m);
+
+  void
+  tcp_send_challenge_ack(struct tcpcb *tp, struct tcphdr *th, struct mbuf *m)
+  {
+      if (tcp_challenge_ack_check(&tp->rcv_nxt, &tp->snd_nxt)) {
+          tcp_respond(tp, m, th, m, tp->rcv_nxt, tp->snd_nxt, 0x10);
+          tp->last_ack_sent = tp->rcv_nxt;
+      } else {
+          m_freem(m);
+      }
+  }
+  ```

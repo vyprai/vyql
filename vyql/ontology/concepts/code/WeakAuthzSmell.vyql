@@ -1,0 +1,11 @@
+module code;
+
+concept WeakAuthzSmell : issue {
+  cwe: [CWE_285, CWE_863]
+  reviewAssumption: "the signal can be influenced by the caller"
+  reviewCategory: access_control
+  reviewCondition: "an authorization decision is made on a weak or client-visible signal"
+  reviewConfidence: medium
+  reviewEvidence: "authorization decision {pattern} rests on a weak signal"
+  vulnerableTo: [access_control.IncorrectAuthorization]
+}

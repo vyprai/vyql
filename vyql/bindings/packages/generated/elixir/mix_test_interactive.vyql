@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m37d5ccdb;
+
+binding cliArgument0 {
+  requires {
+    dependency("mix_test_interactive")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit source code.CliArgument at call.result
+}

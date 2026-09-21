@@ -1,0 +1,46 @@
+# Rank 475 / CVE-2020-36437: conqueue unconditionally implemented
+# Send/Sync for queue handles without requiring T: Send.
+
+test "rank475: conqueue unbounded unsafe Send and Sync impls"
+  lang rust
+  file lib.rs
+  expect VYQL-RACE-003
+  expect_review code.UnsafeAutoTraitImpl
+  code
+  ```
+  use std::sync::Arc;
+
+  pub struct QueueSender<T> {
+      in_queue: Arc<T>,
+  }
+
+  pub struct QueueReceiver<T> {
+      in_queue: Arc<T>,
+  }
+
+  unsafe impl<T> Sync for QueueSender<T> {}
+  unsafe impl<T> Send for QueueSender<T> {}
+  unsafe impl<T> Send for QueueReceiver<T> {}
+  ```
+
+test "rank475: conqueue requires T Send for queue auto-traits"
+  lang rust
+  file lib.rs
+  reject VYQL-RACE-003
+  reject_review code.UnsafeAutoTraitImpl
+  code
+  ```
+  use std::sync::Arc;
+
+  pub struct QueueSender<T> {
+      in_queue: Arc<T>,
+  }
+
+  pub struct QueueReceiver<T> {
+      in_queue: Arc<T>,
+  }
+
+  unsafe impl<T: Send> Sync for QueueSender<T> {}
+  unsafe impl<T: Send> Send for QueueSender<T> {}
+  unsafe impl<T: Send> Send for QueueReceiver<T> {}
+  ```

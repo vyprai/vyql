@@ -1,0 +1,11 @@
+module code;
+
+concept IncompleteDotSegmentRequestScreen : issue {
+  cwe: [CWE_22, CWE_184]
+  reviewAssumption: "request paths can contain nested '/.' or '/../' segments, literal or percent-encoded, that reach later file resolution or package asset access"
+  reviewCategory: path
+  reviewCondition: "request path screening rejects some dangerous character sequences but no dot-segment or encoded dot/slash form is rejected, so traversal segments survive the screen"
+  reviewConfidence: high
+  reviewEvidence: "request screen context {pattern} checks request path character sequences but lacks any dot-segment rejection, encoded dot/slash rejection, or path normalization"
+  vulnerableTo: [path.PathTraversal, validation.ImproperInputValidation]
+}

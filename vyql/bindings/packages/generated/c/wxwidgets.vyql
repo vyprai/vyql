@@ -1,0 +1,41 @@
+module bindings.c.generated.m43a06365;
+
+binding cliArgument0 {
+  requires {
+    dependency("wxwidgets")
+  }
+  query pattern callExpr where callee.method == "OnInitCmdLine"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument1 {
+  requires {
+    dependency("wxwidgets")
+  }
+  query pattern callExpr where callee.method == "OnCmdLineParsed"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument2 {
+  requires {
+    dependency("wxwidgets")
+  }
+  query pattern callExpr where callee.method == "OnCmdLineHelp"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument3 {
+  requires {
+    dependency("wxwidgets")
+  }
+  query pattern callExpr where callee.method == "OnCmdLineError"
+  emit source code.CliArgument at call.result
+}
+
+binding userControlledData4 {
+  requires {
+    dependency("wxwidgets")
+  }
+  query pattern callExpr where callee.method == "ParseAccel"
+  emit source core.UserControlledData at call.result
+}

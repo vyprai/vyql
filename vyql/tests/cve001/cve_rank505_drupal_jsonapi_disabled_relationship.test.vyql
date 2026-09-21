@@ -1,0 +1,56 @@
+# Rank 505 / CVE-2020-13677: Drupal JSON:API exposed relationship
+# metadata for disabled fields because relationship helpers omitted isFieldEnabled().
+
+test "rank505: disabled relationship metadata is exposed"
+  lang php
+  expect VYQL-AUTH-027
+  expect_review code.DisabledRelationshipMetadataExposure
+  code
+  ```
+  <?php
+  class ResourceType {
+    public function getRelatableResourceTypes() {
+      if (!isset($this->relatableResourceTypesByField)) {
+        $this->relatableResourceTypesByField = array_reduce(array_map(function (ResourceTypeRelationship $field) {
+          return [$field->getPublicName() => $field->getRelatableResourceTypes()];
+        }, array_filter($this->fields, function (ResourceTypeField $field) {
+          return $field instanceof ResourceTypeRelationship;
+        })), 'array_merge', []);
+      }
+      return $this->relatableResourceTypesByField;
+    }
+
+    public function getRelatableResourceTypesByField($field_name) {
+      return ($field = $this->getFieldByPublicName($field_name)) && $field instanceof ResourceTypeRelationship
+        ? $field->getRelatableResourceTypes()
+        : [];
+    }
+  }
+  ```
+
+test "rank505: disabled relationship metadata checks field enabled"
+  lang php
+  reject VYQL-AUTH-027
+  reject_review code.DisabledRelationshipMetadataExposure
+  code
+  ```
+  <?php
+  class ResourceType {
+    public function getRelatableResourceTypes() {
+      if (!isset($this->relatableResourceTypesByField)) {
+        $this->relatableResourceTypesByField = array_reduce(array_map(function (ResourceTypeRelationship $field) {
+          return [$field->getPublicName() => $field->getRelatableResourceTypes()];
+        }, array_filter($this->fields, function (ResourceTypeField $field) {
+          return $field instanceof ResourceTypeRelationship && $field->isFieldEnabled();
+        })), 'array_merge', []);
+      }
+      return $this->relatableResourceTypesByField;
+    }
+
+    public function getRelatableResourceTypesByField($field_name) {
+      return ($field = $this->getFieldByPublicName($field_name)) && $field instanceof ResourceTypeRelationship && $field->isFieldEnabled()
+        ? $field->getRelatableResourceTypes()
+        : [];
+    }
+  }
+  ```

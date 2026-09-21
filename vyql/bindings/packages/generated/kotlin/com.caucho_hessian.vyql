@@ -1,0 +1,49 @@
+module bindings.kotlin.generated.mb840d269;
+
+binding deserialization0 {
+  requires {
+    dependency("com.caucho:hessian")
+  }
+  query pattern callExpr where callee.method == "readObject"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("com.caucho:hessian")
+  }
+  query pattern callExpr where callee.method == "readString"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("com.caucho:hessian")
+  }
+  query pattern callExpr where callee.method == "readCall"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("com.caucho:hessian")
+  }
+  query pattern callExpr where callee.method == "readMethod"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("com.caucho:hessian")
+  }
+  query pattern callExpr where callee.method == "readReply"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("com.caucho:hessian")
+  }
+  query pattern callExpr where callee.method == "startReply"
+  emit sink code.Deserialization at args[0]
+}

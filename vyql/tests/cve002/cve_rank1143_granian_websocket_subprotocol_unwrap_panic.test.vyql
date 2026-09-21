@@ -1,0 +1,64 @@
+test "rank1143: a header value's to_str decode is unwrapped inside the scope macro"
+  lang rust
+  file utils.rs
+  expect VYQL-VAL-001
+  code
+  ```
+  use pyo3::prelude::*;
+  use pyo3::types::{PyList, PyString};
+
+  pub(super) fn build_scope_ws(
+      py: Python,
+      req: http::request::Parts,
+  ) -> Vec<Bound<PyString>> {
+      let scope: Vec<Bound<PyString>> = req
+          .headers
+          .get_all("Sec-WebSocket-Protocol")
+          .iter()
+          .flat_map(|v| { v.to_str().unwrap().split(',').map(|s| PyString::new(py, s.trim())) })
+          .collect();
+      scope
+  }
+  ```
+
+test "rank1143: an undecodable header degrades to empty instead of panicking"
+  lang rust
+  file utils.rs
+  reject VYQL-VAL-001
+  code
+  ```
+  use pyo3::prelude::*;
+  use pyo3::types::{PyList, PyString};
+
+  pub(super) fn build_scope_ws(
+      py: Python,
+      req: http::request::Parts,
+  ) -> Vec<Bound<PyString>> {
+      let scope: Vec<Bound<PyString>> = req
+          .headers
+          .get_all("Sec-WebSocket-Protocol")
+          .iter()
+          .flat_map(|v| {
+              v.to_str()
+                  .unwrap_or_default()
+                  .split(',')
+                  .filter(|s| !s.is_empty())
+                  .map(|s| PyString::new(py, s.trim()))
+          })
+          .collect();
+      scope
+  }
+  ```
+
+test "rank1143: an unwrapped to_str on a value that is not a header stays quiet"
+  lang rust
+  file net.rs
+  reject VYQL-VAL-001
+  code
+  ```
+  pub(super) fn socket_path(addr: std::os::unix::net::SocketAddr) -> String {
+      addr.as_pathname()
+          .map_or("", |v| v.to_str().unwrap())
+          .to_string()
+  }
+  ```

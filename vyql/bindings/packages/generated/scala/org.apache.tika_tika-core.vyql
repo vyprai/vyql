@@ -1,0 +1,17 @@
+module bindings.scala.generated.m6ac3ae0b;
+
+binding deserialization0 {
+  requires {
+    dependency("org.apache.tika:tika-core")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("org.apache.tika:tika-core")
+  }
+  query pattern callExpr where callee.method == "parseToString"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,8 @@
+module code;
+
+review code.ResultStageAccessDecision {
+  category: auth
+  expected: [core.AuthorizationCheck]
+  kind: attention
+  text: "review access decisions issued from result-stage filter hooks: the hook runs after the handler it guards, so the handler's side effects already happened -- move the decision to a pre-handler stage (authorization filter, OnPageHandlerExecutionAsync, OnPageHandlerExecuting) or OnActionExecuting"
+}

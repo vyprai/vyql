@@ -1,0 +1,299 @@
+# Rank 1819 / CVE-2026-28815 (CWE-125): apple/swift-crypto's BoringSSL-backed
+# X-Wing private key decapsulates an attacker-supplied HPKE ciphertext without
+# first checking its length. OpenSSLXWingPrivateKeyImpl.Backing.decapsulate(_:)
+# (Sources/Crypto/KEM/BoringSSL/XWing_boring.swift at fix parent fa308c0) takes
+# `encapsulated: Data` straight from the KEM/HPKE entry points, opens it with
+# `withUnsafeBytes`, and passes `encapsulatedSecretBytes.baseAddress` as the
+# `ciphertext` parameter of CCryptoBoringSSL_XWING_decap -- a C function whose
+# header (Sources/CCryptoBoringSSL/include/CCryptoBoringSSL_xwing.h:91)
+# declares `const uint8_t ciphertext[XWING_CIPHERTEXT_BYTES]` (1120) with no
+# length parameter, so the callee reads 1120 bytes regardless of what the
+# sender sent. A truncated encapsulated key reads past the buffer. Fix
+# bb4ba815 adds `guard encapsulated.count == Int(XWING_CIPHERTEXT_BYTES) else
+# { throw CryptoKitError.incorrectParameterSize }` before the call, exactly
+# the guard every sibling in the same package carries: the MLKEM768
+# and MLKEM1024 decapsulate(_:) implementations open with
+# `guard encapsulated.count == <ciphertextByteCount> else { throw
+# CryptoKitError.incorrectParameterSize }` (MLKEM_boring.swift:144/411), and
+# XWing_boring.swift's own key imports guard `$0.count == XWING_PUBLIC_KEY_BYTES`
+# and `ptr.count == Int(XWING_PRIVATE_KEY_BYTES) + Int(XWING_PUBLIC_KEY_BYTES)`
+# before touching baseAddress -- those three throw
+# CryptoKitError.incorrectKeySize, the package's error case for a wrong-sized
+# *key*; the fix introduces the file's first *parameter*-size rejection. The
+# pool row is correct: the vulnerable shape is present at the parent, the
+# remediation is present at the fixed revision, and the merge commit's
+# combined diff reads in full.
+#
+# ATTENTION, rechecked, both stacked reasons still standing.
+#
+# First, an extraction gap, fixed in the companion commit: `try S` in
+# statement position lowered to nothing, so the whole decapsulate body
+# contributed no nodes. `vyql query -call XWING_decap` now returns the call
+# node at XWing_boring.swift:241 on the parent (and `withUnsafeBytes` at
+# :240), so the calls extract; the same query returns zero nodes on the fixed
+# revision, because the fix also respelled `try SymmetricKey(...)` as
+# `return try SymmetricKey(...)` and a return-wrapped trailing closure still
+# drops its body. That asymmetry is an artifact of the fixing commit's own
+# spelling and is not usable as a discriminator.
+#
+# Second, no binding can discriminate the guard, so no detection ships. The
+# full findings view, union over three `--cache off` runs per revision
+# (timeout 180, --max-ram 6GB) over Sources/Crypto: 24 findings at the parent
+# and the identical 24 at the fix, fingerprint sets byte-identical -- every
+# one VYQL-DOS-040 on a `fatalError`/`preconditionFailure` site in an
+# unrelated file (ECDSA, HMAC, the ASN1 types, DHKEM, MLKEM_wrapper), none in
+# XWing_boring.swift. `vyql match` on XWing_boring.swift labels nothing at
+# either revision, and the whole-tree scan (1419 findings) reports nothing on
+# any KEM file but those same assertion reviews.
+#
+# The scoping routes are dead, re-measured at this tip. A throwaway
+# `presenceNode where node.scope == "function"` binding labels zero nodes in
+# any .swift file: Swift still emits one module-context node per file and
+# never populates FuncDef.ContextTokens, so every context clause is file-wide
+# co-presence (the rank-1792 attribution gap). A call-anchored negation does
+# not even compile -- `containsAny(node.context.identifier, ...)` on a
+# callExpr binding is rejected at load with "not implemented in scanner IR
+# lowering". And stmt's branch lowering still gates the condition on
+# `n.Kind() == "if_statement"` (swift.go:320), so the fix's
+# `guard encapsulated.count == ...` contributes no node at all: the C
+# analogue of the missing count-to-call correlation is filed at rank 1676.
+#
+# The one route the first pass left untested, now measured: a module-scope
+# co-presence binding -- decap callee present, negated on the file mentioning
+# `incorrectParameterSize`. On the real pair it reads 1 (XWing_boring.swift:1)
+# at the parent and 0 at the fix, and on the fix re-spelled without the
+# `return` (so the decap call extracts) it still reads 0, which proves the
+# negation rather than the extraction accident does the work. It is nonetheless
+# the fixing commit's own vocabulary, not the presence of a length check: the
+# identical guard throwing CryptoKitError.incorrectKeySize -- the error case
+# this file already uses for its three key-size guards -- leaves it firing at
+# 1, and so does `precondition(encapsulated.count ==
+# Int(XWING_CIPHERTEXT_BYTES))`. Two genuinely-enforcing variants flagged is
+# the rejected shape, so the route is declined. Had it discriminated, the
+# collateral was already cheap: across 475 Swift files on three other trees
+# (swift-asn1 18, swift-nio 309, swift-corelibs-foundation 148) the probe
+# adds nothing.
+#
+# What the weakness needs is "encapsulated.count compares to the ciphertext
+# size in this function, at the call immediately above" -- per-function
+# context facts for Swift (rank 1792), guard/if condition lowering beyond the
+# first term (rank 1217), and a buffer-count-to-call correlation no frontend
+# offers (rank 1676). Named, not re-filed.
+#
+# verify_current_expected: attention-engine-gap; cases 1 and 2 (the shipped
+# VYQL-RF-001 try-prefix isolation pair) expected, cases 3 to 6 pinned.
+
+test "rank1819: engine gap isolated -- environment-sourced URL fetched inside a trailing closure reports"
+  lang swift
+  file XWingProbe.swift
+  expect VYQL-RF-001
+  code
+  ```
+  import Foundation
+
+  func handler(encapsulated: Data) {
+      let u = ProcessInfo.processInfo.environment["URL"]!
+      encapsulated.withUnsafeBytes { raw in
+          URL(string: u)
+      }
+  }
+  ```
+
+test "rank1819: engine gap isolated -- the identical call in the identical closure, prefixed with try, reports the same"
+  lang swift
+  file XWingProbeTry.swift
+  expect VYQL-RF-001
+  code
+  ```
+  import Foundation
+
+  func handler(encapsulated: Data) throws {
+      let u = ProcessInfo.processInfo.environment["URL"]!
+      try encapsulated.withUnsafeBytes { raw in
+          URL(string: u)
+      }
+  }
+  ```
+
+test "rank1819: X-Wing decapsulation hands the encapsulated key's baseAddress to the fixed-size native decap with no length check"
+  lang swift
+  file XWing_boring.swift
+  reject VYQL-MEM-064
+  code
+  ```
+  import Foundation
+
+  enum CryptoKitError: Error {
+      case incorrectParameterSize
+      case internalBoringSSLError()
+  }
+
+  struct SymmetricKey {
+      init(unsafeUninitializedCapacity: Int, _ body: (inout UnsafeMutableRawBufferPointer, inout Int) throws -> Void) throws {}
+  }
+
+  struct XWING_private_key {}
+
+  func CCryptoBoringSSL_XWING_decap(_ out: UnsafeMutableRawPointer, _ ciphertext: UnsafeRawPointer, _ key: UnsafeMutablePointer<XWING_private_key>) -> CInt { 1 }
+
+  struct OpenSSLXWingPrivateKeyImpl {
+      var privateKey: XWING_private_key
+
+      func decapsulate(_ encapsulated: Data) throws -> SymmetricKey {
+          try SymmetricKey(unsafeUninitializedCapacity: 32) { sharedSecretBytes, count in
+              try encapsulated.withUnsafeBytes { encapsulatedSecretBytes in
+                  let rc = CCryptoBoringSSL_XWING_decap(
+                      sharedSecretBytes.baseAddress,
+                      encapsulatedSecretBytes.baseAddress,
+                      &self.privateKey
+                  )
+                  guard rc == 1 else {
+                      throw CryptoKitError.internalBoringSSLError()
+                  }
+                  count = 32
+              }
+          }
+      }
+  }
+  ```
+
+test "rank1819: the patched decapsulation guards the ciphertext length before opening the buffer"
+  lang swift
+  file XWing_boring_fixed.swift
+  reject VYQL-MEM-064
+  code
+  ```
+  import Foundation
+
+  enum CryptoKitError: Error {
+      case incorrectParameterSize
+      case internalBoringSSLError()
+  }
+
+  struct SymmetricKey {
+      init(unsafeUninitializedCapacity: Int, _ body: (inout UnsafeMutableRawBufferPointer, inout Int) throws -> Void) throws {}
+  }
+
+  struct XWING_private_key {}
+
+  func CCryptoBoringSSL_XWING_decap(_ out: UnsafeMutableRawPointer, _ ciphertext: UnsafeRawPointer, _ key: UnsafeMutablePointer<XWING_private_key>) -> CInt { 1 }
+
+  let XWING_CIPHERTEXT_BYTES = 1120
+
+  struct OpenSSLXWingPrivateKeyImpl {
+      var privateKey: XWING_private_key
+
+      func decapsulate(_ encapsulated: Data) throws -> SymmetricKey {
+          guard encapsulated.count == Int(XWING_CIPHERTEXT_BYTES) else {
+              throw CryptoKitError.incorrectParameterSize
+          }
+
+          return try SymmetricKey(unsafeUninitializedCapacity: 32) { sharedSecretBytes, count in
+              try encapsulated.withUnsafeBytes { encapsulatedSecretBytes in
+                  let rc = CCryptoBoringSSL_XWING_decap(
+                      sharedSecretBytes.baseAddress,
+                      encapsulatedSecretBytes.baseAddress,
+                      &self.privateKey
+                  )
+                  guard rc == 1 else {
+                      throw CryptoKitError.internalBoringSSLError()
+                  }
+                  count = 32
+              }
+          }
+      }
+  }
+  ```
+
+test "rank1819: the same guard throwing the key-size error case is equally enforcing and must not be flagged"
+  lang swift
+  file XWing_boring_fixed_keysize.swift
+  reject VYQL-MEM-064
+  code
+  ```
+  import Foundation
+
+  enum CryptoKitError: Error {
+      case incorrectKeySize
+      case internalBoringSSLError()
+  }
+
+  struct SymmetricKey {
+      init(unsafeUninitializedCapacity: Int, _ body: (inout UnsafeMutableRawBufferPointer, inout Int) throws -> Void) throws {}
+  }
+
+  struct XWING_private_key {}
+
+  func CCryptoBoringSSL_XWING_decap(_ out: UnsafeMutableRawPointer, _ ciphertext: UnsafeRawPointer, _ key: UnsafeMutablePointer<XWING_private_key>) -> CInt { 1 }
+
+  let XWING_CIPHERTEXT_BYTES = 1120
+
+  struct OpenSSLXWingPrivateKeyImpl {
+      var privateKey: XWING_private_key
+
+      func decapsulate(_ encapsulated: Data) throws -> SymmetricKey {
+          guard encapsulated.count == Int(XWING_CIPHERTEXT_BYTES) else {
+              throw CryptoKitError.incorrectKeySize
+          }
+
+          return try SymmetricKey(unsafeUninitializedCapacity: 32) { sharedSecretBytes, count in
+              try encapsulated.withUnsafeBytes { encapsulatedSecretBytes in
+                  let rc = CCryptoBoringSSL_XWING_decap(
+                      sharedSecretBytes.baseAddress,
+                      encapsulatedSecretBytes.baseAddress,
+                      &self.privateKey
+                  )
+                  guard rc == 1 else {
+                      throw CryptoKitError.internalBoringSSLError()
+                  }
+                  count = 32
+              }
+          }
+      }
+  }
+  ```
+
+test "rank1819: the guard spelled as a precondition is equally enforcing and must not be flagged"
+  lang swift
+  file XWing_boring_fixed_precondition.swift
+  reject VYQL-MEM-064
+  code
+  ```
+  import Foundation
+
+  enum CryptoKitError: Error {
+      case internalBoringSSLError()
+  }
+
+  struct SymmetricKey {
+      init(unsafeUninitializedCapacity: Int, _ body: (inout UnsafeMutableRawBufferPointer, inout Int) throws -> Void) throws {}
+  }
+
+  struct XWING_private_key {}
+
+  func CCryptoBoringSSL_XWING_decap(_ out: UnsafeMutableRawPointer, _ ciphertext: UnsafeRawPointer, _ key: UnsafeMutablePointer<XWING_private_key>) -> CInt { 1 }
+
+  let XWING_CIPHERTEXT_BYTES = 1120
+
+  struct OpenSSLXWingPrivateKeyImpl {
+      var privateKey: XWING_private_key
+
+      func decapsulate(_ encapsulated: Data) throws -> SymmetricKey {
+          precondition(encapsulated.count == Int(XWING_CIPHERTEXT_BYTES))
+
+          return try SymmetricKey(unsafeUninitializedCapacity: 32) { sharedSecretBytes, count in
+              try encapsulated.withUnsafeBytes { encapsulatedSecretBytes in
+                  let rc = CCryptoBoringSSL_XWING_decap(
+                      sharedSecretBytes.baseAddress,
+                      encapsulatedSecretBytes.baseAddress,
+                      &self.privateKey
+                  )
+                  guard rc == 1 else {
+                      throw CryptoKitError.internalBoringSSLError()
+                  }
+                  count = 32
+              }
+          }
+      }
+  }
+  ```

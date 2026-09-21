@@ -1,0 +1,17 @@
+module bindings.objc.generated.m20ccc7da;
+
+binding userControlledData0 {
+  requires {
+    dependency("Branch")
+  }
+  query pattern callExpr where callee.method == "handleDeepLink:"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("Branch")
+  }
+  query pattern callExpr where callee.method == "handleDeepLinkWithNewSession:"
+  emit source core.UserControlledData at call.result
+}

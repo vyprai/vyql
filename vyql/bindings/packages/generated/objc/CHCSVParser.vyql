@@ -1,0 +1,17 @@
+module bindings.objc.generated.m61061ea8;
+
+binding deserialization0 {
+  requires {
+    dependency("CHCSVParser")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding weakHash1 {
+  requires {
+    dependency("CHCSVParser")
+  }
+  query pattern presenceNode where node.path ~= "chcsvparser.hash"
+  emit issue code.WeakHash at node
+}

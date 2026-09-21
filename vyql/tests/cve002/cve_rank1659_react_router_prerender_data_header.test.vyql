@@ -1,0 +1,174 @@
+# Rank 1659 / CVE-2025-43865 (GHSA-cpj6-fhp6-mr6j, CWE-345): React Router's
+# server runtime trusted the X-React-Router-Prerender-Data request header as a
+# build-time signal. Any client sending it on a .data request made the
+# data-route loader wrapper skip the real loader and return the header's decoded
+# payload as that route's loader data, so the caller chose what the victim's
+# page renders. The wrapper in packages/react-router/lib/server-runtime/routes.ts
+# did `if (args.request.headers.has("X-React-Router-Prerender-Data"))` and
+# returned decodeViaTurboStream's decode of `args.request.headers.get(...)` --
+# a header the vite plugin sets only on its own build-time prerender requests,
+# which the deployed handler never distinguished from a client request. The
+# integration test the fix adds sends the header with
+# '[{"_1":2},"routes/_index",{"_3":4},"data","Hello World!"]' and asserts the
+# runtime ignores it.
+#
+# Commit c84302972a ("Adjust approach for prerendering/SPA mode via headers",
+# PR #13453) moves the read into getBuildTimeHeader (server-runtime/dev.ts),
+# which returns the value only when process.env.IS_RR_BUILD_REQUEST === "yes"
+# -- set by the vite plugin around its build-time requests -- and null
+# otherwise, so a runtime client's header is ignored and the real loader runs.
+# The remediation is present at the fix and the vulnerable read at its parent.
+# No pool correction: the row names this repository and this commit, and both
+# read as the fixing change.
+#
+# Held: build-signal header provenance. The defect is which channel a
+# privileged decision reads -- a request header any client can send, treated as
+# an internal build-time signal with no server-side gate. Nothing can ask "is
+# this header read gated by a trusted server-side signal rather than by the
+# request itself". Keying on the fix's env var keys on the fixing commit's own
+# vocabulary, and the header name is the framework's private channel, so a
+# binding naming it detects this framework rather than the weakness. Measured
+# on packages/react-router/lib/server-runtime, three --cache off runs per
+# revision, deterministic: 22 findings at the parent and 21 at the fix. The one
+# row touching the vulnerable return is VYQL-INJ-013, code.DomInput at
+# routes.ts:129 flowing to code.ProtoPollute at server.ts:373 -- present at
+# both revisions (at the fix the source moves to routes.ts:131 and the sink to
+# server.ts:379), so it does not discriminate. The fix adds rows on the new
+# helper instead of removing any: ExternalEntryInput twice at dev.ts:19,
+# SqlExecution and UrlFetch at dev.ts:23, and two caller-controlled headerName
+# rows -- fix-direction noise on a 12-line function. The -flags view drops 9
+# flags to 6, but the three that disappear are low-confidence NullableDeref
+# flags on routes.ts's function contexts, cleared by the added
+# `preRenderedData != null` comparison: a null-check heuristic, not header
+# provenance.
+#
+# The family's ship-blocker lifted after the first pass and still does not
+# reach here. core.AuthenticationCheck now also neutralises
+# access_control.IncorrectAuthorization, so a sink declaring that threat is no
+# longer orphaned in javascript and code.ClientControlledSecurityDecision /
+# VYQL-AUTH-098 is shippable in this language. It does not apply: that concept
+# reports a client-controlled value driving a role or privilege decision, and
+# this defect is a client-controlled value selecting which data serves the
+# route. The decision lives in control flow -- whether callRouteHandler runs --
+# not on any node the header's taint can reach, so there is no sink to label;
+# the only binding today is java's, on bean accessors that read a
+# client-chosen authentication mode back.
+#
+# The expressible approximations were measured with throwaway presence probes
+# on the loader wrapper and are co-occurrence, not data flow. Requiring a
+# `headers.get` and a decode call in one function labels 3 contexts at the
+# parent (the wrapper plus the two functions enclosing it, which inherit nested
+# tokens) and 0 at the fix -- but across real trees it reports qwik's
+# parseRequest (request-handler/request-event.ts:374), which reads the standard
+# content-type header at :379 and decodes a query parameter at :392, two values
+# with no relation. Requiring `headers.has` and `headers.get` together reports
+# four more on CF-connecting-ip, CF-IPCountry, Cache-Control and Sec-Fetch-Dest.
+# react, growi and ToolJet report 0 under every variant. Negating on a
+# process.env selector does not remove the qwik row. What separates this defect
+# from those reads is which header it is and what the decoded value becomes --
+# provenance, not shape -- so no rule keyed on the shape is shippable. No
+# ENGINE-GAPS entry: the gap is decision vocabulary, not a localised construct.
+# No definition change. Both blocks assert reject VYQL-AUTH-079: when
+# build-signal provenance vocabulary lands, the ungated form must flip to
+# expect.
+
+test "rank1659: the loader returns the prerender header's payload"
+  lang javascript
+  file packages/react-router/lib/server-runtime/routes.ts
+  reject VYQL-AUTH-079
+  code
+  ```
+  import { decodeViaTurboStream } from "./single-fetch";
+
+  export function createStaticHandlerDataRoutes(routes, callRouteHandler) {
+    return routes.map((route) => {
+      return {
+        id: route.id,
+        loader: route.module.loader
+          ? async (args) => {
+              // If we're prerendering, use the data passed in from
+              // prerendering the .data route so we don't call loaders twice
+              if (args.request.headers.has("X-React-Router-Prerender-Data")) {
+                const preRenderedData = args.request.headers.get(
+                  "X-React-Router-Prerender-Data"
+                );
+                let encoded = preRenderedData
+                  ? decodeURI(preRenderedData)
+                  : preRenderedData;
+                let uint8array = new TextEncoder().encode(encoded);
+                let stream = new ReadableStream({
+                  start(controller) {
+                    controller.enqueue(uint8array);
+                    controller.close();
+                  },
+                });
+                let decoded = await decodeViaTurboStream(stream, global);
+                let data = decoded.value;
+                let result = data[route.id];
+                return result.data;
+              }
+              let val = await callRouteHandler(route.module.loader, args);
+              return val;
+            }
+          : undefined,
+      };
+    });
+  }
+  ```
+
+test "rank1659: the fixed revision reads the header only for build-time requests"
+  lang javascript
+  file packages/react-router/lib/server-runtime/routes.ts
+  reject VYQL-AUTH-079
+  code
+  ```
+  import { decodeViaTurboStream } from "./single-fetch";
+
+  // Guarded access to build-time-only headers
+  export function getBuildTimeHeader(request, headerName) {
+    if (typeof process !== "undefined") {
+      try {
+        if (process.env?.IS_RR_BUILD_REQUEST === "yes") {
+          return request.headers.get(headerName);
+        }
+      } catch (e) {}
+    }
+    return null;
+  }
+
+  export function createStaticHandlerDataRoutes(routes, callRouteHandler) {
+    return routes.map((route) => {
+      return {
+        id: route.id,
+        loader: route.module.loader
+          ? async (args) => {
+              // If we're prerendering, use the data passed in from
+              // prerendering the .data route so we don't call loaders twice
+              let preRenderedData = getBuildTimeHeader(
+                args.request,
+                "X-React-Router-Prerender-Data"
+              );
+              if (preRenderedData != null) {
+                let encoded = preRenderedData
+                  ? decodeURI(preRenderedData)
+                  : preRenderedData;
+                let uint8array = new TextEncoder().encode(encoded);
+                let stream = new ReadableStream({
+                  start(controller) {
+                    controller.enqueue(uint8array);
+                    controller.close();
+                  },
+                });
+                let decoded = await decodeViaTurboStream(stream, global);
+                let data = decoded.value;
+                let result = data[route.id];
+                return result.data;
+              }
+              let val = await callRouteHandler(route.module.loader, args);
+              return val;
+            }
+          : undefined,
+      };
+    });
+  }
+  ```

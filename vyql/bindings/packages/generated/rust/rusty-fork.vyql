@@ -1,0 +1,9 @@
+module bindings.rust.generated.ma011f54a;
+
+binding commandExecution0 {
+  requires {
+    dependency("rusty-fork")
+  }
+  query pattern callExpr where callee.method == "fork_impl"
+  emit sink code.CommandExecution at args[0]
+}

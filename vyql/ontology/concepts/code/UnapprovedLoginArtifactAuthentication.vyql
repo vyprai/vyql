@@ -1,0 +1,11 @@
+module code;
+
+concept UnapprovedLoginArtifactAuthentication : issue {
+  cwe: [CWE_287, CWE_306]
+  reviewAssumption: "an out-of-band login artifact is created at the requester's initiative for an account the requester names, and its shared secret is known to the requester, so only the account holder's recorded approval turns it into proof of identity for that account"
+  reviewCategory: auth
+  reviewCondition: "a login path resolves a pending login artifact by a request-supplied identifier, verifies the artifact's shared secret, and never reads the artifact's approval state or owner binding"
+  reviewConfidence: high
+  reviewEvidence: "login context {pattern} verifies a resolved login artifact's access code without consulting the artifact's approval or owner fields"
+  vulnerableTo: [authentication.ImproperAuthentication, authentication.AuthenticationBypass]
+}

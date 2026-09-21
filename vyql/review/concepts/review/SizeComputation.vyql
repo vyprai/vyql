@@ -1,0 +1,7 @@
+module code;
+
+review code.SizeComputation {
+  category: memory
+  kind: attention
+  text: "review allocation or size computation for overflow and untrusted dimensions"
+}

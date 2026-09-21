@@ -1,0 +1,9 @@
+module bindings.python.generated.m4fab4b12;
+
+binding filePathAccess0 {
+  requires {
+    dependency("fonttools")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.FilePathAccess at args[0]
+}

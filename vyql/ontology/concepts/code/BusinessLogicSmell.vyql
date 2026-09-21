@@ -1,0 +1,11 @@
+module code;
+
+concept BusinessLogicSmell : issue {
+  cwe: [CWE_841, CWE_20, CWE_862]
+  reviewAssumption: "the caller can reach the operation out of order"
+  reviewCategory: access_control
+  reviewCondition: "a business operation proceeds without validating the state transition it assumes"
+  reviewConfidence: medium
+  reviewEvidence: "operation {pattern} does not check the state it depends on"
+  vulnerableTo: [access_control.IncorrectAuthorization]
+}

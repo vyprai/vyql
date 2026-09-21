@@ -1,0 +1,8 @@
+module code;
+
+review code.SamlAssertionWrappingBypass {
+  category: auth
+  expected: [core.AuthenticationCheck]
+  kind: attention
+  text: "review SAML assertion validation so the assertion content it processes is the content the verified signature covers, not an element re-selected from the unverified response"
+}

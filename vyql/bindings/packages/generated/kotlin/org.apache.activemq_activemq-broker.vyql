@@ -1,0 +1,65 @@
+module bindings.kotlin.generated.md572087c;
+
+binding networkData0 {
+  requires {
+    dependency("org.apache.activemq:activemq-broker")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData1 {
+  requires {
+    dependency("org.apache.activemq:activemq-broker")
+  }
+  query pattern callExpr where callee.method == "preProcessDispatch"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData2 {
+  requires {
+    dependency("org.apache.activemq:activemq-broker")
+  }
+  query pattern callExpr where callee.method == "postProcessDispatch"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData3 {
+  requires {
+    dependency("org.apache.activemq:activemq-broker")
+  }
+  query pattern callExpr where callee.method == "messageConsumed"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData4 {
+  requires {
+    dependency("org.apache.activemq:activemq-broker")
+  }
+  query pattern callExpr where callee.method == "messageDelivered"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData5 {
+  requires {
+    dependency("org.apache.activemq:activemq-broker")
+  }
+  query pattern callExpr where callee.method == "messageDispatched"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData6 {
+  requires {
+    dependency("org.apache.activemq:activemq-broker")
+  }
+  query pattern callExpr where callee.method == "messageDiscarded"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData7 {
+  requires {
+    dependency("org.apache.activemq:activemq-broker")
+  }
+  query pattern callExpr where callee.method == "sendToDeadLetterQueue"
+  emit source code.NetworkData at call.result
+}

@@ -1,0 +1,191 @@
+# The folder add-owner handler interpolated the request body's owner into a
+# raw sqlx query through format! (GHSA-34m2-qrpf-6v7q): the owner value lands
+# inside a jsonb_set path argument, '("{\"{owner}\"}")', so an owner carrying
+# SQL metacharacters executes as part of the UPDATE statement. The advisory's
+# chain reads the JWT signing secret out of the database through it, so the
+# recorded CWE-89 matches the mechanism.
+#
+# The fixed revision adds a charset validation helper (alphanumeric, underscore, hyphen,
+# slash) called before the interpolation in both the add-owner and
+# remove-owner handlers. The interpolation itself is unchanged at <fix>: the
+# patched tree still builds the same query string from format!, and the
+# vulnerable form is present at <fix>^ with no validation call. So the two
+# revisions differ only by the presence of validate_owner(&owner)? -- the
+# discriminator is the added control, not any change in the sink shape.
+#
+# The taint path from the body to the query is dead at two independent Rust
+# extraction constructs, each isolated below at finding level:
+#
+# 1. A tuple-struct-pattern parameter -- Json(Owner { owner, .. }): Json<Owner>
+#    -- extracts no parameter at all. params() and paramTypes() (rust.go)
+#    take patName(field(ch, "pattern")), which returns "" for a
+#    tuple_struct_pattern, so the handler's Json and Path parameters leave no
+#    Param node and no local binding for the destructured owner. The same
+#    family as the JavaScript entry for rank 1803 (object-pattern parameters
+#    lower to an empty parameter list): the body's owner is a free Name with
+#    no incoming edge.
+#
+# 2. An implicit format capture -- format!("... {owner} ...") -- keeps the
+#    identifier inside the template string literal. The macro's token tree
+#    holds one string-literal child, so the Format node's parts carry the
+#    template Const and no expression for the captured variable; taint from
+#    the variable cannot reach the format result. An explicit positional
+#    capture, format!("{}", owner), does produce a Name part and reports.
+#
+# Both halves of the discrimination question are measured and rejected:
+# - A DynamicSqlQuery binding on sqlx::query over a format-built string (the
+#   concept exists, VYQL-INJ-203, Python-only today) fires on the vulnerable
+#   and the patched form alike, because the patched form still formats the
+#   query; it cannot score the fixed revision below the parent.
+# - A negation on the validate_owner call is the fixing commit's own
+#   vocabulary (the helper is new in the fixed revision); renamed, the suppression
+#   disappears. The control itself is a same-file free function, which does
+#   resolve, but no cross-procedural fact attributes its body to the caller
+#   (the Rust control-attribution gap, rank 1364 family).
+#
+# Reach: windmill's backend has 859 extractor-typed parameters across 57
+# files, and 446 of its 2184 format! calls use implicit named captures;
+# corpus-wide 3402 of 8667 format! calls across the clones do. So both
+# constructs are ordinary Rust, not windmill-specific.
+#
+# Flip conditions: when implicit format captures lower as value parts, case
+# 4 flips to expect; when a pattern parameter lowers to a parameter plus
+# per-leaf bindings, case 6 flips to expect. Cases 1 and 2 flip only when
+# both of those land plus a source binding for axum extractor parameters,
+# and case 2 stays reject only once a neutralising control is attributable
+# across the sibling call (otherwise both revisions report).
+
+test "rank1951: the folder add-owner handler interpolates the body's owner into a jsonb_set path query"
+  lang rust
+  file src/folders.rs
+  reject VYQL-INJ-001
+  code
+  ```
+  use axum::Json;
+  use serde::Deserialize;
+
+  #[derive(Deserialize)]
+  pub struct Owner {
+      pub owner: String,
+      pub edit: bool,
+  }
+
+  async fn add_owner(
+      Path((w_id, name)): Path<(String, String)>,
+      Json(Owner { owner, .. }): Json<Owner>,
+  ) -> Result<String> {
+      sqlx::query(&format!(
+          "UPDATE folder SET extra_perms = jsonb_set(extra_perms, '{{\"{owner}\"}}', to_jsonb($1), \
+           true) WHERE name = $2 AND workspace_id = $3 RETURNING extra_perms"
+      ))
+      .bind(true)
+      .fetch_optional(&mut *tx)
+      .await?;
+
+      Ok(format!("Added {} to folder {}", owner, name))
+  }
+  ```
+
+test "rank1951: the patched handler validates the owner charset before the same interpolation"
+  lang rust
+  file src/folders.rs
+  reject VYQL-INJ-001
+  code
+  ```
+  use axum::Json;
+  use serde::Deserialize;
+
+  #[derive(Deserialize)]
+  pub struct Owner {
+      pub owner: String,
+      pub edit: bool,
+  }
+
+  fn validate_owner(owner: &str) -> Result<()> {
+      if !owner
+          .chars()
+          .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '/' || c == '-')
+      {
+          return Err(Error::BadRequest(
+              "Invalid owner: must contain only alphanumeric characters, underscores, hyphens, or slashes".to_string(),
+          ));
+      }
+      Ok(())
+  }
+
+  async fn add_owner(
+      Path((w_id, name)): Path<(String, String)>,
+      Json(Owner { owner, .. }): Json<Owner>,
+  ) -> Result<String> {
+      validate_owner(&owner)?;
+      sqlx::query(&format!(
+          "UPDATE folder SET extra_perms = jsonb_set(extra_perms, '{{\"{owner}\"}}', to_jsonb($1), \
+           true) WHERE name = $2 AND workspace_id = $3 RETURNING extra_perms"
+      ))
+      .bind(true)
+      .fetch_optional(&mut *tx)
+      .await?;
+
+      Ok(format!("Added {} to folder {}", owner, name))
+  }
+  ```
+
+test "rank1951: an explicit positional capture carries the source into the query"
+  lang rust
+  file src/explicit.rs
+  expect VYQL-INJ-001
+  code
+  ```
+  fn sync_owners() {
+      let owner = std::env::var("OWNER").unwrap();
+      let q = format!("UPDATE folder SET owners = '{}' WHERE workspace_id = $1", owner);
+      sqlx::query(&q).fetch_optional();
+  }
+  ```
+
+test "rank1951: the same capture spelled implicitly inside the template reports nothing"
+  lang rust
+  file src/implicit.rs
+  reject VYQL-INJ-001
+  code
+  ```
+  fn sync_owners() {
+      let owner = std::env::var("OWNER").unwrap();
+      let q = format!("UPDATE folder SET owners = '{owner}' WHERE workspace_id = $1");
+      sqlx::query(&q).fetch_optional();
+  }
+  ```
+
+test "rank1951: a plain identifier parameter carries the entry input into the query"
+  lang rust
+  file src/plainparam.rs
+  profile library
+  expect VYQL-INJ-001
+  code
+  ```
+  pub fn sync_owners(owner: String) {
+      let q = format!("UPDATE folder SET owners = '{}' WHERE workspace_id = $1", owner);
+      sqlx::query(&q).fetch_optional();
+  }
+  ```
+
+test "rank1951: the same parameter bound through an extractor pattern reports nothing"
+  lang rust
+  file src/extractorparam.rs
+  profile library
+  reject VYQL-INJ-001
+  code
+  ```
+  use axum::Json;
+  use serde::Deserialize;
+
+  #[derive(Deserialize)]
+  pub struct Owner {
+      pub owner: String,
+  }
+
+  pub fn sync_owners(Json(Owner { owner, .. }): Json<Owner>) {
+      let q = format!("UPDATE folder SET owners = '{}' WHERE workspace_id = $1", owner);
+      sqlx::query(&q).fetch_optional();
+  }
+  ```

@@ -1,0 +1,7 @@
+module code;
+
+concept LogWrite : issue {
+  enabledBy: [taint.SecretValue]
+  possibility: exclude
+  vulnerableTo: [secrets.SecretLeak]
+}

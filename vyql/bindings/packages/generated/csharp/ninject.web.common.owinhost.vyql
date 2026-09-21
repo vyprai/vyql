@@ -1,0 +1,9 @@
+module bindings.csharp.generated.m7364b994;
+
+binding networkData0 {
+  requires {
+    dependency("ninject.web.common.owinhost")
+  }
+  query pattern callExpr where callee.method == "Execute"
+  emit source code.NetworkData at call.result
+}

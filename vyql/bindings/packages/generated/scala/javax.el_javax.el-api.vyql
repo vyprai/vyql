@@ -1,0 +1,9 @@
+module bindings.scala.generated.m0e38fb9e;
+
+binding expressionEval0 {
+  requires {
+    dependency("javax.el:javax.el-api")
+  }
+  query pattern callExpr where callee.method == "ELProcessor.eval"
+  emit sink code.ExpressionEval at args[0]
+}

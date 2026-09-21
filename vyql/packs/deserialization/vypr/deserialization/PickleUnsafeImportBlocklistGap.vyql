@@ -1,0 +1,11 @@
+module vypr.deserialization;
+
+rule PickleUnsafeImportBlocklistGap {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_184, CWE_502]
+    id: "VYQL-DESER-017"
+    severity: high
+  }
+  issue code.PickleUnsafeImportBlocklistGap as analyzer
+}

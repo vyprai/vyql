@@ -1,0 +1,7 @@
+module code;
+
+concept XpathQuery : sink {
+  cwe: [CWE_643]
+  enabledBy: [taint.UntrustedData]
+  vulnerableTo: [injection.XpathInjection]
+}

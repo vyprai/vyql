@@ -1,0 +1,214 @@
+# PX4's Zenoh uORB subscriber sized a stack variable-length array
+# straight from the received payload length: the reassembly branch of
+# data_handler in src/modules/zenoh/subscribers/uorb_subscriber.hpp did
+# `size_t len = z_bytes_len(payload);` and then `unsigned char
+# reassembled_payload[len];`, so a remote publisher chose how many bytes
+# the handler's frame claimed, and a large enough message exhausted the
+# Zenoh bridge task's stack (stack buffer overflow, CWE-121; the
+# fragmentation path makes any payload over 512 bytes take this branch).
+# The fixing commit 2d79b9ea38e8 ("fix(zenoh): validate payload size
+# before stack allocation") keeps the array and adds the bound the
+# allocation was missing: `if (len > max_payload_size || len < 4)
+# return;` ahead of it.
+#
+# The discriminator is the correlation a runtime-sized stack
+# allocation carries: the variable-length array declaration lowers to no
+# node at all -- the declaration case of the C/C++/ObjC frontend visits
+# only init_declarator values, and array_declarator appears solely
+# inside declName to unwrap the identifier -- so the allocation is read
+# as a frontend fact instead (ccUnboundedCallSizedStackArrayObservations,
+# internal/extract/frontend/treesitter/c.go): an array declarator whose
+# size is a bare identifier, the identifier last assigned from a call
+# the binding names as reporting a received length, and no relational
+# comparison naming that identifier anywhere in the body. The added
+# bound clears it, the shape-only form does not. A shape-only rule
+# without the callee question is unshippable on volume: 607 VLA-shaped
+# declarations across this tree's src/, boards/ and platforms/,
+# identical at both revisions, and the unrestricted observation measures
+# eighteen sites across three collateral trees of which one sizes from
+# received data.
+#
+# The four cases hold the shape from both sides. The unguarded form and
+# the fixed form differ only in the added bound, so whichever lands must
+# separate them. The renamed case pins that the discriminator is the
+# correlation -- a call reporting a received length, an array sized by
+# the identifier it fills, no comparison naming that identifier -- never
+# the spellings this file happens to carry. The fourth is the exclusion
+# half: the metadata-sized buffer the same handler declares is sized by
+# a field expression, not by the received length, and must stay silent,
+# as must every constant and macro-sized declaration in the collateral
+# trees.
+#
+# Measured on the real checkout, 3 x --cache off runs per revision
+# (timeout 180, --max-ram 6GB): the zenoh module reports 49 findings at
+# the fix parent and 48 at the fix, the difference being VYQL-MEM-077 on
+# uorb_subscriber.hpp:97, the allocation the fix bounds; with the
+# received-length callee question in place the collateral trees report
+# nothing.
+
+test "rank1622: the reassembly buffer is a VLA sized by the payload length"
+  lang cpp
+  file src/modules/zenoh/subscribers/uorb_subscriber.hpp
+  expect VYQL-MEM-077
+  code
+  ```
+  #include <stddef.h>
+  #include <stdint.h>
+
+  typedef struct z_loaned_sample_t z_loaned_sample_t;
+  typedef struct z_loaned_bytes_t z_loaned_bytes_t;
+  typedef struct { unsigned char *buf; size_t size; } z_bytes_reader_t;
+
+  const z_loaned_bytes_t *z_sample_payload(const z_loaned_sample_t *sample);
+  size_t z_bytes_len(const z_loaned_bytes_t *payload);
+  z_bytes_reader_t z_bytes_get_reader(const z_loaned_bytes_t *payload);
+  void z_bytes_reader_read(z_bytes_reader_t *reader, unsigned char *buf, size_t len);
+  void dds_stream_read(unsigned char *buffer, size_t len, const uint32_t *ops);
+
+  typedef struct { uint16_t o_size; } orb_metadata;
+
+  class uORB_Zenoh_Subscriber
+  {
+  public:
+  	void data_handler(const z_loaned_sample_t *sample)
+  	{
+  		const z_loaned_bytes_t *payload = z_sample_payload(sample);
+  		size_t len = z_bytes_len(payload);
+
+  		unsigned char reassembled_payload[len];
+  		z_bytes_reader_t reader = z_bytes_get_reader(payload);
+  		z_bytes_reader_read(&reader, reassembled_payload, len);
+
+  		dds_stream_read(&reassembled_payload[4], len, _cdr_ops);
+  	}
+
+  private:
+  	const orb_metadata *_uorb_meta;
+  	const uint32_t *_cdr_ops;
+  };
+  ```
+
+test "rank1622: the fixed revision bounds the payload length before the allocation"
+  lang cpp
+  file src/modules/zenoh/subscribers/uorb_subscriber.hpp
+  reject VYQL-MEM-077
+  code
+  ```
+  #include <stddef.h>
+  #include <stdint.h>
+
+  typedef struct z_loaned_sample_t z_loaned_sample_t;
+  typedef struct z_loaned_bytes_t z_loaned_bytes_t;
+  typedef struct { unsigned char *buf; size_t size; } z_bytes_reader_t;
+
+  const z_loaned_bytes_t *z_sample_payload(const z_loaned_sample_t *sample);
+  size_t z_bytes_len(const z_loaned_bytes_t *payload);
+  z_bytes_reader_t z_bytes_get_reader(const z_loaned_bytes_t *payload);
+  void z_bytes_reader_read(z_bytes_reader_t *reader, unsigned char *buf, size_t len);
+  void dds_stream_read(unsigned char *buffer, size_t len, const uint32_t *ops);
+
+  typedef struct { uint16_t o_size; } orb_metadata;
+
+  class uORB_Zenoh_Subscriber
+  {
+  public:
+  	void data_handler(const z_loaned_sample_t *sample)
+  	{
+  		const z_loaned_bytes_t *payload = z_sample_payload(sample);
+  		size_t len = z_bytes_len(payload);
+
+  		const size_t max_payload_size = _uorb_meta->o_size + 4;
+
+  		if (len > max_payload_size || len < 4) {
+  			return;
+  		}
+
+  		unsigned char reassembled_payload[len];
+  		z_bytes_reader_t reader = z_bytes_get_reader(payload);
+  		z_bytes_reader_read(&reader, reassembled_payload, len);
+
+  		dds_stream_read(&reassembled_payload[4], len, _cdr_ops);
+  	}
+
+  private:
+  	const orb_metadata *_uorb_meta;
+  	const uint32_t *_cdr_ops;
+  };
+  ```
+
+test "rank1622: the shape survives renaming"
+  lang cpp
+  file src/modules/zenoh/subscribers/uorb_subscriber.hpp
+  expect VYQL-MEM-077
+  code
+  ```
+  #include <stddef.h>
+  #include <stdint.h>
+
+  typedef struct z_loaned_sample_t z_loaned_sample_t;
+  typedef struct z_loaned_bytes_t z_loaned_bytes_t;
+  typedef struct { unsigned char *buf; size_t size; } z_bytes_reader_t;
+
+  const z_loaned_bytes_t *z_sample_payload(const z_loaned_sample_t *sample);
+  size_t z_bytes_len(const z_loaned_bytes_t *payload);
+  z_bytes_reader_t z_bytes_get_reader(const z_loaned_bytes_t *payload);
+  void z_bytes_reader_read(z_bytes_reader_t *reader, unsigned char *buf, size_t len);
+  void dds_stream_read(unsigned char *buffer, size_t len, const uint32_t *ops);
+
+  typedef struct { uint16_t o_size; } orb_metadata;
+
+  class uORB_Zenoh_Subscriber
+  {
+  public:
+  	void data_handler(const z_loaned_sample_t *sample)
+  	{
+  		const z_loaned_bytes_t *payload = z_sample_payload(sample);
+  		size_t nbytes = z_bytes_len(payload);
+
+  		unsigned char scratch[nbytes];
+  		z_bytes_reader_t reader = z_bytes_get_reader(payload);
+  		z_bytes_reader_read(&reader, scratch, nbytes);
+
+  		dds_stream_read(&scratch[4], nbytes, _cdr_ops);
+  	}
+
+  private:
+  	const orb_metadata *_uorb_meta;
+  	const uint32_t *_cdr_ops;
+  };
+  ```
+
+test "rank1622: the metadata-sized buffer is not sized by the received length"
+  lang cpp
+  file src/modules/zenoh/subscribers/uorb_subscriber.hpp
+  reject VYQL-MEM-077
+  code
+  ```
+  #include <stddef.h>
+  #include <stdint.h>
+
+  typedef struct z_loaned_sample_t z_loaned_sample_t;
+  typedef struct z_loaned_bytes_t z_loaned_bytes_t;
+
+  const z_loaned_bytes_t *z_sample_payload(const z_loaned_sample_t *sample);
+  size_t z_bytes_len(const z_loaned_bytes_t *payload);
+
+  typedef struct { uint16_t o_size; } orb_metadata;
+
+  class uORB_Zenoh_Subscriber
+  {
+  public:
+  	void data_handler(const z_loaned_sample_t *sample)
+  	{
+  		char data[_uorb_meta->o_size];
+
+  		const z_loaned_bytes_t *payload = z_sample_payload(sample);
+  		size_t len = z_bytes_len(payload);
+  		(void)len;
+  		(void)data;
+  	}
+
+  private:
+  	const orb_metadata *_uorb_meta;
+  };
+  ```

@@ -1,0 +1,8 @@
+module code;
+
+review code.AssemblyLoadPathTraversal {
+  category: path
+  expected: [core.PathAccessCheck]
+  kind: attention
+  text: "reject traversal and drive-qualified assembly path components before dynamic assembly loading"
+}

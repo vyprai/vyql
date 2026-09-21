@@ -1,0 +1,9 @@
+module bindings.go.generated.m370b8319;
+
+binding filePathAccess0 {
+  requires {
+    dependency("github.com/tklauser/go-sysconf")
+  }
+  query pattern callExpr where callee.method == "pathconf"
+  emit sink code.FilePathAccess at args[0]
+}

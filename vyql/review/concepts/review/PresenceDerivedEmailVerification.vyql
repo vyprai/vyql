@@ -1,0 +1,8 @@
+module code;
+
+review code.PresenceDerivedEmailVerification {
+  category: auth
+  expected: [core.AuthenticationCheck]
+  kind: attention
+  text: "set the email-verified status from a verification claim the identity provider supplies, and treat the absence of one as unverified"
+}

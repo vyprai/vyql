@@ -1,0 +1,11 @@
+module vypr.request_forgery;
+
+rule CookieAuthHandlerMissingPrepareOriginCheck {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_352]
+    id: "VYQL-RF-044"
+    severity: medium
+  }
+  issue code.CookieAuthHandlerMissingPrepareOriginCheck as action
+}

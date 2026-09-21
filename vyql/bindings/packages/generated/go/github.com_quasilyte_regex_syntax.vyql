@@ -1,0 +1,10 @@
+module bindings.go.generated.m0bb6e356;
+
+binding regexCompile0 {
+  requires {
+    dependency("github.com/quasilyte/regex/syntax")
+  }
+  query pattern callExpr where callee.method == "NewParser"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}

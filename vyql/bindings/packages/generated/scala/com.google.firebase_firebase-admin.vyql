@@ -1,0 +1,9 @@
+module bindings.scala.generated.mb8c4b4e7;
+
+binding deserialization0 {
+  requires {
+    dependency("com.google.firebase:firebase-admin")
+  }
+  query pattern callExpr where callee.method == "FirebaseTokenVerifierImpl.parse"
+  emit sink code.Deserialization at args[0]
+}

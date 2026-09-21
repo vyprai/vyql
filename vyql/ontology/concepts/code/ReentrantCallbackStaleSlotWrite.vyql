@@ -1,0 +1,11 @@
+module code;
+
+concept ReentrantCallbackStaleSlotWrite : issue {
+  cwe: [CWE_416]
+  reviewAssumption: "the callback can add or remove entries in the same container, so the storage the cached slot pointer refers to may be rehashed or freed while the traversal still holds it"
+  reviewCategory: memory
+  reviewCondition: "an interior pointer to a container's entry is written through after a call that runs caller-supplied code, instead of re-resolving the entry by key"
+  reviewConfidence: medium
+  reviewEvidence: "cached entry-slot write-back {pattern} follows a caller-supplied callback invocation in the same body"
+  vulnerableTo: [memory.UseAfterFree, memory.DoubleFree]
+}

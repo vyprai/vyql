@@ -1,0 +1,9 @@
+module bindings.php.generated.mc847dfd1;
+
+binding commandExecution0 {
+  requires {
+    dependency("laravel/horizon")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.CommandExecution at args[0]
+}

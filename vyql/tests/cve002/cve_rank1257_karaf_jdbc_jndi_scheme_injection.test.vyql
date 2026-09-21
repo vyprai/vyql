@@ -1,0 +1,100 @@
+# JDBCUtils.doCreateDatasource resolved the "jndi:" portion of a configured
+# datasource URL straight through InitialContext.lookup(). Nothing in this
+# codebase labelled javax.naming Context/InitialContext lookup(String) as a
+# sink until this rank: it joins code.Deserialization, the concept the sink
+# family (readObject, Yaml.load, XMLDecoder, ...) carries, since an
+# untrusted JNDI name lets a naming/directory service outside the caller's
+# control choose what object gets instantiated -- the same remote-object risk
+# that concept models. The fixed revision validates URI(jndiName).getScheme() and throws
+# unless it is exactly "java", i.e. restricts lookups to the local java: naming
+# environment so the client can never be redirected to a remote LDAP/RMI
+# provider. That validation runs on a value derived from the same tainted
+# variable (getScheme() is a side read, not a rebinding of jndiName), so it is
+# the sanitize-or-throw idiom this engine's dataflow doc calls out as
+# unaddressed (docs/08-dataflow-and-taint.md, "Open questions: path
+# sensitivity" -- v1 is branch-insensitive by design). The reject case below
+# demonstrates the discrimination the engine can actually make today: a
+# lookup name that carries no request-derived data at all does not fire.
+test "rank1257: JDBCUtils resolves an unrestricted JNDI name against InitialContext"
+  lang java
+  file JDBCUtils.java
+  expect VYQL-DESER-001
+  code
+  ```
+  import javax.naming.InitialContext;
+
+  public final class JDBCUtils {
+    public static final String JNDI = "jndi:";
+
+    protected static Object doCreateDatasource(BundleContext bc, String url) throws Exception {
+      url = (url != null) ? url.trim() : null;
+      if (url == null || url.isEmpty()) {
+        throw new Exception("Illegal datasource url format. Datasource URL cannot be null or empty.");
+      } else if (url.startsWith(JNDI)) {
+        String jndiName = url.substring(JNDI.length());
+        InitialContext ic = new InitialContext();
+        try {
+          return ic.lookup(jndiName);
+        } finally {
+          ic.close();
+        }
+      }
+      throw new Exception("Illegal datasource url format " + url);
+    }
+  }
+
+  class JdbcRealmConfigServlet extends HttpServlet {
+    void updateDatasource(HttpServletRequest request, BundleContext bc) throws Exception {
+      String url = request.getParameter("datasource");
+      JDBCUtils.doCreateDatasource(bc, url);
+    }
+  }
+
+  class HttpServlet {}
+  interface HttpServletRequest { String getParameter(String name); }
+  interface BundleContext {}
+  ```
+
+test "rank1257: JDBCUtils resolves a fixed local java: name regardless of the request"
+  lang java
+  file JDBCUtils.java
+  reject VYQL-DESER-001
+  code
+  ```
+  import javax.naming.InitialContext;
+
+  public final class JDBCUtils {
+    public static final String JNDI = "jndi:";
+    private static final String LOCAL_DATASOURCE_NAME = "java:comp/env/jdbc/primary";
+
+    protected static Object doCreateDatasource(BundleContext bc, String url) throws Exception {
+      url = (url != null) ? url.trim() : null;
+      if (url == null || url.isEmpty()) {
+        throw new Exception("Illegal datasource url format. Datasource URL cannot be null or empty.");
+      } else if (url.startsWith(JNDI)) {
+        return doLookup(LOCAL_DATASOURCE_NAME);
+      }
+      throw new Exception("Illegal datasource url format " + url);
+    }
+
+    private static Object doLookup(String jndiName) throws Exception {
+      InitialContext ic = new InitialContext();
+      try {
+        return ic.lookup(jndiName);
+      } finally {
+        ic.close();
+      }
+    }
+  }
+
+  class JdbcRealmConfigServlet extends HttpServlet {
+    void updateDatasource(HttpServletRequest request, BundleContext bc) throws Exception {
+      String url = request.getParameter("datasource");
+      JDBCUtils.doCreateDatasource(bc, url);
+    }
+  }
+
+  class HttpServlet {}
+  interface HttpServletRequest { String getParameter(String name); }
+  interface BundleContext {}
+  ```

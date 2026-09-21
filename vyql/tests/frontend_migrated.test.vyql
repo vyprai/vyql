@@ -1,0 +1,76 @@
+test "javascript library option object reaches prototype option sink"
+  lang javascript
+  profile library
+  expect VYQL-INJ-013
+  code
+  ```
+  exports.compile = function compile(template, optsParam) {
+    var opts = optsParam || {};
+    var options = {};
+    options.outputFunctionName = opts.outputFunctionName;
+  };
+  ```
+
+test "javascript exported CommonJS parameter reaches shell command sink"
+  lang javascript
+  profile library
+  expect VYQL-INJ-002
+  code
+  ```
+  const cp = require('child_process');
+  module.exports = function killport(port) {
+    cp.exec('lsof -i:' + port);
+  };
+  ```
+
+test "javascript destructured exported values reach shell command sink"
+  lang javascript
+  profile library
+  expect VYQL-INJ-002
+  code
+  ```
+  module.exports = function launch(file, specifiedEditor) {
+    const parsed = parseFile(file);
+    let { fileName } = parsed;
+    const [editor, ...args] = guessEditor(specifiedEditor);
+    args.push(fileName);
+    childProcess.spawn('cmd.exe', ['/C', editor].concat(args), {});
+  };
+  ```
+
+test "javascript express receiver-typed body reaches query sink"
+  lang javascript
+  expect VYQL-INJ-001
+  code
+  ```
+  const express = require("express");
+  const app = express();
+  app.post("/submit", (incoming, outgoing) => {
+    db.query("select * from users where name = '" + incoming.body.name + "'");
+  });
+  ```
+
+test "javascript untyped lookalike body does not reach query sink"
+  lang javascript
+  reject VYQL-INJ-001
+  code
+  ```
+  const express = require("express");
+  const app = express();
+  app.post("/submit", (incoming, outgoing) => {
+    const payload = { body: { name: "fixed" } };
+    db.query("select * from users where name = '" + payload.body.name + "'");
+  });
+  ```
+
+test "javascript express error middleware request body reaches query sink"
+  lang javascript
+  expect VYQL-INJ-001
+  code
+  ```
+  const express = require("express");
+  const app = express();
+  app.use((err, incoming, outgoing, next) => {
+    db.query("select * from users where name = '" + incoming.body.name + "'");
+  });
+  ```

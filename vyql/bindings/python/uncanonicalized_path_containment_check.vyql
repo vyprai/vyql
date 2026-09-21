@@ -1,0 +1,39 @@
+module bindings.python.uncanonicalized_path_containment_check;
+
+// os.path.commonpath and os.path.commonprefix are lexical: commonpath splits on
+// the separator and discards "" and "." segments but keeps "..", and
+// commonprefix compares characters and is documented as able to return an
+// invalid path. Comparing commonpath([base, join(base, name)]) against base is
+// therefore a containment check only once the joined path has been
+// canonicalized -- os.path.normpath collapses the up-level references, and
+// realpath, abspath, Path.resolve and Path.relative_to do so as well. With none
+// of those in the same scope the comparison accepts any name carrying "..",
+// because commonpath(["assets", "assets/../etc/passwd"]) is still "assets".
+//
+// The Python frontend emits per-function-scope call_path, expr and assign
+// tokens and no call-argument shape tokens, so this is a function-scope
+// presence predicate rather than a per-call one. Context call paths are the
+// syntactic dotted text, so both the `os.path.commonpath` and the
+// `from os.path import commonpath` spelling are matched on the bare name.
+// Three conditions keep this on the containment-guard use of these functions:
+//
+//   * the commonpath or commonprefix call appears inside a comparison or
+//     boolean operator, which is what a guard looks like. Computing a shared
+//     root to derive a relative or display path -- the ordinary, non-security
+//     use of commonpath -- is a plain assignment and is not covered.
+//   * a join appears in the same function, so the function composes a
+//     candidate under a base rather than comparing two paths handed to it.
+//   * no canonicalizer appears anywhere in the same function scope.
+//
+// Function scope, not module scope: a module-scope canonicalizer check means
+// "anywhere in the file", which lets an unrelated os.path.abspath elsewhere in
+// a large module decide whether a guard is sound.
+binding uncanonicalizedPathContainmentCheck {
+  query pattern presenceNode where node.scope == "function"
+    and node.context.language == "python"
+    and containsAny(node.context.callPath, ["commonpath", "commonprefix"])
+    and containsAny(node.context.expr, ["commonpath", "commonprefix"])
+    and node.context.callPath contains "join"
+    and not containsAny(node.context.callPath, ["normpath", "realpath", "abspath", "resolve", "relative_to"])
+  emit issue code.UncanonicalizedPathContainmentCheck at node
+}

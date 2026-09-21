@@ -1,0 +1,9 @@
+module bindings.elixir.generated.me97d423b;
+
+binding filePathAccess0 {
+  requires {
+    dependency("log_reset")
+  }
+  query pattern callExpr where callee.method == "reset_logs"
+  emit sink code.FilePathAccess at args[0]
+}

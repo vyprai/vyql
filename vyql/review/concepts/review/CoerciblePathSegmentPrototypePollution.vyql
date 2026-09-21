@@ -1,0 +1,8 @@
+module code;
+
+review code.CoerciblePathSegmentPrototypePollution {
+  category: prototype_pollution
+  expected: [core.PrototypePollutionGuard]
+  kind: attention
+  text: "review nested path setters for primitive path-segment validation before bracket property access"
+}

@@ -1,0 +1,84 @@
+# Rank 1121 / CVE-2019-16551: a Jenkins descriptor doTest* action opens a remote
+# connection from caller-supplied host/port/proxy values with neither CSRF
+# protection nor a permission check, so a forged or low-privilege request can
+# make the controller connect wherever it names (CWE-352).
+#
+# A doTest* function that performs a remote connection (getConnection /
+# testConnection / buildClient) with no @POST/@RequirePOST annotation and no
+# checkPermission/hasPermission call emits
+# code.JenkinsRemoteValidationMissingPostPermission, which VYQL-RF-023
+# reports. The same annotation and permission call, when present, also emit
+# core.CsrfProtection and core.AuthorizationCheck covering the endpoint. The
+# observation keys on the doTest* shape rather than any one plugin's API, so
+# it covers every Jenkins descriptor that tests a connection. Vulnerable
+# snippet expects the review; fixed snippet rejects it.
+#
+# verify_current_expected: current-behavior
+
+test "rank1121: doTestConnection opens an SSH connection with no POST or permission check"
+  lang java
+  file GerritServer.java
+  expect_review code.JenkinsRemoteValidationMissingPostPermission
+  code
+  ```
+  public class GerritServer {
+      public static final class DescriptorImpl extends Descriptor<GerritServer> {
+
+          public FormValidation doTestConnection(
+                  @QueryParameter("gerritHostName") final String gerritHostName,
+                  @QueryParameter("gerritSshPort") final int gerritSshPort,
+                  @QueryParameter("gerritProxy") final String gerritProxy,
+                  @QueryParameter("gerritUserName") final String gerritUserName,
+                  @QueryParameter("gerritAuthKeyFile") final String gerritAuthKeyFile,
+                  @QueryParameter("gerritAuthKeyFilePassword") final String gerritAuthKeyFilePassword) {
+
+              File file = new File(gerritAuthKeyFile);
+              String password = null;
+              if (gerritAuthKeyFilePassword != null && gerritAuthKeyFilePassword.length() > 0) {
+                  password = Secret.fromString(gerritAuthKeyFilePassword).getPlainText();
+              }
+              final SshConnection sshConnection = SshConnectionFactory.getConnection(
+                      gerritHostName,
+                      gerritSshPort,
+                      gerritProxy,
+                      new Authentication(file, gerritUserName, password));
+              return FormValidation.ok();
+          }
+      }
+  }
+  ```
+
+test "rank1121: doTestConnection requires POST and an administrator permission"
+  lang java
+  file GerritServer.java
+  reject_review code.JenkinsRemoteValidationMissingPostPermission
+  code
+  ```
+  public class GerritServer {
+      public static final class DescriptorImpl extends Descriptor<GerritServer> {
+
+          @RequirePOST
+          public FormValidation doTestConnection(
+                  @QueryParameter("gerritHostName") final String gerritHostName,
+                  @QueryParameter("gerritSshPort") final int gerritSshPort,
+                  @QueryParameter("gerritProxy") final String gerritProxy,
+                  @QueryParameter("gerritUserName") final String gerritUserName,
+                  @QueryParameter("gerritAuthKeyFile") final String gerritAuthKeyFile,
+                  @QueryParameter("gerritAuthKeyFilePassword") final String gerritAuthKeyFilePassword) {
+              Jenkins.get().checkPermission(Jenkins.ADMINISTER);
+
+              File file = new File(gerritAuthKeyFile);
+              String password = null;
+              if (gerritAuthKeyFilePassword != null && gerritAuthKeyFilePassword.length() > 0) {
+                  password = Secret.fromString(gerritAuthKeyFilePassword).getPlainText();
+              }
+              final SshConnection sshConnection = SshConnectionFactory.getConnection(
+                      gerritHostName,
+                      gerritSshPort,
+                      gerritProxy,
+                      new Authentication(file, gerritUserName, password));
+              return FormValidation.ok();
+          }
+      }
+  }
+  ```

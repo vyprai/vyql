@@ -1,0 +1,12 @@
+module bindings.javascript.meteor_login_handler_request_input;
+
+// Meteor documents Accounts.registerLoginHandler(name, handler): the handler
+// receives the login request object the client submitted over DDP, and
+// clients may add arbitrary fields to it (username, password digests, and
+// protocol-specific options alike), so every parameter of a registered
+// login handler is client input the way an Express handler's `req` is.
+
+binding httpInput1 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.entryKind contains "call_lambda_param" and args.any.context.callPath contains "Accounts.registerLoginHandler"
+  emit source code.HttpInput at call.result
+}

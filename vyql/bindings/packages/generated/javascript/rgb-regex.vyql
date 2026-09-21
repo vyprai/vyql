@@ -1,0 +1,10 @@
+module bindings.javascript.generated.m133e9b7a;
+
+binding regexCompile0 {
+  requires {
+    dependency("rgb-regex")
+  }
+  query pattern callExpr where callee.method == "module.exports"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}

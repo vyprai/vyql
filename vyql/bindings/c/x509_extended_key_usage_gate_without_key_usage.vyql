@@ -1,0 +1,26 @@
+module bindings.c.x509_extended_key_usage_gate_without_key_usage;
+
+// X509_get_extended_key_usage returns a certificate's extended key usage
+// flags and X509_get_key_usage its key usage flags; the man page they share
+// states that each reads exactly one of the two extensions and returns
+// UINT32_MAX when its extension is absent, usage then being unrestricted,
+// and the X509_check_purpose man page states its checks take into account
+// the X.509 extensions keyUsage, extendedKeyUsage and basicConstraints. A
+// purpose gate built on the raw extended-key-usage accessor therefore
+// consults one of the two RFC 5280 usage extensions and never the other:
+// it accepts a certificate whose key the keyUsage extension forbids from
+// the very operation the gate exists to authorise. The gate is complete
+// when the same function reads the key usage flags, or performs the
+// combined purpose check that already covers both extensions.
+//
+// The anchor is exact-token, so a vendor-prefixed implementation spelling
+// such as wolfSSL_X509_get_extended_key_usage is not drawn in, and the
+// negations read call tokens only, so prose naming a check cannot clear
+// a finding. Residual: a key usage check in a helper the function calls,
+// or inside the chain verifier it delegates to, does not clear either --
+// the false-positive direction of a review advisory, kept because the
+// token routes that would credit it are the callee's, not the gate's.
+binding x509ExtendedKeyUsageGateWithoutKeyUsage {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.call in ["X509_get_extended_key_usage"] and not (node.context.call contains "X509_get_key_usage") and not (node.context.call contains "X509_check_purpose")
+  emit issue code.CertificatePurposeGateWithoutKeyUsage at node
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mb86a7c51;
+
+binding networkData0 {
+  requires {
+    dependency("websocket")
+  }
+  query pattern callExpr where callee.method == "Handler03"
+  emit source code.NetworkData at call.result
+}

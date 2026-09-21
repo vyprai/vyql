@@ -1,0 +1,299 @@
+# A document parser sends an uploaded file to an external parsing service and
+# unpacks the zip it gets back member by member. deepdoc/parser/mineru_parser.py's
+# _extract_zip_no_root is the whole of it:
+#
+#   for member in zip_ref.infolist():
+#       filename = member.filename
+#       ...
+#       full_path = os.path.join(extract_to, path)
+#       if member.is_dir():
+#           os.makedirs(full_path, exist_ok=True)
+#       else:
+#           os.makedirs(os.path.dirname(full_path), exist_ok=True)
+#           with open(full_path, "wb") as f:
+#               f.write(zip_ref.read(filename))
+#
+# zipfile's own extract and extractall sanitise a member name before joining it
+# to the destination, and the function's no-root branch uses exactly that safe
+# fallback. The manual loop does not: os.path.join adopts an absolute path as
+# the whole result, follows `..` components out of extract_to, and a
+# Windows-style member name keeps its drive letter -- so the archive that the
+# parsing service returns decides where each entry lands, with the writing
+# process's privileges. The fixed revision (which also applies the same constraint set to
+# tcadp_parser.py's read-only walk) rejects an encrypted or symlink-shaped
+# entry, an absolute or drive-letter name, and any `..` component, and confirms
+# the resolved destination still sits under the resolved extract_to.
+#
+# What fires without this change: nothing on the extraction. The tarfile
+# extraction binding anchors on tarfile.open plus extract/extractall, which this
+# loop never calls, and the archive_symlink_filter_bypass frontend fact needs a
+# getmembers() walk. zipfile's extractall is deliberately outside both, because
+# it sanitises member names itself -- this rank is the complement: the manual
+# per-member write loop, where the raw name reaches the filesystem.
+#
+# Nothing is minted. The concept (code.ArchiveSymlinkFilterBypass), its review
+# twin and the rule (VYQL-PATH-007) exist and carry the
+# CWE-22 traversal arm for tarfile; the addition is the Python binding for the
+# manual-write form of the same weakness,
+# vyql/bindings/python/archive_member_write_member_filter.vyql, keyed on the
+# modules' own member surfaces (infolist/namelist on a ZipFile,
+# getmembers/getnames on a TarFile) plus the unambiguous per-entry write
+# primitives, and silenced by any of the documented constraints -- a `..`
+# component test, the containment normalisers (resolve, relative_to,
+# is_relative_to, abspath, realpath, isabs), basename's strip, or an
+# entry-type inspection (issym, islnk, linkname, external_attr, flag_bits).
+#
+# Measured. The vulnerable revision of deepdoc/parser reports the extraction as
+# a new VYQL-PATH-007 row on _extract_zip_no_root (mineru_parser.py:141) and
+# the patched revision reports none, three identical runs each; renaming the
+# fix's _is_zipinfo_symlink helper does not un-silence the patched form, so the
+# discrimination rides on the constraint markers, not the fixed revision's own vocabulary.
+# The whole ragflow tree, scanned per top-level directory inside the 180s bound
+# (the full tree does not finish), carries exactly one PATH-007 row -- the
+# vulnerable function; rag/utils/file_utils.py's read-only namelist walks and
+# tcadp_parser.py's in-memory walk report nothing at either revision.
+#
+# Precision, enumerated rather than sampled: across every Python file under the
+# sibling clones /tmp/cve-work/rank*/ that names a member-list call (~130
+# files), the binding adds exactly one row outside its target repository --
+# pip's fp/unpacking.py unzip_file, a per-entry write loop whose containment
+# check lives in an is_within_directory helper one resolved call away, the
+# delegated-control register the tarfile binding documents as case (e)
+# of its own spec. Two shapes measured during tightening and pinned below as
+# rejects: a member walk whose only constraint is tarfile's filter= keyword,
+# and a test that writes fixtures through an inline os.path.join while reading
+# the member list back to assert on it. BenchmarkPython carries none of the
+# identifiers (infolist, namelist, getmembers, getnames, os.path.join,
+# copyfileobj), so the +0.90 gate cannot move.
+
+test "rank1646: (a) a service-returned zip unpacked member by member with no constraint on entry names"
+  lang python
+  file deepdoc/parser/mineru_parser.py
+  expect VYQL-PATH-007
+  expect_review code.ArchiveSymlinkFilterBypass
+  code
+  ```
+  import os
+  import zipfile
+
+
+  def _extract_zip_no_root(self, zip_path, extract_to, root_dir):
+      with zipfile.ZipFile(zip_path, "r") as zip_ref:
+          if not root_dir:
+              files = zip_ref.namelist()
+              if files and files[0].endswith("/"):
+                  root_dir = files[0]
+              else:
+                  root_dir = None
+
+          if not root_dir or not root_dir.endswith("/"):
+              zip_ref.extractall(extract_to)
+              return
+
+          root_len = len(root_dir)
+          for member in zip_ref.infolist():
+              filename = member.filename
+              if filename == root_dir:
+                  continue
+
+              path = filename
+              if path.startswith(root_dir):
+                  path = path[root_len:]
+
+              full_path = os.path.join(extract_to, path)
+              if member.is_dir():
+                  os.makedirs(full_path, exist_ok=True)
+              else:
+                  os.makedirs(os.path.dirname(full_path), exist_ok=True)
+                  with open(full_path, "wb") as f:
+                      f.write(zip_ref.read(filename))
+  ```
+
+test "rank1646: (b) the same loop rejecting encrypted and link-shaped entries, absolute names, `..` components and escape"
+  lang python
+  file deepdoc/parser/mineru_parser.py
+  reject VYQL-PATH-007
+  reject_review code.ArchiveSymlinkFilterBypass
+  code
+  ```
+  import os
+  import re
+  import shutil
+  import zipfile
+  from pathlib import Path
+
+
+  def _extract_zip_no_root(self, zip_path, extract_to, root_dir):
+      base_dir = Path(extract_to).resolve()
+      with zipfile.ZipFile(zip_path, "r") as zip_ref:
+          members = zip_ref.infolist()
+          if root_dir:
+              root_dir = root_dir.replace("\\", "/")
+              if not root_dir.endswith("/"):
+                  root_dir += "/"
+
+          for member in members:
+              if member.flag_bits & 0x1:
+                  raise RuntimeError(f"encrypted zip entry not supported: {member.filename}")
+              if self._is_zipinfo_symlink(member):
+                  raise RuntimeError(f"symlink zip entry not supported: {member.filename}")
+
+              name = member.filename.replace("\\", "/")
+              if root_dir and name == root_dir:
+                  continue
+              if root_dir and name.startswith(root_dir):
+                  name = name[len(root_dir):]
+              if not name:
+                  continue
+              if name.startswith("/") or name.startswith("//") or re.match(r"^[A-Za-z]:", name):
+                  raise RuntimeError(f"unsafe zip path (absolute): {member.filename}")
+
+              parts = [p for p in name.split("/") if p not in ("", ".")]
+              if any(p == ".." for p in parts):
+                  raise RuntimeError(f"unsafe zip path (traversal): {member.filename}")
+
+              rel_path = os.path.join(*parts) if parts else ""
+              dest_path = (Path(extract_to) / rel_path).resolve(strict=False)
+              if dest_path != base_dir and base_dir not in dest_path.parents:
+                  raise RuntimeError(f"unsafe zip path (escape): {member.filename}")
+
+              if member.is_dir():
+                  os.makedirs(dest_path, exist_ok=True)
+                  continue
+
+              os.makedirs(dest_path.parent, exist_ok=True)
+              with zip_ref.open(member) as src, open(dest_path, "wb") as dst:
+                  shutil.copyfileobj(src, dst)
+  ```
+
+test "rank1646: (c) a read-only member walk opens entries in memory and writes nothing"
+  lang python
+  file rag/utils/file_utils.py
+  reject VYQL-PATH-007
+  reject_review code.ArchiveSymlinkFilterBypass
+  code
+  ```
+  import io
+  import json
+  import zipfile
+
+
+  def _extract_zip_content(zip_path):
+      results = []
+      with zipfile.ZipFile(zip_path, "r") as zip_file:
+          json_files = [f for f in zip_file.namelist() if f.endswith(".json")]
+          for json_file in json_files:
+              with zip_file.open(json_file) as f:
+                  data = json.load(f)
+                  if isinstance(data, list):
+                      results.extend(data)
+                  else:
+                      results.append(data)
+      return results
+  ```
+
+test "rank1646: (d) zipfile's own extractall sanitises member names and is not the shape"
+  lang python
+  reject VYQL-PATH-007
+  reject_review code.ArchiveSymlinkFilterBypass
+  code
+  ```
+  import zipfile
+
+
+  def unpack(local_path, dest):
+      with zipfile.ZipFile(local_path) as archive:
+          archive.extractall(dest)
+  ```
+
+test "rank1646: (e) a tar member written per entry with no constraint is the same weakness"
+  lang python
+  expect VYQL-PATH-007
+  expect_review code.ArchiveSymlinkFilterBypass
+  code
+  ```
+  import os
+  import tarfile
+
+
+  def unpack_tarball(tar_path, dest_dir):
+      with tarfile.open(tar_path) as tar:
+          for member in tar.getmembers():
+              if member.isreg():
+                  target = os.path.join(dest_dir, member.name)
+                  os.makedirs(os.path.dirname(target), exist_ok=True)
+                  with open(target, "wb") as out:
+                      out.write(tar.extractfile(member).read())
+  ```
+
+test "rank1646: (f) a manual loop that rejects `..` components and non-relative names stays quiet"
+  lang python
+  reject VYQL-PATH-007
+  reject_review code.ArchiveSymlinkFilterBypass
+  code
+  ```
+  import os
+  import zipfile
+
+
+  def unpack(local_path, dest):
+      with zipfile.ZipFile(local_path) as archive:
+          for name in archive.namelist():
+              if os.path.isabs(name) or name.startswith("\\"):
+                  raise ValueError(f"absolute member name: {name}")
+              parts = name.replace("\\", "/").split("/")
+              if any(p == ".." for p in parts):
+                  raise ValueError(f"traversal member name: {name}")
+              target = os.path.join(dest, *parts)
+              os.makedirs(os.path.dirname(target), exist_ok=True)
+              with open(target, "wb") as out:
+                  out.write(archive.read(name))
+  ```
+
+test "rank1646: (g) a member walk whose only constraint is tarfile's data filter stays quiet"
+  lang python
+  reject VYQL-PATH-007
+  reject_review code.ArchiveSymlinkFilterBypass
+  code
+  ```
+  import os
+  import tarfile
+
+
+  def extract_archive_to_dir(archive_path, dest_dir):
+      os.makedirs(dest_dir, exist_ok=True)
+      with tarfile.open(archive_path, "r") as tar:
+          for member in tar.getmembers():
+              pass
+          tar.extractall(path=dest_dir, filter="data")
+      return dest_dir
+  ```
+
+test "rank1646: (h) a test that writes fixtures and reads the member list back to assert on it"
+  lang python
+  file ray/python/ray/tune/tests/test_util_file_transfer.py
+  reject VYQL-PATH-007
+  reject_review code.ArchiveSymlinkFilterBypass
+  code
+  ```
+  import io
+  import os
+  import tarfile
+
+
+  def test_sync_nodes_only_diff(tmp_source, tmp_target, node_ip, sync):
+      with open(os.path.join(tmp_source, "level0_new.txt"), "w") as f:
+          f.write("Data\n")
+
+      unpack, pack_actor, files_stats = sync(
+          source_ip=node_ip,
+          source_path=tmp_source,
+          target_ip=node_ip,
+          target_path=tmp_target,
+      )
+
+      tarball = pack_actor.get_full_data()
+      with tarfile.open(fileobj=io.BytesIO(tarball)) as tar:
+          files_in_tar = tar.getnames()
+          assert "subdir/level1.txt" in files_in_tar
+  ```

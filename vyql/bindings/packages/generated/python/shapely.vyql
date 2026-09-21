@@ -1,0 +1,9 @@
+module bindings.python.generated.m0401bcb0;
+
+binding deserialization0 {
+  requires {
+    dependency("shapely")
+  }
+  query pattern callExpr where callee.method == "loads"
+  emit sink code.Deserialization at args[0]
+}

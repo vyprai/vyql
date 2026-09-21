@@ -1,0 +1,9 @@
+module bindings.php.generated.md1bd63c6;
+
+binding commandExecution0 {
+  requires {
+    dependency("illuminate/filesystem")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.CommandExecution at args[0]
+}

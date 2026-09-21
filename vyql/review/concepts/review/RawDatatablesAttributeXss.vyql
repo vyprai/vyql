@@ -1,0 +1,8 @@
+module code;
+
+review code.RawDatatablesAttributeXss {
+  category: xss
+  expected: [core.HtmlEscape]
+  kind: target
+  text: "verify server-side DataTables raw columns escape model fields before inserting them into HTML attributes"
+}

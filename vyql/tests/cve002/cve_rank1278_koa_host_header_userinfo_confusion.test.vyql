@@ -1,0 +1,92 @@
+# Rank 1278: koa's request.host getter resolves the effective host straight
+# out of the Host (or X-Forwarded-Host/:authority) header by comma-splitting
+# it, with no handling for an embedded userinfo component:
+#
+#   get host() {
+#     const proxy = this.app.proxy;
+#     let host = proxy && this.get('X-Forwarded-Host');
+#     if (!host) host = this.get('Host');
+#     if (!host) return '';
+#     return splitCommaSeparatedValues(host, 1)[0];
+#   }
+#
+# A Host header of "evil.com:fake@legitimate.com" survives untouched: the
+# comma split is a no-op, so the getter hands back the whole string,
+# userinfo and all, as "the host". Anything downstream that treats this
+# value as a bare authority (a vhost router keying off the leading segment,
+# a cache keying entries by ctx.host, an origin comparison against a
+# separately-parsed URL) reads a different host than what an authority
+# parser would recover from the same header -- a parser-differential host
+# desync, CWE-444. The fixed revision adds a URL-based re-parse gated on the presence
+# of '@': `new URL('http://' + host).host` recovers the actual host
+# component per the URL/WHATWG authority grammar instead of returning the
+# raw header text.
+#
+# FIXED. No existing rule reported this shape. New concept
+# code.HostHeaderUserinfoConfusion (CWE-444/CWE-20) and binding
+# hostHeaderUserinfoConfusion in koa_host_header_userinfo.vyql: a
+# function-scoped presence match on a `this.get(...)` call naming Host,
+# X-Forwarded-Host, or :authority, with neither a `URL` call nor an
+# `.includes(...)` guard anywhere in the function -- the two idioms a
+# userinfo re-parse always needs one of. VYQL-RF-045 fires on the
+# unpatched getter (lib/request.js:252) and does not fire on the patched
+# one, confirmed against both revisions of the real koa checkout. Full
+# spec suite green.
+
+test "rank1278: host getter returns the raw header text unchanged when it carries userinfo"
+  lang javascript
+  file lib/request.js
+  expect VYQL-RF-045
+  expect_review code.HostHeaderUserinfoConfusion
+  code
+  ```
+  module.exports = {
+    get host() {
+      const proxy = this.app.proxy;
+      let host = proxy && this.get('X-Forwarded-Host');
+      if (!host) {
+        if (this.req.httpVersionMajor >= 2) host = this.get(':authority');
+        if (!host) host = this.get('Host');
+      }
+      if (!host) return '';
+      return splitCommaSeparatedValues(host, 1)[0];
+    }
+  };
+
+  function splitCommaSeparatedValues(value, limit) {
+    return value.split(',', limit).map(v => v.trim());
+  }
+  ```
+
+test "rank1278: host getter re-parses through URL when the header carries userinfo"
+  lang javascript
+  file lib/request.js
+  reject VYQL-RF-045
+  reject_review code.HostHeaderUserinfoConfusion
+  code
+  ```
+  module.exports = {
+    get host() {
+      const proxy = this.app.proxy;
+      let host = proxy && this.get('X-Forwarded-Host');
+      if (!host) {
+        if (this.req.httpVersionMajor >= 2) host = this.get(':authority');
+        if (!host) host = this.get('Host');
+      }
+      if (!host) return '';
+      host = splitCommaSeparatedValues(host, 1)[0];
+      if (host.includes('@')) {
+        try {
+          host = new URL(`http://${host}`).host;
+        } catch (e) {
+          return '';
+        }
+      }
+      return host;
+    }
+  };
+
+  function splitCommaSeparatedValues(value, limit) {
+    return value.split(',', limit).map(v => v.trim());
+  }
+  ```

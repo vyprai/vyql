@@ -1,0 +1,8 @@
+module code;
+
+review code.ProtocolStatusVectorUnknownArgumentFallback {
+  category: resource
+  expected: [core.InputValidation]
+  kind: target
+  text: "review protocol status-vector decoders for fail-closed handling of unknown argument tags"
+}

@@ -1,0 +1,17 @@
+module bindings.dart.generated.m9bb9b3af;
+
+binding filePathAccess0 {
+  requires {
+    dependency("gallery_saver")
+  }
+  query pattern callExpr where callee.method == "GallerySaver.saveVideo"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("gallery_saver")
+  }
+  query pattern callExpr where callee.method == "GallerySaver.saveImage"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,7 @@
+module code;
+
+review code.SymlinkFollowedWithoutBaseContainment {
+  category: path
+  kind: attention
+  text: "review symlink resolution for a component-wise containment comparison against the tree's base directory before the resolved target is served or listed"
+}

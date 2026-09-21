@@ -1,0 +1,11 @@
+module vypr.path;
+
+rule IncompleteDotSegmentRequestScreen {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_22, CWE_184]
+    id: "VYQL-PATH-041"
+    severity: high
+  }
+  issue code.IncompleteDotSegmentRequestScreen as sink
+}

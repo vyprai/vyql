@@ -1,0 +1,421 @@
+# CVE-2024-36117 (GHSA-82j3-hf72-7x93, CWE-22): the javadoc raw-resource
+# route of Reposilite served any file the process can read. The route
+#
+#   GET /javadoc/{repository}/<gav>/raw/<resource>
+#
+# takes the client-controlled `<resource>` path parameter, wraps it in
+# reposilite's Location type and serves
+# `Files.newInputStream(javadocUnpackPath.resolve(resource.toString()))`.
+# The wrap does not make the value a safe path: `Location.of` at the
+# vulnerable revision only rewrote `\` to `/` and collapsed repeated
+# slashes, so `..` segments survive construction, and the serving code
+# reads the raw form (`resource.toString()`) rather than the validating
+# accessor (`resource.toPath()`, which rejects `..` and `:` outright).
+# Resolving `../../../../../../reposilite.db` against the unpack directory
+# then reads the sqlite database with password hashes and token data --
+# the advisory's own reproduction.
+#
+# Fix e172ae4b539c822d0d6e04cf090713c7202a79d6 collapses every run of two
+# or more dots to a single one and strips drive-letter colons inside
+# `Location.of` itself, so the raw `toString()` form cannot name an
+# ancestor. The serving code is unchanged by the fix, so the two revisions
+# differ only inside that private constructor.
+#
+# ATTENTION, two measured reasons.
+#
+# The reachability half is nearly closed already: the Javalin parameter
+# sources and java.nio.file.Files access sinks ship (httpInput400-402 and
+# filePathAccess403-412, vyql/bindings/kotlin/m304d1620.vyql); a bare call
+# to a method inherited from a base class resolves through the
+# unique-short-name fallback in resolveCallee (`requireParameter` has the
+# only definition in the scan); an expression body lowers through a
+# return; a postfix `!!` passes its operand through; and a value stored
+# through a constructor is read back from the field by an explicit
+# receiver (tests 3, 4 and 6). What still severs the real route is a
+# Kotlin scope function: `trailingLambdaStmts`
+# (internal/extract/frontend/treesitter/kotlin.go) inlines the lambda's
+# statements into the caller but binds nothing to the receiver, so the
+# value handed to `with (request) { ... }` or `request.let { ... }` never
+# reaches the implicit receiver or the `it` parameter inside. The real
+# route crosses two such hops -- `JavadocRawRequest(...).let {
+# javadoc.findRawJavadocResource(it) }` at the endpoint and
+# `with (request) { ... }` in the facade -- and tests 5 and 6 hold the
+# minimal pair: the identical body read through the with-block reports
+# nothing, read through the named receiver it reports.
+#
+# The discrimination half is decisive and independent of that: the fix
+# lives inside the private `Location.of`, and its collapse chain
+# (`replaceBefore(":", "")`, `replace(":", "")`,
+# `replace(Regex("\\.{2,}"), ".")`) is a string transform no layer
+# recognizes as a traversal neutralizer -- every core.PathCanonicalization
+# binding names a canonicalization API (normalize / canonicalPath /
+# toRealPath / FilenameUtils.normalize). Measured with the chain spelled
+# so the engine tracks every hop (tests 7 and 8): the vulnerable wrapper
+# and the patched wrapper BOTH propagate taint to the same sink, so
+# closing the scope-function hop alone would report the remediated
+# revision identically. Keying instead on this fix's own regex spelling
+# would be a repro-shaped patch.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1669: the javadoc raw route resolves the request's resource against the unpack directory and opens it"
+  lang kotlin
+  file reposilite-backend/src/main/kotlin/com/reposilite/javadocs/JavadocFacade.kt
+  reject VYQL-PATH-001
+  code
+  ```
+  import java.nio.file.Files
+  import java.nio.file.Path
+
+  class Context(val pathParamMap: Map<String, String>, val uri: String) {
+      fun queryParam(name: String): String? = null
+  }
+
+  open class ContextDsl<out R : Any>(private val ctx: Context) {
+      fun requireParameter(name: String): String = parameter(name)!!
+      fun parameter(name: String): String? = ctx.pathParamMap()[name]
+  }
+
+  class Location private constructor(private val uri: String) {
+      companion object {
+          private val multipleSlashes = Regex("/+")
+          fun of(uri: String): Location =
+              uri.replace("\\", "/")
+                  .replace(multipleSlashes, "/")
+                  .let { Location(it) }
+      }
+      fun toPath(): Path? {
+          if (uri.contains("..") || uri.contains(":") || uri.contains("\\")) {
+              return null
+          }
+          return Path.of(uri).normalize()
+      }
+      override fun toString(): String = uri
+  }
+
+  fun String?.toLocation(): Location =
+      if (this != null) Location.of(this) else Location.of("")
+
+  class JavadocRawRequest(val repository: String, val gav: Location, val resource: Location)
+
+  class Container(val javadocUnpackPath: Path)
+
+  class JavadocRoutes(val ctx: Context, val container: Container) : ContextDsl<Any>(ctx) {
+      fun findRawJavadocResource(): ByteArray {
+          val request = JavadocRawRequest("releases", Location.of("javadoc/1.0.0"), requireParameter("resource").toLocation())
+          return with (request) {
+              Files.exists(container.javadocUnpackPath.resolve(resource.toString()))
+              Files.newInputStream(container.javadocUnpackPath.resolve(resource.toString())).readBytes()
+          }
+      }
+  }
+  ```
+
+test "rank1669: the same route with Location.of collapsing directory operators at construction"
+  lang kotlin
+  file reposilite-backend/src/main/kotlin/com/reposilite/javadocs/JavadocFacade.kt
+  reject VYQL-PATH-001
+  code
+  ```
+  import java.nio.file.Files
+  import java.nio.file.Path
+
+  class Context(val pathParamMap: Map<String, String>, val uri: String) {
+      fun queryParam(name: String): String? = null
+  }
+
+  open class ContextDsl<out R : Any>(private val ctx: Context) {
+      fun requireParameter(name: String): String = parameter(name)!!
+      fun parameter(name: String): String? = ctx.pathParamMap()[name]
+  }
+
+  class Location private constructor(private val uri: String) {
+      companion object {
+          private val multipleSlashes = Regex("/+")
+          private val multipleDirectoryOperators = Regex("\\.{2,}")
+          fun of(uri: String): Location =
+              uri.replaceBefore(":", "")
+                  .replace(":", "")
+                  .replace(multipleDirectoryOperators, ".")
+                  .replace("\\", "/")
+                  .replace(multipleSlashes, "/")
+                  .let { Location(it) }
+      }
+      fun toPath(): Path? {
+          if (uri.contains(":") || uri.contains("\\") || uri.contains(multipleDirectoryOperators)) {
+              return null
+          }
+          return Path.of(uri).normalize()
+      }
+      override fun toString(): String = uri
+  }
+
+  fun String?.toLocation(): Location =
+      if (this != null) Location.of(this) else Location.of("")
+
+  class JavadocRawRequest(val repository: String, val gav: Location, val resource: Location)
+
+  class Container(val javadocUnpackPath: Path)
+
+  class JavadocRoutes(val ctx: Context, val container: Container) : ContextDsl<Any>(ctx) {
+      fun findRawJavadocResource(): ByteArray {
+          val request = JavadocRawRequest("releases", Location.of("javadoc/1.0.0"), requireParameter("resource").toLocation())
+          return with (request) {
+              Files.exists(container.javadocUnpackPath.resolve(resource.toString()))
+              Files.newInputStream(container.javadocUnpackPath.resolve(resource.toString())).readBytes()
+          }
+      }
+  }
+  ```
+
+test "rank1669: the parameter read reaches the file open when every function returns its value in a block body"
+  lang kotlin
+  file reposilite-backend/src/main/kotlin/com/reposilite/javadocs/JavadocFacade.kt
+  expect VYQL-PATH-001
+  code
+  ```
+  import java.nio.file.Files
+  import java.nio.file.Path
+
+  class Context {
+      fun pathParamMap(): Map<String, String> = mapOf()
+  }
+
+  class ContextDsl(private val ctx: Context) {
+      fun requireParameter(name: String): String {
+          val value = parameter(name)
+          return value!!
+      }
+      fun parameter(name: String): String? {
+          val map = ctx.pathParamMap()
+          return map[name]
+      }
+  }
+
+  class Container(val javadocUnpackPath: Path)
+
+  class JavadocRoutes(private val dsl: ContextDsl, private val container: Container) {
+      fun findRawJavadocResource(): ByteArray {
+          val resource = dsl.requireParameter("resource")
+          return Files.newInputStream(container.javadocUnpackPath.resolve(resource)).readBytes()
+      }
+  }
+  ```
+
+test "rank1669: the parameter wrapper as an expression body returns its value now that the body lowers through a return"
+  lang kotlin
+  file reposilite-backend/src/main/kotlin/com/reposilite/javadocs/JavadocFacade.kt
+  expect VYQL-PATH-001
+  code
+  ```
+  import java.nio.file.Files
+  import java.nio.file.Path
+
+  class Context {
+      fun pathParamMap(): Map<String, String> = mapOf()
+  }
+
+  class ContextDsl(private val ctx: Context) {
+      fun requireParameter(name: String): String = parameter(name)!!
+      fun parameter(name: String): String? = ctx.pathParamMap()[name]
+  }
+
+  class Container(val javadocUnpackPath: Path)
+
+  class JavadocRoutes(private val dsl: ContextDsl, private val container: Container) {
+      fun findRawJavadocResource(): ByteArray {
+          val resource = dsl.requireParameter("resource")
+          return Files.newInputStream(container.javadocUnpackPath.resolve(resource)).readBytes()
+      }
+  }
+  ```
+
+test "rank1669: the facade reads the request through a with-block, so the receiver never reaches the field read"
+  lang kotlin
+  file reposilite-backend/src/main/kotlin/com/reposilite/javadocs/JavadocFacade.kt
+  reject VYQL-PATH-001
+  code
+  ```
+  import java.nio.file.Files
+  import java.nio.file.Path
+
+  class Context(val pathParamMap: Map<String, String>)
+
+  open class ContextDsl(private val ctx: Context) {
+      fun requireParameter(name: String): String = parameter(name)!!
+      fun parameter(name: String): String? = ctx.pathParamMap()[name]
+  }
+
+  class Location private constructor(private val uri: String) {
+      companion object {
+          fun of(uri: String): Location = Location(uri)
+      }
+      override fun toString(): String = uri
+  }
+
+  fun String?.toLocation(): Location =
+      if (this != null) Location.of(this) else Location.of("")
+
+  class JavadocRawRequest(val repository: String, val gav: Location, val resource: Location)
+
+  class Container(val javadocUnpackPath: Path)
+
+  class JavadocFacade(private val container: Container) {
+      fun findRawJavadocResource(request: JavadocRawRequest): ByteArray =
+          with (request) {
+              Files.newInputStream(container.javadocUnpackPath.resolve(resource.toString())).readBytes()
+          }
+  }
+
+  class JavadocRoutes(private val ctx: Context, private val container: Container) : ContextDsl(ctx) {
+      val javadoc = JavadocFacade(container)
+      fun handler(): ByteArray {
+          val request = JavadocRawRequest("releases", Location.of("javadoc/1.0.0"), requireParameter("resource").toLocation())
+          return javadoc.findRawJavadocResource(request)
+      }
+  }
+  ```
+
+test "rank1669: the same facade reading the field through the named receiver reports the traversal"
+  lang kotlin
+  file reposilite-backend/src/main/kotlin/com/reposilite/javadocs/JavadocFacade.kt
+  expect VYQL-PATH-001
+  code
+  ```
+  import java.nio.file.Files
+  import java.nio.file.Path
+
+  class Context(val pathParamMap: Map<String, String>)
+
+  open class ContextDsl(private val ctx: Context) {
+      fun requireParameter(name: String): String = parameter(name)!!
+      fun parameter(name: String): String? = ctx.pathParamMap()[name]
+  }
+
+  class Location private constructor(private val uri: String) {
+      companion object {
+          fun of(uri: String): Location = Location(uri)
+      }
+      override fun toString(): String = uri
+  }
+
+  fun String?.toLocation(): Location =
+      if (this != null) Location.of(this) else Location.of("")
+
+  class JavadocRawRequest(val repository: String, val gav: Location, val resource: Location)
+
+  class Container(val javadocUnpackPath: Path)
+
+  class JavadocFacade(private val container: Container) {
+      fun findRawJavadocResource(request: JavadocRawRequest): ByteArray =
+          Files.newInputStream(container.javadocUnpackPath.resolve(request.resource.toString())).readBytes()
+  }
+
+  class JavadocRoutes(private val ctx: Context, private val container: Container) : ContextDsl(ctx) {
+      val javadoc = JavadocFacade(container)
+      fun handler(): ByteArray {
+          val request = JavadocRawRequest("releases", Location.of("javadoc/1.0.0"), requireParameter("resource").toLocation())
+          return javadoc.findRawJavadocResource(request)
+      }
+  }
+  ```
+
+test "rank1669: with every hop tracked the vulnerable wrapper propagates to the file open"
+  lang kotlin
+  file reposilite-backend/src/main/kotlin/com/reposilite/javadocs/JavadocFacade.kt
+  expect VYQL-PATH-001
+  code
+  ```
+  import java.nio.file.Files
+  import java.nio.file.Path
+
+  class Context(val pathParamMap: Map<String, String>)
+
+  open class ContextDsl(private val ctx: Context) {
+      fun requireParameter(name: String): String = parameter(name)!!
+      fun parameter(name: String): String? = ctx.pathParamMap()[name]
+  }
+
+  class Location private constructor(private val uri: String) {
+      companion object {
+          private val multipleSlashes = Regex("/+")
+          fun of(uri: String): Location =
+              uri.replace("\\", "/")
+                  .replace(multipleSlashes, "/")
+                  .let { Location(it) }
+      }
+      override fun toString(): String = uri
+  }
+
+  fun String?.toLocation(): Location =
+      if (this != null) Location.of(this) else Location.of("")
+
+  class JavadocRawRequest(val repository: String, val gav: Location, val resource: Location)
+
+  class Container(val javadocUnpackPath: Path)
+
+  class JavadocFacade(private val container: Container) {
+      fun findRawJavadocResource(request: JavadocRawRequest): ByteArray =
+          Files.newInputStream(container.javadocUnpackPath.resolve(request.resource.toString())).readBytes()
+  }
+
+  class JavadocRoutes(private val ctx: Context, private val container: Container) : ContextDsl(ctx) {
+      val javadoc = JavadocFacade(container)
+      fun handler(): ByteArray {
+          val request = JavadocRawRequest("releases", Location.of("javadoc/1.0.0"), requireParameter("resource").toLocation())
+          return javadoc.findRawJavadocResource(request)
+      }
+  }
+  ```
+
+test "rank1669: the patched wrapper also propagates, so the collapse chain does not discriminate"
+  lang kotlin
+  file reposilite-backend/src/main/kotlin/com/reposilite/javadocs/JavadocFacade.kt
+  expect VYQL-PATH-001
+  code
+  ```
+  import java.nio.file.Files
+  import java.nio.file.Path
+
+  class Context(val pathParamMap: Map<String, String>)
+
+  open class ContextDsl(private val ctx: Context) {
+      fun requireParameter(name: String): String = parameter(name)!!
+      fun parameter(name: String): String? = ctx.pathParamMap()[name]
+  }
+
+  class Location private constructor(private val uri: String) {
+      companion object {
+          private val multipleSlashes = Regex("/+")
+          private val multipleDirectoryOperators = Regex("\\.{2,}")
+          fun of(uri: String): Location =
+              uri.replaceBefore(":", "")
+                  .replace(":", "")
+                  .replace(multipleDirectoryOperators, ".")
+                  .replace("\\", "/")
+                  .replace(multipleSlashes, "/")
+                  .let { Location(it) }
+      }
+      override fun toString(): String = uri
+  }
+
+  fun String?.toLocation(): Location =
+      if (this != null) Location.of(this) else Location.of("")
+
+  class JavadocRawRequest(val repository: String, val gav: Location, val resource: Location)
+
+  class Container(val javadocUnpackPath: Path)
+
+  class JavadocFacade(private val container: Container) {
+      fun findRawJavadocResource(request: JavadocRawRequest): ByteArray =
+          Files.newInputStream(container.javadocUnpackPath.resolve(request.resource.toString())).readBytes()
+  }
+
+  class JavadocRoutes(private val ctx: Context, private val container: Container) : ContextDsl(ctx) {
+      val javadoc = JavadocFacade(container)
+      fun handler(): ByteArray {
+          val request = JavadocRawRequest("releases", Location.of("javadoc/1.0.0"), requireParameter("resource").toLocation())
+          return javadoc.findRawJavadocResource(request)
+      }
+  }
+  ```

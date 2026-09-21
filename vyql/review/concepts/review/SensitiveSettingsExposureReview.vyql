@@ -1,0 +1,8 @@
+module code;
+
+review code.SensitiveSettingsExposureReview {
+  category: auth
+  expected: [core.AuthenticationCheck]
+  kind: attention
+  text: "verify sensitive settings fields are only returned to authenticated callers"
+}

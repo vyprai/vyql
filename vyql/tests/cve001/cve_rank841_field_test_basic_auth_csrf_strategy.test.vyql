@@ -1,0 +1,33 @@
+test "rank841: Rails HTTP Basic auth controller needs exception CSRF strategy"
+  lang ruby
+  expect VYQL-RF-033
+  expect_review code.RailsBasicAuthWeakCsrfStrategy
+  code
+  ```
+    module FieldTest
+      class BaseController < ActionController::Base
+        layout "field_test/application"
+
+        protect_from_forgery
+
+        http_basic_authenticate_with name: ENV["FIELD_TEST_USERNAME"], password: ENV["FIELD_TEST_PASSWORD"] if ENV["FIELD_TEST_PASSWORD"]
+      end
+    end
+  ```
+
+test "rank841: Rails HTTP Basic auth controller with exception CSRF strategy is clean"
+  lang ruby
+  reject VYQL-RF-033
+  reject_review code.RailsBasicAuthWeakCsrfStrategy
+  code
+  ```
+    module FieldTest
+      class BaseController < ActionController::Base
+        layout "field_test/application"
+
+        protect_from_forgery with: :exception
+
+        http_basic_authenticate_with name: ENV["FIELD_TEST_USERNAME"], password: ENV["FIELD_TEST_PASSWORD"] if ENV["FIELD_TEST_PASSWORD"]
+      end
+    end
+  ```

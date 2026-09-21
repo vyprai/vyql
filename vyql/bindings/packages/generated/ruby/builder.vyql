@@ -1,0 +1,65 @@
+module bindings.ruby.generated.md7f97319;
+
+binding htmlRender0 {
+  requires {
+    dependency("builder")
+  }
+  query pattern callExpr where callee.method == "tag!"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender1 {
+  requires {
+    dependency("builder")
+  }
+  query pattern callExpr where callee.method == "text!"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender2 {
+  requires {
+    dependency("builder")
+  }
+  query pattern callExpr where callee.method == "method_missing"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender3 {
+  requires {
+    dependency("builder")
+  }
+  query pattern callExpr where callee.method == "declare!"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender4 {
+  requires {
+    dependency("builder")
+  }
+  query pattern callExpr where callee.method == "instruct!"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender5 {
+  requires {
+    dependency("builder")
+  }
+  query pattern callExpr where callee.method == "cdata!"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender6 {
+  requires {
+    dependency("builder")
+  }
+  query pattern callExpr where callee.method == "cdata_value!"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender7 {
+  requires {
+    dependency("builder")
+  }
+  query pattern callExpr where callee.method == "comment!"
+  emit sink code.HtmlRender at args[0]
+}

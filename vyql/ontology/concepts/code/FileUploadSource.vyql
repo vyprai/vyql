@@ -1,0 +1,7 @@
+module code;
+
+concept FileUploadSource : source {
+  cwe: [CWE_434]
+  refines: core.UserControlledData
+  taint: [taint.UntrustedData]
+}

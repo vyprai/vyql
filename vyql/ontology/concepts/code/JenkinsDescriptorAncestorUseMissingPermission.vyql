@@ -1,0 +1,11 @@
+module code;
+
+concept JenkinsDescriptorAncestorUseMissingPermission : issue {
+  cwe: [CWE_200, CWE_862]
+  reviewAssumption: "the doCheck/doFill endpoint is reachable by any authenticated user with Overall/Read, while the data it reads through the @AncestorInPath item requires a stronger permission"
+  reviewCategory: auth
+  reviewCondition: "Jenkins descriptor check or fill method reads workspace, build, artifact, credential or SCM data through its @AncestorInPath parameter without an observed permission check"
+  reviewConfidence: high
+  reviewEvidence: "descriptor endpoint context {pattern} reads item data through the ancestor parameter before any checkPermission or hasPermission call"
+  vulnerableTo: [access_control.MissingAuthorization, secrets.SecretLeak]
+}

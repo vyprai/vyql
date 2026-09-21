@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m36be0d30;
+
+binding httpInput0 {
+  requires {
+    dependency("com.sun.jersey:jersey-server")
+  }
+  query pattern callExpr where callee.method == "cookie"
+  emit source code.HttpInput at call.result
+}

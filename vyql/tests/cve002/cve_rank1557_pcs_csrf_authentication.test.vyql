@@ -1,0 +1,152 @@
+# Rank 1557 / CVE-2016-0720: pcsd's request guard admitted any request that
+# carried a valid browser credential and never asked for a signal that the
+# request came from the application's own origin, so a page an attacker
+# controls could drive a logged-in pcsd user's browser to a state-changing
+# endpoint (CSRF, CWE-352 -- the advisory's own words are "visited by an
+# authenticated pcsd user"). The guard is `protected!`, called by the `before`
+# filter at pcsd/pcsd.rb:66 with `/login`, `/logout` and `/remote/auth` exempt.
+# Fix b9e7f06178 ("fix CSRF vulnerability") rewrites it: `/remote/*` and
+# `/run_pcs` now require token authentication (`unless
+# PCSAuth.loginByToken(...) halt [401, ...]`) instead of accepting a session,
+# every non-GUI request must carry `request.env['HTTP_X_REQUESTED_WITH'] ==
+# 'XMLHttpRequest'` -- the header a cross-origin form post cannot set -- and
+# GUI pages keep the `/login` redirect for an unauthenticated session.
+#
+# The 1st pass recorded this rank as a fail-open check ("a guard that logs
+# instead of stopping ... no halt, no redirect on those shapes") and pinned
+# the miss on missing check-termination vocabulary. That reading is wrong
+# about the code: the vulnerable `then` branch at pcsd/pcsd.rb:140 runs
+# `$logger.info "ERROR: Request without authentication"` and *then*
+# `halt [401, '{"notauthorized":"true"}']` -- the halt is present, and an
+# unauthenticated request to `/remote/*` is refused at both revisions. The
+# defect the advisory describes is the CSRF one above: the outer condition
+# `if not PCSAuth.loginByToken(session, cookies) and not
+# PCSAuth.isLoggedIn(session)` only enters the branch when *both* credentials
+# are absent, so a request riding a valid session cookie clears the guard
+# with nothing distinguishing it from the application's own page. Both
+# revisions are re-read here from the checkouts at b9e7f06178^ and b9e7f06178.
+#
+# Recheck measurements, all against pcsd/ at both revisions, 3x `--cache off`,
+# timeout 180, --max-ram 6GB: 242 findings, 137 at high or above, on every
+# run at both revisions. The JSON finding sets differ by exactly one
+# VYQL-RF-001 witness whose source line moves pcsd.rb:361 -> pcsd.rb:366
+# with the five added lines -- no AUTH or request-forgery rule reports
+# pcsd.rb at either revision, so no rule shipped since the 1st pass
+# discriminates. The natural binding was built and measured rather than
+# argued: `node.context.literal contains "HTTP_X_REQUESTED_WITH"` at
+# function scope fires only on the fixed revision (1 -> 0), but it is not
+# shippable. The discriminator is the fixing commit's own mechanism rather
+# than a library-documented control -- Sinatra's documented CSRF control is
+# Rack::Protection, which the fix does not use, so the genericity test fails
+# on the negation. And Ruby function-context predicates are file-wide rather
+# than function-confined (the recorded `rubyFunctionContext` gap): a
+# `node.context.call contains "halt"` conjunct at function scope matches
+# pcsd.rb:29, :123, :153, :1031, :1037 and :1041 at both revisions, so the
+# positive half cannot name the guard at all. The reachable set is also too
+# thin to support a precision claim either way: across the 25,551 Ruby files
+# in the campaign clones only three contain a `halt` call (this repository's
+# two revisions and one espruino test), and only five `require 'sinatra'`,
+# so there is no negative population to measure collateral on. Both
+# directions stay rejects; VYQL-RF-003 has no Ruby sink and VYQL-AUTH-103 no
+# Ruby binding, so neither can fire here today.
+
+test "rank1557: a session-clearing request guard with no request-origin signal"
+  lang ruby
+  file pcsd/pcsd.rb
+  code
+  ```
+  before do
+    if request.path != '/login' and not request.path == "/logout" and not request.path == '/remote/auth'
+      protected!
+    end
+    $cluster_name = get_cluster_name()
+    @errorval = session[:errorval]
+  end
+
+  helpers do
+    def protected!
+      if not PCSAuth.loginByToken(session, cookies) and not PCSAuth.isLoggedIn(session)
+        match_expr = "/managec/(.*)/(.*)"
+        mymatch = request.path.match(match_expr)
+        on_managec_main = false
+        if mymatch and mymatch.length >= 3 and mymatch[2] == "main"
+          on_managec_main = true
+        end
+
+        if request.path.start_with?('/remote') or
+          (request.path.match(match_expr) and not on_managec_main) or
+          '/run_pcs' == request.path or
+          '/clusters_overview' == request.path or
+          request.path.start_with?('/permissions_')
+        then
+          $logger.info "ERROR: Request without authentication"
+          halt [401, '{"notauthorized":"true"}']
+        else
+          session[:pre_login_path] = request.path
+          redirect '/login'
+        end
+      end
+    end
+  end
+
+  post '/run_pcs' do
+    command = params['command'] || '{}'
+    std_in = params['stdin'] || nil
+    command_decoded = JSON.parse(command)
+    return run_pcs_command(command_decoded, std_in)
+  end
+  ```
+  reject VYQL-RF-003
+  reject VYQL-AUTH-103
+
+test "rank1557: token-only remote routes and a required same-origin header"
+  lang ruby
+  file pcsd/pcsd.rb
+  code
+  ```
+  before do
+    if request.path != '/login' and not request.path == "/logout" and not request.path == '/remote/auth'
+      protected!
+    end
+    $cluster_name = get_cluster_name()
+    @errorval = session[:errorval]
+  end
+
+  helpers do
+    def protected!
+      gui_request = (
+        request.path == '/' or
+        request.path == '/manage' or
+        request.path == '/permissions' or
+        request.path.match('/managec/.+/main')
+      )
+      if request.path.start_with?('/remote/') or request.path == '/run_pcs'
+        unless PCSAuth.loginByToken(session, cookies)
+          halt [401, '{"notauthorized":"true"}']
+        end
+      else
+        if !gui_request and
+          request.env['HTTP_X_REQUESTED_WITH'] != 'XMLHttpRequest'
+        then
+          halt [401, '{"notauthorized":"true"}']
+        elsif not PCSAuth.isLoggedIn(session)
+          if gui_request
+            session[:pre_login_path] = request.path
+            redirect '/login'
+          else
+            halt [401, '{"notauthorized":"true"}']
+          end
+        end
+      end
+    end
+  end
+
+  post '/run_pcs' do
+    command = params['command'] || '{}'
+    std_in = params['stdin'] || nil
+    command_decoded = JSON.parse(command)
+    return run_pcs_command(command_decoded, std_in)
+  end
+  ```
+  reject VYQL-RF-003
+  reject VYQL-AUTH-103

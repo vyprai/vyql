@@ -1,0 +1,10 @@
+module vypr.smartcontract;
+
+rule ExternalCall {
+  meta {
+    cwe: [CWE_829]
+    id: "VYQL-SC-001"
+    severity: high
+  }
+  taint core.UserControlledData -> code.ExternalCall
+}

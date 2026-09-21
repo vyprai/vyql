@@ -1,0 +1,11 @@
+module code;
+
+concept LibreOfficeEnhwmfDibHeaderSizeUnderflow : issue {
+  cwe: [CWE_190, CWE_787]
+  reviewAssumption: "crafted EMF records can choose cbBmiSrc while forcing the alpha-reading path"
+  reviewCategory: memory
+  reviewCondition: "LibreOffice EMF alpha-blend import subtracts an attacker-controlled bitmap header size from the DIBV5 header size before sizing and copying a heap buffer"
+  reviewConfidence: high
+  reviewEvidence: "EnhWMFReader::ReadEnhWMF context {pattern} computes getDIBV5HeaderSize() - cbBmiSrc and then uses the delta in nTargetSize and ReadBytes before the patched cbBmiSrc > nHeaderSize guard"
+  vulnerableTo: [memory.IntegerOverflow, memory.OobWrite]
+}

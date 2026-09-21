@@ -1,0 +1,43 @@
+module bindings.dart.generated.mb06f65f7;
+
+binding deserialization0 {
+  requires {
+    dependency("glob")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("glob")
+  }
+  query pattern callExpr where callee.method == "list"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("glob")
+  }
+  query pattern callExpr where callee.method == "listSync"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding regexCompile3 {
+  requires {
+    dependency("glob")
+  }
+  query pattern callExpr where callee.method == "matchAsPrefix"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}
+
+binding regexCompile4 {
+  requires {
+    dependency("glob")
+  }
+  query pattern callExpr where callee.method == "matches"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}

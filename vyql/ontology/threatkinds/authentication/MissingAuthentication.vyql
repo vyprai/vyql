@@ -1,0 +1,6 @@
+module authentication;
+
+threat MissingAuthentication {
+  cwe: [CWE_306]
+  desc: "Missing authentication for critical function"
+}

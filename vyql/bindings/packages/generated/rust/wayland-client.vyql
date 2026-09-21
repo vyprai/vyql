@@ -1,0 +1,33 @@
+module bindings.rust.generated.mbc8ea658;
+
+binding networkConnect0 {
+  requires {
+    dependency("wayland-client")
+  }
+  query pattern callExpr where callee.method == "connect_to_env"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect1 {
+  requires {
+    dependency("wayland-client")
+  }
+  query pattern callExpr where callee.method == "from_socket"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend2 {
+  requires {
+    dependency("wayland-client")
+  }
+  query pattern callExpr where callee.method == "send_request"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("wayland-client")
+  }
+  query pattern callExpr where callee.method == "parse_event"
+  emit sink code.Deserialization at args[0]
+}

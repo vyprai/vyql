@@ -1,0 +1,6 @@
+module code;
+
+concept BackupAllowedConfig : issue {
+  cwe: [CWE_922]
+  vulnerableTo: [mobile.BackupExposure]
+}

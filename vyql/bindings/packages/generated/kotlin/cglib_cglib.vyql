@@ -1,0 +1,25 @@
+module bindings.kotlin.generated.mb451c9ce;
+
+binding codeEval0 {
+  requires {
+    dependency("cglib:cglib")
+  }
+  query pattern callExpr where callee.method == "defineClass"
+  emit sink code.CodeEval at args[0]
+}
+
+binding codeEval1 {
+  requires {
+    dependency("cglib:cglib")
+  }
+  query pattern callExpr where callee.method == "create"
+  emit sink code.CodeEval at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("cglib:cglib")
+  }
+  query pattern callExpr where callee.method == "convert"
+  emit sink code.Deserialization at args[0]
+}

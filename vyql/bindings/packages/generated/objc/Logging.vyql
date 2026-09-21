@@ -1,0 +1,65 @@
+module bindings.objc.generated.m4fa4208d;
+
+binding logOutput0 {
+  requires {
+    dependency("Logging")
+  }
+  query pattern callExpr where callee.method == "log"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput1 {
+  requires {
+    dependency("Logging")
+  }
+  query pattern callExpr where callee.method == "trace"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput2 {
+  requires {
+    dependency("Logging")
+  }
+  query pattern callExpr where callee.method == "debug"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput3 {
+  requires {
+    dependency("Logging")
+  }
+  query pattern callExpr where callee.method == "info"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput4 {
+  requires {
+    dependency("Logging")
+  }
+  query pattern callExpr where callee.method == "notice"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput5 {
+  requires {
+    dependency("Logging")
+  }
+  query pattern callExpr where callee.method == "warning"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput6 {
+  requires {
+    dependency("Logging")
+  }
+  query pattern callExpr where callee.method == "error"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput7 {
+  requires {
+    dependency("Logging")
+  }
+  query pattern callExpr where callee.method == "critical"
+  emit sink code.LogOutput at args[0]
+}

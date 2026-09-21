@@ -1,0 +1,9 @@
+module bindings.scala.generated.m77a50f3e;
+
+binding httpInput0 {
+  requires {
+    dependency("javax.servlet:javax.servlet-api")
+  }
+  query pattern callExpr where callee.method == "Cookie"
+  emit source code.HttpInput at call.result
+}

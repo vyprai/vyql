@@ -1,0 +1,9 @@
+module bindings.java.generated.m837c6fd0;
+
+binding sqlExecution0 {
+  requires {
+    dependency("javax.servlet.jsp.jstl:jstl-api")
+  }
+  query pattern callExpr where callee.method == "addSQLParameter"
+  emit sink code.SqlExecution at args[0]
+}

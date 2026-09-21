@@ -1,0 +1,11 @@
+module code;
+
+concept JdbcSensitiveParamSinglePassFilterBypass : issue {
+  cwe: [CWE_182, CWE_502]
+  reviewAssumption: "the URL reaches this filter as a caller-supplied JDBC connection string before anything opens a connection or persists it as trusted"
+  reviewCategory: deserialization
+  reviewCondition: "a JDBC connection-string sanitizer strips each denylisted parameter in a single pass over the URL instead of re-scanning the result, so nesting one occurrence of a denylisted key=value pair inside another lets the outer removal reconstruct the inner one"
+  reviewConfidence: high
+  reviewEvidence: "filterSensitive context {pattern} loops once over the denylisted parameter names calling a strip function per key, with no re-check of the resulting URL for a parameter that reappeared"
+  vulnerableTo: [deserialization.DeserializationAbuse, injection.CodeInjection]
+}

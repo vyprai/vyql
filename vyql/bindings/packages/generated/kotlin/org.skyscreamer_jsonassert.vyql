@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m12628231;
+
+binding deserialization0 {
+  requires {
+    dependency("org.skyscreamer:jsonassert")
+  }
+  query pattern callExpr where callee.method == "parseJSON"
+  emit sink code.Deserialization at args[0]
+}

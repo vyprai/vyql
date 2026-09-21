@@ -1,0 +1,7 @@
+module code;
+
+concept LogWriteSink : sink {
+  enabledBy: [taint.SecretValue]
+  possibility: exclude
+  vulnerableTo: [secrets.SecretLeak]
+}

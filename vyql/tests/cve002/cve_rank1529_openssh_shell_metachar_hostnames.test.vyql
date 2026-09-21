@@ -1,0 +1,224 @@
+# Rank 1529 / CVE-2026-4631: ssh(1) accepted user and host names
+# containing shell metacharacters from the command line, and those
+# names flow into shell commands that scripts and wrappers build
+# around them, so a hostname like `host';cmd` escaped its argument
+# position (argument/shell injection, CWE-78/CWE-88). ssh.c read
+# options.host_arg from `*av` after the getopt loop and options.user
+# from optarg, with no character policy anywhere between argv and
+# every later use -- the proxy command is percent-expanded with %h
+# bound to the host (sshconnect.c expand_proxy_command) and run as
+# `execv(shell, argv)` with argv[2] the expanded string. Pool commit
+# 7ef3787 is the real fix (COMMIT_OK -- upstream "ban user/hostnames
+# with most shell metacharacters", ssh.c v1.599): new valid_hostname()
+# and valid_ruser() reject names starting with '-' (option injection)
+# and any of `'`"$\;&<>|(){}`, whitespace or control characters,
+# applied where the command-line arguments are parsed. No pool
+# correction.
+#
+# ## What fires, both revisions
+#
+# Three --cache off runs per revision over the whole checkout report
+# 6577/6577/6577 findings (2519 at or above high) at the parent
+# 0cb50ee and 6581/6581/6581 (2521 high) at the fix, deterministic
+# across runs. Normalising ssh.c line numbers across the fix's +35/+4
+# inserted lines and taking the union of the three runs per revision:
+# nothing reported at the parent is absent at the fix, and the only
+# fix-only row is VYQL-MEM-005 on the added strchr/isspace loop in
+# valid_hostname. The full findings view was read, not the `-flags`
+# only view. VYQL-INJ-002 does fire CRITICAL on both proxy-command
+# sinks (sshconnect.c:166 and :250, the two `execv(argv[0], argv)`
+# calls) at both revisions -- but each row's taint path is two nodes,
+# `Subscript -> Arg`: the source is the sink's own argv[0], labelled
+# by the C cliArgument binding (`callee.path ~= "argv"`, name-keyed),
+# so the row is a self-source artifact that happens to sit on the
+# right line. Findings on the sink line are not coverage of this
+# weakness, and the artifact is identical before and after the fix.
+#
+# ## Why nothing ships
+#
+# Four measured links, each independent:
+#
+# * Source: the positional command-line read is not labelled. The
+#   shipped binding labels only subscripts of a variable *named*
+#   `argv`; ssh.c reads the host as `*av` (a deref, which no probe
+#   keyed on the vector name labels either) and `av[optind - 1]`, and
+#   the user from getopt's optarg (an out-parameter outside the
+#   hardcoded reader table). A probe widening the label to `av`
+#   subscripts adds 75 findings on this one tree -- 80 VYQL-MEM-005
+#   (half of them in regress/unittests/misc/test_argv.c, where every
+#   local is named av or argv), 3 more INJ-002 self-source rows and
+#   1 PATH-001 -- and not one finding connects ssh.c's host to either
+#   execv sink.
+# * Sink: the C exec bindings emit `code.CommandExecution` at args[0]
+#   only, which for `execv(path, argv)` is the program path, so the
+#   argv vector argument carries no sink label at all. With a probe
+#   sink on args[1] the initializer-built vector below reports and the
+#   element-assignment vector still does not.
+# * Engine: the construct the real code uses -- a local vector built
+#   by per-element assignment -- does not carry taint from its element
+#   stores to the vector's later use as a call argument. The last two
+#   blocks are the minimal pair: same origin, same sink, same rule,
+#   only the construction form differs. Carrying an element store to a
+#   later whole-array read is a new dataflow relation, not a localized
+#   correction to a known construct, so it is recorded as an engine
+#   gap rather than worked around in data.
+# * Discrimination: none of the above would separate the revisions
+#   anyway. The fix adds a bespoke character-policy guard in main() --
+#   a different function and file from the sink -- so a discriminating
+#   pair is only expressible by keying on the fix's own vocabulary
+#   (valid_hostname/valid_ruser), which detects this client rather
+#   than the weakness.
+#
+# No definition change shipped. ENGINE-GAPS.md entry proposed: the
+# per-element array store in C, shared with every caller that builds
+# an argv vector before exec (the POSIX idiom), see the pair below.
+#
+# ## Recheck measurements (knowledge base tip 11984e0e1)
+#
+# Baseline 3x3 over the checkout: 6577/6577/6577 vulnerable,
+# 6581/6581/6581 fixed, normalised union diff 0 rows at the parent
+# absent at the fix. Probe A/B: `av`-subscript source 6652 findings
+# (+75, none on the host path); execv args[1] sink plus that source
+# still 0 on the element-assignment form and 1 VYQL-INJ-002 CRITICAL
+# on the initializer form. Narrow spec passing with -v. Rank stays
+# ATTENTION.
+
+test "rank1529: the command-line host reaches the shell-built proxy command"
+  lang c
+  file ssh.c
+  reject VYQL-INJ-002
+  code
+  ```
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <string.h>
+
+  static char *
+  expand_proxy_command(const char *proxy_command, const char *host)
+  {
+      char *tmp, *ret;
+
+      if (asprintf(&tmp, "exec %s", proxy_command) == -1)
+          return NULL;
+      ret = percent_expand(tmp, 'h', host, '\0');
+      free(tmp);
+      return ret;
+  }
+
+  int main(int ac, char **av)
+  {
+      char *host;
+      char *command_string;
+      char *args[4];
+
+      ac -= optind;
+      av += optind;
+      host = *av;
+      command_string = expand_proxy_command("%h", host);
+      args[0] = "/bin/sh";
+      args[1] = "-c";
+      args[2] = command_string;
+      args[3] = NULL;
+      execv(args[0], args);
+      return 0;
+  }
+  ```
+
+test "rank1529: the fixed revision refuses metacharactered names at parse"
+  lang c
+  file ssh.c
+  reject VYQL-INJ-002
+  code
+  ```
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <string.h>
+  #include <ctype.h>
+
+  static int
+  valid_hostname(const char *s)
+  {
+      size_t i;
+
+      if (*s == '-')
+          return 0;
+      for (i = 0; s[i] != 0; i++) {
+          if (strchr("'`\"$\\;&<>|(){}", s[i]) != NULL ||
+              isspace((unsigned char)s[i]) || iscntrl((unsigned char)s[i]))
+              return 0;
+      }
+      return 1;
+  }
+
+  static char *
+  expand_proxy_command(const char *proxy_command, const char *host)
+  {
+      char *tmp, *ret;
+
+      if (asprintf(&tmp, "exec %s", proxy_command) == -1)
+          return NULL;
+      ret = percent_expand(tmp, 'h', host, '\0');
+      free(tmp);
+      return ret;
+  }
+
+  int main(int ac, char **av)
+  {
+      char *host;
+      char *command_string;
+      char *args[4];
+
+      ac -= optind;
+      av += optind;
+      host = *av;
+      if (!valid_hostname(host))
+          fatal("hostname contains invalid characters");
+      command_string = expand_proxy_command("%h", host);
+      args[0] = "/bin/sh";
+      args[1] = "-c";
+      args[2] = command_string;
+      args[3] = NULL;
+      execv(args[0], args);
+      return 0;
+  }
+  ```
+
+test "rank1529: a vector built by initializer carries its origin to the exec"
+  lang c
+  file sshconnect.c
+  expect VYQL-INJ-002
+  code
+  ```
+  #include <stdlib.h>
+
+  int main(void)
+  {
+      char *cmd = getenv("PROXY");
+      char *args[4] = { "/bin/sh", "-c", cmd, NULL };
+
+      execv(args[0], args);
+      return 0;
+  }
+  ```
+
+test "rank1529: the same vector built element by element loses the origin"
+  lang c
+  file sshconnect.c
+  reject VYQL-INJ-002
+  code
+  ```
+  #include <stdlib.h>
+
+  int main(void)
+  {
+      char *cmd = getenv("PROXY");
+      char *args[4];
+
+      args[0] = "/bin/sh";
+      args[1] = "-c";
+      args[2] = cmd;
+      args[3] = NULL;
+      execv(args[0], args);
+      return 0;
+  }
+  ```

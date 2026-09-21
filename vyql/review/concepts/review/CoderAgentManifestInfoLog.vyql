@@ -1,0 +1,8 @@
+module code;
+
+review code.CoderAgentManifestInfoLog {
+  category: secret
+  expected: [core.SecretRedaction]
+  kind: attention
+  text: "review Coder workspace-agent manifest logs for redaction or omission before info-level logging"
+}

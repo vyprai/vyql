@@ -1,0 +1,33 @@
+# Rank 649 / CVE-2011-4104: django-tastypie's YAML deserializer used
+# yaml.load on request content before switching to yaml.safe_load.
+test "rank649: tastypie YAML deserializer uses unsafe yaml.load"
+  lang python
+  profile library
+  file serializers.py
+  expect VYQL-DESER-001
+  code
+  ```
+  import yaml
+
+  class Serializer(object):
+      def from_yaml(self, content):
+          if yaml is None:
+              raise RuntimeError("Usage of the YAML aspects requires yaml.")
+          return yaml.load(content)
+  ```
+
+test "rank649: tastypie YAML deserializer uses safe_load"
+  lang python
+  profile library
+  file serializers.py
+  reject VYQL-DESER-001
+  code
+  ```
+  import yaml
+
+  class Serializer(object):
+      def from_yaml(self, content):
+          if yaml is None:
+              raise RuntimeError("Usage of the YAML aspects requires yaml.")
+          return yaml.safe_load(content)
+  ```

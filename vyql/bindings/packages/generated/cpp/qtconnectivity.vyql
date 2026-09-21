@@ -1,0 +1,41 @@
+module bindings.cpp.generated.m676b3c51;
+
+binding networkBind0 {
+  requires {
+    dependency("qtconnectivity")
+  }
+  query pattern callExpr where callee.method == "QBluetoothServer::listen"
+  emit sink code.NetworkBind at args[0]
+}
+
+binding networkData1 {
+  requires {
+    dependency("qtconnectivity")
+  }
+  query pattern callExpr where callee.method == "QBluetoothServer::nextPendingConnection"
+  emit source code.NetworkData at call.result
+}
+
+binding networkConnect2 {
+  requires {
+    dependency("qtconnectivity")
+  }
+  query pattern callExpr where callee.method == "QBluetoothSocket::connectToService"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend3 {
+  requires {
+    dependency("qtconnectivity")
+  }
+  query pattern callExpr where callee.method == "QBluetoothSocket::writeData"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkData4 {
+  requires {
+    dependency("qtconnectivity")
+  }
+  query pattern callExpr where callee.method == "QBluetoothSocket::readData"
+  emit source code.NetworkData at call.result
+}

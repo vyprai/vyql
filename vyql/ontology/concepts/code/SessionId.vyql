@@ -1,0 +1,7 @@
+module code;
+
+concept SessionId : issue {
+  cwe: [CWE_384]
+  enabledBy: [taint.UntrustedData]
+  vulnerableTo: [session.SessionFixation]
+}

@@ -1,0 +1,80 @@
+test "rank192: Backstage vm2 templater exposes host callbacks to sandbox code"
+  lang javascript
+  file SecureTemplater.ts
+  expect VYQL-INJ-035
+  code
+  ```
+  import { VM } from 'vm2';
+
+  export class SecureTemplater {
+    static async loadRenderer(options = {}) {
+      const { templateFilters, templateGlobals } = options;
+      const sandbox: Record<string, any> = {};
+
+      if (templateFilters) {
+        sandbox.templateFilters = Object.fromEntries(
+          Object.entries(templateFilters).map(([filterName, filterFunction]) => [
+            filterName,
+            (...args: JsonValue[]) => JSON.stringify(filterFunction(...args)),
+          ]),
+        );
+      }
+      if (templateGlobals) {
+        sandbox.templateGlobals = Object.fromEntries(
+          Object.entries(templateGlobals).map(([globalName, global]) => {
+            if (typeof global === 'function') {
+              return [
+                globalName,
+                (...args: JsonValue[]) => JSON.stringify(global(...args)),
+              ];
+            }
+            return [globalName, JSON.stringify(global)];
+          }),
+        );
+      }
+
+      const vm = new VM({ sandbox });
+      vm.run(mkScript(nunjucksSource));
+      return (template, values) => vm.run(`render(templateStr, templateValues)`);
+    }
+  }
+  ```
+
+test "rank192: Backstage isolated-vm templater does not expose vm2 host callback bridge"
+  lang javascript
+  file SecureTemplater.ts
+  reject VYQL-INJ-035
+  code
+  ```
+  import { Isolate } from 'isolated-vm';
+
+  export class SecureTemplater {
+    static async loadRenderer(options = {}) {
+      const {
+        templateFilters = {},
+        templateGlobals = {},
+      } = options;
+      const isolate = new Isolate({ memoryLimit: 128 });
+      const context = await isolate.createContext();
+      const contextGlobal = context.global;
+
+      await contextGlobal.set(
+        'callFilter',
+        (filterName: string, args: JsonValue[]) => {
+          return JSON.stringify(templateFilters[filterName](...args));
+        },
+      );
+      await contextGlobal.set(
+        'callGlobal',
+        (globalName: string, args: JsonValue[]) => {
+          const global = templateGlobals[globalName];
+          return JSON.stringify(global(...args));
+        },
+      );
+
+      const script = await isolate.compileScript(mkScript(nunjucksSource));
+      await script.run(context);
+      return (template, values) => context.evalSync(`render(templateStr, templateValues)`);
+    }
+  }
+  ```

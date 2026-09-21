@@ -1,0 +1,17 @@
+module bindings.elixir.generated.mca3de826;
+
+binding deserialization0 {
+  requires {
+    dependency("makeup_html")
+  }
+  query pattern callExpr where callee.method == "lex"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("makeup_html")
+  }
+  query pattern callExpr where callee.method == "postprocess"
+  emit sink code.Deserialization at args[0]
+}

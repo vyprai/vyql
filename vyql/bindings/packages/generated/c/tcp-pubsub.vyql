@@ -1,0 +1,33 @@
+module bindings.c.generated.me6cbb240;
+
+binding networkSend0 {
+  requires {
+    dependency("tcp-pubsub")
+  }
+  query pattern callExpr where callee.method == "Publisher.publish"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkBind1 {
+  requires {
+    dependency("tcp-pubsub")
+  }
+  query pattern callExpr where callee.method == "Publisher.Publisher"
+  emit sink code.NetworkBind at args[0]
+}
+
+binding networkData2 {
+  requires {
+    dependency("tcp-pubsub")
+  }
+  query pattern callExpr where callee.method == "Subscriber.Subscriber"
+  emit source code.NetworkData at call.result
+}
+
+binding networkConnect3 {
+  requires {
+    dependency("tcp-pubsub")
+  }
+  query pattern callExpr where callee.method == "Subscriber.Subscriber"
+  emit sink code.NetworkConnectSink at args[0]
+}

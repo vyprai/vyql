@@ -1,0 +1,11 @@
+module code;
+
+concept CatastrophicRegexSink : sink {
+  cwe: [CWE_1333, CWE_400]
+  reviewAssumption: "an attacker can supply input matched by this exported or reachable regex"
+  reviewCategory: resource
+  reviewCondition: "a static regular expression has catastrophic-backtracking structure"
+  reviewConfidence: medium
+  reviewEvidence: "regex construction {pattern} contains nested or ambiguous quantified branches"
+  vulnerableTo: [dos.ReDoS, dos.UncontrolledResourceConsumption]
+}

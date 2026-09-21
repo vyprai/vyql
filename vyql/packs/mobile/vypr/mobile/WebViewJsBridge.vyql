@@ -1,0 +1,10 @@
+module vypr.mobile;
+
+rule WebViewJsBridge {
+  meta {
+    cwe: [CWE_749]
+    id: "VYQL-MOB-002"
+    severity: medium
+  }
+  issue code.WebViewJsInterface as w
+}

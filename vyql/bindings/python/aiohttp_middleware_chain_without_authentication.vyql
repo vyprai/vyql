@@ -1,0 +1,46 @@
+module bindings.python.aiohttpMiddlewareChainWithoutAuthentication;
+
+// aiohttp assembles a request pipeline in one place: `web.Application(...)`
+// takes a keyword-only `middlewares=[...]` chain, and the library applies
+// that chain to every handler before the handler runs. The documentation
+// names the permission check as what a middleware is for -- "displaying 403
+// Forbidden page or raising HTTPForbidden exception if the user does not have
+// permissions" -- so a function that names the chain is declaring exactly
+// which cross-cutting request processing the application performs, and
+// `app.add_routes(...)` in the same function is what turns that chain into
+// the gate in front of real request handlers. A chain that names no
+// authentication leaves every bound route -- administrative surfaces, job
+// submission, log streaming -- answerable to whichever caller can reach the
+// port, which is an assumption the operator has to supply from outside the
+// code. That is the same reading the C#, Go, JavaScript and PHP bindings in
+// this family give a privileged surface with no gate: the operation is
+// sensitive, and whether the caller may reach it is decided nowhere the code
+// shows.
+//
+// The suppressing spellings are matched generously and read from both the
+// keyword argument and the middleware references themselves: an
+// authentication or authorization middleware, a token, session, login or
+// credential check, a bearer or api-key reader. For a negation, matching too
+// much costs recall rather than precision, and a chain that so much as names
+// its authentication is one whose gating has to be read by a human rather
+// than guessed at here.
+//
+// Three limits worth stating. aiohttp also documents a per-route
+// `expect_handler=check_auth`, so authentication written on individual routes
+// rather than in the chain leaves no token in this function and reports --
+// the shape is visible only where the library puts chain-wide request
+// processing. An application that installs its chain by
+// `app.middlewares.append(...)` after construction carries no `middlewares=`
+// keyword at all, so it does not match; this reads the constructor form only.
+// And a chain installed in front of routes that are themselves only ever
+// reached over a trusted interface reports all the same, because nothing in
+// the function says who can connect.
+binding pyAiohttpMiddlewareChainWithoutAuthentication {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "python"
+    and containsAny(node.context.callPath, ["web.Application"])
+    and containsAny(node.context.identifier, ["middlewares"])
+    and containsAny(node.context.selector, ["add_routes"])
+    and not (containsAny(node.context.identifier, ["auth", "Auth", "token", "Token", "login", "Login", "session", "Session", "credential", "Credential", "apiKey", "api_key", "ApiKey"]))
+    and not (containsAny(node.context.selector, ["auth", "Auth", "token", "Token", "login", "Login", "session", "Session", "credential", "Credential", "apiKey", "api_key", "ApiKey"]))
+  emit issue code.SensitiveOperation at node
+}

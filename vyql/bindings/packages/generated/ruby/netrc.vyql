@@ -1,0 +1,29 @@
+module bindings.ruby.generated.mef5f9370;
+
+binding filePathAccess0 {
+  requires {
+    dependency("netrc")
+  }
+  query pattern callExpr where callee.method == "Netrc.read"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding authorizationCheck1 {
+  requires {
+    dependency("netrc")
+  }
+  query pattern callExpr where callee.method == "Netrc.check_permissions"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding secretValue2 {
+  requires {
+    dependency("netrc")
+  }
+  query pattern callExpr where callee.method == "Netrc#new_item"
+  emit source code.SecretValue at call.result
+}

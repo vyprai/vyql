@@ -1,0 +1,7 @@
+module code;
+
+review code.PermissiveCors {
+  category: auth
+  kind: attention
+  text: "review permissive CORS configuration and restrict allowed origins to trusted domains"
+}

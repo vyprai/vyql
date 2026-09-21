@@ -1,0 +1,40 @@
+module bindings.ruby.response_header_hash_write;
+
+// Rack's response is a `[status, headers, body]` triple and the headers slot is a
+// plain Hash; the documented way for middleware and a Rails controller to set a
+// response header is an element assignment on it (`headers["Cache-Control"] = v`,
+// `response.headers["Content-Disposition"] = v`). Ruby carries no type for the
+// receiver, so the binding keys on the conventional names, the same way the
+// Python `headers.add` / `headers.setdefault` sink does.
+//
+// A subscript write lowers to a call on the base's path with no method, so an
+// exact `callee.path` names the receiver and nothing else: `bag[key] = v` does
+// not match, and neither does a read (`headers[key]`), which lowers to a
+// subscript node. The value is the sole argument of that lowered call.
+
+binding responseHeaderHashWrite {
+  query pattern callExpr where callee.path == "headers"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding responseHeadersHashWrite {
+  query pattern callExpr where callee.path == "response.headers"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+// Sinatra's response helper is a Rack::Response, whose documented element
+// write is the bracket spelling (`response['Content-Type'] = v`, used by
+// Sinatra's own content_type). The same receiver builds a value in place with
+// `response['Content-Disposition'] << v`: the slot append lowers to a call on
+// the element reference itself, whose dotted path ends in `[]`, so the write
+// and the append are two exact paths over one receiver and each carries the
+// written value as its sole argument.
+binding responseSubscriptWrite {
+  query pattern callExpr where callee.path == "response"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding responseSubscriptAppend {
+  query pattern callExpr where callee.path == "response[]"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

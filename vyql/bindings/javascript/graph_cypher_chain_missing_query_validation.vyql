@@ -1,0 +1,25 @@
+module bindings.javascript.graph_cypher_chain_missing_query_validation;
+
+// LangChain's GraphCypherQAChain (and Cypher/graph QA chains built the same
+// way) turns a caller's natural-language question into a Cypher statement by
+// running it through an LLM generation sub-chain, then extracts that
+// statement from the sub-chain's output and executes it directly against the
+// graph database as the next step of the same method. The class's own
+// documentation calls this out: the chain "will execute Cypher statements
+// against the provided database" and warns operators to scope credentials
+// narrowly, because nothing in the chain itself restricts what the generated
+// statement may do. A caller who can influence the question (directly, or
+// through a prompt-injected document the chain summarizes) can therefore
+// steer the model into emitting a write or delete statement that runs with
+// whatever privilege the graph connection holds.
+//
+// The binding looks for the whole shape in one function: a call into a
+// generation sub-chain carrying both a natural-language question and the
+// graph's schema (the two inputs GraphCypherQAChain's prompt takes), and a
+// direct call into the graph's query execution, with no call in between that
+// validates, sanitizes, or restricts the generated statement (a read-only
+// check, an allow-list, or a dedicated Cypher validator) before it runs.
+binding graphCypherChainMissingQueryValidation {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "GenerationChain.call" and node.context.callPath contains ".getSchema" and node.context.callPath contains ".query" and not (containsAny(node.context.callPath, ["validateCypher", "sanitizeCypher", "isReadOnlyCypher", "assertReadOnly", "checkCypherSafety", "isSafeCypher", "isReadOnlyQuery", "assertIsReadOnly"]))
+  emit issue code.GraphCypherChainMissingQueryValidation at node
+}

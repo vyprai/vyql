@@ -1,0 +1,46 @@
+# Rank 882 / CVE-2025-29192: Flowise rendered chat/artifact HTML with
+# dangerouslySetInnerHTML. The fix routes HTML through a DOMPurify-backed SafeHTML
+# component before the dangerous React sink.
+
+test "rank882: chat HTML data is rendered with dangerouslySetInnerHTML"
+  lang javascript
+  file ChatMessage.jsx
+  expect VYQL-INJ-004
+  code
+  ```
+  export function ChatMessage({ item }) {
+      if (item.type === 'html') {
+          return (
+              <div style={{ marginTop: '20px' }}>
+                  <div dangerouslySetInnerHTML={{ __html: item.data }}></div>
+              </div>
+          )
+      }
+      return <div>{item.data}</div>
+  }
+  ```
+
+test "rank882: chat HTML data is sanitized before raw React HTML rendering"
+  lang javascript
+  file ChatMessage.jsx
+  reject VYQL-INJ-004
+  code
+  ```
+  import DOMPurify from 'dompurify'
+
+  export const SafeHTML = ({ html }) => {
+      const sanitizedHTML = DOMPurify.sanitize(html || '')
+      return <div dangerouslySetInnerHTML={{ __html: sanitizedHTML }} />
+  }
+
+  export function ChatMessage({ item }) {
+      if (item.type === 'html') {
+          return (
+              <div style={{ marginTop: '20px' }}>
+                  <SafeHTML html={item.data} />
+              </div>
+          )
+      }
+      return <div>{item.data}</div>
+  }
+  ```

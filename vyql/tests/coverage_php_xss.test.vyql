@@ -1,0 +1,27 @@
+test "php: unescaped session flash assignment is stored XSS"
+  lang php
+  expect VYQL-INJ-025
+  code
+  ```
+  <?php
+  class AdminServ {
+    public static function info($text) {
+      $_SESSION['info'] = $text;
+    }
+  }
+  ?>
+  ```
+
+test "php: escaped session flash assignment is clean"
+  lang php
+  reject VYQL-INJ-025
+  code
+  ```
+  <?php
+  class AdminServ {
+    public static function info($text) {
+      $_SESSION['info'] = htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+    }
+  }
+  ?>
+  ```

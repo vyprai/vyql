@@ -1,0 +1,33 @@
+module bindings.go.generated.m4a74693d;
+
+binding codeEval0 {
+  requires {
+    dependency("go.starlark.net")
+  }
+  query pattern callExpr where callee.method == "Eval"
+  emit sink code.CodeEval at args[0]
+}
+
+binding codeEval1 {
+  requires {
+    dependency("go.starlark.net")
+  }
+  query pattern callExpr where callee.method == "EvalOptions"
+  emit sink code.CodeEval at args[0]
+}
+
+binding codeEval2 {
+  requires {
+    dependency("go.starlark.net")
+  }
+  query pattern callExpr where callee.method == "EvalExpr"
+  emit sink code.CodeEval at args[0]
+}
+
+binding codeEval3 {
+  requires {
+    dependency("go.starlark.net")
+  }
+  query pattern callExpr where callee.method == "EvalExprOptions"
+  emit sink code.CodeEval at args[0]
+}

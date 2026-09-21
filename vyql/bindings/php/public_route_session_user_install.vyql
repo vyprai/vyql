@@ -1,0 +1,48 @@
+module bindings.php.public_route_session_user_install;
+
+// Nextcloud's OCP\IUserSession is the request-scoped authentication state:
+// setUser(IUser) installs a user as the active principal and writes that
+// identity into the PHP session, isLoggedIn() reports whether the session
+// already holds one, and getUser() returns it. The documented way to act as
+// a user resolved from an identifier is exactly this pair --
+// IUserManager::get($uid) then IUserSession::setUser($user) -- and whether
+// that is safe depends entirely on where the identifier came from. On a
+// console command the identifier is operator input and the process exits
+// with the request; on a route published with @PublicPage the Nextcloud app
+// framework dispatches the call without an authenticated session, so the
+// identifier is client-supplied and the installed identity is persisted
+// into session storage that the next request inherits. Installing a session
+// user there without consulting isLoggedIn()/getUser() first both hijacks
+// an already-authenticated session and leaves the installed user in place
+// after the request, which is the CWE-613 shape: the session is never
+// cleared at the boundary where the identity was assumed.
+//
+// The clauses are class-scoped because that is where the type evidence
+// lives -- a PHP call site carries no receiver type, so the binding ties
+// the setUser call to the IUserSession dependency two ways: the class
+// declares IUserSession (identifier: token from the property or constructor
+// parameter, measured confined to the class on the motivating file), and
+// the call path's receiver segment is the conventional field name
+// (userSession.setUser). The @PublicPage requirement is what separates the
+// public route from the console command, and the negation on isLoggedIn is
+// the already-authenticated consultation; both were measured load-bearing
+// on real collateral -- dropping @PublicPage reports the three
+// files_external occ commands, and widening the call match from the
+// receiver-qualified path to the bare method name reports two controllers
+// whose ->setUser( is INotification::setUser on a notification builder.
+//
+// Residuals, both stated. The receiver segment is a naming convention: 237
+// of 252 IUserSession declarations across the corpus spell it $userSession
+// and 15 spell it $session, so a class that names the dependency $session
+// is not reported. And the @PublicPage clause reads the class body text,
+// so a route made public by a different mechanism -- a route configuration
+// file, or @NoCSRFRequired-style annotations added elsewhere -- is not
+// recognised.
+binding sessionUserInstallWithoutAuthenticationStateCheck {
+  query pattern presenceNode where node.scope == "class" and node.context.language == "php"
+    and containsAny(node.context.identifier, ["IUserSession"])
+    and node.context.callPath contains "userSession.setUser"
+    and node.token contains "@PublicPage"
+    and not (node.context.call in ["isLoggedIn"])
+  emit issue code.SessionUserInstallWithoutAuthenticationStateCheck at node
+}

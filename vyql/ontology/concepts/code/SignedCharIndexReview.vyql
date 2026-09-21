@@ -1,0 +1,11 @@
+module code;
+
+concept SignedCharIndexReview : issue {
+  cwe: [CWE_190, CWE_197, CWE_125]
+  reviewAssumption: "input bytes with the high bit set produce negative indexes on platforms where plain char is signed"
+  reviewCategory: numeric
+  reviewCondition: "a lookup table is indexed by a char or ctype result without an unsigned char cast"
+  reviewConfidence: high
+  reviewEvidence: "table subscript {pattern} uses a possibly-signed char index"
+  vulnerableTo: [memory.OobRead, memory.OobWrite]
+}

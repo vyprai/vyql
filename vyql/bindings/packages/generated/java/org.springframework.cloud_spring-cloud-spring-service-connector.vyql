@@ -1,0 +1,41 @@
+module bindings.java.generated.mc5d72032;
+
+binding userControlledData0 {
+  requires {
+    dependency("org.springframework.cloud:spring-cloud-spring-service-connector")
+  }
+  query pattern callExpr where callee.method == "CassandraClusterFactory"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("org.springframework.cloud:spring-cloud-spring-service-connector")
+  }
+  query pattern callExpr where callee.method == "CloudDataSourceFactory"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("org.springframework.cloud:spring-cloud-spring-service-connector")
+  }
+  query pattern callExpr where callee.method == "MailSenderFactory"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("org.springframework.cloud:spring-cloud-spring-service-connector")
+  }
+  query pattern callExpr where callee.method == "GenericCloudServiceConnectorFactory"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData4 {
+  requires {
+    dependency("org.springframework.cloud:spring-cloud-spring-service-connector")
+  }
+  query pattern callExpr where callee.method == "MongoDbFactoryFactory"
+  emit source core.UserControlledData at call.result
+}

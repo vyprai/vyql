@@ -1,0 +1,10 @@
+module bindings.perl.generated.m13522699;
+
+binding redirectTarget0 {
+  requires {
+    dependency("Sledge-Plugin-RedirectReferer")
+  }
+  query pattern callExpr where callee.method == "dispatch_index"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

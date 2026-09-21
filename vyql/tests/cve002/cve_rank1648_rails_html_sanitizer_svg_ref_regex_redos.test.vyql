@@ -1,0 +1,357 @@
+# Rank 1648 / CVE-2022-23517: rails-html-sanitizer's permit scrubber rewrote the
+# SVG attributes that may carry a local reference with an unanchored global
+# regex substitution, and the substitution's cost is quadratic in the length of
+# the attacker-supplied attribute value (CWE-1333 inefficient regular expression
+# complexity, CWE-400; GHSA-5x79-w82f-gw8w).
+#
+# `PermitScrubber#scrub_attribute` (lib/rails/html/scrubbers.rb:148-150 at the
+# fix parent) reaches, for every attribute named in
+# `Loofah::HTML5::SafeList::SVG_ATTR_VAL_ALLOWS_REF` (`fill`, `stroke`,
+# `filter`, `clip-path` and the rest),
+# `attr_node.value = attr_node.value.gsub(/url\s*\(\s*[^#\s][^)]+?\)/m, " ")`.
+# The pattern is unanchored and applied globally, so `gsub` retries it at every
+# `url(` in the attribute value, and each retry grows `[^)]+?` one character at
+# a time to the end of the value when no `)` follows -- a value built out of
+# repeated `url(` prefixes with no closing parenthesis costs O(n^2). The
+# attribute value is markup the caller handed the sanitizer, which is the input
+# a sanitizer exists to accept, so the bound is entirely the attacker's.
+#
+# The pool row carries no flag, and 56c61c0cebd1e493e8ad7bca2a0191609a4a6979
+# reads as the real, targeted fix ("fix: replace slow regex attribute check with
+# Loofah method"): neither a merge nor a release bump, it touches
+# lib/rails/html/scrubbers.rb plus a regression test, the vulnerable `gsub` is
+# present at the parent, and the remediation is present at the commit itself.
+# The `gsub` call is replaced by `Loofah::HTML5::Scrub.scrub_attribute_that_
+# allows_local_ref`, which Loofah implements over Crass's component-value
+# parser. No pool correction.
+#
+# ATTENTION, engine gap, re-measured. A bounded scan of the fix parent under
+# the library profile reports 0 findings and 0 flags over ruby:6, stable over
+# three --cache off runs; the fixed revision is identical. lib/rails/html/
+# scrubbers.rb is among the six parsed files, so the zero is real.
+#
+# The source half is present. The library profile's parameter source labels
+# every method parameter `code.ExternalEntryInput`
+# (bindings_apply.go paramSourceApplicator), and `core.UserControlledData` is
+# that profile's entrypoint, so `scrub_attribute`'s `node` and `attr_node`
+# params are sources: `vyql match -profile library` reports 19 param labels on
+# the real file. Taint survives the `.value` read and any unresolved receiver
+# chain (`value`, `value.foo`, `value.bar.baz` as a `case` subject all report).
+# The first pass recorded "no source" because `vyql match` was run without the
+# profile; that was an artifact of the invocation, not a gap.
+#
+# Two blockers remain, both on the sink side, and the pair below isolates each
+# inside the real method rather than on a synthetic parameter.
+#
+# First, the pattern is not classified as backtracking-prone, and that
+# classification is correct as far as it goes: `regexambig.Ambiguous` answers
+# false for `url\s*\(\s*[^#\s][^)]+?\)` because the pattern has no overlapping
+# quantified branches -- `\s*` is followed by `\(` and by `[^#\s]`, both
+# disjoint from `\s`, and `[^)]+?` is followed by `\)`, which it excludes. The
+# cost is polynomial in the number of start positions `gsub` retries, not
+# exponential in one match attempt, and polynomial backtracking is a class the
+# engine does not model. So the `regex` node lowers to a plain `nir.Const`
+# instead of the `__regex.match` call that `rubyRegexMayBacktrack`
+# (internal/extract/frontend/treesitter/ruby.go) synthesises for a
+# backtracking-prone literal, and no `code.RegexMatch` or `code.RegexMatchSink`
+# label is ever emitted: `regexMatch205` in vyql/bindings/ruby/m5a48bf47.vyql
+# keys on that synthesised node.
+#
+# Second, a regex supplied as a call argument has no operand link. When
+# `rubyRegexMayBacktrack` answers true, the regex node lowers to an
+# `__regex.match` call whose only argument is the pattern text itself, so
+# `value.gsub(/re/, " ")` produces a labelled sink no receiver can reach. The
+# one route that links an operand is `case value when /re/`, which `rubyCase`
+# lowers to a Switch carrying the case value as Subject and the regex as a
+# Label. The pair measures both axes on the real method: the reportable
+# pattern over `attr_node.value` reports VYQL-DOS-002 in the `case` form and
+# reports nothing as a `gsub` argument, and reports nothing in the `case` form
+# once the literal carries the real quadratic quantifiers.
+#
+# Third, measured while building that pair and new: a statement-level `if`
+# modifier drops the `case` lowering. `rubyCase` is reached only from the
+# statement dispatch's `case` arm, and `if_modifier`/`unless_modifier` have no
+# arm there, so `case x when /re/ ... end if cond` falls through to the generic
+# expression fallback, which flattens the whole construct into a `nir.Seq` of
+# its children. Source and sink both stay labelled -- the `__regex.match` node
+# still exists -- but the Switch that carries the subject-to-label edge never
+# forms, so the taint path is gone. Minimal pair below, differing only in the
+# trailing modifier: 1 -> 0, stable over three runs. The real code spells the
+# modifier on the assignment carrying the `gsub`, so this third absence sits in
+# front of the other two for any future sweep.
+#
+# Teaching the classifier polynomial backtracking is what a fix would mean,
+# and the measurement that killed it stands: over the `lib/` trees of loofah,
+# rack and sanitize -- 268 Ruby regex literals, all three libraries whose job
+# is handling untrusted input -- every candidate pattern shape flags 1 real in
+# 7 to 11, and rack's `/bytes=([^;]+)/` against the untrusted `Range` header is
+# structurally identical to this pattern and harmless. The discriminator is not
+# in the pattern; it is that the operand is unbounded attacker-supplied
+# attribute value, and what the fixed revision changes is the algorithm that
+# reads it. The parameter source makes that gate weaker rather than stronger:
+# under the library profile every parameter is a source, so the taint rule
+# alone separates nothing, and an operand-boundedness notion is still required.
+# Keying instead on the Loofah call the fixed revision installs would name the
+# fixing commit's own vocabulary, and a binding on "an attribute value read
+# rewritten by a regex substitution" flags loofah's own CVE-2018-8048
+# remediation, which is exactly that shape and is safe. No definition change.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1648: the permit scrubber substitutes the SVG ref attributes with a quadratic regex"
+  lang ruby
+  file lib/rails/html/scrubbers.rb
+  profile library
+  reject VYQL-DOS-001
+  reject VYQL-DOS-002
+  reject VYQL-DOS-003
+  code
+  ```
+  require "cgi"
+
+  module Rails
+    module Html
+      class PermitScrubber < Loofah::Scrubber
+        def scrub_attributes(node)
+          node.attribute_nodes.each do |attr_node|
+            scrub_attribute(node, attr_node)
+          end
+        end
+
+        def scrub_attribute(node, attr_node)
+          attr_name = if attr_node.namespace
+                        "#{attr_node.namespace.prefix}:#{attr_node.node_name}"
+                      else
+                        attr_node.node_name
+                      end
+
+          if Loofah::HTML5::SafeList::ATTR_VAL_IS_URI.include?(attr_name)
+            val_unescaped = CGI.unescapeHTML(attr_node.value).gsub(Loofah::HTML5::Scrub::CONTROL_CHARACTERS, "").downcase
+            if val_unescaped =~ /^[a-z0-9][-+.a-z0-9]*:/ && !Loofah::HTML5::SafeList::ALLOWED_PROTOCOLS.include?(val_unescaped.split(Loofah::HTML5::SafeList::PROTOCOL_SEPARATOR)[0])
+              attr_node.remove
+            end
+          end
+
+          if Loofah::HTML5::SafeList::SVG_ATTR_VAL_ALLOWS_REF.include?(attr_name)
+            attr_node.value = attr_node.value.gsub(/url\s*\(\s*[^#\s][^)]+?\)/m, " ") if attr_node.value
+          end
+
+          if Loofah::HTML5::SafeList::SVG_ALLOW_LOCAL_HREF.include?(node.name) && attr_name == "xlink:href" && attr_node.value =~ /^\s*[^#\s].*/m
+            attr_node.remove
+          end
+
+          Loofah::HTML5::Scrub.force_correct_attribute_escaping! node
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1648: the permit scrubber handing the attribute to Loofah's component-value parser is clean"
+  lang ruby
+  file lib/rails/html/scrubbers.rb
+  profile library
+  reject VYQL-DOS-001
+  reject VYQL-DOS-002
+  reject VYQL-DOS-003
+  code
+  ```
+  require "cgi"
+
+  module Rails
+    module Html
+      class PermitScrubber < Loofah::Scrubber
+        def scrub_attributes(node)
+          node.attribute_nodes.each do |attr_node|
+            scrub_attribute(node, attr_node)
+          end
+        end
+
+        def scrub_attribute(node, attr_node)
+          attr_name = if attr_node.namespace
+                        "#{attr_node.namespace.prefix}:#{attr_node.node_name}"
+                      else
+                        attr_node.node_name
+                      end
+
+          if Loofah::HTML5::SafeList::ATTR_VAL_IS_URI.include?(attr_name)
+            val_unescaped = CGI.unescapeHTML(attr_node.value).gsub(Loofah::HTML5::Scrub::CONTROL_CHARACTERS, "").downcase
+            if val_unescaped =~ /^[a-z0-9][-+.a-z0-9]*:/ && !Loofah::HTML5::SafeList::ALLOWED_PROTOCOLS.include?(val_unescaped.split(Loofah::HTML5::SafeList::PROTOCOL_SEPARATOR)[0])
+              attr_node.remove
+            end
+          end
+
+          if Loofah::HTML5::SafeList::SVG_ATTR_VAL_ALLOWS_REF.include?(attr_name)
+            Loofah::HTML5::Scrub.scrub_attribute_that_allows_local_ref(attr_node)
+          end
+
+          if Loofah::HTML5::SafeList::SVG_ALLOW_LOCAL_HREF.include?(node.name) && attr_name == "xlink:href" && attr_node.value =~ /^\s*[^#\s].*/m
+            attr_node.remove
+          end
+
+          Loofah::HTML5::Scrub.force_correct_attribute_escaping! node
+        end
+      end
+    end
+  end
+  ```
+
+# The isolating pair, on the real method's own scope. Each block is the real
+# `scrub_attribute` verbatim with only the SVG-ref branch's statement changed,
+# so the source half (the library profile's parameter source, taint surviving
+# the `.value` read) is identical across all three and each difference is one
+# axis:
+#   -- case form, reportable literal  -> reports. Proves source, classifier and
+#      the Switch operand link all work inside this method.
+#   -- gsub form, reportable literal  -> silent. Only the call form differs, so
+#      the receiver-to-regex-argument edge is what is missing.
+#   -- case form, the real literal    -> silent. Only the quantifiers differ, so
+#      the cost model is what is missing.
+
+test "rank1648 pair: the real scrub_attribute with a reportable literal in the case form"
+  lang ruby
+  profile library
+  expect VYQL-DOS-002
+  code
+  ```
+  require "cgi"
+
+  class Scrub
+    def scrub_attribute(node, attr_node)
+      attr_name = if attr_node.namespace
+                    "#{attr_node.namespace.prefix}:#{attr_node.node_name}"
+                  else
+                    attr_node.node_name
+                  end
+
+      if Loofah::HTML5::SafeList::ATTR_VAL_IS_URI.include?(attr_name)
+        val_unescaped = CGI.unescapeHTML(attr_node.value).gsub(Loofah::HTML5::Scrub::CONTROL_CHARACTERS, "").downcase
+        if val_unescaped =~ /^[a-z0-9][-+.a-z0-9]*:/ && !Loofah::HTML5::SafeList::ALLOWED_PROTOCOLS.include?(val_unescaped.split(Loofah::HTML5::SafeList::PROTOCOL_SEPARATOR)[0])
+          attr_node.remove
+        end
+      end
+      if Loofah::HTML5::SafeList::SVG_ATTR_VAL_ALLOWS_REF.include?(attr_name)
+        if attr_node.value
+          case attr_node.value
+          when /url\s*\(\s*([^#\s]+)+\)/m
+            attr_node.value = " "
+          end
+        end
+      end
+      if Loofah::HTML5::SafeList::SVG_ALLOW_LOCAL_HREF.include?(node.name) && attr_name == "xlink:href" && attr_node.value =~ /^\s*[^#\s].*/m
+        attr_node.remove
+      end
+
+      Loofah::HTML5::Scrub.force_correct_attribute_escaping! node
+    end
+  end
+  ```
+
+test "rank1648 pair: the same reportable literal as the gsub argument of the real statement"
+  lang ruby
+  profile library
+  reject VYQL-DOS-002
+  code
+  ```
+  require "cgi"
+
+  class Scrub
+    def scrub_attribute(node, attr_node)
+      attr_name = if attr_node.namespace
+                    "#{attr_node.namespace.prefix}:#{attr_node.node_name}"
+                  else
+                    attr_node.node_name
+                  end
+
+      if Loofah::HTML5::SafeList::ATTR_VAL_IS_URI.include?(attr_name)
+        val_unescaped = CGI.unescapeHTML(attr_node.value).gsub(Loofah::HTML5::Scrub::CONTROL_CHARACTERS, "").downcase
+        if val_unescaped =~ /^[a-z0-9][-+.a-z0-9]*:/ && !Loofah::HTML5::SafeList::ALLOWED_PROTOCOLS.include?(val_unescaped.split(Loofah::HTML5::SafeList::PROTOCOL_SEPARATOR)[0])
+          attr_node.remove
+        end
+      end
+      if Loofah::HTML5::SafeList::SVG_ATTR_VAL_ALLOWS_REF.include?(attr_name)
+        attr_node.value = attr_node.value.gsub(/url\s*\(\s*([^#\s]+)+\)/m, " ") if attr_node.value
+      end
+      if Loofah::HTML5::SafeList::SVG_ALLOW_LOCAL_HREF.include?(node.name) && attr_name == "xlink:href" && attr_node.value =~ /^\s*[^#\s].*/m
+        attr_node.remove
+      end
+
+      Loofah::HTML5::Scrub.force_correct_attribute_escaping! node
+    end
+  end
+  ```
+
+test "rank1648 pair: the real quadratic literal in the case form"
+  lang ruby
+  profile library
+  reject VYQL-DOS-002
+  code
+  ```
+  require "cgi"
+
+  class Scrub
+    def scrub_attribute(node, attr_node)
+      attr_name = if attr_node.namespace
+                    "#{attr_node.namespace.prefix}:#{attr_node.node_name}"
+                  else
+                    attr_node.node_name
+                  end
+
+      if Loofah::HTML5::SafeList::ATTR_VAL_IS_URI.include?(attr_name)
+        val_unescaped = CGI.unescapeHTML(attr_node.value).gsub(Loofah::HTML5::Scrub::CONTROL_CHARACTERS, "").downcase
+        if val_unescaped =~ /^[a-z0-9][-+.a-z0-9]*:/ && !Loofah::HTML5::SafeList::ALLOWED_PROTOCOLS.include?(val_unescaped.split(Loofah::HTML5::SafeList::PROTOCOL_SEPARATOR)[0])
+          attr_node.remove
+        end
+      end
+      if Loofah::HTML5::SafeList::SVG_ATTR_VAL_ALLOWS_REF.include?(attr_name)
+        if attr_node.value
+          case attr_node.value
+          when /url\s*\(\s*[^#\s][^)]+?\)/m
+            attr_node.value = " "
+          end
+        end
+      end
+      if Loofah::HTML5::SafeList::SVG_ALLOW_LOCAL_HREF.include?(node.name) && attr_name == "xlink:href" && attr_node.value =~ /^\s*[^#\s].*/m
+        attr_node.remove
+      end
+
+      Loofah::HTML5::Scrub.force_correct_attribute_escaping! node
+    end
+  end
+  ```
+
+# The modifier minimal pair, stripped to the construct: the trailing `if`
+# modifier alone takes the reportable `case` from 1 finding to 0, with source
+# and sink both still labelled.
+
+test "rank1648 pair: a reportable case statement over an attribute value"
+  lang ruby
+  profile library
+  expect VYQL-DOS-002
+  code
+  ```
+  class Scrub
+    def scrub_attribute(node, attr_node)
+      case attr_node.value
+      when /url\s*\(\s*([^#\s]+)+\)/m
+        attr_node.value = " "
+      end
+    end
+  end
+  ```
+
+test "rank1648 pair: the same case statement under an if modifier"
+  lang ruby
+  profile library
+  reject VYQL-DOS-002
+  code
+  ```
+  class Scrub
+    def scrub_attribute(node, attr_node)
+      case attr_node.value
+      when /url\s*\(\s*([^#\s]+)+\)/m
+        attr_node.value = " "
+      end if attr_node.value
+    end
+  end
+  ```

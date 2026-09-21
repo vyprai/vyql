@@ -1,0 +1,40 @@
+module bindings.rust.raw_write_past_size_hint_reservation;
+
+// A raw-write region sized from an iterator's size hint, with capacity regrown
+// by a single-element literal while the writes continue.
+//
+// Iterator::size_hint is documented as "primarily intended to be used for
+// optimizations such as reserving space for the elements of the iterator, but
+// must not be trusted", and its first tuple element is only a lower bound: an
+// iterator may yield more elements than it hints (library/core/src/iter/
+// traits/iterator.rs). Vec::reserve(additional) sizes the allocation from the
+// collection's current length. A function that reserves from the lower bound,
+// truncates or republishes its length with set_len, writes through
+// std::ptr::write, and then regrows capacity by a fixed literal once the write
+// cursor passes the reservation has an allocation shorter than the highest
+// index it writes: the cursor advances one element per regrow, while the
+// regrow sizes from a length the writes have already left behind.
+//
+// The canonical safe form of this pattern, Vec::extend_desugared in
+// library/alloc, checks the length against the capacity each iteration and
+// reserves a computed `lower.saturating_add(1)` from that accurate length --
+// a computed amount, not a literal -- and does not match. A single-element
+// insert that reserves one and writes one carries no size_hint call and does
+// not match either.
+//
+// The literal is matched as body text because the call-argument token route
+// flow-expands a call's inputs: `self.reserve(lower.saturating_add(1))` reads
+// as though the literal 1 were reserve's own argument. The text needle
+// requires the literal to be spelled at the call itself.
+//
+// Residuals. Prose in a comment can satisfy the literal clause, in the
+// false-positive direction. A regrow spelled with a computed amount
+// (`self.reserve(k + 1)`) or a multi-digit literal is missed, in the
+// false-negative direction. And the conjuncts are co-membership on one
+// function: the Rust function context carries no ordering fact, so the
+// reserve-by-literal is not required to sit inside the write loop -- it must
+// merely share the function with the hint-driven raw writes.
+binding rawWritePastSizeHintReservation {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.call in ["size_hint"] and node.context.call in ["set_len"] and node.context.callPath in ["ptr.write", "std.ptr.write", "core.ptr.write"] and containsAny(node.token, ["self.reserve(1)", "self.reserve(2)", "self.reserve(3)", "self.reserve(4)", "self.reserve(5)", "self.reserve(6)", "self.reserve(7)", "self.reserve(8)", "self.reserve(9)"])
+  emit issue code.FixedChunkCapacityGrowthIndex at node
+}

@@ -1,0 +1,125 @@
+# Rank 1070 / CVE-2022-23639: crossbeam-utils' AtomicCell does its arithmetic by
+# casting the cell's storage to an atomic of matching width and calling
+# fetch_add on it, whether or not the type can live in that atomic (CWE-362).
+#
+# ATTENTION: engine gap, with a vocabulary gap behind it. The whole fix lives
+# inside a macro_rules! body, and the Rust frontend lowers macro_definition
+# bodies to unstructured token soup: the identifiers survive as bare Name
+# nodes (fetch_add, get, AcqRel) wrapped in Seq(__object_literal), but no
+# function context, no call structure, no dereference primitive and no cast
+# target type are produced, so no binding can see the cast or the
+# read-modify-write at all -- not even the null-deref review that fires on the
+# same shape once expanded. The invocation sites are visible (Call
+# path=impl_arithmetic with the type arguments as Arg nodes), but nothing
+# joins them to the template. Making macro bodies visible needs a re-parse of
+# the token tree, which is not mechanical, and it still would not convert this
+# rank: the only source-level discriminator the fix introduces is the guard
+# can_transmute::<$t, $atomic>(), a private const fn of this crate (it predates
+# the fix but is undocumented and crate-local), so a negation keyed on it is
+# repro-shaped, and keying on the cast now sitting inside an if expression
+# encodes the fixing commit's own layout. The first two snippets pin the real
+# macro form the scanner has nothing to say about; the last two pin the
+# expanded form, where the only label the shape draws is the unrelated
+# null-deref review, identically with and without the guard.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1070: the arithmetic arm casts the cell's storage unconditionally"
+  lang rust
+  file crossbeam-utils/src/atomic/atomic_cell.rs
+  reject VYQL-MEM-006
+  code
+  ```
+  use core::sync::atomic::Ordering;
+
+  macro_rules! impl_arithmetic {
+      ($t:ty, $atomic:ty) => {
+          impl AtomicCell<$t> {
+              #[inline]
+              pub fn fetch_add(&self, val: $t) -> $t {
+                  let a = unsafe { &*(self.value.get() as *const $atomic) };
+                  a.fetch_add(val, Ordering::AcqRel)
+              }
+          }
+      };
+  }
+  ```
+
+test "rank1070: the same arm reaches the cast only when the type transmutes"
+  lang rust
+  file crossbeam-utils/src/atomic/atomic_cell.rs
+  reject VYQL-MEM-006
+  code
+  ```
+  use core::sync::atomic::Ordering;
+
+  macro_rules! impl_arithmetic {
+      ($t:ty, $atomic:ty) => {
+          impl AtomicCell<$t> {
+              #[inline]
+              pub fn fetch_add(&self, val: $t) -> $t {
+                  if can_transmute::<$t, $atomic>() {
+                      let a = unsafe { &*(self.value.get() as *const $atomic) };
+                      a.fetch_add(val, Ordering::AcqRel)
+                  } else {
+                      let _guard = lock(self.value.get() as usize).write();
+                      let value = unsafe { &mut *(self.value.get()) };
+                      let old = *value;
+                      *value = value.wrapping_add(val);
+                      old
+                  }
+              }
+          }
+      };
+  }
+  ```
+
+test "rank1070: the expanded fetch_add dereferences a reinterpreted atomic reference"
+  lang rust
+  file crossbeam-utils/src/atomic/atomic_cell.rs
+  expect VYQL-MEM-006
+  code
+  ```
+  use std::sync::atomic::{AtomicU64, Ordering};
+  use std::cell::UnsafeCell;
+
+  pub struct AtomicCell<T> {
+      value: UnsafeCell<T>,
+  }
+
+  impl AtomicCell<u64> {
+      pub fn fetch_add(&self, val: u64) -> u64 {
+          let a = unsafe { &*(self.value.get() as *const AtomicU64) };
+          a.fetch_add(val, Ordering::AcqRel)
+      }
+  }
+  ```
+
+test "rank1070: the expanded fetch_add takes the cast only when the type transmutes"
+  lang rust
+  file crossbeam-utils/src/atomic/atomic_cell.rs
+  expect VYQL-MEM-006
+  code
+  ```
+  use std::sync::atomic::{AtomicU64, Ordering};
+  use std::cell::UnsafeCell;
+
+  pub struct AtomicCell<T> {
+      value: UnsafeCell<T>,
+  }
+
+  impl AtomicCell<u64> {
+      pub fn fetch_add(&self, val: u64) -> u64 {
+          if can_transmute::<u64, AtomicU64>() {
+              let a = unsafe { &*(self.value.get() as *const AtomicU64) };
+              a.fetch_add(val, Ordering::AcqRel)
+          } else {
+              let _guard = lock(self.value.get() as usize).write();
+              let value = unsafe { &mut *(self.value.get()) };
+              let old = *value;
+              *value = value.wrapping_add(val);
+              old
+          }
+      }
+  }
+  ```

@@ -1,0 +1,33 @@
+module bindings.python.generated.m4ccc92d1;
+
+binding commandExecution0 {
+  requires {
+    dependency("sphinx-rtd-theme")
+  }
+  query pattern callExpr where callee.method == "WebpackBuildCommand.run"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution1 {
+  requires {
+    dependency("sphinx-rtd-theme")
+  }
+  query pattern callExpr where callee.method == "WebpackDevelopCommand.run"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution2 {
+  requires {
+    dependency("sphinx-rtd-theme")
+  }
+  query pattern callExpr where callee.method == "UpdateTranslationsCommand.run"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution3 {
+  requires {
+    dependency("sphinx-rtd-theme")
+  }
+  query pattern callExpr where callee.method == "TransifexCommand.run"
+  emit sink code.CommandExecution at args[0]
+}

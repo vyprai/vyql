@@ -1,0 +1,7 @@
+module code;
+
+review code.ChakraScopeSlotArrayUncheckedIndex {
+  category: memory
+  kind: attention
+  text: "review Chakra scope-slot array writes for a checked helper before indexing property-id storage"
+}

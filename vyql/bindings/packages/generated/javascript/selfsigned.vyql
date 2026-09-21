@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m2776b029;
+
+binding weakHash0 {
+  requires {
+    dependency("selfsigned")
+  }
+  query pattern callExpr where callee.method == "generate"
+  emit issue code.WeakHash at call
+}

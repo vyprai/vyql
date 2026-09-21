@@ -1,0 +1,11 @@
+module code;
+
+concept ConvertedBufferSourceLength : issue {
+  cwe: [CWE_125, CWE_131]
+  reviewAssumption: "the conversion's output encoding can need more elements than its input's own length reports"
+  reviewCategory: memory
+  reviewCondition: "a call receives a re-encoded buffer as an unnamed conversion temporary together with a length taken from the conversion's input, so the length describes a buffer the call was not handed"
+  reviewConfidence: medium
+  reviewEvidence: "call context {pattern} hands over a conversion temporary's buffer accessor while its length argument derives from the conversion's input"
+  vulnerableTo: [memory.OobRead]
+}

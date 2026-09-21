@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule SandboxHostObjectMemberDenylistGap {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_749, CWE_184]
+    id: "VYQL-INJ-271"
+    severity: high
+  }
+  issue code.SandboxHostObjectMemberDenylistGap as facade
+}

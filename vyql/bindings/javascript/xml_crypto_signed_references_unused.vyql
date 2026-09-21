@@ -1,0 +1,34 @@
+module bindings.javascript.xml_crypto_signed_references_unused;
+
+// `xml-crypto` splits an XML signature check into two questions, and its
+// README is explicit that answering only the first is not enough: "The
+// xml-crypto api requires you to supply it separately the xml signature and
+// the signed xml (in checkSignature)". `SignedXml.checkSignature(xml)` returns
+// whether *a* signature over *some* subset of that document verified; it does
+// not say which subset. The library's own guidance after a successful check is
+// `var signedBytes = sig.getSignedReferences();` followed by "It is now safe
+// to load SAML, obtain the assertion XML, or do whatever else is needed. Be
+// sure to only use authenticated data." It documents the older
+// `getReferences()` as deprecated because "the content in them should be
+// treated as unsigned", and says moving to `getSignedReferences()` "will help
+// prevent future XML signature wrapping attacks".
+//
+// A module that constructs `SignedXml`, loads a signature into it with
+// `loadSignature`, and calls `checkSignature` therefore has the verification
+// half of the API and none of the attribution half. Whatever it hands on to
+// assertion processing is a node it re-selected from the parsed document, so a
+// response carrying a legitimately signed element beside an attacker-authored
+// Assertion passes the boolean and delivers the attacker's assertion -- the
+// signature-wrapping shape the SAML profile has been broken by repeatedly.
+//
+// The scope is the module rather than the function because the verification
+// helper and the caller that consumes the signed bytes are conventionally
+// separate functions in the same file, as they are in every wrapper around
+// this API. Each name is matched as a whole `call:` token, so `getReferences`
+// does not stand in for `getSignedReferences`. A module that reads the signed
+// references anywhere satisfies the control and is not reported; so does one
+// that only signs, since it never calls `checkSignature`.
+binding xmlCryptoSignedReferencesUnused {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.call == "SignedXml" and node.context.call == "loadSignature" and node.context.call == "checkSignature" and not (node.context.call == "getSignedReferences")
+  emit issue code.SamlAssertionWrappingBypass at node
+}

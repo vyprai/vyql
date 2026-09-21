@@ -1,0 +1,6 @@
+module injection;
+
+threat Xss {
+  cwe: [CWE_79]
+  desc: "Untrusted data in rendered HTML (cross-site scripting)"
+}

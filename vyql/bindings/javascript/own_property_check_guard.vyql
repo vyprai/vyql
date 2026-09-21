@@ -1,0 +1,21 @@
+module bindings.javascript.own_property_check_guard;
+
+// The platform documents one predicate that distinguishes an object's
+// own properties from the inherited ones it walks in for-in, and every
+// prototype-pollution remediation that filters a walked key uses a
+// spelling of it: `Object.prototype.hasOwnProperty.call(obj, key)`
+// (the form that also works on `Object.create(null)` receivers),
+// `obj.hasOwnProperty(key)`, and the ES2022 `Object.hasOwn(obj, key)`.
+// The call is a pure predicate -- it can only be a check, never a
+// mutation -- so a computed-key write made under it is the guarded
+// write the prototype-pollution rule asks for. The binding anchors the
+// check in the endpoint whose writes it guards, matching how the other
+// spellings of this guard are anchored.
+binding ownPropertyCheckGuard {
+  query pattern callExpr where callee.path ~= "Object.prototype.hasOwnProperty.call" or callee.method == "hasOwnProperty" or callee.path ~= "Object.hasOwn"
+  emit check core.PrototypePollutionGuard at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule UnescapedJsonTreeLabelXss {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_79]
+    id: "VYQL-INJ-125"
+    severity: high
+  }
+  issue code.UnescapedJsonTreeLabelXss as sink
+}

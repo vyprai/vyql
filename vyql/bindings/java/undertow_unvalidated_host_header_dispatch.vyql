@@ -1,0 +1,40 @@
+module bindings.java.undertow_unvalidated_host_header_dispatch;
+
+// RFC 7230 section 5.4 puts an obligation on every HTTP/1.1 server: a request
+// that carries more than one Host header, or a Host header whose value is not
+// a valid authority (uri-host [":" port]), MUST be rejected. The obligation
+// lands in the transport's request-dispatch method -- the one that both reads
+// the request's header store and hands the exchange to the application
+// handler chain -- because that is the last point the server controls the
+// request before application code consumes its authority (routing, redirects,
+// cache keys, proxying). Undertow documents both halves of that method:
+// HttpServerExchange.getRequestHeaders() returns the request header store,
+// and Connectors.executeRootHandler(HttpHandler, HttpServerExchange) runs the
+// handler chain for the exchange.
+//
+// The method this labels is identified by all three of the things that make
+// it the obligation site, in one method: it consults the request header
+// store, it names the Host header while doing so (Headers.HOST, or the HTTP/2
+// form that copies the :authority pseudo-header into Host), and it executes
+// the root handler. A middleware handler that re-dispatches a buffered
+// exchange consults the header store without naming Host -- the authority
+// decision was made upstream -- and is not reported. Connectors
+// .areRequestHeadersValid is deliberately not a discharge: it reconciles
+// Transfer-Encoding against Content-Length and never looks at the Host value.
+//
+// The negation lists the spellings that check a host value's grammar:
+// String/Matcher.matches for a grammar match, and NetworkUtils' documented
+// address parsers (parseIpv4Address, parseIpv6Address, parseIpv6AddressToBytes,
+// formatPossibleIpv6Address), which reject a malformed host. A dispatch method
+// that delegates the check to a wrapping handler keeps no Host consult of its
+// own and is not this method; one that validates inline is silent however it
+// spells the test.
+//
+// This is a property of the dispatch method rather than of any value flowing
+// through it -- the attacker's input is the header block the exchange already
+// carries -- so it is a presence fact on the method context, not a taint sink.
+
+binding undertowUnvalidatedHostHeaderDispatch {
+  query pattern presenceNode where node.scope == "function" and node.context.call in ["getRequestHeaders"] and node.context.selector in ["Headers.HOST"] and node.context.callPath in ["Connectors.executeRootHandler"] and not (node.context.call in ["matches", "parseIpv4Address", "parseIpv6Address", "parseIpv6AddressToBytes", "formatPossibleIpv6Address"])
+  emit issue code.UnvalidatedHostHeaderDispatch at node
+}

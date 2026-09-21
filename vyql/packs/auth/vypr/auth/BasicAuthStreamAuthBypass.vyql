@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule BasicAuthStreamAuthBypass {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_287, CWE_306]
+    id: "VYQL-AUTH-033"
+    severity: high
+  }
+  issue code.BasicAuthStreamAuthBypass as auth
+}

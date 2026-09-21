@@ -1,0 +1,40 @@
+# Rank 562 / CVE-2015-10053: Curupira passed the whole user params hash into
+# ActiveRecord find_by, allowing request-controlled query conditions.
+
+test "rank562: curupira passes request hash directly to find_by"
+  lang ruby
+  file passwords_controller.rb
+  expect VYQL-INJ-030
+  expect_review code.UnparameterizedSqlQueryParser
+  code
+  ```
+  class Curupira::PasswordsController < ApplicationController
+    def create
+      @user = User.find_by(params[:user])
+      if @user.present?
+        @user.deliver_reset_password_instructions!
+      else
+        @user = User.new(params[:user])
+      end
+    end
+  end
+  ```
+
+test "rank562: curupira constrains find_by to email key"
+  lang ruby
+  file passwords_controller.rb
+  reject VYQL-INJ-030
+  reject_review code.UnparameterizedSqlQueryParser
+  code
+  ```
+  class Curupira::PasswordsController < ApplicationController
+    def create
+      @user = User.find_by(email: params[:user][:email])
+      if @user.present?
+        @user.deliver_reset_password_instructions!
+      else
+        @user = User.new(params[:user])
+      end
+    end
+  end
+  ```

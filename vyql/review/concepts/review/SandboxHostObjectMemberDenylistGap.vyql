@@ -1,0 +1,7 @@
+module code;
+
+review code.SandboxHostObjectMemberDenylistGap {
+  category: code_execution
+  kind: attention
+  text: "expose an explicit allowlist of the members sandboxed script needs instead of forwarding a live host object behind a denylist of property names"
+}

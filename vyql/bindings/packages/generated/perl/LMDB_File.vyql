@@ -1,0 +1,9 @@
+module bindings.perl.generated.m2a979fd7;
+
+binding sqlExecution0 {
+  requires {
+    dependency("LMDB_File")
+  }
+  query pattern callExpr where callee.method == "DELETE"
+  emit sink code.SqlExecution at args[0]
+}

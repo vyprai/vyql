@@ -1,0 +1,248 @@
+# CVE-2022-40152 (CWE-400/CWE-674): Woodstox's DTD reader recursed into
+# nested content specifications with no depth limit, so a DOCTYPE whose
+# <!ELEMENT> content spec nests a few thousand parentheses drove
+# readContentSpec into a StackOverflowError and took the parsing thread
+# down. readContentSpec in
+# src/main/java/com/ctc/wstx/dtd/FullDTDReader.java walked the spec in a
+# while(true) loop and, at every '(' token, called itself unconditionally
+# -- `ContentSpec cs = readContentSpec(elemName, false, construct);` -- so
+# nesting depth was bounded only by the input itself. The pool row carried
+# nocommit; the flag is advisory-side absence only: 7e93907 ("add recursion
+# limit of 500 for DTD parsing (#159)") is the fixing change, and it reads
+# in full from the default clone -- the method gains a recursionDepth
+# parameter, `if (recursionDepth > DTD_RECURSION_DEPTH_LIMIT) throw new
+# XMLStreamException(...)` at entry, and the self-call passes
+# `recursionDepth + 1`.
+#
+# ATTENTION, re-measured fresh on both revisions and both report views.
+# Three `--cache off` runs per revision over src/main/java report one
+# finding each, byte-identical: VYQL-NUM-014 on UTF8Writer.java:112, an
+# offset-plus-length bounds heuristic in the writer, untouched by the fix.
+# The `-flags only` view reports 36 flags per revision with identical
+# sets; the only movement is the FullDTDReader ResourceRelease flag
+# shifting 864 -> 885 with the twenty-one lines the fix adds above it.
+# Nothing in either view names the content-spec walk.
+#
+# Extraction and resolution are not the blocker. `vyql graph` on the
+# vulnerable FullDTDReader.java shows the self-call as a node
+# (`Call path=readContentSpec` at :3090, inside fn377) with its arguments
+# flowing into the enclosing function's own parameters
+# (`Arg#3907 --FLOWS--> FullDTDReader.readContentSpec#param#elemName`),
+# and `vyql resolve` counts 505 resolved call sites with readContentSpec
+# absent from the unresolved list. The recursion is in the graph; no fact
+# observes it.
+#
+# What stands, engine: presence predicates compare one field to a string
+# literal (internal/bindings/compile_presence.go:229, re-verified on the
+# current engine), so no predicate unifies node.context.functionName with
+# node.context.callPath and "the callee is the enclosing function" does
+# not compile -- the depth-budget family recorded for C (1320), JS (1391),
+# Rust (1697), Scala (1586, 1776) and Kotlin (1954). The shipped
+# JavaScript extglob binding states the same limit in its own comment:
+# "`function_name:` and `call_path:` both reach it but no predicate can
+# unify them".
+#
+# What stands, vocabulary: code.UnboundedResourceOperation (VYQL-DOS-042)
+# has emitters in python, rust, javascript, swift and c, none in java, and
+# each is anchored on its ecosystem's documented bounding vocabulary
+# (asyncio's spawn and len() comparison, flate2's buffer-growth calls and
+# min/clamp/take/truncate, python-multipart's window contract, RFC 8915's
+# cookie exchange). The depth-limit concepts that do exist are
+# per-ecosystem the same way: NestedExtglobExpansionWithoutDepthLimit
+# (javascript, anchored on the documented `noext` option),
+# NestedParamExpansionWithoutDepthLimit (ruby) and
+# GsonObjectTypeAdapterRecursiveRead (java, keyed on Gson's own
+# identifiers). Woodstox's readContentSpec is a private method with no
+# public surface, so a binding naming it detects this parser rather than
+# the weakness, and the fix's own spellings (recursionDepth,
+# DTD_RECURSION_DEPTH_LIMIT) are the discriminator such a binding would
+# key on.
+#
+# The discriminating fact is the budget asymmetry, the same shape the
+# Kotlin sibling measured: woodstox documents and enforces two depth
+# budgets at both revisions -- WstxInputProperties.P_MAX_ELEMENT_DEPTH
+# ("com.ctc.wstx.maxElementDepth", default 1000) enforced in
+# InputElementStack.java:326 as `if (++mDepth >
+# mConfig.getMaxElementDepth()) throw ...`, and P_MAX_ENTITY_DEPTH
+# ("com.ctc.wstx.maxEntityDepth") enforced in StreamScanner.java:976
+# through verifyLimit("Maximum entity expansion depth", ...). The DTD
+# content-spec walk consults neither budget at either revision; the fix
+# adds its own static limit rather than routing through the config. So no
+# fact naming the budget alone separates the revisions either -- only
+# "the self-recursive call site consults a cap" does, which is the
+# inexpressible half above.
+#
+# The one generic anchor available was measured and is not shippable: a
+# function-scope `'('` character literal with a negation on generic depth
+# identifiers (maxRecursion, recursionLimit, recursionDepth, maxDepth,
+# depthLimit, maxNesting, nestingLimit, nestingDepth) reports 7 findings
+# at the vulnerable revision and 6 at the fixed one. The six that persist
+# are ChoiceContentSpec.java:123, ConcatModel.java:108 and
+# SeqContentSpec.java:114 -- `sb.append('(')` in content-spec toString
+# builders -- plus FullDTDReader's handleElementDecl, handleAttrDecl and
+# readMixedSpec, three iterative walks that never recurse; only
+# readContentSpec clears. Seven flagged for one true, six of them present
+# at both revisions, and the anchor cannot name recursion at all. Its
+# reach elsewhere is quiet on web code and wrong on parser code: zero
+# `'('` character literals across the 2766-file OWASP Java benchmark
+# corpus, one in the protobuf-java clone, twenty-eight over eighteen
+# files in quarkus. (The protobuf-java scan itself stops at the --max-ram
+# ceiling at 5.6 GiB resident, reported as measured rather than retried.)
+#
+# No definition change ships. Tests one and two hold the two revisions
+# and both reject VYQL-DOS-029, VYQL-DOS-042 and VYQL-DOS-045: when
+# recursion-depth budget vocabulary lands, the unbounded form must flip
+# to expect.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1959: the content-spec walk recurses without a depth cap"
+  lang java
+  file src/main/java/com/ctc/wstx/dtd/FullDTDReader.java
+  reject VYQL-DOS-029
+  reject VYQL-DOS-042
+  reject VYQL-DOS-045
+  code
+  ```
+  package com.ctc.wstx.dtd;
+
+  import java.util.ArrayList;
+  import javax.xml.stream.XMLStreamException;
+
+  class FullDTDReader
+  {
+      private ContentSpec readContentSpec(PrefixedName elemName, boolean mainLevel,
+                                          boolean construct)
+          throws XMLStreamException
+      {
+          ArrayList<ContentSpec> subSpecs = new ArrayList<ContentSpec>();
+          boolean isChoice = false;
+          boolean choiceSet = false;
+
+          while (true) {
+              char c = skipDtdWs(true);
+              if (c == ')') {
+                  if (subSpecs.isEmpty()) {
+                      _reportWFCViolation("Empty content specification for '"+elemName+"' (need at least one entry)");
+                  }
+                  break;
+              }
+              if (c == '|' || c == ',') {
+                  boolean newChoice = (c == '|');
+                  if (!choiceSet) {
+                      isChoice = newChoice;
+                      choiceSet = true;
+                  } else {
+                      if (isChoice != newChoice) {
+                          _reportWFCViolation("Can not mix content spec separators ('|' and ','); need to use parenthesis groups");
+                      }
+                  }
+                  c = skipDtdWs(true);
+              } else {
+                  if (!subSpecs.isEmpty()) {
+                      throwDTDUnexpectedChar(c, " (missing separator '|' or ','?)");
+                  }
+              }
+              if (c == '(') {
+                  ContentSpec cs = readContentSpec(elemName, false, construct);
+                  subSpecs.add(cs);
+                  continue;
+              }
+              PrefixedName thisName = readDTDQName(c);
+              char arity = readArity();
+              ContentSpec cs = construct ?
+                  TokenContentSpec.construct(arity, thisName)
+                  : TokenContentSpec.getDummySpec();
+              subSpecs.add(cs);
+          }
+
+          char arity = readArity();
+          if (subSpecs.size() == 1) {
+              return subSpecs.get(0);
+          }
+          if (isChoice) {
+              return ChoiceContentSpec.constructChoice(mCfgNsEnabled, arity, subSpecs);
+          }
+          return SeqContentSpec.construct(mCfgNsEnabled, arity, subSpecs);
+      }
+  }
+  ```
+
+test "rank1959: the fixed revision caps the content-spec recursion depth"
+  lang java
+  file src/main/java/com/ctc/wstx/dtd/FullDTDReader.java
+  reject VYQL-DOS-029
+  reject VYQL-DOS-042
+  reject VYQL-DOS-045
+  code
+  ```
+  package com.ctc.wstx.dtd;
+
+  import java.util.ArrayList;
+  import javax.xml.stream.XMLStreamException;
+
+  class FullDTDReader
+  {
+      final static int DEFAULT_DTD_RECURSION_DEPTH_LIMIT = 500;
+      static int DTD_RECURSION_DEPTH_LIMIT = DEFAULT_DTD_RECURSION_DEPTH_LIMIT;
+
+      private ContentSpec readContentSpec(final PrefixedName elemName, final boolean construct,
+                                          final int recursionDepth)
+          throws XMLStreamException
+      {
+          if (recursionDepth > DTD_RECURSION_DEPTH_LIMIT) {
+              throw new XMLStreamException("FullDTDReader has reached recursion depth limit of " + DTD_RECURSION_DEPTH_LIMIT);
+          }
+
+          ArrayList<ContentSpec> subSpecs = new ArrayList<ContentSpec>();
+          boolean isChoice = false;
+          boolean choiceSet = false;
+
+          while (true) {
+              char c = skipDtdWs(true);
+              if (c == ')') {
+                  if (subSpecs.isEmpty()) {
+                      _reportWFCViolation("Empty content specification for '"+elemName+"' (need at least one entry)");
+                  }
+                  break;
+              }
+              if (c == '|' || c == ',') {
+                  boolean newChoice = (c == '|');
+                  if (!choiceSet) {
+                      isChoice = newChoice;
+                      choiceSet = true;
+                  } else {
+                      if (isChoice != newChoice) {
+                          _reportWFCViolation("Can not mix content spec separators ('|' and ','); need to use parenthesis groups");
+                      }
+                  }
+                  c = skipDtdWs(true);
+              } else {
+                  if (!subSpecs.isEmpty()) {
+                      throwDTDUnexpectedChar(c, " (missing separator '|' or ','?)");
+                  }
+              }
+              if (c == '(') {
+                  ContentSpec cs = readContentSpec(elemName, construct, recursionDepth + 1);
+                  subSpecs.add(cs);
+                  continue;
+              }
+              PrefixedName thisName = readDTDQName(c);
+              char arity = readArity();
+              ContentSpec cs = construct ?
+                  TokenContentSpec.construct(arity, thisName)
+                  : TokenContentSpec.getDummySpec();
+              subSpecs.add(cs);
+          }
+
+          char arity = readArity();
+          if (subSpecs.size() == 1) {
+              return subSpecs.get(0);
+          }
+          if (isChoice) {
+              return ChoiceContentSpec.constructChoice(mCfgNsEnabled, arity, subSpecs);
+          }
+          return SeqContentSpec.construct(mCfgNsEnabled, arity, subSpecs);
+      }
+  }
+  ```

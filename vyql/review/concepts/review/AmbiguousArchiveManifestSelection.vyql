@@ -1,0 +1,8 @@
+module code;
+
+review code.AmbiguousArchiveManifestSelection {
+  category: input_validation
+  expected: [core.InputValidation]
+  kind: attention
+  text: "review archive manifest lookups that scan entry names for the manifest filename without requiring exactly one match"
+}

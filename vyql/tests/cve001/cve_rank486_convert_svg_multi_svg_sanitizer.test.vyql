@@ -1,0 +1,61 @@
+# Rank 486 / CVE-2022-24278: convert-svg sanitized a broad `svg` selection,
+# then embedded all selected SVG elements into the Puppeteer page. The fix
+# converts only the first SVG element with `svg:first`.
+
+test "rank486: convert-svg sanitizes broad multi-SVG selection before rendering"
+  lang javascript
+  file Converter.js
+  expect VYQL-PATH-024
+  expect_review code.ConvertSvgMultiSvgSanitizerBypass
+  code
+  ```
+  class Converter {
+    async [_convert](input, options) {
+      input = Buffer.isBuffer(input) ? input.toString('utf8') : input;
+
+      const { provider } = this;
+      const svg = cheerio.default.html(this[_sanitize](cheerio.load(input, null, false)('svg'), options));
+
+      const html = `<!DOCTYPE html>
+  <html>
+  <head>
+  <base href="${options.baseUrl}">
+  </head>
+  <body>${svg}</body>
+  </html>`;
+
+      const page = await this[_getPage](html);
+      await page.setViewport(provider.getDimensions(options));
+      return await page.screenshot();
+    }
+  }
+  ```
+
+test "rank486: convert-svg selects first SVG before sanitizing and rendering"
+  lang javascript
+  file Converter.js
+  reject VYQL-PATH-024
+  reject_review code.ConvertSvgMultiSvgSanitizerBypass
+  code
+  ```
+  class Converter {
+    async [_convert](input, options) {
+      input = Buffer.isBuffer(input) ? input.toString('utf8') : input;
+
+      const { provider } = this;
+      const svg = cheerio.default.html(this[_sanitize](cheerio.load(input, null, false)('svg:first'), options));
+
+      const html = `<!DOCTYPE html>
+  <html>
+  <head>
+  <base href="${options.baseUrl}">
+  </head>
+  <body>${svg}</body>
+  </html>`;
+
+      const page = await this[_getPage](html);
+      await page.setViewport(provider.getDimensions(options));
+      return await page.screenshot();
+    }
+  }
+  ```

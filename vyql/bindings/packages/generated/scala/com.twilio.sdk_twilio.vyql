@@ -1,0 +1,13 @@
+module bindings.scala.generated.maa0525d4;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("com.twilio.sdk:twilio")
+  }
+  query pattern callExpr where callee.method == "RequestValidator.validate"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

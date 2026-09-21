@@ -1,0 +1,44 @@
+# Rank 982 / CVE-2020-36066: gjson depended on a vulnerable tidwall/match
+# version before bumping to v1.0.3.
+
+test "rank982: vulnerable tidwall match dependency is flagged"
+  lang go
+  file gjson.go
+  code
+  ```
+  package gjson
+  ```
+  file go.mod
+  expect VYQL-SCA-001
+  code
+  ```
+  module github.com/tidwall/gjson
+
+  go 1.12
+
+  require (
+      github.com/tidwall/match v1.0.1
+      github.com/tidwall/pretty v1.0.2
+  )
+  ```
+
+test "rank982: patched tidwall match dependency is clean"
+  lang go
+  file gjson.go
+  code
+  ```
+  package gjson
+  ```
+  file go.mod
+  reject VYQL-SCA-001
+  code
+  ```
+  module github.com/tidwall/gjson
+
+  go 1.12
+
+  require (
+      github.com/tidwall/match v1.0.3
+      github.com/tidwall/pretty v1.0.2
+  )
+  ```

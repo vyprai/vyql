@@ -1,0 +1,9 @@
+module bindings.perl.generated.m5f66fafb;
+
+binding filePathAccess0 {
+  requires {
+    dependency("Statistics-ROC")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}

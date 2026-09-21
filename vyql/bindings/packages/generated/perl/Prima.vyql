@@ -1,0 +1,25 @@
+module bindings.perl.generated.mc1a0aeb2;
+
+binding filePathAccess0 {
+  requires {
+    dependency("Prima")
+  }
+  query pattern callExpr where callee.method == "Prima::IniFile::read"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("Prima")
+  }
+  query pattern callExpr where callee.method == "Prima::IniFile::read"
+  emit sink code.Deserialization at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("Prima")
+  }
+  query pattern callExpr where callee.method == "Prima::IniFile::write"
+  emit sink code.FilePathAccess at args[0]
+}

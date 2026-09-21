@@ -1,0 +1,49 @@
+module bindings.java.generated.me54f191d;
+
+binding filePathAccess0 {
+  requires {
+    dependency("org.apache.ivy:ivy")
+  }
+  query pattern callExpr where callee.method == "configure"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("org.apache.ivy:ivy")
+  }
+  query pattern callExpr where callee.method == "configure"
+  emit sink code.Deserialization at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("org.apache.ivy:ivy")
+  }
+  query pattern callExpr where callee.method == "configureDefault"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("org.apache.ivy:ivy")
+  }
+  query pattern callExpr where callee.method == "configureDefault14"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("org.apache.ivy:ivy")
+  }
+  query pattern callExpr where callee.method == "resolve"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("org.apache.ivy:ivy")
+  }
+  query pattern callExpr where callee.method == "resolve"
+  emit sink code.Deserialization at args[0]
+}

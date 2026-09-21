@@ -1,0 +1,11 @@
+module vypr.concurrency;
+
+rule EffectMixedSchedulerSharedRunner {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_362]
+    id: "VYQL-RACE-008"
+    severity: high
+  }
+  issue code.EffectMixedSchedulerSharedRunner as scheduler
+}

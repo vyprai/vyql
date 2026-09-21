@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule MissingGuestFallbackForWebAuth {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_287]
+    id: "VYQL-AUTH-007"
+    severity: high
+  }
+  issue code.MissingGuestFallbackForWebAuth as fallback
+}

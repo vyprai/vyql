@@ -1,0 +1,17 @@
+module bindings.elixir.generated.maccf35a5;
+
+binding httpInput0 {
+  requires {
+    dependency("bandit")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit source code.HttpInput at call.result
+}
+
+binding deserialization1 {
+  requires {
+    dependency("bandit")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

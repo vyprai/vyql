@@ -1,0 +1,39 @@
+module bindings.kotlin.openSearchTenantScopedDocumentAccess;
+
+// OpenSearch's security plugin gives every user a private tenant, and it
+// addresses all of them by one reserved name: `__user__`. That is what
+// `org.opensearch.commons.authuser.User.getRequestedTenant()` returns for any
+// principal browsing their private space, so the tenant name is identical for
+// every user in the cluster and comparing it against a stored document's
+// tenant separates one user's private documents from another's not at all.
+// The security plugin's own documentation states the consequence -- private
+// tenant content is never shared -- and the plugins that persist tenant-scoped
+// documents implement it by adding the requester's own name to the document's
+// access list and matching on that.
+//
+// The OpenSearch plugins that store such documents share one class for it,
+// `UserAccessManager`, replicated in observability, reporting and
+// simple-schema. It has two halves that have to agree: `getSearchAccessInfo`
+// builds the filter a search runs under and returns `listOf("User:${user.name}")`
+// for a private-tenant requester, and `doesUserHasAccess(user, tenant, access)`
+// is the per-document decision the get/update/delete paths call. Both read the
+// requester's tenant through `getUserTenant`, and `isUserPrivateTenant` is the
+// contract's name for the `__user__` comparison.
+//
+// A `getUserTenant` read whose function then decides on the document's access
+// list or on the requester's roles, without asking anywhere in that function
+// whether the requester is in their private tenant, is the half that disagrees:
+// tenant equality holds for every user of the cluster inside `__user__`, so the
+// role or filter-by branch it falls through to hands one user's private
+// documents to another (CWE-285, CWE-639). Whether that is a finding is
+// VYQL-AUTH-081's call; this says only which decision omitted the constraint.
+//
+// Residual: the private-tenant question is recognised through the contract's
+// `isUserPrivateTenant` predicate, which every copy of the class declares, so a
+// plugin that renames it or inlines the `__user__` comparison instead of
+// calling it still flags. Kotlin emits no literal context tokens, so the
+// sentinel itself is not readable from the decision's function scope.
+binding kotlinTenantScopedDocumentAccessWithoutPrivateTenantConstraint {
+  query pattern presenceNode where node.kind == "call" and node.path ~= "getUserTenant" and containsAny(node.context.scopeCall, ["access.contains", "backendRoles.map", "roles.stream", "roles.map"]) and not containsAny(node.context.scopeCall, ["isUserPrivateTenant"])
+  emit issue code.IdorPolicyReview at node
+}

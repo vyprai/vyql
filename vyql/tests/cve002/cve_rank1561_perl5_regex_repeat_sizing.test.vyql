@@ -1,0 +1,151 @@
+# Rank 1561 / CVE-2026-8376: Perl's regex compiler sized its
+# repeat-quantifier expansion with an unchecked multiply, so a crafted
+# pattern overflowed the size computation and corrupted memory
+# (integer overflow leading to buffer overflow, CWE-190/CWE-787;
+# perl-security#147). Perl_study_chunk in regcomp_study.c computed the
+# added-string size for a quantified node as `l = ... - old; l -=
+# old;` then used mincount * l downstream (`SvGROW(last_str, (mincount
+# * l) + 1)` feeding a repeatcpy that writes mincount copies of l
+# bytes) with no overflow check anywhere -- a large mincount times a
+# long literal wraps the SSize_t arithmetic and the undersized buffer
+# overflows. The fixing commit 5e7f119eb2 ("test against the actual
+# character lengths", citing perl-security#147) guards the multiply
+# with the project's saturating limit before the string is built:
+# `if (l > 0 && (mincount >= SSize_t_MAX / (SSize_t)l || old >
+# SSize_t_MAX - mincount * (SSize_t)l)) FAIL("Regexp out of space");`.
+#
+# ATTENTION, guard-to-sink attribution. The trust boundary and the
+# arithmetic are both reached today: Perl_study_chunk has external
+# linkage, so under the library profile the parameter source labels it
+# and VYQL-NUM-003 (TaintedIntegerSizeArithmetic) carries a
+# caller-controlled value into the sizing multiply -- measured 3 x
+# --cache off on regcomp_study.c at 5e7f119eb2^, the CVE multiply at
+# line 2795 is one of 125 NUM-003 rows (199 findings). What cannot
+# discriminate is the fix's guard: the SSize_t_MAX comparison is not
+# in the C overflow-guard vocabulary, and the same revision already
+# carries that spelling seven hundred lines earlier guarding other
+# arithmetic (regcomp_study.c:2587, `mincount >= SSize_t_MAX /
+# minnext`), which existed while this bug was live. Adding the
+# spelling to the function-scoped guard binding was measured and
+# reverted: both revisions drop to 96 findings, because the
+# pre-existing check at :2587 suppresses every NUM-003 endpoint in
+# the 1400-line function, including the true positive at the CVE
+# line. A guard must be attributed to the arithmetic it actually
+# protects, the same condition-blind `covers endpoint` family as the
+# inverse attribution gaps; no binding-layer fact can express that
+# ordering. Spec cve_rank1561 pins all three facts: the unchecked
+# sizing reports (expect, and must keep reporting), the guarded form
+# still reports -- pinned, it must flip to reject when a guard
+# observation carries a limit comparison to the multiply it protects
+# -- and the file-local static twin does not report, because internal
+# linkage is not a trust boundary.
+
+test "rank1561: the repeat expansion is sized by an unchecked caller-controlled multiply"
+  lang c
+  profile library
+  file regcomp_study.c
+  expect VYQL-NUM-003
+  code
+  ```
+  #include <stddef.h>
+
+  typedef long SSize_t;
+  typedef size_t STRLEN;
+  typedef struct SV SV;
+
+  SV *newSVpvn_utf8(const char *s, STRLEN len, int utf8);
+  void SvGROW(SV *sv, STRLEN len);
+  void repeatcpy(char *to, const char *from, STRLEN len, SSize_t count);
+
+  SSize_t study_repeat(const char *s, STRLEN old, SSize_t mincount,
+                       STRLEN end)
+  {
+      STRLEN l = end - old;
+      l -= old;
+
+      /* Get the added string: */
+      SV *last_str = newSVpvn_utf8(s + old, l, 0);
+
+      if (mincount > 1) {
+          SvGROW(last_str, (mincount * l) + 1);
+          repeatcpy(0, 0, l, mincount - 1);
+      }
+      return mincount;
+  }
+  ```
+
+test "rank1561: the overflow-checked repeat sizing still reports, pinned -- the SSize_t_MAX guard is not attributed to the multiply it protects"
+  lang c
+  profile library
+  file regcomp_study.c
+  expect VYQL-NUM-003
+  code
+  ```
+  #include <stddef.h>
+
+  typedef long SSize_t;
+  typedef size_t STRLEN;
+  typedef struct SV SV;
+
+  #define SSize_t_MAX ((SSize_t)(~(size_t)0 >> 1))
+
+  SV *newSVpvn_utf8(const char *s, STRLEN len, int utf8);
+  void SvGROW(SV *sv, STRLEN len);
+  void repeatcpy(char *to, const char *from, STRLEN len, SSize_t count);
+
+  SSize_t study_repeat(const char *s, STRLEN old, SSize_t mincount,
+                       STRLEN end)
+  {
+      STRLEN l = end - old;
+      l -= old;
+
+      if (l > 0 &&
+          (mincount >= SSize_t_MAX / (SSize_t)l
+           || old > SSize_t_MAX - mincount * (SSize_t)l)) {
+          return 0; /* FAIL("Regexp out of space") */
+      }
+
+      /* Get the added string: */
+      SV *last_str = newSVpvn_utf8(s + old, l, 0);
+
+      if (mincount > 1) {
+          SvGROW(last_str, (mincount * l) + 1);
+          repeatcpy(0, 0, l, mincount - 1);
+      }
+      return mincount;
+  }
+  ```
+
+test "rank1561: the file-local static twin is not a caller-controlled entry point"
+  lang c
+  profile library
+  file regcomp_study.c
+  reject VYQL-NUM-003
+  code
+  ```
+  #include <stddef.h>
+
+  typedef long SSize_t;
+  typedef size_t STRLEN;
+  typedef struct SV SV;
+
+  SV *newSVpvn_utf8(const char *s, STRLEN len, int utf8);
+  void SvGROW(SV *sv, STRLEN len);
+  void repeatcpy(char *to, const char *from, STRLEN len, SSize_t count);
+
+  static SSize_t study_repeat(const char *s, STRLEN old, SSize_t mincount,
+                              STRLEN end)
+  {
+      STRLEN l = end - old;
+      l -= old;
+
+      /* Get the added string: */
+      SV *last_str = newSVpvn_utf8(s + old, l, 0);
+
+      if (mincount > 1) {
+          SvGROW(last_str, (mincount * l) + 1);
+          repeatcpy(0, 0, l, mincount - 1);
+      }
+      return mincount;
+  }
+  ```

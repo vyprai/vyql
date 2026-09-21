@@ -1,0 +1,11 @@
+module code;
+
+concept OversizedWebsocketPayloadDefault : issue {
+  cwe: [CWE_400]
+  reviewAssumption: "malicious clients can connect without overriding the server default and submit large payloads to consume memory or CPU"
+  reviewCategory: resource
+  reviewCondition: "a WebSocket or long-polling server exposes an oversized default request payload limit"
+  reviewConfidence: high
+  reviewEvidence: "server initialization context {pattern} sets a very large maxHttpBufferSize default and forwards it into the WebSocket maxPayload limit"
+  vulnerableTo: [dos.UncontrolledResourceConsumption]
+}

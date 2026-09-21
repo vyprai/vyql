@@ -1,0 +1,7 @@
+module code;
+
+review code.UncheckedFfiLengthNarrowing {
+  category: numeric
+  kind: attention
+  text: "review FFI length casts from host-sized buffers into narrower C integer fields"
+}

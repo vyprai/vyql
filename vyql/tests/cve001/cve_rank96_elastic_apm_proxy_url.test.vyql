@@ -1,0 +1,12 @@
+# Rank 96 / CVE-2019-7617: Elastic APM Python accepted proxy/server URL input
+# that reached outbound HTTP transport.
+
+test "rank96: proxy URL reaches outbound fetch"
+  expect VYQL-RF-001
+  graph
+  ```
+  node src core.UserControlledData
+  node sink code.UrlFetch
+  edge FLOWS src -> sink
+  ```
+

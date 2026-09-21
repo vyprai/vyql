@@ -1,0 +1,7 @@
+module code;
+
+review code.UrlDomainFirstLabelAllowlistLookup {
+  category: auth
+  kind: attention
+  text: "review origin gates that split the request URL's domain and look a fragment up in the trusted registry instead of anchoring on the full host"
+}

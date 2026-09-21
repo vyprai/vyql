@@ -1,0 +1,11 @@
+module code;
+
+concept OauthErrorResponseRedirectUriWithoutPreauth : issue {
+  cwe: [CWE_601]
+  reviewAssumption: "an attacker who can trigger an authorization error chooses the URI the browser is sent to"
+  reviewCategory: request_forgery
+  reviewCondition: "OAuth error handling redirects to the request's own redirect_uri before the pre-authorization has validated it"
+  reviewConfidence: high
+  reviewEvidence: "oauth error redirect context {pattern} places a request parameter under a redirect_uri key and redirects through a location keyword with no pre_auth.valid? gate in the function"
+  vulnerableTo: [request_forgery.OpenRedirect]
+}

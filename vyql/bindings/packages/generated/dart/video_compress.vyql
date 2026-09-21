@@ -1,0 +1,9 @@
+module bindings.dart.generated.md54ba7b9;
+
+binding fileUse0 {
+  requires {
+    dependency("video_compress")
+  }
+  query pattern callExpr where callee.method == "compressVideo"
+  emit sink code.FileUseSink at args[0]
+}

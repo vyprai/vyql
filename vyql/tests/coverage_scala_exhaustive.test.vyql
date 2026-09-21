@@ -1,0 +1,335 @@
+# Scala language-gap narrowing: exhaustive coverage for adapter-claimed idioms.
+
+test "scala exhaustive: request input reaches SQL execution"
+  lang scala
+  expect VYQL-INJ-001
+  code
+  ```
+  object T {
+    def handler(request: Request, stmt: Statement) = {
+      val q = request.getQueryString("q").get
+      stmt.executeQuery(q)
+      stmt.executeUpdate(q)
+      stmt.execute(q)
+      SQL(q)
+    }
+  }
+  ```
+
+test "scala exhaustive: constant SQL execution is clean"
+  lang scala
+  reject VYQL-INJ-001
+  code
+  ```
+  object T {
+    def handler(stmt: Statement) = {
+      stmt.executeQuery("select 1")
+      SQL("select 1")
+    }
+  }
+  ```
+
+test "scala exhaustive: request input reaches command execution"
+  lang scala
+  expect VYQL-INJ-002
+  code
+  ```
+  object T {
+    def handler(request: Request) = {
+      val cmd = request.getQueryString("cmd").get
+      Runtime.getRuntime.exec(cmd)
+      Process(cmd)
+    }
+  }
+  ```
+
+test "scala exhaustive: shell escaping suppresses command execution"
+  lang scala
+  reject VYQL-INJ-002
+  code
+  ```
+  object T {
+    def handler(request: Request) = {
+      Runtime.getRuntime.exec(escapeShell(request.getQueryString("cmd").get))
+    }
+  }
+  ```
+
+test "scala exhaustive: file and archive APIs receive tainted paths"
+  lang scala
+  expect VYQL-PATH-001
+  expect VYQL-PATH-004
+  code
+  ```
+  object T {
+    def handler(request: Request, archive: Archive) = {
+      val p = request.getQueryString("path").get
+      Source.fromFile(p)
+      File(p).readText()
+      archive.extractEntry(p)
+    }
+  }
+  ```
+
+test "scala exhaustive: canonicalized file and archive paths are clean"
+  lang scala
+  reject VYQL-PATH-001
+  reject VYQL-PATH-004
+  code
+  ```
+  object T {
+    def handler(request: Request, archive: Archive) = {
+      val p = safePath(request.getQueryString("path").get)
+      Source.fromFile(p)
+      archive.extractEntry(p)
+    }
+  }
+  ```
+
+test "scala exhaustive: Play and Akka HTTP clients fetch tainted URLs"
+  lang scala
+  expect VYQL-RF-001
+  code
+  ```
+  object T {
+    def handler(request: Request, ws: WSClient, http: HttpExt) = {
+      val u = request.getQueryString("url").get
+      ws.url(u)
+      http.singleRequest(HttpRequest(uri = u))
+    }
+  }
+  ```
+
+test "scala exhaustive: constant HTTP client URLs are clean for SSRF"
+  lang scala
+  reject VYQL-RF-001
+  code
+  ```
+  object T {
+    def handler(ws: WSClient, http: HttpExt) = {
+      ws.url("https://example.com")
+      http.singleRequest(HttpRequest(uri = "https://example.com"))
+    }
+  }
+  ```
+
+test "scala exhaustive: cleartext URL is reported"
+  lang scala
+  expect VYQL-CFG-006
+  code
+  ```
+  object T {
+    def handler() = {
+      URL("http://example.com")
+    }
+  }
+  ```
+
+test "scala exhaustive: HTTPS and localhost URLs are clean for cleartext"
+  lang scala
+  reject VYQL-CFG-006
+  code
+  ```
+  object T {
+    def handler() = {
+      URL("https://example.com")
+      URL("http://127.0.0.1:8080")
+    }
+  }
+  ```
+
+test "scala exhaustive: regex and deserialization sinks receive taint"
+  lang scala
+  expect VYQL-DOS-001
+  expect VYQL-DESER-001
+  code
+  ```
+  object T {
+    def handler(request: Request, mapper: ObjectMapper, stream: ObjectInputStream) = {
+      val v = request.getQueryString("v").get
+      Pattern.compile(v)
+      mapper.readValue(v, classOf[User])
+      stream.readObject()
+    }
+  }
+  ```
+
+test "scala exhaustive: constant regex and deserialization data are clean"
+  lang scala
+  reject VYQL-DOS-001
+  reject VYQL-DESER-001
+  code
+  ```
+  object T {
+    def handler(mapper: ObjectMapper) = {
+      Pattern.compile("^[a-z]+$")
+      mapper.readValue("{\"name\":\"a\"}", classOf[User])
+    }
+  }
+  ```
+
+test "scala exhaustive: HTML LDAP XPath trust-boundary and expression sinks receive taint"
+  lang scala
+  expect VYQL-INJ-004
+  expect VYQL-INJ-005
+  expect VYQL-INJ-006
+  expect VYQL-CFG-014
+  expect VYQL-INJ-016
+  code
+  ```
+  object T {
+    def handler(request: Request, out: Writer, ldap: DirContext, xpath: XPath, session: Session, parser: Parser) = {
+      val v = request.getQueryString("v").get
+      Html(v)
+      out.write(v)
+      ldap.search("dc=x", v, controls)
+      xpath.evaluate(v, doc)
+      session.setAttribute("role", v)
+      parser.parseExpression(v)
+    }
+  }
+  ```
+
+test "scala exhaustive: encoders and validation suppress HTML LDAP XPath and trust-boundary findings"
+  lang scala
+  reject VYQL-INJ-004
+  reject VYQL-INJ-005
+  reject VYQL-INJ-006
+  reject VYQL-CFG-014
+  code
+  ```
+  object T {
+    def handler(request: Request, out: Writer, ldap: DirContext, xpath: XPath, session: Session) = {
+      val html = escapeHtml(request.getQueryString("v").get)
+      val filter = encodeForLDAP(request.getQueryString("v").get)
+      val xp = xpathEscape(request.getQueryString("v").get)
+      val role = validateRole(request.getQueryString("v").get)
+      out.write(html)
+      ldap.search("dc=x", filter, controls)
+      xpath.evaluate(xp, doc)
+      session.setAttribute("role", role)
+    }
+  }
+  ```
+
+test "scala exhaustive: auth and IDOR findings are reported"
+  lang scala
+  expect VYQL-AUTH-001
+  expect VYQL-AUTH-002
+  code
+  ```
+  object T {
+    def handler(request: Request, repo: Repo) = {
+      changePassword(request.getQueryString("password").get)
+      repo.findById(request.getQueryString("id").get)
+    }
+  }
+  ```
+
+test "scala exhaustive: auth and ownership guards suppress findings"
+  lang scala
+  reject VYQL-AUTH-001
+  reject VYQL-AUTH-002
+  code
+  ```
+  object T {
+    def handler(request: Request, repo: Repo) = {
+      requireAuth(request)
+      changePassword(request.getQueryString("password").get)
+      checkOwnership(request.getQueryString("id").get)
+      repo.findById(request.getQueryString("id").get)
+    }
+  }
+  ```
+
+test "scala exhaustive: crypto and config presence findings are reported"
+  lang scala
+  expect VYQL-CRY-001
+  expect VYQL-CRY-002
+  expect VYQL-CRY-003
+  expect VYQL-CRY-004
+  expect VYQL-CFG-001
+  expect VYQL-CFG-003
+  expect VYQL-CFG-004
+  expect VYQL-CFG-005
+  expect VYQL-CFG-007
+  expect VYQL-CFG-008
+  expect VYQL-CFG-009
+  expect VYQL-PATH-003
+  code
+  ```
+  object T {
+    def handler(http: HttpSecurity, response: Response, file: File) = {
+      MessageDigest.getInstance("MD5")
+      Cipher.getInstance("DES")
+      IvParameterSpec("0000000000000000".getBytes)
+      Random()
+      http.csrf().disable()
+      NoopHostnameVerifier()
+      Algorithm.none()
+      setSecure(false)
+      setHttpOnly(false)
+      file.setWritable(true, false)
+      Files.createFile(Paths.get("/tmp/fixed"))
+      response.setHeader("Access-Control-Allow-Origin", "*")
+      response.setHeader("X-Frame-Options", "ALLOWALL")
+    }
+  }
+  ```
+
+test "scala exhaustive: stronger crypto and secure config are clean"
+  lang scala
+  reject VYQL-CRY-001
+  reject VYQL-CRY-002
+  reject VYQL-CRY-003
+  reject VYQL-CRY-004
+  reject VYQL-CFG-003
+  reject VYQL-CFG-004
+  reject VYQL-CFG-005
+  reject VYQL-CFG-007
+  reject VYQL-CFG-008
+  reject VYQL-CFG-009
+  reject VYQL-PATH-003
+  code
+  ```
+  object T {
+    def handler(response: Response, file: File, iv: Array[Byte]) = {
+      MessageDigest.getInstance("SHA-256")
+      Cipher.getInstance("AES/GCM/NoPadding")
+      IvParameterSpec(iv)
+      SecureRandom()
+      setSecure(true)
+      setHttpOnly(true)
+      file.setWritable(false, false)
+      Files.createTempFile("safe", ".tmp")
+      response.setHeader("Access-Control-Allow-Origin", "https://example.com")
+      response.setHeader("X-Frame-Options", "DENY")
+    }
+  }
+  ```
+
+test "scala exhaustive: resource handles closed are clean"
+  lang scala
+  reject VYQL-RES-001
+  code
+  ```
+  object T {
+    def handler() = {
+      val s = Socket("example.com", 443)
+      s.close()
+    }
+  }
+  ```
+
+test "scala exhaustive: resource handles leak"
+  lang scala
+  expect VYQL-RES-001
+  code
+  ```
+  object T {
+    def handler() = {
+      val s = Socket("example.com", 443)
+      s.getInputStream()
+    }
+  }
+  ```

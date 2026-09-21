@@ -1,0 +1,8 @@
+module code;
+
+review code.CraftCommercePurchasablesSortSqlInjection {
+  category: sql
+  expected: [core.InputValidation]
+  kind: attention
+  text: "review Craft Commerce purchasables table sort columns for an explicit allowlist before Yii orderBy array-key use"
+}

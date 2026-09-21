@@ -1,0 +1,187 @@
+# A PDF library builds a whole HTML document by string concatenation and hands
+# it to `document.write` on the window it just opened with `window.open()`. The
+# concatenation stops inside an unterminated attribute (`<script src="`,
+# `<iframe ... src="`), so the option values the caller passes -- the viewer URL,
+# the PDF.js URL, the file name -- are parsed as markup and can close the
+# attribute and open a `<script>` element. Creating the element with
+# `createElement`, assigning `src` as a property and appending it is what keeps
+# an option value a string instead of markup.
+
+test "rank1244: new window document is written from a concatenated markup string"
+  lang javascript
+  file jspdf.js
+  expect VYQL-INJ-240
+  expect_review code.OpenedWindowConcatenatedDocumentWrite
+  code
+  ```
+  function jsPDF(options) {
+    var globalObject = typeof window !== "undefined" ? window : global;
+
+    API.output = function(type, options) {
+      options = options || {};
+
+      switch (type) {
+        case "pdfobjectnewwindow":
+          var pdfObjectUrl =
+            "https://cdnjs.cloudflare.com/ajax/libs/pdfobject/2.1.1/pdfobject.min.js";
+          var integrity =
+            ' integrity="sha512-4ze/a9/4jqu" crossorigin="anonymous"';
+
+          if (options.pdfObjectUrl) {
+            pdfObjectUrl = options.pdfObjectUrl;
+            integrity = "";
+          }
+
+          var htmlForNewWindow =
+            "<html>" +
+            '<style>html, body { padding: 0; margin: 0; }</style><body><script src="' +
+            pdfObjectUrl +
+            '"' +
+            integrity +
+            '></script><script >PDFObject.embed("' +
+            this.output("dataurlstring") +
+            '", ' +
+            JSON.stringify(options) +
+            ");</script></body></html>";
+
+          var nW = globalObject.open();
+          if (nW !== null) {
+            nW.document.write(htmlForNewWindow);
+          }
+          return nW;
+
+        case "pdfjsnewwindow":
+          var pdfJsUrl = options.pdfJsUrl || "examples/PDF.js/web/viewer.html";
+          var htmlForPDFjsNewWindow =
+            "<html>" +
+            "<style>html, body { padding: 0; margin: 0; }</style>" +
+            '<body><iframe id="pdfViewer" src="' +
+            pdfJsUrl +
+            "?file=&downloadName=" +
+            options.filename +
+            '" width="500px" height="400px" />' +
+            "</body></html>";
+
+          var PDFjsNewWindow = globalObject.open();
+          if (PDFjsNewWindow !== null) {
+            PDFjsNewWindow.document.write(htmlForPDFjsNewWindow);
+          }
+          return PDFjsNewWindow;
+
+        default:
+          return null;
+      }
+    };
+  }
+  ```
+
+test "rank1244: new window document is built from created elements"
+  lang javascript
+  file jspdf.js
+  reject VYQL-INJ-240
+  reject_review code.OpenedWindowConcatenatedDocumentWrite
+  code
+  ```
+  function jsPDF(options) {
+    var globalObject = typeof window !== "undefined" ? window : global;
+
+    var clearDomNode = function(node) {
+      while (node.firstChild) {
+        node.removeChild(node.firstChild);
+      }
+    };
+
+    var initializeNewWindow = function(window) {
+      var targetDocument = window.document;
+      var html = targetDocument.documentElement;
+      var head = targetDocument.head;
+      var body = targetDocument.body;
+
+      if (!head) {
+        head = targetDocument.createElement("head");
+        html.appendChild(head);
+      }
+
+      if (!body) {
+        body = targetDocument.createElement("body");
+        html.appendChild(body);
+      }
+
+      clearDomNode(head);
+      clearDomNode(body);
+
+      return { document: targetDocument, body: body };
+    };
+
+    API.output = function(type, options) {
+      options = options || {};
+
+      switch (type) {
+        case "pdfobjectnewwindow":
+          var pdfObjectUrl =
+            "https://cdnjs.cloudflare.com/ajax/libs/pdfobject/2.1.1/pdfobject.min.js";
+          var useDefaultPdfObjectUrl = !options.pdfObjectUrl;
+
+          if (!useDefaultPdfObjectUrl) {
+            pdfObjectUrl = options.pdfObjectUrl;
+          }
+
+          var nW = globalObject.open();
+          if (nW !== null) {
+
+            // The URL is assigned as a property on a created element, so it
+            // never reaches the HTML parser as markup.
+            var initializedPdfObjectWindow = initializeNewWindow(nW);
+            var pdfObjectScript = initializedPdfObjectWindow.document.createElement(
+              "script"
+            );
+            var scope = this;
+
+            pdfObjectScript.src = pdfObjectUrl;
+
+            if (useDefaultPdfObjectUrl) {
+              pdfObjectScript.integrity = "sha512-4ze/a9/4jqu";
+              pdfObjectScript.crossOrigin = "anonymous";
+            }
+
+            pdfObjectScript.onload = function() {
+              nW.PDFObject.embed(scope.output("dataurlstring"), options);
+            };
+
+            initializedPdfObjectWindow.body.appendChild(pdfObjectScript);
+          }
+          return nW;
+
+        case "pdfjsnewwindow":
+          var pdfJsUrl = options.pdfJsUrl || "examples/PDF.js/web/viewer.html";
+          var PDFjsNewWindow = globalObject.open();
+
+          if (PDFjsNewWindow !== null) {
+            var initializedPdfJsWindow = initializeNewWindow(PDFjsNewWindow);
+            var pdfViewer = initializedPdfJsWindow.document.createElement(
+              "iframe"
+            );
+            var pdfJsQueryChar = pdfJsUrl.indexOf("?") === -1 ? "?" : "&";
+
+            pdfViewer.id = "pdfViewer";
+            pdfViewer.width = "500px";
+            pdfViewer.height = "400px";
+
+            // The file name is percent-encoded, so it cannot add another query
+            // parameter or a fragment to the viewer URL.
+            pdfViewer.src =
+              pdfJsUrl +
+              pdfJsQueryChar +
+              "file=&downloadName=" +
+              encodeURIComponent(options.filename);
+
+            initializedPdfJsWindow.body.appendChild(pdfViewer);
+          }
+          return PDFjsNewWindow;
+
+        default:
+          return null;
+      }
+    };
+  }
+  ```

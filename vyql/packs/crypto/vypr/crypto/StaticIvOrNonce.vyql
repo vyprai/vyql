@@ -1,0 +1,11 @@
+module vypr.crypto;
+
+rule StaticIvOrNonce {
+  meta {
+    confidenceFloor: low
+    cwe: [CWE_329]
+    id: "VYQL-CRY-004"
+    severity: medium
+  }
+  issue code.StaticIv as iv
+}

@@ -1,0 +1,50 @@
+module bindings.java.generated.mf0bf139c;
+
+binding networkSend0 {
+  requires {
+    dependency("org.eclipse.jetty:jetty-client")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect1 {
+  requires {
+    dependency("org.eclipse.jetty:jetty-client")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("org.eclipse.jetty:jetty-client")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding inputValidation3 {
+  requires {
+    dependency("org.eclipse.jetty:jetty-client")
+  }
+  query pattern callExpr where callee.method == "sanitize"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding authenticationCheck4 {
+  requires {
+    dependency("org.eclipse.jetty:jetty-client")
+  }
+  query pattern callExpr where callee.method == "authenticate"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

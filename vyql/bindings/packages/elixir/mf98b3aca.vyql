@@ -1,0 +1,311 @@
+module bindings.elixir.generated.mf98b3aca;
+
+binding httpInput0 {
+  requires {
+    dependency("phoenix")
+  }
+  query pattern callExpr where callee.path ~= "params"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput1 {
+  requires {
+    dependency("plug")
+  }
+  query pattern callExpr where callee.path ~= "conn.params"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput2 {
+  requires {
+    dependency("plug")
+  }
+  query pattern callExpr where callee.path ~= "Plug.Conn.get_req_header"
+  emit source code.HttpInput at call.result
+}
+
+binding csrfProtection3 {
+  requires {
+    dependency("plug")
+  }
+  query pattern callExpr where callee.path ~= "Plug.CSRFProtection"
+  emit check core.CsrfProtection at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding secretValue4 {
+  requires {
+    dependency("elixir")
+  }
+  query pattern callExpr where callee.path ~= "System.get_env"
+  emit source code.SecretValue at call.result
+}
+
+binding commandExecution5 {
+  requires {
+    dependency("elixir")
+  }
+  query pattern callExpr where callee.path ~= "System.cmd"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding codeEval6 {
+  requires {
+    dependency("elixir")
+  }
+  query pattern callExpr where callee.path ~= "Code.eval_string"
+  emit sink code.CodeEval at args[0]
+}
+
+binding codeEval7 {
+  requires {
+    dependency("elixir")
+  }
+  query pattern callExpr where callee.path ~= "Code.eval_file"
+  emit sink code.CodeEval at args[0]
+}
+
+binding filePathAccess8 {
+  requires {
+    dependency("elixir")
+  }
+  query pattern callExpr where callee.path ~= "File.read"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding regexCompile9 {
+  requires {
+    dependency("elixir")
+  }
+  query pattern callExpr where callee.path ~= "Regex.compile"
+  emit sink code.RegexCompileSink at args[0]
+}
+
+binding pathCanonicalization10 {
+  requires {
+    dependency("elixir")
+  }
+  query pattern callExpr where callee.path ~= "Path.expand"
+  emit check core.PathCanonicalization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding externalApiResponse11 {
+  requires {
+    dependency("req")
+  }
+  query pattern callExpr where callee.method == "body"
+  emit source code.ExternalApiResponse at call.result
+}
+
+binding urlFetch12 {
+  requires {
+    dependency("req")
+  }
+  query pattern callExpr where callee.path ~= "Req.get"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding externalApiResponse13 {
+  requires {
+    dependency("httpoison")
+  }
+  query pattern callExpr where callee.method == "body"
+  emit source code.ExternalApiResponse at call.result
+}
+
+binding urlFetch14 {
+  requires {
+    dependency("httpoison")
+  }
+  query pattern callExpr where callee.path ~= "HTTPoison.get"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding sqlExecution15 {
+  requires {
+    dependency("ecto_sql")
+  }
+  query pattern callExpr where callee.path ~= "Ecto.Adapters.SQL.query"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution16 {
+  requires {
+    dependency("ecto_sql")
+  }
+  query pattern callExpr where callee.method == "query!"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlParameterization17 {
+  requires {
+    dependency("ecto_sql")
+  }
+  query pattern callExpr where callee.method == "parameters"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding nosqlQuery18 {
+  requires {
+    dependency("mongodb_driver")
+  }
+  query pattern callExpr where callee.method == "find"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding deserialization19 {
+  requires {
+    dependency("plug_crypto")
+  }
+  query pattern callExpr where callee.path ~= "Plug.Crypto.non_executable_binary_to_term"
+  emit sink code.Deserialization at args[0]
+}
+
+binding archiveEntryWrite20 {
+  requires {
+    dependency("erl_tar")
+  }
+  query pattern callExpr where callee.method == "extract"
+  emit sink code.ArchiveEntryWrite at args[0]
+}
+
+binding xmlParse21 {
+  requires {
+    dependency("sweet_xml")
+  }
+  query pattern callExpr where callee.path ~= "SweetXml.parse"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xpathQuery22 {
+  requires {
+    dependency("sweet_xml")
+  }
+  query pattern callExpr where callee.path ~= "SweetXml.xpath"
+  emit sink code.XpathQuery at args[1]
+}
+
+binding xmlHardening23 {
+  requires {
+    dependency("sweet_xml")
+  }
+  query pattern callExpr where callee.path ~= "SweetXml.parse" and args.any.literal contains "dtd=false"
+  emit check core.XmlHardening at call {
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}
+
+binding xpathEscape24 {
+  requires {
+    dependency("sweet_xml")
+  }
+  query pattern callExpr where callee.path ~= "escape_xpath"
+  emit check core.XpathEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding ldapQuery25 {
+  requires {
+    dependency("eldap")
+  }
+  query pattern callExpr where callee.method == "search"
+  emit sink code.LdapQuery at args[1]
+}
+
+binding ldapEscape26 {
+  requires {
+    dependency("eldap")
+  }
+  query pattern callExpr where callee.path ~= "encode_for_ldap"
+  emit check core.LdapEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlRender27 {
+  requires {
+    dependency("phoenix_html")
+  }
+  query pattern callExpr where callee.path ~= "Phoenix.HTML.raw"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlEscape28 {
+  requires {
+    dependency("phoenix_html")
+  }
+  query pattern callExpr where callee.path ~= "Phoenix.HTML.html_escape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape29 {
+  requires {
+    dependency("phoenix_html")
+  }
+  query pattern callExpr where callee.path ~= "Phoenix.HTML.safe_to_string"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding templateRender30 {
+  requires {
+    dependency("phoenix_view")
+  }
+  query pattern callExpr where callee.method == "render"
+  emit sink code.TemplateRender at args[0]
+}
+
+binding authenticationCheck31 {
+  requires {
+    dependency("guardian")
+  }
+  query pattern callExpr where callee.path ~= "Guardian.Plug.EnsureAuthenticated"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck32 {
+  requires {
+    dependency("bodyguard")
+  }
+  query pattern callExpr where callee.path ~= "Bodyguard.permit"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

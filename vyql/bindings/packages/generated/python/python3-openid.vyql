@@ -1,0 +1,9 @@
+module bindings.python.generated.m4603fb63;
+
+binding deserialization0 {
+  requires {
+    dependency("python3-openid")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,11 @@
+module vypr.path;
+
+rule DirectoryCreateExistingPathUnchecked {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_22, CWE_59]
+    id: "VYQL-PATH-069"
+    severity: medium
+  }
+  issue code.DirectoryCreateExistingPathUnchecked as sink
+}

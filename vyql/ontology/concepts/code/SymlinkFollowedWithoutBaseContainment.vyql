@@ -1,0 +1,11 @@
+module code;
+
+concept SymlinkFollowedWithoutBaseContainment : issue {
+  cwe: [CWE_59, CWE_22]
+  reviewAssumption: "an attacker can plant a symbolic link inside the tree the code walks, as a world-writable upload, spool or served directory allows"
+  reviewCategory: path
+  reviewCondition: "code that serves, lists or otherwise exposes entries of a directory tree tests a path for being a symbolic link and resolves the link's target, but never compares the resolved target against the tree's base directory, so a link planted inside the tree exposes the file or directory it points at outside it"
+  reviewConfidence: medium
+  reviewEvidence: "symlink resolution context {pattern} resolves a link target and reads through it with no containment comparison against a base directory"
+  vulnerableTo: [path.LinkFollowing, path.PathTraversal]
+}

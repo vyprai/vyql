@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m2cc4f8ad;
+
+binding deserialization0 {
+  requires {
+    dependency("com.sun.mail:javax.mail")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

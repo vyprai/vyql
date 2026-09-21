@@ -1,0 +1,14 @@
+module vypr.deserialization;
+
+rule UnrestrictedClassDeserialization {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_502]
+    id: "VYQL-DESER-023"
+    severity: high
+  }
+  issue code.UnrestrictedClassDeserialization as blob
+  unless blob.endpoint coveredBy core.SafeDeserialization
+  unless blob.sameScope coveredBy core.SafeDeserialization
+  unless blob.path coveredBy core.SafeDeserialization
+}

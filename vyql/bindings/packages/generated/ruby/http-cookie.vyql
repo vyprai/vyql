@@ -1,0 +1,33 @@
+module bindings.ruby.generated.meb3abca7;
+
+binding httpInput0 {
+  requires {
+    dependency("http-cookie")
+  }
+  query pattern callExpr where callee.method == "HTTP::Cookie.parse"
+  emit source code.HttpInput at call.result
+}
+
+binding deserialization1 {
+  requires {
+    dependency("http-cookie")
+  }
+  query pattern callExpr where callee.method == "HTTP::CookieJar.load"
+  emit sink code.Deserialization at args[0]
+}
+
+binding sqlExecution2 {
+  requires {
+    dependency("http-cookie")
+  }
+  query pattern callExpr where callee.method == "HTTP::CookieJar::MozillaStore.execute"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution3 {
+  requires {
+    dependency("http-cookie")
+  }
+  query pattern callExpr where callee.method == "HTTP::CookieJar::MozillaStore.prepare"
+  emit sink code.SqlExecution at args[0]
+}

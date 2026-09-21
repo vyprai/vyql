@@ -1,0 +1,92 @@
+# T1.1 — latent rules now wired: reflection, response-header, log-injection, secret-in-log.
+
+test "java: request param -> Class.forName/newInstance is unsafe reflection"
+  lang java
+  expect VYQL-DESER-003
+  code
+  ```
+  @RestController
+  public class C {
+    @GetMapping("/x")
+    public Object x(@RequestParam String cls) throws Exception {
+      return Class.forName(cls).newInstance();
+    }
+  }
+  ```
+
+test "java: a constant class name is clean (reflection)"
+  lang java
+  reject VYQL-DESER-003
+  code
+  ```
+  @RestController
+  public class C {
+    @GetMapping("/x")
+    public Object x() throws Exception {
+      return Class.forName("com.example.Safe").newInstance();
+    }
+  }
+  ```
+
+test "java: request param -> response setHeader is HTTP response splitting"
+  lang java
+  expect VYQL-INJ-010
+  code
+  ```
+  @RestController
+  public class C {
+    @GetMapping("/x")
+    public void x(@RequestParam String lang, HttpServletResponse response) {
+      response.setHeader("Content-Language", lang);
+    }
+  }
+  ```
+
+test "java: request param -> logger.info is log injection"
+  lang java
+  expect VYQL-INJ-009
+  code
+  ```
+  @RestController
+  public class C {
+    @GetMapping("/x")
+    public void x(@RequestParam String name) {
+      logger.info("login: " + name);
+    }
+  }
+  ```
+
+test "java: a constant log message is clean"
+  lang java
+  reject VYQL-INJ-009
+  code
+  ```
+  @RestController
+  public class C {
+    @GetMapping("/x")
+    public void x() {
+      logger.info("login event");
+    }
+  }
+  ```
+
+test "python: secret from env -> logging is secret leakage to logs"
+  lang python
+  expect VYQL-SEC-001
+  code
+  ```
+  import os, logging
+  def handler():
+      key = os.environ["API_KEY"]
+      logging.info("using key %s" % key)
+  ```
+
+test "python: logging a non-secret constant is clean"
+  lang python
+  reject VYQL-SEC-001
+  code
+  ```
+  import logging
+  def handler():
+      logging.info("started")
+  ```

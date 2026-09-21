@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mc1b20608;
+
+binding filePathAccess0 {
+  requires {
+    dependency("eleveldb")
+  }
+  query pattern callExpr where callee.method == "eleveldb_open"
+  emit sink code.FilePathAccess at args[0]
+}

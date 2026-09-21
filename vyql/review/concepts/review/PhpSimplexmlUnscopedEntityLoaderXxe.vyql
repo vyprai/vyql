@@ -1,0 +1,8 @@
+module code;
+
+review code.PhpSimplexmlUnscopedEntityLoaderXxe {
+  category: xml
+  expected: [core.XmlHardening]
+  kind: attention
+  text: "review PHP SimpleXML parsing that toggles libxml entity loading without saving and restoring the previous loader state"
+}

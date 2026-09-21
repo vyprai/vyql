@@ -1,0 +1,11 @@
+module code;
+
+concept ResolvedUrlOriginOnlyContainment : issue {
+  cwe: [CWE_22, CWE_20]
+  reviewAssumption: "the configured base URL carries a path prefix and requests must not reach paths outside that prefix on the same origin"
+  reviewCategory: path
+  reviewCondition: "a URL resolved against a configured base is confined by comparing only its origin, which excludes the path"
+  reviewConfidence: high
+  reviewEvidence: "URL resolution context {pattern} containment-checks the resolved URL through its origin component"
+  vulnerableTo: [path.PathTraversal]
+}

@@ -1,0 +1,47 @@
+# Rank 321 / CVE-2023-6836: WSO2 carbon-commons fixed raw JAXB unmarshalling
+# by feeding the unmarshaller through a StAX XMLStreamReader with external
+# entities and DTD support disabled.
+
+test "rank321: raw JAXB unmarshal is structural XXE"
+  lang java
+  expect VYQL-DESER-004
+  code
+  ```
+  import java.io.InputStream;
+  import javax.xml.bind.Unmarshaller;
+
+  class FileBasedTaskRepository {
+    private Unmarshaller getTaskUnmarshaller() { return null; }
+
+    Object loadTask(InputStream in) throws Exception {
+      return getTaskUnmarshaller().unmarshal(in);
+    }
+  }
+  ```
+
+test "rank321: StAX external entity hardening suppresses JAXB XXE"
+  lang java
+  reject VYQL-DESER-004
+  code
+  ```
+  import java.io.InputStream;
+  import javax.xml.bind.Unmarshaller;
+  import javax.xml.stream.XMLInputFactory;
+  import javax.xml.stream.XMLStreamReader;
+  import javax.xml.transform.stream.StreamSource;
+
+  class FileBasedTaskRepository {
+    private Unmarshaller getTaskUnmarshaller() { return null; }
+
+    Object loadTask(InputStream in) throws Exception {
+      return getTaskUnmarshaller().unmarshal(getXMLStreamReader(in));
+    }
+
+    private static XMLStreamReader getXMLStreamReader(InputStream input) throws Exception {
+      XMLInputFactory xmlInputFactory = XMLInputFactory.newFactory();
+      xmlInputFactory.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
+      xmlInputFactory.setProperty(XMLInputFactory.SUPPORT_DTD, false);
+      return xmlInputFactory.createXMLStreamReader(new StreamSource(input));
+    }
+  }
+  ```

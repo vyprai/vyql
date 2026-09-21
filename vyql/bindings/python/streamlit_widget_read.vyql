@@ -1,0 +1,40 @@
+module bindings.python.streamlit_widget_read;
+
+// A Streamlit app has no request object: the browser conversation happens
+// through widget calls, and the framework's documentation groups them as
+// input widgets whose return value is "the current value of the widget".
+// The free-text widgets -- `st.text_input`, `st.text_area` and
+// `st.chat_input` -- return exactly the text the client typed, and the
+// query-parameter readers return the page URL the client sent, so both are
+// `code.HttpInput`, the same treatment the CGI form object and the Flask
+// request mappings already get. The call is spelt `st.<widget>` or
+// `streamlit.<widget>` and also `col.<widget>` on a container returned by
+// `st.columns`, so the match is on the final segment: these are compound
+// names no unrelated API shares.
+//
+// The option widgets -- `selectbox`, `multiselect`, `radio`, `slider`,
+// `checkbox` -- are deliberately not labelled: the client only picks among
+// options the app itself listed, so the app authored every string the call
+// can return, and labelling the choice would credit the app's own literals
+// to the client. `file_uploader` is an upload rather than a field read and
+// belongs to `code.FileUpload`, not `code.HttpInput`.
+//
+// The query parameters are matched on the full `st.query_params.get`
+// spelling rather than the bare `query_params.get`, because Django REST's
+// `request.query_params.get` is a query read its own binding already
+// labels, and a suffix match would re-credit every Django view.
+
+binding streamlitFreeTextWidgetRead {
+  query pattern callExpr where callee.method in ["text_input", "text_area", "chat_input"]
+  emit source code.HttpInput at call.result
+}
+
+binding streamlitQueryParameterRead {
+  query pattern callExpr where callee.method in ["experimental_get_query_params"]
+  emit source code.HttpInput at call.result
+}
+
+binding streamlitQueryParameterMappingRead {
+  query pattern callExpr where callee.path in ["st.query_params.get", "streamlit.query_params.get"]
+  emit source code.HttpInput at call.result
+}

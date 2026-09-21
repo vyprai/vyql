@@ -1,0 +1,9 @@
+module bindings.dart.generated.m0989a2b2;
+
+binding htmlRender0 {
+  requires {
+    dependency("fluttertoast")
+  }
+  query pattern callExpr where callee.method == "showToast"
+  emit sink code.HtmlRender at args[0]
+}

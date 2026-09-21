@@ -1,0 +1,73 @@
+module bindings.python.generated.mfe65b901;
+
+binding authorizationCheck0 {
+  requires {
+    dependency("django-guardian")
+  }
+  query pattern callExpr where callee.method == "get_user_perms"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck1 {
+  requires {
+    dependency("django-guardian")
+  }
+  query pattern callExpr where callee.method == "get_group_perms"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck2 {
+  requires {
+    dependency("django-guardian")
+  }
+  query pattern callExpr where callee.method == "has_add_permission"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck3 {
+  requires {
+    dependency("django-guardian")
+  }
+  query pattern callExpr where callee.method == "has_view_permission"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck4 {
+  requires {
+    dependency("django-guardian")
+  }
+  query pattern callExpr where callee.method == "has_change_permission"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck5 {
+  requires {
+    dependency("django-guardian")
+  }
+  query pattern callExpr where callee.method == "has_delete_permission"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

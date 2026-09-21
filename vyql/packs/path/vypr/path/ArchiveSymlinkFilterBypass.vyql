@@ -1,0 +1,11 @@
+module vypr.path;
+
+rule ArchiveSymlinkFilterBypass {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_22, CWE_59]
+    id: "VYQL-PATH-007"
+    severity: high
+  }
+  issue code.ArchiveSymlinkFilterBypass as sink
+}

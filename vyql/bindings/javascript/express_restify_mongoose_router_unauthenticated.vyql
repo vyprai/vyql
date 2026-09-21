@@ -1,0 +1,38 @@
+module bindings.javascript.expressRestifyMongooseRouterUnauthenticated;
+
+// `express-restify-mongoose` turns one `serve(router, Model)` call into the
+// model's whole REST surface: GET on the collection and on any document, POST,
+// PUT/PATCH, DELETE on a document, DELETE on the collection, plus a `query`
+// parameter that accepts arbitrary Mongo selectors. Its documentation is
+// explicit that it ships no access control of its own -- the options that add
+// it are `access`, `contextFilter`, `preMiddleware`, `preCreate`, `preRead`,
+// `preUpdate` and `preDelete`, and its "Authentication" guidance is to mount
+// the served router behind ordinary Express middleware. So in a project that
+// depends on it, the module that builds the Express `Router` and mounts things
+// onto it is the point where the model's CRUD surface is either gated or handed
+// to anyone who can reach the port, and a mount with no authentication
+// middleware publishes the database.
+//
+// The module is the scope because that is the unit Express mounting happens in:
+// `express.Router()` and the `use` calls that populate it sit together in a
+// routes index, one file above the module that calls `serve`. Both are read as
+// whole `call:` tokens, so no receiver name is assumed -- `router.use`,
+// `api.use` and `apiRouter.use` read alike.
+//
+// A module carrying any authentication middleware is not reported. Middleware
+// invoked at mount time is read as a call -- passport's `authenticate`,
+// express-jwt's `expressjwt`/`jwt`, express-oauth2-jwt-bearer's `auth`,
+// express-openid-connect's `requiresAuth`, connect-ensure-login's
+// `ensureLoggedIn` -- and middleware passed by reference, which produces no
+// call, is read as an identifier naming an authentication gate. The identifier
+// list is deliberately generous: for a negation, matching too much costs recall
+// rather than precision, and a routes module that so much as names `passport`
+// or a JWT is one whose gating has to be read by a human rather than guessed at
+// here.
+binding jsRestifyMongooseCrudRouterUnauthenticated {
+  requires {
+    dependency("express-restify-mongoose")
+  }
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.call == "Router" and node.context.call == "use" and not (node.context.call in ["authenticate", "isAuthenticated", "ensureAuthenticated", "ensureLoggedIn", "requiresAuth", "requireAuth", "requireLogin", "checkJwt", "verifyToken", "expressjwt", "expressJwt", "jwt", "auth", "basicAuth"]) and not (containsAny(node.context.identifier, ["passport", "Passport", "jwt", "Jwt", "JWT", "authenticate", "Authenticate", "requireAuth", "requiresAuth", "requireLogin", "ensureLogged", "isAuthenticated", "authMiddleware", "authorize", "Authorize", "checkJwt", "verifyToken", "authGuard", "AuthGuard"]))
+  emit issue code.AuthenticationRequiredOp at node
+}

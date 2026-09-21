@@ -1,0 +1,259 @@
+# PostgreSQL called the printf family without consulting the return, and
+# every known standard library implementation of those functions can fail
+# with ENOMEM, so a failed call silently omitted output, exposed trailing
+# buffer contents, or crashed -- unchecked function returns to information
+# exposure (CWE-252/CWE-200, CVE-2015-3166; the May 2015 security release).
+# The fixing commit 16304a013432931e61e623c8d85e9fe24709d9ba, "Add
+# error-throwing wrappers for the printf family of functions", remediates
+# the callers architecturally rather than at any call site:
+# src/include/port.h #defines printf/fprintf/sprintf/vsnprintf/... to
+# *_throw_on_fail wrappers in the new src/port/syswrap.c, each of which
+# checks `ret < 0` and aborts (elog(ERROR) in the backend, abort() in the
+# frontend) instead of returning, and the one file that bypasses the
+# wrappers -- src/port/snprintf.c, the replacement implementation built
+# under USE_REPL_SNPRINTF -- gains explicit `< 0` tests of its own.
+#
+# ## Re-measured at the current tip
+#
+# Three `--cache off` runs per revision (timeout 180, --max-ram 6GB) over
+# src/port/snprintf.c: 34 findings at the parent cac18a76b and 32 at the
+# fix, stable in all six runs -- 4 VYQL-MEM-002, 29 vs 27 VYQL-MEM-006 and
+# 1 VYQL-MEM-016. The two-finding delta is NullableDeref heuristics on the
+# guards the fix *adds*, so the safe revision scores higher; nothing fires
+# on the unchecked returns. The `-flags only` view reports 129 vs 125
+# flags with the same shape. Scanning the whole src/port directory reports
+# 25 findings at or above high at both revisions, 3/3 runs each.
+# `vyql match` labels the four sprintf calls in fmtptr/fmtfloat only
+# `code.UnboundedCopySmell` -- a judgement about the destination buffer
+# with no relation to the return -- at both revisions.
+#
+# ## Why the miss holds
+#
+# The remediation is invisible at every call site: src/backend/main/main.c
+# carries thirty discarded printf calls and is byte-identical at the
+# parent and the fix, so caller-side detection cannot discriminate this
+# pair in principle. The direct CWE-252 form is measured unshippable as a
+# rule: 4610 statement-discarded printf-family call sites stand in this
+# tree against 37 that capture the return (882 discarded in src/backend
+# alone), and the upstream author's own message calls editing each site
+# "painfully invasive". The format-length family that has shipped since
+# the first pass -- VYQL-MEM-073, code.MissingFormatTruncationCheck over
+# analysis.format_length.truncation_unchecked -- is scoped to the bounded
+# spellings by its own contract ("the unbounded sprintf spellings have no
+# bound to consult and are not reported here at all"), and its guard is
+# bound consultation, which sprintf has nothing to consult. The one
+# dataflow-visible slice, fmtfloat's `convert[vallen - 1]` reading past
+# the buffer when the captured sprintf return is negative, is a CWE-787
+# slice of this fix rather than the recorded weakness, and covering it
+# needs a second per-shape sibling in that observation family with
+# different guard semantics -- a new fact, concept and rule, not a
+# mechanical correction. Its measured precision is good (87 raw sites
+# across 78,076 C files in the corpus, 2 here at the parent and 0 at the
+# fix), so it is worth its own rank rather than this one. No definition
+# change shipped. All forms pin the miss as a double reject of the
+# family's consumer: when checked-return vocabulary reaches the standard
+# formatted-output functions, the discarded form and the
+# consumed-as-length form must flip to expect VYQL-VAL-001, and the
+# unbounded spelling of the length family to expect VYQL-MEM-073.
+
+test "rank1596: the caller discards the formatted-output return"
+  lang c
+  file src/backend/main/main.c
+  reject VYQL-VAL-001
+  code
+  ```
+  #include <stdio.h>
+
+  static void
+  usage(const char *progname)
+  {
+      printf("%s is the PostgreSQL server.\n\n", progname);
+      printf("Usage:\n  %s [OPTION]...\n\n", progname);
+      printf("Options:\n");
+      printf("  -D DATADIR     database directory location\n");
+      printf("  -V, --version  output version information, then exit\n");
+  }
+  ```
+
+test "rank1596: the captured sprintf return is consumed as a length"
+  lang c
+  file src/port/snprintf.c
+  reject VYQL-VAL-001
+  reject VYQL-MEM-073
+  code
+  ```
+  #include <stdio.h>
+  #include <ctype.h>
+
+  typedef struct PrintfTarget
+  {
+      char       *bufstart;
+      char       *bufptr;
+      char       *bufend;
+  } PrintfTarget;
+
+  static void dostr(const char *str, int slen, PrintfTarget *target);
+
+  static void
+  fmtptr(void *value, PrintfTarget *target)
+  {
+      int         vallen;
+      char        convert[64];
+
+      /* we rely on regular C library's sprintf to do the basic conversion */
+      vallen = sprintf(convert, "%p", value);
+
+      dostr(convert, vallen, target);
+  }
+
+  static void
+  fmtfloat(double value, char type, int precision, int pointflag,
+           PrintfTarget *target)
+  {
+      int         vallen;
+      char        fmt[32];
+      char        convert[1024];
+      int         zeropadlen = 0;
+
+      if (pointflag)
+      {
+          sprintf(fmt, "%%.%d%c", precision, type);
+          zeropadlen = 8;
+      }
+      else
+          sprintf(fmt, "%%%c", type);
+
+      vallen = sprintf(convert, fmt, value);
+
+      /* If it's infinity or NaN, forget about doing any zero-padding */
+      if (zeropadlen > 0 && !isdigit((unsigned char) convert[vallen - 1]))
+          zeropadlen = 0;
+  }
+  ```
+
+test "rank1596: the fixed revision consults the formatted-output return"
+  lang c
+  file src/port/snprintf.c
+  reject VYQL-VAL-001
+  reject VYQL-MEM-073
+  code
+  ```
+  #include <stdio.h>
+  #include <ctype.h>
+
+  typedef struct PrintfTarget
+  {
+      char       *bufstart;
+      char       *bufptr;
+      char       *bufend;
+      bool        failed;
+  } PrintfTarget;
+
+  static void dostr(const char *str, int slen, PrintfTarget *target);
+
+  static void
+  fmtptr(void *value, PrintfTarget *target)
+  {
+      int         vallen;
+      char        convert[64];
+
+      /* we rely on regular C library's sprintf to do the basic conversion */
+      vallen = sprintf(convert, "%p", value);
+      if (vallen < 0)
+          target->failed = true;
+      else
+          dostr(convert, vallen, target);
+  }
+
+  static void
+  fmtfloat(double value, char type, int precision, int pointflag,
+           PrintfTarget *target)
+  {
+      int         vallen;
+      char        fmt[32];
+      char        convert[1024];
+      int         zeropadlen = 0;
+
+      if (pointflag)
+      {
+          if (sprintf(fmt, "%%.%d%c", precision, type) < 0)
+              goto fail;
+          zeropadlen = 8;
+      }
+      else if (sprintf(fmt, "%%%c", type) < 0)
+          goto fail;
+
+      vallen = sprintf(convert, fmt, value);
+      if (vallen < 0)
+          goto fail;
+
+      /* If it's infinity or NaN, forget about doing any zero-padding */
+      if (zeropadlen > 0 && !isdigit((unsigned char) convert[vallen - 1]))
+          zeropadlen = 0;
+      return;
+
+  fail:
+      target->failed = true;
+  }
+  ```
+
+test "rank1596: the throw-on-fail wrapper aborts instead of returning"
+  lang c
+  file src/port/syswrap.c
+  reject VYQL-VAL-001
+  code
+  ```
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <stdarg.h>
+  #include <errno.h>
+
+  /* We abort() in the frontend, rather than exit(), because libpq in
+   * particular has no business calling exit().  These failures had better
+   * be rare. */
+  static void
+  lib_err(const char *func)
+  {
+      int         discard;
+
+      discard = fprintf(stderr, "%s failed: %s\n", func, strerror(errno));
+      (void) discard;
+      abort();
+  }
+
+  int
+  vfprintf_throw_on_fail(FILE *stream, const char *fmt, va_list args)
+  {
+      int         ret;
+
+      ret = vfprintf(stream, fmt, args);
+      if (ret < 0)
+          lib_err("vfprintf");
+      return ret;
+  }
+
+  int
+  vsprintf_throw_on_fail(char *str, const char *fmt, va_list args)
+  {
+      int         ret;
+
+      ret = vsprintf(str, fmt, args);
+      if (ret < 0)
+          lib_err("vsprintf");
+      return ret;
+  }
+
+  int
+  printf_throw_on_fail(const char *fmt,...)
+  {
+      int         ret;
+      va_list     args;
+
+      va_start(args, fmt);
+      ret = vprintf(fmt, args);
+      va_end(args);
+      if (ret < 0)
+          lib_err("printf");
+      return ret;
+  }
+  ```

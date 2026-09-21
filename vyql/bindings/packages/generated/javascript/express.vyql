@@ -1,0 +1,138 @@
+module bindings.javascript.generated.m5103d1c9;
+
+binding httpInput0 {
+  requires {
+    dependency("express")
+  }
+  query pattern callExpr where callee.method == "req.query"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput1 {
+  requires {
+    dependency("express")
+  }
+  query pattern callExpr where callee.method == "req.params"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput2 {
+  requires {
+    dependency("express")
+  }
+  query pattern callExpr where callee.method == "req.body"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput3 {
+  requires {
+    dependency("express")
+  }
+  query pattern callExpr where callee.method == "req.headers"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput4 {
+  requires {
+    dependency("express")
+  }
+  query pattern callExpr where callee.method == "req.get"
+  emit source code.HttpInput at call.result
+}
+
+binding cookie5 {
+  requires {
+    dependency("express")
+  }
+  query pattern callExpr where callee.method == "req.cookies"
+  emit source code.Cookie at call.result
+}
+
+binding cookie6 {
+  requires {
+    dependency("express")
+  }
+  query pattern callExpr where callee.method == "req.signedCookies"
+  emit source code.Cookie at call.result
+}
+
+binding redirectTarget7 {
+  requires {
+    dependency("express")
+  }
+  query pattern callExpr where callee.method == "res.redirect"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}
+
+binding networkSend8 {
+  requires {
+    dependency("express")
+  }
+  query pattern callExpr where callee.method == "res.send"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend9 {
+  requires {
+    dependency("express")
+  }
+  query pattern callExpr where callee.method == "res.json"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend10 {
+  requires {
+    dependency("express")
+  }
+  query pattern callExpr where callee.method == "res.jsonp"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding templateRender11 {
+  requires {
+    dependency("express")
+  }
+  query pattern callExpr where callee.method == "res.render"
+  emit sink code.TemplateRender at args[0]
+}
+
+binding filePathAccess12 {
+  requires {
+    dependency("express")
+  }
+  query pattern callExpr where callee.method == "res.sendFile"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess13 {
+  requires {
+    dependency("express")
+  }
+  query pattern callExpr where callee.method == "res.download"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding responseHeaderWrite14 {
+  requires {
+    dependency("express")
+  }
+  query pattern callExpr where callee.method == "res.set"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding responseHeaderWrite15 {
+  requires {
+    dependency("express")
+  }
+  query pattern callExpr where callee.method == "res.header"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding cookie16 {
+  requires {
+    dependency("express")
+  }
+  query pattern callExpr where callee.method == "res.cookie"
+  emit source code.Cookie at call.result
+}

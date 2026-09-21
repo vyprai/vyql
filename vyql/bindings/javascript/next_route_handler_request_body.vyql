@@ -1,0 +1,19 @@
+module bindings.javascript.next_route_handler_request_body;
+
+// A Next.js App Router route handler is exported as `export async function
+// POST(request: Request)` and reads its body through the Fetch API Request
+// interface's body readers -- `await request.json()`, `.text()`,
+// `.formData()`, `.arrayBuffer()` or `.blob()` -- which is how the framework
+// documents receiving a request payload. Every one of those returns caller-
+// controlled data. The already-bound `searchParams` covers only the query
+// string, so a handler whose whole input is its body carried no source at
+// all. Both spellings of the parameter are matched because the framework's
+// own examples use `request` and the shorter `req` is the other conventional
+// name for the same parameter.
+binding nextRouteHandlerRequestBody {
+  requires {
+    dependency("next")
+  }
+  query pattern callExpr where callee.path ~= "request.json" or callee.path ~= "request.text" or callee.path ~= "request.formData" or callee.path ~= "request.arrayBuffer" or callee.path ~= "request.blob" or callee.path ~= "req.json" or callee.path ~= "req.text" or callee.path ~= "req.formData" or callee.path ~= "req.arrayBuffer" or callee.path ~= "req.blob"
+  emit source code.HttpInput at call.result
+}

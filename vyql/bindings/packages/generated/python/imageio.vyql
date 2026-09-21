@@ -1,0 +1,73 @@
+module bindings.python.generated.m40d3cdd1;
+
+binding filePathAccess0 {
+  requires {
+    dependency("imageio")
+  }
+  query pattern callExpr where callee.method == "imread"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("imageio")
+  }
+  query pattern callExpr where callee.method == "imwrite"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("imageio")
+  }
+  query pattern callExpr where callee.method == "mimread"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("imageio")
+  }
+  query pattern callExpr where callee.method == "mimwrite"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("imageio")
+  }
+  query pattern callExpr where callee.method == "volread"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess5 {
+  requires {
+    dependency("imageio")
+  }
+  query pattern callExpr where callee.method == "volwrite"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess6 {
+  requires {
+    dependency("imageio")
+  }
+  query pattern callExpr where callee.method == "mvolread"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess7 {
+  requires {
+    dependency("imageio")
+  }
+  query pattern callExpr where callee.method == "mvolwrite"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding xmlParse8 {
+  requires {
+    dependency("imageio")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.XmlParse at args[0]
+}

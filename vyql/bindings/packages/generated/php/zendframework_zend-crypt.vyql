@@ -1,0 +1,17 @@
+module bindings.php.generated.m1275784e;
+
+binding filePathAccess0 {
+  requires {
+    dependency("zendframework/zend-crypt")
+  }
+  query pattern callExpr where callee.method == "ZendCryptFileCipher::encrypt"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("zendframework/zend-crypt")
+  }
+  query pattern callExpr where callee.method == "ZendCryptFileCipher::decrypt"
+  emit sink code.FilePathAccess at args[0]
+}

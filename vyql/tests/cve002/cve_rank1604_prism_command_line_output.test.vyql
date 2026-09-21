@@ -1,0 +1,242 @@
+# Prism's command-line plugin spliced the output lines of a code block back
+# into the highlighted markup without encoding, so a page whose code-block
+# content carried markup executed it when the block rendered (DOM
+# cross-site scripting, CWE-79; CVE-2022-23647 / PR #3341). before-highlight
+# in plugins/command-line/prism-command-line.js reads
+# pre.getAttribute('data-output') as line ranges, stashes those lines raw in
+# env.vars['command-line'].outputLines and clears them from env.code so the
+# highlight pipeline -- which encodes markup -- never touches them;
+# before-insert then rebuilds env.highlightedCode with
+#
+#     codeLines[i] = '<span class="token output">'
+#         + outputLines[i] + '</span>';
+#
+# and Prism core assigns the result to env.element.innerHTML. The fix
+# e002e78c34 ("Command Line: Escape markup in command line output (#3341)")
+# wraps the splice in Prism.util.encode (a comment in the fixed revision:
+# "outputLines were removed from codeLines so missed out on escaping of
+# markup so do it here"). No pool correction.
+#
+# Held ATTENTION at recheck, escaped-vs-raw branches over an escape pipeline
+# -- the else arm of the splice renders lines the highlight pipeline already
+# encoded, the output arm bypasses it, the same present-but-incomplete
+# family as the first-quote-only replace, the unquoted bind type, the
+# flagless regex sanitizer and the adapter param that never enters its
+# sanitising helper: nothing can ask "does every interpolation into rendered
+# markup pass the encoder".
+#
+# Measured at recheck against the current knowledge base, not inherited.
+# Three --cache off scans per revision of the real tree (timeout 180,
+# --max-ram 6GB) report 285/285/285 findings at e002e78c34^ and 285/285/285
+# at e002e78c34 with the whole-tree fingerprint sets differing by exactly one
+# row each way: the single finding in the plugin file,
+# VYQL-INJ-004 source prism-command-line.js:194 -> sink :209, re-fingerprints
+# (fp=b650c6d18779b921 -> fp=53e60e76d145b332) purely from the two-line
+# comment shift the fix inserts. That row is the complete hook's prompt path
+# -- getAttribute('data-prompt'/'data-user'/'data-host') concatenated into
+# prompt.innerHTML -- which the fix does not touch and whose quotes the
+# .replace(/"/g, '&quot') helper does escape for its attribute context, so
+# it fires identically at both revisions and is not the CVE site. The
+# -flags only view on the file reports no flags. The splice itself is
+# unreachable: trace shows the data-output source's taint stop at
+# outputSections.split.forEach (callee not traced) and at parseInt (labelled
+# core.HtmlEscape), the spliced value is a read from the env.vars property
+# bag with no source label, and the DOM insertion
+# env.element.innerHTML = env.highlightedCode sits in
+# components/prism-core.js, which extracts no labels at all -- see the
+# module-pattern entry in ENGINE-GAPS.md: var Prism = (function () { ... })();
+# drops every function definition inside the IIFE from analysis while the
+# identical bare (function () { ... })(); extracts them, so the wrapper of
+# every block below is bare by measurement, not style.
+#
+# A Prism.util.encode binding as core.HtmlEscape would be
+# documentation-answerable but inert alone (no rule fires on the splice for
+# it to neutralize), and a markup-concatenation presence binding negated on
+# the encoder names the fixing commit's own vocabulary. No definition change
+# shipped.
+#
+# The first two blocks reject VYQL-INJ-004 and flip to expect when
+# branch-escape or hook-chain vocabulary lands; the third block pins the
+# prompt path, which VYQL-INJ-004 does report today at both revisions.
+#
+# verify_current_expected: attention-analysis-gap, splice rejected at both
+# revisions, prompt path reported
+
+test "rank1604: the output lines splice into highlighted markup unencoded"
+  lang javascript
+  file plugins/command-line/prism-command-line.js
+  reject VYQL-INJ-004
+  code
+  ```
+  (function () {
+      if (typeof Prism === 'undefined' || typeof document === 'undefined') {
+          return;
+      }
+
+      function getCommandLineInfo(env) {
+          var vars = env.vars = env.vars || {};
+          return vars['command-line'] = vars['command-line'] || {};
+      }
+
+      Prism.hooks.add('before-highlight', function (env) {
+          var commandLine = getCommandLineInfo(env);
+
+          var pre = env.element.parentElement;
+          var codeLines = env.code.split('\n');
+          commandLine.numberOfLines = codeLines.length;
+
+          /** @type {string[]} */
+          var outputLines = commandLine.outputLines = [];
+
+          var outputSections = pre.getAttribute('data-output');
+          if (outputSections !== null) {
+              outputSections.split(',').forEach(function (section) {
+                  var range = section.split('-');
+                  var outputStart = parseInt(range[0], 10);
+                  var outputEnd = range.length === 2 ? parseInt(range[1], 10) : outputStart;
+
+                  if (!isNaN(outputStart) && !isNaN(outputEnd)) {
+                      outputStart--;
+                      outputEnd--;
+                      // Save the output line and clear it in the code so it's not highlighted.
+                      for (var j = outputStart; j <= outputEnd; j++) {
+                          outputLines[j] = codeLines[j];
+                          codeLines[j] = '';
+                      }
+                  }
+              });
+          }
+
+          env.code = codeLines.join('\n');
+      });
+
+      Prism.hooks.add('before-insert', function (env) {
+          var commandLine = getCommandLineInfo(env);
+
+          // Reinsert the output lines into the highlighted code.
+          var codeLines = env.highlightedCode.split('\n');
+          var outputLines = commandLine.outputLines || [];
+          for (var i = 0, l = codeLines.length; i < l; i++) {
+              // Add spans to allow distinction of input/output text for styling
+              if (outputLines.hasOwnProperty(i)) {
+                  codeLines[i] = '<span class="token output">'
+                      + outputLines[i] + '</span>';
+              } else {
+                  codeLines[i] = '<span class="token command">'
+                      + codeLines[i] + '</span>';
+              }
+          }
+          env.highlightedCode = codeLines.join('\n');
+      });
+  })();
+  ```
+
+test "rank1604: the fixed revision encodes the spliced output"
+  lang javascript
+  file plugins/command-line/prism-command-line.js
+  reject VYQL-INJ-004
+  code
+  ```
+  (function () {
+      if (typeof Prism === 'undefined' || typeof document === 'undefined') {
+          return;
+      }
+
+      function getCommandLineInfo(env) {
+          var vars = env.vars = env.vars || {};
+          return vars['command-line'] = vars['command-line'] || {};
+      }
+
+      Prism.hooks.add('before-highlight', function (env) {
+          var commandLine = getCommandLineInfo(env);
+
+          var pre = env.element.parentElement;
+          var codeLines = env.code.split('\n');
+          commandLine.numberOfLines = codeLines.length;
+
+          /** @type {string[]} */
+          var outputLines = commandLine.outputLines = [];
+
+          var outputSections = pre.getAttribute('data-output');
+          if (outputSections !== null) {
+              outputSections.split(',').forEach(function (section) {
+                  var range = section.split('-');
+                  var outputStart = parseInt(range[0], 10);
+                  var outputEnd = range.length === 2 ? parseInt(range[1], 10) : outputStart;
+
+                  if (!isNaN(outputStart) && !isNaN(outputEnd)) {
+                      outputStart--;
+                      outputEnd--;
+                      for (var j = outputStart; j <= outputEnd; j++) {
+                          outputLines[j] = codeLines[j];
+                          codeLines[j] = '';
+                      }
+                  }
+              });
+          }
+
+          env.code = codeLines.join('\n');
+      });
+
+      Prism.hooks.add('before-insert', function (env) {
+          var commandLine = getCommandLineInfo(env);
+
+          var codeLines = env.highlightedCode.split('\n');
+          var outputLines = commandLine.outputLines || [];
+          for (var i = 0, l = codeLines.length; i < l; i++) {
+              if (outputLines.hasOwnProperty(i)) {
+                  // outputLines were removed from codeLines so missed out on escaping
+                  // of markup so do it here.
+                  codeLines[i] = '<span class="token output">'
+                      + Prism.util.encode(outputLines[i]) + '</span>';
+              } else {
+                  codeLines[i] = '<span class="token command">'
+                      + codeLines[i] + '</span>';
+              }
+          }
+          env.highlightedCode = codeLines.join('\n');
+      });
+  })();
+  ```
+
+test "rank1604: the prompt rows the plugin already reports today"
+  lang javascript
+  file plugins/command-line/prism-command-line.js
+  expect VYQL-INJ-004
+  code
+  ```
+  (function () {
+      if (typeof Prism === 'undefined' || typeof document === 'undefined') {
+          return;
+      }
+
+      Prism.hooks.add('complete', function (env) {
+          var pre = env.element.parentElement;
+
+          function getAttribute(key, defaultValue) {
+              return (pre.getAttribute(key) || defaultValue).replace(/"/g, '&quot');
+          }
+
+          // Create the "rows" that will become the command-line prompts.
+          var promptLines = '';
+          var promptText = getAttribute('data-prompt', '');
+          var promptLine;
+          if (promptText !== '') {
+              promptLine = '<span data-prompt="' + promptText + '"></span>';
+          } else {
+              var user = getAttribute('data-user', 'user');
+              var host = getAttribute('data-host', 'localhost');
+              promptLine = '<span data-user="' + user + '" data-host="' + host + '"></span>';
+          }
+
+          var rowCount = 5;
+          for (var j = 0; j < rowCount; j++) {
+              promptLines += promptLine;
+          }
+
+          // Create the wrapper element.
+          var prompt = document.createElement('span');
+          prompt.innerHTML = promptLines;
+      });
+  })();
+  ```

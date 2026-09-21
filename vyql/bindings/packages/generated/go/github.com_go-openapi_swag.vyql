@@ -1,0 +1,73 @@
+module bindings.go.generated.m9d786d35;
+
+binding urlFetch0 {
+  requires {
+    dependency("github.com/go-openapi/swag")
+  }
+  query pattern callExpr where callee.method == "LoadFromFileOrHTTP"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("github.com/go-openapi/swag")
+  }
+  query pattern callExpr where callee.method == "LoadFromFileOrHTTP"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding urlFetch2 {
+  requires {
+    dependency("github.com/go-openapi/swag")
+  }
+  query pattern callExpr where callee.method == "LoadFromFileOrHTTPWithTimeout"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("github.com/go-openapi/swag")
+  }
+  query pattern callExpr where callee.method == "LoadFromFileOrHTTPWithTimeout"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("github.com/go-openapi/swag")
+  }
+  query pattern callExpr where callee.method == "YAMLDoc"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("github.com/go-openapi/swag")
+  }
+  query pattern callExpr where callee.method == "YAMLData"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization6 {
+  requires {
+    dependency("github.com/go-openapi/swag")
+  }
+  query pattern callExpr where callee.method == "ReadJSON"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization7 {
+  requires {
+    dependency("github.com/go-openapi/swag")
+  }
+  query pattern callExpr where callee.method == "DynamicJSONToStruct"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization8 {
+  requires {
+    dependency("github.com/go-openapi/swag")
+  }
+  query pattern callExpr where callee.method == "FromDynamicJSON"
+  emit sink code.Deserialization at args[0]
+}

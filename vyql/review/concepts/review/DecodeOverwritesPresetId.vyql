@@ -1,0 +1,8 @@
+module code;
+
+review code.DecodeOverwritesPresetId {
+  category: mass_assignment
+  expected: [core.InputValidation]
+  kind: attention
+  text: "review handlers that preset identifier fields on a struct and then decode the request body over the same struct"
+}

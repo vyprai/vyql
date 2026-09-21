@@ -1,0 +1,43 @@
+module bindings.perl.generated.m36bd324a;
+
+binding templateRender0 {
+  requires {
+    dependency("Prancer-Plugin-Xslate")
+  }
+  query pattern callExpr where callee.method == "render"
+  emit sink code.TemplateRender at args[0]
+}
+
+binding templateRender1 {
+  requires {
+    dependency("Prancer-Plugin-Xslate")
+  }
+  query pattern callExpr where callee.method == "mark_raw"
+  emit sink code.TemplateRender at args[0]
+}
+
+binding htmlEscape2 {
+  requires {
+    dependency("Prancer-Plugin-Xslate")
+  }
+  query pattern callExpr where callee.method == "html_escape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation3 {
+  requires {
+    dependency("Prancer-Plugin-Xslate")
+  }
+  query pattern callExpr where callee.method == "uri_escape"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

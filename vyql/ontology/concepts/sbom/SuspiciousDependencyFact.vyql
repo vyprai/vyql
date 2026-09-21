@@ -1,0 +1,4 @@
+module sbom;
+
+concept SuspiciousDependencyFact : fact {
+}

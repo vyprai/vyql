@@ -1,0 +1,6 @@
+module deserialization;
+
+threat DeserializationAbuse {
+  cwe: [CWE_502]
+  desc: "Deserialization of untrusted data"
+}

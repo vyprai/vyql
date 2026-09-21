@@ -1,0 +1,222 @@
+# src/sentry/auth/helper.py's `_finish_setup_pipeline` configures SSO for an
+# organization: the admin performing setup is authenticated
+# (`request.user.is_authenticated`, `request.user.id != self.state.uid`,
+# membership checked by `user_id=request.user.id`), the AuthProvider is
+# created, and then
+#
+#     self.auth_handler(identity).handle_attach_identity(om)
+#
+# attaches the provider identity. `identity` is whatever the IdP asserted
+# (`self.provider.build_identity(data)` in `finish_pipeline`), and
+# AuthIdentityHandler's `user` property names the account the identity lands
+# on by resolving that asserted email -- `resolve_email_to_user(email)` over
+# UserEmail with no verification anywhere. During setup there is no login
+# happening: the session's admin is the authoritative identity, yet the
+# address the IdP asserts about anyone picks the local account that receives
+# the identity, so an identity asserted on a victim's address links straight
+# to the victim's account (CWE-290, the advisory's framing). The fixed revision pins the
+# resolution to the session:
+#
+#     setup_identity = {**identity, "email": request.user.email}
+#     self.auth_handler(setup_identity).handle_attach_identity(om)
+#
+# The login flow in the same file carries the control in id form --
+# `handle_unknown_identity` attaches only under
+# `((self.request.user.id == self.user.id) or is_account_verified)` -- so the
+# setup flow is the one attach site with no session-match control at all.
+#
+# What fires without this change: nothing on `_finish_setup_pipeline`. The
+# SAML response data is labelled `code.HttpInput` in providers/saml2 and the
+# engine resolves `auth_handler(identity)` into the AuthIdentityHandler
+# methods (VYQL-RF-002 rows trace that exact hop), but no sink or judgement
+# exists on the attach, and a taint route cannot discriminate anyway: the
+# patched dict still spreads the tainted identity (`{**identity, ...}`), so
+# any whole-value taint finding fires identically at both revisions. The
+# discriminator is the session pin, which only a presence fact can see.
+#
+# Nothing is minted. code.UnverifiedEmailClaimIdentity, its review twin and
+# VYQL-AUTH-146 exist for the JupyterHub arm of the same weakness
+# (a relying party that names the provider's email as the account identity);
+# the addition is the Python binding for the session-pin arm,
+# vyql/bindings/python/sso_setup_attach_session_pin.vyql, keyed on the
+# documented attach API and the two session-match controls its own callers
+# use: the `request.user.email` pin (Django's documented chain, the spelling
+# the fixed revision leaves inside the method it guards) and the resolved-user id equality
+# the login flow carries, either operand order. Measured: the negations are
+# function-confined in Python -- a `request.user.email` read in a sibling
+# method does not suppress, and the login flow's id equality in the same
+# file does not silence the setup attach.
+#
+# Residual, false-negative direction only, stated in the binding: a pin read
+# through an intermediate local (`u = request.user; ... u.email`) is not
+# seen, and an equality guard phrased as a `!=` early return is missed;
+# prose cannot satisfy either negation since both clauses read AST-derived
+# facts.
+#
+# Measured on the real tree at 0c67558ae^: src/sentry/auth scanned three
+# times per revision with --cache off reports one VYQL-AUTH-146 row on
+# helper.py:991 (`_finish_setup_pipeline`) at the vulnerable revision and
+# none at the fixed revision; the guarded login-flow attach (helper.py:506) stays quiet
+# through the id-equality negation. The reachable set is exhaustive:
+# `handle_attach_identity` has exactly three occurrences in all of src/ (the
+# definition, the guarded login call, the setup call) and none in any other
+# tree under /tmp/cve-work/rank*/; BenchmarkPython contains neither it nor
+# `request.user.email`, so the +0.90 gate cannot move.
+
+test "rank1721: (a) the SSO setup flow attaches the provider-asserted identity with no session-match control"
+  lang python
+  file src/sentry/auth/helper.py
+  expect VYQL-AUTH-146
+  expect_review code.UnverifiedEmailClaimIdentity
+  code
+  ```
+  class AuthHelper(Pipeline):
+      def _finish_setup_pipeline(self, identity):
+          request = self.request
+          if not request.user.is_authenticated:
+              return self.error(ERR_NOT_AUTHED)
+
+          if request.user.id != self.state.uid:
+              return self.error(ERR_UID_MISMATCH)
+
+          om = organization_service.check_membership_by_id(
+              organization_id=self.organization.id, user_id=request.user.id
+          )
+          if om is None:
+              return self.error(ERR_UID_MISMATCH)
+
+          self.provider_model = AuthProvider.objects.create(
+              organization_id=self.organization.id, provider=self.provider.key, config={}
+          )
+
+          self.auth_handler(identity).handle_attach_identity(om)
+
+          auth.mark_sso_complete(request, self.organization.id)
+  ```
+
+test "rank1721: (b) the patched setup flow pins the identity email to the session user"
+  lang python
+  file src/sentry/auth/helper.py
+  reject VYQL-AUTH-146
+  reject_review code.UnverifiedEmailClaimIdentity
+  code
+  ```
+  class AuthHelper(Pipeline):
+      def _finish_setup_pipeline(self, identity):
+          request = self.request
+          if not request.user.is_authenticated:
+              return self.error(ERR_NOT_AUTHED)
+
+          if request.user.id != self.state.uid:
+              return self.error(ERR_UID_MISMATCH)
+
+          om = organization_service.check_membership_by_id(
+              organization_id=self.organization.id, user_id=request.user.id
+          )
+          if om is None:
+              return self.error(ERR_UID_MISMATCH)
+
+          self.provider_model = AuthProvider.objects.create(
+              organization_id=self.organization.id, provider=self.provider.key, config={}
+          )
+
+          # The setup flow should always link the identity to the admin who is
+          # performing setup, so override the email to ensure resolve_email_to_user
+          # returns the authenticated user rather than whoever the IdP asserted.
+          setup_identity = {**identity, "email": request.user.email}
+          self.auth_handler(setup_identity).handle_attach_identity(om)
+
+          auth.mark_sso_complete(request, self.organization.id)
+  ```
+
+test "rank1721: (c) the login flow's attach under the resolved-user id equality is the guarded form"
+  lang python
+  file src/sentry/auth/helper.py
+  reject VYQL-AUTH-146
+  reject_review code.UnverifiedEmailClaimIdentity
+  code
+  ```
+  class AuthIdentityHandler:
+      def handle_unknown_identity(self, state):
+          if op == "confirm" and ((self.request.user.id == self.user.id) or is_account_verified):
+              auth_identity = self.handle_attach_identity()
+          elif op == "newuser":
+              auth_identity = self.handle_new_user()
+          return self._build_confirmation_response(is_new_account)
+  ```
+
+test "rank1721: (d) a session-email read in a sibling method does not guard the attach"
+  lang python
+  file src/sentry/auth/helper.py
+  expect VYQL-AUTH-146
+  expect_review code.UnverifiedEmailClaimIdentity
+  code
+  ```
+  class AuthHelper(Pipeline):
+      def _finish_setup_pipeline(self, identity):
+          om = organization_service.check_membership_by_id(
+              organization_id=self.organization.id, user_id=request.user.id
+          )
+          self.auth_handler(identity).handle_attach_identity(om)
+
+      def notify_setup_complete(self):
+          organization_service.email_missing_links(
+              self.organization.id, request.user.email, self.provider.key
+          )
+  ```
+
+test "rank1721: (e) the attach in a plain function under other receiver names is the same weakness"
+  lang python
+  file src/sentry/auth/provider.py
+  expect VYQL-AUTH-146
+  expect_review code.UnverifiedEmailClaimIdentity
+  code
+  ```
+  def configure_provider(auth_handler, identity, member):
+      provider_model = AuthProvider.objects.create(
+          organization_id=member.organization_id, provider="saml2", config={}
+      )
+      return auth_handler(identity).handle_attach_identity(member)
+  ```
+
+test "rank1721: (f) the pin spelled as a dict update guards the attach too"
+  lang python
+  file src/sentry/auth/helper.py
+  reject VYQL-AUTH-146
+  reject_review code.UnverifiedEmailClaimIdentity
+  code
+  ```
+  class AuthHelper(Pipeline):
+      def _finish_setup_pipeline(self, identity):
+          setup_identity = dict(identity)
+          setup_identity["email"] = request.user.email
+          self.auth_handler(setup_identity).handle_attach_identity(om)
+  ```
+
+test "rank1721: (g) the id equality in the flipped operand order is the same control"
+  lang python
+  file src/sentry/auth/helper.py
+  reject VYQL-AUTH-146
+  reject_review code.UnverifiedEmailClaimIdentity
+  code
+  ```
+  class AuthIdentityHandler:
+      def handle_unknown_identity(self, state):
+          if self.user.id == request.user.id:
+              return self.handle_attach_identity()
+          return self._build_confirmation_response(False)
+  ```
+
+test "rank1721: (h) a comment naming the pin does not guard the attach"
+  lang python
+  file src/sentry/auth/helper.py
+  expect VYQL-AUTH-146
+  expect_review code.UnverifiedEmailClaimIdentity
+  code
+  ```
+  class AuthHelper(Pipeline):
+      def _finish_setup_pipeline(self, identity):
+          # override the email with request.user.email before attaching so the
+          # identity links to the admin performing setup
+          self.auth_handler(identity).handle_attach_identity(om)
+  ```

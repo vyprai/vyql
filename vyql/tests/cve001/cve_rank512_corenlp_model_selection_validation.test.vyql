@@ -1,0 +1,115 @@
+test "rank512: CoreNLP request-selected classifier is used before model validation"
+  lang java
+  file NERServlet.java
+  expect VYQL-AUTH-029
+  expect_review code.UnvalidatedModelSelection
+  code
+  ```
+  import java.io.IOException;
+  import java.io.PrintWriter;
+  import java.util.Map;
+
+  class NERServlet extends HttpServlet {
+    private String format = "inlineXML";
+    private boolean spacing = true;
+    private String defaultClassifier = "english.all.3class.distsim.crf.ser.gz";
+    private Map<String, CRFClassifier> ners;
+
+    private void addResults(HttpServletRequest request,
+                            HttpServletResponse response) throws IOException {
+      String input = request.getParameter("input");
+      if (input == null) {
+        return;
+      }
+      String outputFormat = request.getParameter("outputFormat");
+      if (outputFormat == null || outputFormat.trim().isEmpty()) {
+        outputFormat = this.format;
+      }
+      String classifier = request.getParameter("classifier");
+      if (classifier == null || classifier.trim().isEmpty()) {
+        classifier = this.defaultClassifier;
+      }
+
+      PrintWriter out = response.getWriter();
+      response.addHeader("classifier", classifier);
+      response.addHeader("outputFormat", outputFormat);
+      response.addHeader("preserveSpacing", String.valueOf(spacing));
+
+      if (outputFormat.equals("highlighted")) {
+        outputHighlighting(out, ners.get(classifier), input);
+      } else {
+        out.print(ners.get(classifier).classifyToString(input, outputFormat, spacing));
+      }
+    }
+
+    private static void outputHighlighting(PrintWriter out, CRFClassifier classifier, String input) {}
+  }
+  class HttpServlet {}
+  interface HttpServletRequest { String getParameter(String name); }
+  interface HttpServletResponse {
+    PrintWriter getWriter() throws IOException;
+    void addHeader(String name, String value);
+  }
+  interface CRFClassifier { String classifyToString(String input, String format, boolean spacing); }
+  ```
+
+test "rank512: CoreNLP validates selected classifier before response headers"
+  lang java
+  file NERServlet.java
+  reject VYQL-AUTH-029
+  reject_review code.UnvalidatedModelSelection
+  code
+  ```
+  import java.io.IOException;
+  import java.io.PrintWriter;
+  import java.util.Map;
+
+  class NERServlet extends HttpServlet {
+    private String format = "inlineXML";
+    private boolean spacing = true;
+    private String defaultClassifier = "english.all.3class.distsim.crf.ser.gz";
+    private Map<String, CRFClassifier> ners;
+
+    private void addResults(HttpServletRequest request,
+                            HttpServletResponse response) throws IOException {
+      String input = request.getParameter("input");
+      if (input == null) {
+        return;
+      }
+      String outputFormat = request.getParameter("outputFormat");
+      if (outputFormat == null || outputFormat.trim().isEmpty()) {
+        outputFormat = this.format;
+      }
+      String classifier = request.getParameter("classifier");
+      if (classifier == null || classifier.trim().isEmpty()) {
+        classifier = this.defaultClassifier;
+      }
+
+      PrintWriter out = response.getWriter();
+      CRFClassifier nerModel = ners.get(classifier);
+      if (nerModel == null) {
+        out.print("Unknown model " + classifier);
+        return;
+      }
+
+      if (outputFormat.equals("highlighted")) {
+        outputHighlighting(out, nerModel, input);
+      } else {
+        out.print(nerModel.classifyToString(input, outputFormat, spacing));
+      }
+
+      response.addHeader("classifier", classifier);
+      response.addHeader("outputFormat", outputFormat);
+      response.addHeader("preserveSpacing", String.valueOf(spacing));
+    }
+
+    private static void outputHighlighting(PrintWriter out, CRFClassifier classifier, String input) {}
+  }
+  class HttpServlet {}
+  interface HttpServletRequest { String getParameter(String name); }
+  interface HttpServletResponse {
+    PrintWriter getWriter() throws IOException;
+    void addHeader(String name, String value);
+  }
+  interface CRFClassifier { String classifyToString(String input, String format, boolean spacing); }
+  ```

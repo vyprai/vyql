@@ -1,0 +1,20 @@
+module bindings.php.unserialize_allowed_classes;
+
+// unserialize() instantiates whatever class the payload names, so an unrestricted
+// call is PHP object injection. The manual's own restriction is the options array:
+// ['allowed_classes' => false] permits only scalars and arrays, and an explicit
+// class allowlist names the classes that may be constructed. Either spelling
+// neutralises the deserialization, so the call is a core.SafeDeserialization
+// control on the argument it restricts. The literal is the bare key text (quote
+// styles are stripped before matching), and an options variable is deliberately
+// not credited: only a literal restriction at the call is evidence the payload
+// cannot name a class.
+binding unserializeAllowedClasses {
+  query pattern callExpr where callee.path == "unserialize" and args.any.literal contains "allowed_classes"
+  emit check core.SafeDeserialization at args[0] {
+    covers path {
+      from: args[0]
+      to: call
+    }
+  }
+}

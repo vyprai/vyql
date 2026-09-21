@@ -1,0 +1,212 @@
+# Rank 1225 / CVE-2016-8654 (GHSA-fvh8-26m7-hp86): JasPer's QMFB (quadrature
+# mirror filter bank) column-group split functions in
+# src/libjasper/jpc/jpc_qmfb.c keep a fixed-size stack array,
+# `splitbuf[QMFB_SPLITBUFSIZE * JPC_QMFB_COLGRPSIZE]`, as the common-case
+# scratch buffer and fall back to a heap allocation only when `bufsize`
+# exceeds that stack capacity. The stack declaration correctly multiplies by
+# `JPC_QMFB_COLGRPSIZE` because every row the write loop stores is a whole
+# column group, but the heap fallback in `jpc_qmfb_split_colgrp` called
+# `jas_alloc2(bufsize, sizeof(jpc_fix_t))` -- `bufsize` samples, not
+# `bufsize` column groups -- so a crafted JPC codestream with enough rows to
+# force the heap path got a buffer `JPC_QMFB_COLGRPSIZE` times too small
+# while the write loop kept advancing by `JPC_QMFB_COLGRPSIZE` samples per
+# row, a heap buffer overflow (CWE-119/CWE-787). `jpc_qmfb_split_colres` had
+# the same `jas_alloc2(bufsize, sizeof(jpc_fix_t))` call missing its
+# `numcols` multiplier. Fix 4a59cfaf9ab3d48fca4a15c0d2674bf7138e3d1a (the
+# pool row's nocommit flag is a metadata lookup failure, not a missing
+# commit: 4a59cfa resolves in jasper-software/jasper history unchanged and
+# its message, diff and regression PoC match the advisory, so no pool
+# correction is needed) replaces both calls with
+# `jas_alloc3(bufsize, JPC_QMFB_COLGRPSIZE, sizeof(jpc_fix_t))` and
+# `jas_alloc3(bufsize, numcols, sizeof(jpc_fix_t))`, which multiply the
+# width into the allocation the way the stack array's declared size already
+# does; the `hstartcol` -> `hstartrow` rename in the same commit is
+# cosmetic.
+#
+# verify_current_expected: fixed, the two omitted-stride cases report and
+# the two carrying-stride cases stay clean.
+#
+# The defect is a size mismatch between two declarations of one logical
+# buffer, so the pairing is read from the code itself rather than from
+# either call site in isolation: the fallback's count is the size argument
+# the surrounding guard bounds by one factor of the array's declared
+# product, and the width is the stride the write loop advances the buffer
+# pointer by, per row. A fallback whose size arguments, once the
+# element-size terms are dropped, name neither that stride nor anything
+# else beyond the count holds `count` elements where the loop writes
+# `count * width`. No flat context bag can relate the two declarations --
+# the function's tokens carry the array's product and the loop's stride
+# with no way to bind the omitted factor -- so the pairing is a
+# function-local observation, ccStackFallbackStrideUnderallocObservations
+# (internal/extract/frontend/treesitter/c.go), beside the existing
+# ccDestCapacityUncheckedObservations: it reads the array's product from
+# the declaration's own declarator, tracks the buffer through alias
+# reassignment (a write through the pointer does not reassign it, and the
+# fallback allocation hands the alias the heap buffer under judgment), and
+# clears whenever any size argument names the stride -- the group constant
+# in the fixed column-group form, the `numcols` parameter in the fixed
+# column-resolved form, exactly as the same file's already-correct join
+# functions carry their widths. The one-dimensional split functions, whose
+# arrays declare no product, are not the idiom and stay unreported.
+# VYQL-MEM-072 (code.StackFallbackStrideUnderallocation) reports it; on
+# the real checkout the two findings land on `jpc_qmfb_split_colgrp` and
+# `jpc_qmfb_split_colres` at the fix's parent and disappear at the fix
+# (404 -> 402 findings, timeout 180, --max-ram 6GB, --cache off, three
+# runs each), with the tree otherwise identical.
+
+test "rank1225: heap fallback buffer for split_colgrp omits the column-group multiplier"
+  lang c
+  expect VYQL-MEM-072
+  file jpc_qmfb.c
+  ```
+  void jpc_qmfb_split_colgrp(jpc_fix_t *a, int numrows, int stride,
+    int parity)
+  {
+  	int bufsize = JPC_CEILDIVPOW2(numrows, 1);
+  	jpc_fix_t splitbuf[QMFB_SPLITBUFSIZE * JPC_QMFB_COLGRPSIZE];
+  	jpc_fix_t *buf = splitbuf;
+  	jpc_fix_t *dstptr;
+  	register jpc_fix_t *dstptr2;
+  	register int n;
+  	register int i;
+
+  	if (bufsize > QMFB_SPLITBUFSIZE) {
+  		if (!(buf = jas_alloc2(bufsize, sizeof(jpc_fix_t)))) {
+  			abort();
+  		}
+  	}
+
+  	n = numrows;
+  	dstptr = buf;
+  	while (n-- > 0) {
+  		dstptr2 = dstptr;
+  		for (i = 0; i < JPC_QMFB_COLGRPSIZE; ++i) {
+  			*dstptr2 = a[i];
+  			++dstptr2;
+  		}
+  		dstptr += JPC_QMFB_COLGRPSIZE;
+  	}
+
+  	if (buf != splitbuf) {
+  		jas_free(buf);
+  	}
+  }
+  ```
+
+test "rank1225: heap fallback buffer for split_colgrp carries the column-group multiplier"
+  lang c
+  reject VYQL-MEM-072
+  file jpc_qmfb.c
+  ```
+  void jpc_qmfb_split_colgrp(jpc_fix_t *a, int numrows, int stride,
+    int parity)
+  {
+  	int bufsize = JPC_CEILDIVPOW2(numrows, 1);
+  	jpc_fix_t splitbuf[QMFB_SPLITBUFSIZE * JPC_QMFB_COLGRPSIZE];
+  	jpc_fix_t *buf = splitbuf;
+  	jpc_fix_t *dstptr;
+  	register jpc_fix_t *dstptr2;
+  	register int n;
+  	register int i;
+
+  	if (bufsize > QMFB_SPLITBUFSIZE) {
+  		if (!(buf = jas_alloc3(bufsize, JPC_QMFB_COLGRPSIZE,
+  		  sizeof(jpc_fix_t)))) {
+  			abort();
+  		}
+  	}
+
+  	n = numrows;
+  	dstptr = buf;
+  	while (n-- > 0) {
+  		dstptr2 = dstptr;
+  		for (i = 0; i < JPC_QMFB_COLGRPSIZE; ++i) {
+  			*dstptr2 = a[i];
+  			++dstptr2;
+  		}
+  		dstptr += JPC_QMFB_COLGRPSIZE;
+  	}
+
+  	if (buf != splitbuf) {
+  		jas_free(buf);
+  	}
+  }
+  ```
+
+test "rank1225: heap fallback buffer for split_colres omits the column count"
+  lang c
+  expect VYQL-MEM-072
+  file jpc_qmfb.c
+  ```
+  void jpc_qmfb_split_colres(jpc_fix_t *a, int numrows, int numcols,
+    int stride, int parity)
+  {
+  	int bufsize = JPC_CEILDIVPOW2(numrows, 1);
+  	jpc_fix_t splitbuf[QMFB_SPLITBUFSIZE * JPC_QMFB_COLGRPSIZE];
+  	jpc_fix_t *buf = splitbuf;
+  	jpc_fix_t *dstptr;
+  	register jpc_fix_t *dstptr2;
+  	register int n;
+  	register int i;
+
+  	if (bufsize > QMFB_SPLITBUFSIZE) {
+  		if (!(buf = jas_alloc2(bufsize, sizeof(jpc_fix_t)))) {
+  			abort();
+  		}
+  	}
+
+  	n = numrows;
+  	dstptr = buf;
+  	while (n-- > 0) {
+  		dstptr2 = dstptr;
+  		for (i = 0; i < numcols; ++i) {
+  			*dstptr2 = a[i];
+  			++dstptr2;
+  		}
+  		dstptr += numcols;
+  	}
+
+  	if (buf != splitbuf) {
+  		jas_free(buf);
+  	}
+  }
+  ```
+
+test "rank1225: heap fallback buffer for split_colres carries the column count"
+  lang c
+  reject VYQL-MEM-072
+  file jpc_qmfb.c
+  ```
+  void jpc_qmfb_split_colres(jpc_fix_t *a, int numrows, int numcols,
+    int stride, int parity)
+  {
+  	int bufsize = JPC_CEILDIVPOW2(numrows, 1);
+  	jpc_fix_t splitbuf[QMFB_SPLITBUFSIZE * JPC_QMFB_COLGRPSIZE];
+  	jpc_fix_t *buf = splitbuf;
+  	jpc_fix_t *dstptr;
+  	register jpc_fix_t *dstptr2;
+  	register int n;
+  	register int i;
+
+  	if (bufsize > QMFB_SPLITBUFSIZE) {
+  		if (!(buf = jas_alloc3(bufsize, numcols, sizeof(jpc_fix_t)))) {
+  			abort();
+  		}
+  	}
+
+  	n = numrows;
+  	dstptr = buf;
+  	while (n-- > 0) {
+  		dstptr2 = dstptr;
+  		for (i = 0; i < numcols; ++i) {
+  			*dstptr2 = a[i];
+  			++dstptr2;
+  		}
+  		dstptr += numcols;
+  	}
+
+  	if (buf != splitbuf) {
+  		jas_free(buf);
+  	}
+  }
+  ```

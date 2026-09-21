@@ -1,0 +1,8 @@
+module code;
+
+review code.UploadContentScanMissingPharStub {
+  category: upload
+  expected: [core.AllowlistValidation]
+  kind: attention
+  text: "review upload content scanners for the `__HALT_COMPILER` phar stub marker, not only the `<?php` opening tag, because a phar archive is loadable without an opening tag"
+}

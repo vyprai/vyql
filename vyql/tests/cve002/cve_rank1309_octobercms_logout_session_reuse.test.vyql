@@ -1,0 +1,211 @@
+# Rank 1309 / CVE-2021-3311: October CMS's authentication manager cleared
+# the logged-out user's session data but never rotated the session
+# identifier itself, so a session ID an attacker had captured before logout
+# came back to life the next time the same user logged in (CWE-613).
+#
+# Auth\Manager::logout() in src/Auth/Manager.php called Session::flush(),
+# which empties the session's stored data but leaves the session ID (and
+# its backing store record) intact. A subsequent login re-populated that
+# same session under the same ID rather than issuing a new one, so a
+# cookie captured while the victim is still logged in keeps working across
+# a logout/login cycle: good logs in, bad captures the cookie, good logs
+# out (the captured cookie stops working), good logs in again, and the
+# captured cookie is valid once more because it names the same session
+# slot. The fixed revision replaces Session::flush() with
+# Session::invalidate(), which both clears the session data and
+# regenerates the session ID.
+#
+# Detection reads the flow through PHP's own documented vocabulary: the
+# function name is the near-universal spelling of the session-ending
+# event, and the teardown call is Laravel's documented
+# "remove all of the session data" (Session::flush() / ->flush(),
+# session_unset() in the core), which empties the store without ending the
+# session. The negation is the vocabulary that rotates or destroys the
+# identifier -- Session::invalidate()/->invalidate(),
+# Session::regenerate()/->regenerate(), session_regenerate_id() and
+# session_destroy() in the core, an invalidateSession*/destroy*/revoke*
+# sweep, or a delegated logout. Residual, stated: a teardown spelled
+# outside the documented set is invisible (false-negative direction), a
+# regenerateToken() chain reads as a control through its regenerate prefix
+# although it rotates the CSRF token rather than the session identifier,
+# and full delegation to another logout implementation is accepted as
+# handled without seeing into the callee.
+#
+# Variants pin what the discrimination rests on: a control spelled with
+# the core session_regenerate_id(true) or session_destroy() instead of the
+# fix's own Session::invalidate() also reports zero, so the clause reads a
+# control vocabulary rather than this commit's layout; a comment naming
+# the fix inside the vulnerable handler leaves it reporting, since these
+# tokens are AST-derived; an invalidate in a sibling method does not
+# suppress the handler; and output-buffer flushes (ob_flush/fflush) are
+# not session teardowns. Across the clone corpus the reachable set is
+# this one handler: no other PHP logout function pairs a session flush
+# with no rotation vocabulary.
+
+test "rank1309: logout clears session data without rotating the session id"
+  lang php
+  file src/Auth/Manager.php
+  expect VYQL-AUTH-177
+  expect_review code.LogoutWithoutSessionInvalidation
+  code
+  ```
+  <?php
+
+  class Manager
+  {
+      public function logout()
+      {
+          // Initialize the current auth session before trying to remove it
+          if (is_null($this->user) && !$this->check()) {
+              return;
+          }
+
+          if ($this->user) {
+              $this->user->setRememberToken(null);
+              $this->user->forceSave();
+          }
+
+          $this->user = null;
+
+          Session::flush();
+          Cookie::queue(Cookie::forget($this->sessionKey));
+      }
+  }
+  ```
+
+test "rank1309: logout invalidates the session, rotating the session id"
+  lang php
+  file src/Auth/Manager.php
+  reject VYQL-AUTH-177
+  reject_review code.LogoutWithoutSessionInvalidation
+  code
+  ```
+  <?php
+
+  class Manager
+  {
+      public function logout()
+      {
+          // Initialize the current auth session before trying to remove it
+          if (is_null($this->user) && !$this->check()) {
+              return;
+          }
+
+          if ($this->user) {
+              $this->user->setRememberToken(null);
+              $this->user->forceSave();
+          }
+
+          $this->user = null;
+
+          Session::invalidate();
+          Cookie::queue(Cookie::forget($this->sessionKey));
+      }
+  }
+  ```
+
+test "rank1309: the core session_regenerate_id control also clears it"
+  lang php
+  file src/Auth/Manager.php
+  reject VYQL-AUTH-177
+  reject_review code.LogoutWithoutSessionInvalidation
+  code
+  ```
+  <?php
+
+  class Manager
+  {
+      public function logout()
+      {
+          $this->user = null;
+
+          session_unset();
+          session_regenerate_id(true);
+      }
+  }
+  ```
+
+test "rank1309: the core session_destroy control also clears it"
+  lang php
+  file src/Auth/Manager.php
+  reject VYQL-AUTH-177
+  reject_review code.LogoutWithoutSessionInvalidation
+  code
+  ```
+  <?php
+
+  class Manager
+  {
+      public function logout()
+      {
+          $this->user = null;
+
+          session_unset();
+          session_destroy();
+      }
+  }
+  ```
+
+test "rank1309: an invalidate in a sibling method does not clear the handler"
+  lang php
+  file src/Auth/Manager.php
+  expect VYQL-AUTH-177
+  expect_review code.LogoutWithoutSessionInvalidation
+  code
+  ```
+  <?php
+
+  class Manager
+  {
+      public function logout()
+      {
+          $this->user = null;
+
+          Session::flush();
+      }
+
+      public function invalidateAll()
+      {
+          Session::invalidate();
+      }
+  }
+  ```
+
+test "rank1309: a comment naming the fix does not clear the handler"
+  lang php
+  file src/Auth/Manager.php
+  expect VYQL-AUTH-177
+  expect_review code.LogoutWithoutSessionInvalidation
+  code
+  ```
+  <?php
+
+  class Manager
+  {
+      public function logout()
+      {
+          // Session::invalidate() would also rotate the session id
+          Session::flush();
+      }
+  }
+  ```
+
+test "rank1309: an output-buffer flush is not a session teardown"
+  lang php
+  file src/Auth/Manager.php
+  reject VYQL-AUTH-177
+  reject_review code.LogoutWithoutSessionInvalidation
+  code
+  ```
+  <?php
+
+  class Output
+  {
+      public function logout()
+      {
+          ob_flush();
+          fflush(STDOUT);
+          $this->user = null;
+      }
+  }
+  ```

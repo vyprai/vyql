@@ -1,0 +1,146 @@
+# Both Zope page-template engines resolve TAL path expressions segment by
+# segment. For plain objects the segment lookup goes through
+# `zope.traversing.adapters.traversePathElement`, which applies no security
+# policy, so each engine screens the names itself: segments starting with an
+# underscore raise NotFound, the same screening `restrictedTraverse` performs.
+# Neither engine consulted the security manager for the segments that passed
+# the screen, so an expression could walk from a module the policy authorized
+# (`modules/AccessControl`) onto attributes it never did (`users`), reaching
+# otherwise-blocked modules indirectly and executing code with them. The fixed revision
+# obtains the validator (`validate = getSecurityManager().validate`) and calls
+# it on every resolved segment inside the loop, converting Unauthorized to
+# NotFound; the trusted engines, which resolve through
+# `unrestrictedTraverse` and screen nothing, keep no validation by design and
+# must stay unreported.
+#
+# The shipped binding anchors on the function that both screens segment names
+# and resolves through the unsecured primitive while never consulting the
+# security manager, and emits code.AccessPolicyReview (VYQL-AUTH-080). The
+# control is the documented AccessControl entry point, not this fix's local
+# alias: renaming the alias leaves the flag suppressed, and the trusted
+# engines match neither positive half. Measured over three `--cache off` runs
+# per revision of the real checkout: the vulnerable tree reports the finding
+# at src/Products/PageTemplates/Expressions.py:65 and
+# src/Products/PageTemplates/expression.py:57 and nothing else moves; the
+# patched tree reports none. `traversePathElement` appears in no other clone
+# under /tmp/cve-work/rank*, so the reachable set is the three call sites in
+# this repository, two of them the vulnerable engines.
+
+test "rank1997: a name-screening traversal loop resolves segments through the unsecured path-element primitive"
+  lang python
+  file expressions.py
+  expect VYQL-AUTH-080
+  code
+  ```
+  from zope.traversing.adapters import traversePathElement
+
+
+  def boboAwareZopeTraverse(object, path_items, econtext):
+      request = getattr(econtext, 'request', None)
+      path_items = list(path_items)
+      path_items.reverse()
+
+      while path_items:
+          name = path_items.pop()
+
+          if name.startswith('_'):
+              raise NotFound(name)
+
+          if ITraversable.providedBy(object):
+              object = object.restrictedTraverse(name)
+          else:
+              object = traversePathElement(object, name, path_items,
+                                           request=request)
+      return object
+  ```
+
+test "rank1997: validating every resolved segment against the security manager is the control"
+  lang python
+  file expressions_fixed.py
+  reject VYQL-AUTH-080
+  code
+  ```
+  from AccessControl.SecurityManagement import getSecurityManager
+  from zope.traversing.adapters import traversePathElement
+
+
+  def boboAwareZopeTraverse(object, path_items, econtext):
+      request = getattr(econtext, 'request', None)
+      validate = getSecurityManager().validate
+      path_items = list(path_items)
+      path_items.reverse()
+
+      while path_items:
+          name = path_items.pop()
+
+          if name.startswith('_'):
+              raise NotFound(name)
+
+          if ITraversable.providedBy(object):
+              object = object.restrictedTraverse(name)
+          else:
+              found = traversePathElement(object, name, path_items,
+                                           request=request)
+              try:
+                  validate(object, object, name, found)
+                  object = found
+              except Unauthorized:
+                  raise NotFound(name)
+      return object
+  ```
+
+test "rank1997: the chameleon engine's traversal classmethod screens names but never validates"
+  lang python
+  file expression.py
+  expect VYQL-AUTH-080
+  code
+  ```
+  from zope.traversing.adapters import traversePathElement
+
+
+  class BoboAwareZopeTraverse:
+      traverse_method = 'restrictedTraverse'
+
+      @classmethod
+      def traverse(cls, base, request, path_items):
+          path_items = list(path_items)
+          path_items.reverse()
+
+          while path_items:
+              name = path_items.pop()
+
+              if name.startswith('_'):
+                  raise NotFound(name)
+
+              if ITraversable.providedBy(base):
+                  base = getattr(base, cls.traverse_method)(name)
+              else:
+                  base = traversePathElement(base, name, path_items,
+                                             request=request)
+          return base
+  ```
+
+test "rank1997: a trusted traversal loop resolves unrestricted and screens nothing"
+  lang python
+  file expression_trusted.py
+  reject VYQL-AUTH-080
+  code
+  ```
+  from zope.traversing.adapters import traversePathElement
+
+
+  def trustedBoboAwareZopeTraverse(object, path_items, econtext):
+      request = getattr(econtext, 'request', None)
+      path_items = list(path_items)
+      path_items.reverse()
+
+      while path_items:
+          name = path_items.pop()
+
+          if ITraversable.providedBy(object):
+              object = object.unrestrictedTraverse(name)
+          else:
+              object = traversePathElement(object, name, path_items,
+                                           request=request)
+      return object
+  ```

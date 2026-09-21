@@ -1,0 +1,11 @@
+module vypr.request_forgery;
+
+rule WordPressOptionUpdateMissingCsrf {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_352]
+    id: "VYQL-RF-028"
+    severity: medium
+  }
+  issue code.WordPressOptionUpdateMissingCsrf as action
+}

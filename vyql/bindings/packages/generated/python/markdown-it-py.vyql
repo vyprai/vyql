@@ -1,0 +1,38 @@
+module bindings.python.generated.m06c3a4e3;
+
+binding deserialization0 {
+  requires {
+    dependency("markdown-it-py")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("markdown-it-py")
+  }
+  query pattern callExpr where callee.method == "parseInline"
+  emit sink code.Deserialization at args[0]
+}
+
+binding htmlRender2 {
+  requires {
+    dependency("markdown-it-py")
+  }
+  query pattern callExpr where callee.method == "render"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlEscape3 {
+  requires {
+    dependency("markdown-it-py")
+  }
+  query pattern callExpr where callee.method == "escape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

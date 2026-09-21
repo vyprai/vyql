@@ -1,0 +1,6 @@
+module smartcontract;
+
+threat PrivilegedDestruct {
+  cwe: [CWE_284]
+  desc: "Untrusted-reachable selfdestruct/privileged operation"
+}

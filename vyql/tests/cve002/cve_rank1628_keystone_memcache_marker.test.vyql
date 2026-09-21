@@ -1,0 +1,169 @@
+# Rank 1628 / CVE-2013-2166: the keystone auth_token middleware's
+# memcache security strategies are opt-in from the payload's own
+# point of view. decrypt_data and verify_signed_data checked for a
+# marker prefix the cached entry itself carries
+# ('{ENCRYPT:AES256}' / '{MAC:SHA1}') and, when the marker ias
+# absent, returned the raw stored value untouched -- so an attacker
+# with write access to the memcache backend stored an unsigned
+# entry and the middleware consumed it as trusted token data,
+# bypassing the encryption (CVE-2013-2166, CWE-326) and the signing
+# (CVE-2013-2167) strategies alike. In ENCRYPT mode the old code
+# never MACed at all. The MAC itself is sha1(serialized_data +
+# token), keyed on the client-supplied token rather than the
+# configured secret. The fixing commit eeefb784f2
+# ("Fix memcache encryption middleware", lp1175367 and
+# lp1175368): derive_keys HMACs the secret, unprotect_data always
+# verifies an HMAC-SHA384 MAC with a constant-time compare before
+# any decryption, and no marker path remains. .
+#
+# ATTENTION, marker-conditional integrity. The bypass is decided by
+# control flow the corpus cannot ask about: whether the integrity
+# check is skipped when the payload lacks a prefix the payload
+# itself carries. vyql match on the module at the parent labels
+# only the sha1 (code.WeakHash) and even reads data.startswith as a
+# neutralizer assumption; no sink exists in the module. The sha1
+# finding is real and discriminates (VYQL-CRY-001 at
+# memcache_crypt.py:96 at the parent, absent at the fixed revision) but it is
+# the weak MAC construction -- CVE-2013-2167's half -- and is
+# neither necessary nor sufficient for the encryption bypass.
+# Routes considered: a marker-conditional verification binding keys
+# on startswith or on routine names, and the fixed revision renames every
+# routine, so it fails the rename test; a generic "cipher
+# constructed with no MAC call in scope" binding measured 19
+# cipher-constructing Python modules across 41052 files in the
+# rank clones, of which 18 (litestar cookie backend, mlflow
+# crypto, pypdf crypt providers, pyload containers, metasploit
+# auxiliaries) are encrypt-only by design, and at function scope
+# it does not discriminate here -- the patched encrypt_data also
+# carries no hmac call, the MAC moved to protect_data; the
+# concat-key derivation (sha256(token + secret)) needs Python
+# call-argument shape tokens, the engine gap recorded at rank
+# 1327. Same protocol-state character as the csrf family at ranks
+# 1501/1567/1581/1592/1601: the guard is invisible to a taint
+# path. No ENGINE-GAPS.md entry. No definition change shipped.
+# Spec cve_rank1628 records the sha1 cache MAC (caught today), the
+# marker-passthrough decrypt and the always-verified form, the
+# last two asserting reject VYQL-CRY-009: when
+# integrity-of-protected-stored-data vocabulary lands, the
+# marker-passthrough form must flip to expect.
+
+test "rank1628: the cache MAC is a bare sha1 over data and token"
+  lang python
+  file keystoneclient/middleware/memcache_crypt.py
+  expect VYQL-CRY-001
+  code
+  ```
+  import base64
+  import hashlib
+
+
+  def compute_mac(token, serialized_data):
+      """ Computes and returns the base64 encoded MAC. """
+      return hash_data(serialized_data + token)
+
+
+  def hash_data(data):
+      """ Return the base64 encoded SHA1 hash of the data. """
+      return base64.b64encode(hashlib.sha1(data).digest())
+  ```
+
+test "rank1628: cache data without the encrypt marker decrypts to itself"
+  lang python
+  file keystoneclient/middleware/memcache_crypt.py
+  reject VYQL-CRY-009
+  code
+  ```
+  import base64
+  import hashlib
+  import json
+
+  from Crypto.Cipher import AES
+
+  ENCRYPT_MARKER = '{ENCRYPT:AES256}'
+
+
+  def generate_aes_key(token, secret):
+      """ Generates and returns a 256 bit AES key, based on sha256 hash. """
+      return hashlib.sha256(token + secret).digest()
+
+
+  def decrypt_data(token, secret, data):
+      """ Decrypt the data with the given secret key. """
+      if data.startswith(ENCRYPT_MARKER):
+          try:
+              # encrypted data
+              encoded_data = data[len(ENCRYPT_MARKER):]
+              aes_key = generate_aes_key(token, secret)
+              decoded_data = base64.b64decode(encoded_data)
+              iv = decoded_data[:16]
+              encrypted_data = decoded_data[16:]
+              cipher = AES.new(aes_key, AES.MODE_CFB, iv)
+              decrypted_data = cipher.decrypt(encrypted_data)
+              return json.loads(decrypted_data)
+          except:
+              raise DecryptError('data appeared to be corrupted')
+      else:
+          # doesn't appear to be encrypted data
+          return data
+  ```
+
+test "rank1628: the fixed revision verifies a MAC over every cache entry"
+  lang python
+  file keystoneclient/middleware/memcache_crypt.py
+  reject VYQL-CRY-001
+  reject VYQL-CRY-009
+  code
+  ```
+  import base64
+  import hashlib
+  import hmac
+  import math
+
+  HASH_FUNCTION = hashlib.sha384
+  DIGEST_LENGTH = HASH_FUNCTION().digest_size
+  DIGEST_SPLIT = DIGEST_LENGTH // 3
+  DIGEST_LENGTH_B64 = 4 * int(math.ceil(DIGEST_LENGTH / 3.0))
+
+
+  def constant_time_compare(first, second):
+      """ Returns True if both string inputs are equal, otherwise False """
+      if len(first) != len(second):
+          return False
+      result = 0
+      for x, y in zip(first, second):
+          result |= ord(x) ^ ord(y)
+      return result == 0
+
+
+  def derive_keys(token, secret, strategy):
+      digest = hmac.new(secret, token + strategy, HASH_FUNCTION).digest()
+      return {'CACHE_KEY': digest[:DIGEST_SPLIT],
+              'MAC': digest[DIGEST_SPLIT: 2 * DIGEST_SPLIT],
+              'ENCRYPTION': digest[2 * DIGEST_SPLIT:],
+              'strategy': strategy}
+
+
+  def sign_data(key, data):
+      mac = hmac.new(key, data, HASH_FUNCTION).digest()
+      return base64.b64encode(mac)
+
+
+  def unprotect_data(keys, signed_data):
+      if signed_data is None:
+          return None
+
+      provided_mac = signed_data[:DIGEST_LENGTH_B64]
+      calculated_mac = sign_data(
+          keys['MAC'],
+          signed_data[DIGEST_LENGTH_B64:])
+
+      if not constant_time_compare(provided_mac, calculated_mac):
+          raise InvalidMacError('Invalid MAC; data appears to be corrupted.')
+
+      data = base64.b64decode(signed_data[DIGEST_LENGTH_B64:])
+
+      if keys['strategy'] == 'ENCRYPT':
+          data = decrypt_data(keys['ENCRYPTION'], data)
+
+      return data
+  ```

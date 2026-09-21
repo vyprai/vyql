@@ -1,0 +1,11 @@
+module code;
+
+concept UnboundedBeanPropertyBinding : issue {
+  cwe: [CWE_915, CWE_470]
+  reviewAssumption: "the descriptor map this function builds is later consulted to resolve a property name that arrives from outside the process"
+  reviewCategory: mass_assignment
+  reviewCondition: "a property surface assembled from java.beans introspection is indexed by the descriptor's name and admits every descriptor, with no bound on the type a resolved name can reach"
+  reviewConfidence: medium
+  reviewEvidence: "introspection context {pattern} indexes every BeanInfo property descriptor by its own name and never bounds the admitted set by the descriptor's property type"
+  vulnerableTo: [injection.MassAssignment]
+}

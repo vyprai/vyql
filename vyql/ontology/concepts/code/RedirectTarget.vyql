@@ -1,0 +1,7 @@
+module code;
+
+concept RedirectTarget : issue {
+  cwe: [CWE_601]
+  enabledBy: [taint.UntrustedData]
+  vulnerableTo: [request_forgery.OpenRedirect]
+}

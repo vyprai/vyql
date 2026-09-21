@@ -1,0 +1,8 @@
+module code;
+
+review code.PortRequestResponseCorrelationMissing {
+  category: concurrency
+  expected: [core.InputValidation]
+  kind: attention
+  text: "review async port request/response loops for per-request correlation identifiers and stale-response discard"
+}

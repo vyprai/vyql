@@ -1,0 +1,25 @@
+module bindings.groovy.generated.ma4c9cd1e;
+
+binding networkData0 {
+  requires {
+    dependency("io.netty:netty-handler")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend1 {
+  requires {
+    dependency("io.netty:netty-handler")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect2 {
+  requires {
+    dependency("io.netty:netty-handler")
+  }
+  query pattern callExpr where callee.method == "SslHandler"
+  emit sink code.NetworkConnectSink at args[0]
+}

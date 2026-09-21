@@ -1,0 +1,167 @@
+# Redmine's Mercurial adapter assembled the hg command line from
+# request-derived values passed as standalone arguments next to their option
+# flags (CWE-88, argument injection). Mercurial's early option parser rescans
+# the whole command line for its own global options -- --config, --repo,
+# --debugger -- even where a subcommand has begun, so a standalone
+# --config=alias.rhdiff=!xterm anywhere in the argv turns one hg invocation
+# into arbitrary command execution. The values arrive from the repository
+# browser routes (path, identifier, branch, limit) and reach hg as their own
+# argv elements, after per-element shell quoting that escapes shell
+# metacharacters but leaves a leading -- intact.
+#
+# Ticket #27516 landed as three commits in the same minute: 58ed8655 inserts
+# the end-of-options separator before the positional paths, ca87bf76 (the pool
+# row) adds a blocklist over hg's early-parsing flags inside hg(), and
+# 9d797400 glues each value into its flag ("-r#{value}", "--limit=#{value}")
+# so no value can stand alone and be rescanned as an option. The pool row's
+# parent is the fully-vulnerable tree and the remediation is present at the
+# commit; no pool correction.
+#
+# Nothing reports either revision, re-measured over three --cache off runs per
+# revision: 877 findings on the full tree at the parent and 877 at the fix,
+# and no finding in lib/redmine/scm/adapters/*.rb at either revision.
+#
+# The argument-injection vocabulary that was missing here has since shipped.
+# code.CommandOptionInjection is consumed by VYQL-INJ-031 and VYQL-VAL-004,
+# code.CommandOptionInjectionSink by VYQL-INJ-280, and Ruby emitters exist for
+# both (bindings/ruby/dragonfly_convert_step_raw_arguments.vyql,
+# bindings/ruby/git_argv_positional_value.vyql). All three rules report zero
+# tree-wide here. The two Ruby emitters are library-shaped -- Dragonfly's
+# process!/generate! job steps and ruby-git's Git::Lib command runner, keyed
+# on their documented parameter names -- and neither matches an application's
+# own private runner.
+#
+# The one token-level discriminator the Ruby frontend already exposes for
+# this shape, the expr: token over the append chain, does not separate the
+# revisions. A probe binding over containsAny(node.context.expr, ["<<'--",
+# "<<'-", "<<\"--", "<<\"-"]) with a process-runner call witness reported 42
+# findings on this tree: 8 in mercurial_adapter.rb and 34 across the other
+# four SCM adapters (cvs, bazaar, git, subversion), which build their command
+# vectors the same way -- and the identical four functions in
+# mercurial_adapter.rb (each_revision, nodes_in_branch, diff and hg itself)
+# at the fixed revision, because the fix keeps
+# full_args << '--config' << "extensions.redminehelper=#{HG_HELPER_EXT}"
+# for ancient-Mercurial compatibility and the '--' separator appends.
+# Appending a quoted flag as its own element is how every adapter in this
+# project assembles a command, so it is a project idiom rather than a defect
+# signal, and a binding over it reports the same count before and after the
+# fix.
+#
+# The command-injection fallback stays closed for two reasons that both still
+# hold. hg(*args, &block) lowers to a call the solver reports UNRESOLVED (no
+# callee body), so taint terminates at the adapter boundary; and
+# processArgVectorApplicator (internal/bindings/bindings_apply.go, registered
+# for ruby only) stamps core.ProcessArgVector -- which refines
+# core.ShellEscape and neutralizes injection.CommandInjection -- on every
+# code.Seq whose first element is not Name/Call/Format/Index/Seq/Lambda, with
+# no check that the sequence reaches a process as an argv vector.
+# Re-measured minimal pair with a params[:rev] source:
+# ['rhcat','-r',rev,'--','/x'].join(' ') into IO.popen reports 0 with the
+# stamp, and 1 CRITICAL VYQL-INJ-002 when the first element is a variable.
+# Neither is the half worth fixing here anyway: the remediation leaves the
+# params -> IO.popen path intact, and the per-element shell_quote means the
+# honest class of this weakness is CWE-88 rather than CWE-78, so a
+# command-injection finding reports identically at both revisions.
+#
+# What separates the revisions is the lexical adjacency of flag and value
+# inside one argv element, and the Ruby frontend emits no call-argument
+# tokens: rbStructuredContextTokens
+# (internal/extract/frontend/treesitter/ruby.go) emits assign, expr, field,
+# call_path, call, selector, index, index_base, index_key, literal,
+# interpolation and regex tokens only. A call whose argument list mixes
+# option-flag literals with values -- hg 'rhcat', '-r', rev, '--', path --
+# therefore cannot be told from the glued form at the binding layer, and
+# keying on hg, hg_args or shellout would encode this project's own names.
+# Both cases reject VYQL-INJ-031; when the Ruby frontend emits call-argument
+# tokens and an argv-adjacency binding reaches this shape, the standalone
+# form must flip to expect.
+#
+# verify_current_expected: attention-analysis-gap, both revisions rejected.
+
+test "rank1664: a request-derived revision reaches hg as a standalone argument after its flag"
+  lang ruby
+  file lib/redmine/scm/adapters/mercurial_adapter.rb
+  reject VYQL-INJ-031
+  code
+  ```
+  module Redmine
+    module Scm
+      module Adapters
+        class MercurialAdapter
+          def cat(path, identifier = nil)
+            rev = params[:rev]
+            hg 'rhcat', '-r', rev, '--', path do |io|
+              io.binmode
+              io.read
+            end
+          end
+
+          def hg(*args, &block)
+            full_args = ['-R', root_url, '--encoding', 'utf-8']
+            full_args += args
+            shellout(
+              self.class.sq_bin + ' ' + full_args.map { |e| shell_quote e.to_s }.join(' '),
+              &block
+            )
+          end
+
+          def shellout(cmd, &block)
+            IO.popen(cmd, 'r+') { |io| block.call(io) }
+          end
+
+          def root_url
+            '/var/repos/project'
+          end
+
+          def params
+            {}
+          end
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1664: the fixed revision glues the value into the flag's own argument"
+  lang ruby
+  file lib/redmine/scm/adapters/mercurial_adapter.rb
+  reject VYQL-INJ-031
+  code
+  ```
+  module Redmine
+    module Scm
+      module Adapters
+        class MercurialAdapter
+          def cat(path, identifier = nil)
+            rev = params[:rev]
+            hg 'rhcat', "-r#{rev}", '--', path do |io|
+              io.binmode
+              io.read
+            end
+          end
+
+          def hg(*args, &block)
+            full_args = ["-R#{root_url}", '--encoding=utf-8']
+            full_args += args
+            shellout(
+              self.class.sq_bin + ' ' + full_args.map { |e| shell_quote e.to_s }.join(' '),
+              &block
+            )
+          end
+
+          def shellout(cmd, &block)
+            IO.popen(cmd, 'r+') { |io| block.call(io) }
+          end
+
+          def root_url
+            '/var/repos/project'
+          end
+
+          def params
+            {}
+          end
+        end
+      end
+    end
+  end
+  ```

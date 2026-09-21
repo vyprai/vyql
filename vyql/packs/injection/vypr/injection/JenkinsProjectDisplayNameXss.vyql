@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule JenkinsProjectDisplayNameXss {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_79]
+    id: "VYQL-INJ-133"
+    severity: high
+  }
+  issue code.JenkinsProjectDisplayNameXss as sink
+}

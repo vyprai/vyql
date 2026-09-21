@@ -1,0 +1,9 @@
+module bindings.swift.generated.md7bd4b57;
+
+binding filePathAccess0 {
+  requires {
+    dependency("github.com/patrick-zippenfenig/SwiftTimeZoneLookup")
+  }
+  query pattern callExpr where callee.method == "init"
+  emit sink code.FilePathAccess at args[0]
+}

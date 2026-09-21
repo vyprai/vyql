@@ -1,0 +1,172 @@
+# SubversionSCM.DescriptorImpl.SshPublicKeyCredential is a Serializable
+# credential held in Jenkins job configuration: Jenkins persists plugin state
+# as XML and reconstitutes these objects with XStream, so the constructor never
+# runs on the persisted path and every private final field -- including `id`,
+# which the constructor derives from Random hex precisely so it can only ever
+# be a 16-char hex name -- is whatever the serialized form supplies. getKeyFile()
+# joins that field under the controller root:
+#
+#     File dir = new File(Jenkins.getInstance().getRootDir(),"subversion-credentials");
+#     ...
+#     return new File(dir,id);
+#
+# so a job-config `id` carrying '/' or '\' makes readFileToString(getKeyFile())
+# in createSVNAuthentication() read, and FileUtils.copyFile(keyFile,...) in the
+# constructor write, anywhere under $JENKINS_HOME the segments reach. The fixed revision
+# (7d1525edea6641a2febd3f7deeac55c0a89b0d7e) rejects the separators in
+# getKeyFile() itself:
+#
+#     if (id.contains("/") || id.contains("\\")) {
+#         throw new SecurityException();
+#     }
+#
+# `vyql match` on the vulnerable shape labels code.FilePathAccess on both
+# `new File(...)` argument lists and nothing else -- `id` is a private field
+# assigned only from Random, so no source concept can reach it from this file,
+# and the taint rules are structurally blind to a value whose control comes
+# from serialization bypassing the constructor. That is the review route: a
+# File joined under the Jenkins controller root whose name component the
+# joining function never inspects. getRootDir() is the documented Jenkins API
+# for the controller's root directory, so the anchor is library-documented and
+# fires on any plugin storing under it, not on this plugin's own names.
+#
+# jenkinsRootDirFileNameTraversal981 binds the storage idiom the join lives in:
+# the function creates the directory under the controller root (File.mkdirs,
+# the java.io documented "ensure this directory exists" call) and constructs a
+# File in it, with none of the String inspections a separator check can be
+# spelled with (contains, indexOf, matches, charAt, split, replace,
+# startsWith, endsWith, or the containment idioms getName/normalize/
+# getFileName). The mkdirs+File pair is what excludes the literal-joined
+# storage files: an unqualified getRootDir+File binding flags every
+# `new File(project.getRootDir(), "revision.txt")`-shaped fixed-name store --
+# six of those on this tree alone (getRevisionFile, getXmlFile, migrate's
+# legacy store, getExternalsFile, the saml keystore, the FilePath test),
+# against one real join. The upstream fix's own spelling (`id.contains`) is
+# only one member of the negated family: rewritten fixes using indexOf,
+# matches or FilenameUtils.getName all suppress, verified on variant repros.
+#
+# Measured, `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB -flags
+# only`, three runs per revision, identical inside each revision:
+#
+#   subversion-plugin 7d1525ed^: 2 flags -- SubversionSCM.java:1949
+#       (getKeyFile, the CVE site) and SVNRepositoryView.java:66, an
+#       independent second instance of the same shape the commit does not
+#       touch: `new File(new File(getRootDir(), "caches"), "svn-" + uuid +
+#       ".db")` joins a remote-repository-supplied UUID under the controller
+#       root with mkdirs and no inspection.
+#   subversion-plugin 7d1525ed:  1 flag -- only SVNRepositoryView.java:66;
+#       the CVE site's flag is gone.
+#
+# Collateral, enumerated by grep for getRootDir over the ~380 clones under
+# /tmp/cve-work/rank*/ and each hit scanned both ways: git-plugin 1 flag at
+# AbstractGitSCMSource.java:1247 -- getCacheDir joins its cacheEntry
+# parameter under $JENKINS_HOME/caches with mkdirs and no inspection, the
+# same weakness with a parameter instead of a serialized field; saml-plugin,
+# script-security-plugin, onedev server-core, stapler core and quarkus
+# app-model all 0. lucene-solr's only hit is getRootDirectories(), which the
+# exact `call == "getRootDir"` token does not match. Residual, in the
+# false-negative direction only: an unrelated String inspection anywhere in
+# the joining function silences the flag, and a variant that assumes its
+# storage directory exists (no mkdirs) is not flagged.
+#
+# verify_current_expected: fixed, 2 -> 1 on the real revision pair, the CVE
+# site's flag clearing.
+
+test "rank1804: a serialized credential field joined as the file name under the Jenkins root directory"
+  lang java
+  file SshPublicKeyCredential.java
+  expect_review code.JenkinsRootDirFileNameTraversal
+  code
+  ```
+  import java.io.File;
+  import java.io.Serializable;
+
+  public class SshPublicKeyCredential extends Credential {
+      private final String userName;
+      private final String id;
+
+      public SshPublicKeyCredential(String userName, String passphrase, File keyFile) {
+          this.userName = userName;
+          this.id = "0a1b2c3d4e5f6071";
+          File savedKeyFile = getKeyFile();
+          FileUtils.copyFile(keyFile, savedKeyFile);
+      }
+
+      /**
+       * Gets the location where the private key will be permanently stored.
+       */
+      private File getKeyFile() {
+          File dir = new File(Jenkins.getInstance().getRootDir(),"subversion-credentials");
+          if(dir.mkdirs()) {
+              setFilePermissions(dir, "600");
+          }
+          return new File(dir,id);
+      }
+
+      public String createSVNAuthentication() throws IOException {
+          return FileUtils.readFileToString(getKeyFile(),"iso-8859-1");
+      }
+
+      private boolean setFilePermissions(File file, String perms) {
+          return true;
+      }
+  }
+  ```
+  file Credential.java
+  ```
+  import java.io.Serializable;
+
+  public abstract class Credential implements Serializable {
+  }
+  ```
+
+test "rank1804: the separator check on the stored name stops the join from leaving the storage directory"
+  lang java
+  file SshPublicKeyCredential.java
+  reject_review code.JenkinsRootDirFileNameTraversal
+  code
+  ```
+  import java.io.File;
+  import java.io.Serializable;
+
+  public class SshPublicKeyCredential extends Credential {
+      private final String userName;
+      private final String id;
+
+      public SshPublicKeyCredential(String userName, String passphrase, File keyFile) {
+          this.userName = userName;
+          this.id = "0a1b2c3d4e5f6071";
+          File savedKeyFile = getKeyFile();
+          FileUtils.copyFile(keyFile, savedKeyFile);
+      }
+
+      /**
+       * Gets the location where the private key will be permanently stored.
+       */
+      private File getKeyFile() {
+          if (id.contains("/") || id.contains("\\")) {
+              throw new SecurityException();
+          }
+          File dir = new File(Jenkins.getInstance().getRootDir(),"subversion-credentials");
+          if(dir.mkdirs()) {
+              setFilePermissions(dir, "600");
+          }
+          return new File(dir,id);
+      }
+
+      public String createSVNAuthentication() throws IOException {
+          return FileUtils.readFileToString(getKeyFile(),"iso-8859-1");
+      }
+
+      private boolean setFilePermissions(File file, String perms) {
+          return true;
+      }
+  }
+  ```
+  file Credential.java
+  ```
+  import java.io.Serializable;
+
+  public abstract class Credential implements Serializable {
+  }
+  ```

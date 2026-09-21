@@ -1,0 +1,9 @@
+module bindings.bash.generated.maa59110a;
+
+binding cliArgument0 {
+  requires {
+    dependency("youtube-dl")
+  }
+  query pattern callExpr where callee.path ~= "youtube-dl.argv"
+  emit source code.CliArgument at call.result
+}

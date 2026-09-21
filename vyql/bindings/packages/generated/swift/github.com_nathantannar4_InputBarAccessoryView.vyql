@@ -1,0 +1,25 @@
+module bindings.swift.generated.mec30a9b7;
+
+binding userControlledData0 {
+  requires {
+    dependency("github.com/nathantannar4/InputBarAccessoryView")
+  }
+  query pattern callExpr where callee.method == "paste"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("github.com/nathantannar4/InputBarAccessoryView")
+  }
+  query pattern callExpr where callee.method == "inputTextViewDidChange"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("github.com/nathantannar4/InputBarAccessoryView")
+  }
+  query pattern callExpr where callee.method == "didSelectSendButton"
+  emit source core.UserControlledData at call.result
+}

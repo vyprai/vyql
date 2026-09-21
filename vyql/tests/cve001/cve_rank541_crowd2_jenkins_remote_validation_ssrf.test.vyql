@@ -1,0 +1,64 @@
+# Rank 541 / CVE-2018-1000422: Jenkins Crowd 2 plugin exposed a descriptor
+# remote test endpoint that accepted query parameters and connected to a
+# supplied Crowd URL without @POST and administrator permission checks.
+
+test "rank541: Jenkins descriptor test connection lacks POST and admin permission"
+  lang java
+  file CrowdSecurityRealm.java
+  expect VYQL-RF-023
+  expect_review code.JenkinsRemoteValidationMissingPostPermission
+  code
+  ```
+  import hudson.util.FormValidation;
+  import jenkins.model.Jenkins;
+  import org.kohsuke.stapler.QueryParameter;
+
+  class CrowdSecurityRealm {
+    public static final class DescriptorImpl {
+      public FormValidation doTestConnection(@QueryParameter String url,
+                                             @QueryParameter String applicationName,
+                                             @QueryParameter String password) {
+        CrowdConfigurationService tConfiguration =
+          new CrowdConfigurationService(url, applicationName, password);
+        try {
+          tConfiguration.testConnection();
+          return FormValidation.ok("OK");
+        } finally {
+          tConfiguration.shutdown();
+        }
+      }
+    }
+  }
+  ```
+
+test "rank541: Jenkins descriptor test connection with POST and admin permission is clean"
+  lang java
+  file CrowdSecurityRealm.java
+  reject VYQL-RF-023
+  reject_review code.JenkinsRemoteValidationMissingPostPermission
+  code
+  ```
+  import hudson.util.FormValidation;
+  import jenkins.model.Jenkins;
+  import org.kohsuke.stapler.QueryParameter;
+  import org.kohsuke.stapler.verb.POST;
+
+  class CrowdSecurityRealm {
+    public static final class DescriptorImpl {
+      @POST
+      public FormValidation doTestConnection(@QueryParameter String url,
+                                             @QueryParameter String applicationName,
+                                             @QueryParameter String password) {
+        Jenkins.getInstance().checkPermission(Jenkins.ADMINISTER);
+        CrowdConfigurationService tConfiguration =
+          new CrowdConfigurationService(url, applicationName, password);
+        try {
+          tConfiguration.testConnection();
+          return FormValidation.ok("OK");
+        } finally {
+          tConfiguration.shutdown();
+        }
+      }
+    }
+  }
+  ```

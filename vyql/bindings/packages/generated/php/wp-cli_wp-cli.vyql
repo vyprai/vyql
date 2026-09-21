@@ -1,0 +1,9 @@
+module bindings.php.generated.m027734f1;
+
+binding commandExecution0 {
+  requires {
+    dependency("wp-cli/wp-cli")
+  }
+  query pattern callExpr where callee.method == "WP_CLIProcess::run"
+  emit sink code.CommandExecution at args[0]
+}

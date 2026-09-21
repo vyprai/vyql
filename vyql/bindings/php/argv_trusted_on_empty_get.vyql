@@ -1,0 +1,51 @@
+module bindings.php.argv_trusted_on_empty_get;
+
+// PHP documents register_argc_argv as declaring argv/argc "that would contain
+// the GET information": under a web SAPI with the setting on, $_SERVER['argv']
+// (and $argv) is built from the raw query string, so console input constructed
+// from it is request input, not operator input. $_GET holds only the parsed
+// name=value pairs, so a query string of bare tokens (`?-e`) leaves $_GET
+// empty while argv still carries the tokens. A function that decides "not a
+// web request" from $_GET emptiness or isset and then consumes argv-backed
+// console input -- symfony/console's ArgvInput (whose own docblock spells
+// `new ArgvInput($_SERVER['argv'])`), PHP's getopt, or a direct
+// $_SERVER['argv'] read -- therefore accepts query-derived arguments. The
+// documented raw-channel signals are $_SERVER['QUERY_STRING'] and the SAPI
+// (PHP_SAPI, php_sapi_name()); testing either is the fix shape.
+//
+// The clauses are AST-derived and function-confined for PHP class methods
+// (identifier:, call: and subscript: tokens, all measured on the motivating
+// file): an argv read in a sibling method does not satisfy the consumer
+// clause, and a QUERY_STRING or SAPI token anywhere in the same function
+// suppresses. The decision clause accepts only the channel-emptiness calls
+// (empty, count, sizeof): isset is excluded because an isset on anything in
+// the function satisfies a call-name clause, measured on the component's own
+// GenericRuntime::getArgument, which reads $_GET and $_SERVER['argv'] and
+// carries an unrelated isset($_SERVER['PATH']). The negation deliberately
+// avoids the literal: route, which in PHP sees comment text (measured: a
+// commented-out guard silences it), so a commented-out QUERY_STRING check
+// does not suppress. Residuals, both stated: getenv('QUERY_STRING') as the
+// raw-channel check is not recognised (the argument reaches only the literal
+// route), so that correct spelling is reported; and in files of top-level
+// functions the token routes are file-wide rather than function-confined.
+binding argvInputTrustedOnEmptyGet {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php"
+    and containsAny(node.context.call, [ArgvInput, getopt])
+    and containsAny(node.context.identifier, ["$_GET", "$HTTP_GET_VARS"])
+    and containsAny(node.context.call, [empty, count, sizeof])
+    and not containsAny(node.context.subscript, ["$_SERVER['QUERY_STRING']", "$_SERVER[\"QUERY_STRING\"]"])
+    and not containsAny(node.context.identifier, ["PHP_SAPI"])
+    and not containsAny(node.context.call, [php_sapi_name])
+  emit issue code.ArgvTrustedOnEmptyGet at node
+}
+
+binding argvReadTrustedOnEmptyGet {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php"
+    and containsAny(node.context.subscript, ["$_SERVER['argv']", "$_SERVER[\"argv\"]", "$argv["])
+    and containsAny(node.context.identifier, ["$_GET", "$HTTP_GET_VARS"])
+    and containsAny(node.context.call, [empty, count, sizeof])
+    and not containsAny(node.context.subscript, ["$_SERVER['QUERY_STRING']", "$_SERVER[\"QUERY_STRING\"]"])
+    and not containsAny(node.context.identifier, ["PHP_SAPI"])
+    and not containsAny(node.context.call, [php_sapi_name])
+  emit issue code.ArgvTrustedOnEmptyGet at node
+}

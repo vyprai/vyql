@@ -1,0 +1,13 @@
+module bindings.dart.generated.m6c53987c;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("realtime_client")
+  }
+  query pattern callExpr where callee.method == "setAuth"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

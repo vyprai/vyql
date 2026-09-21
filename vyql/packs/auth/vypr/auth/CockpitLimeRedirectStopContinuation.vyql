@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule CockpitLimeRedirectStopContinuation {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_613]
+    id: "VYQL-AUTH-022"
+    severity: critical
+  }
+  issue code.CockpitLimeRedirectStopContinuation as stop
+}

@@ -1,0 +1,49 @@
+module bindings.python.generated.m1d81b222;
+
+binding deserialization0 {
+  requires {
+    dependency("olefile")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("olefile")
+  }
+  query pattern callExpr where callee.method == "isOleFile"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("olefile")
+  }
+  query pattern callExpr where callee.method == "parse_properties"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("olefile")
+  }
+  query pattern callExpr where callee.method == "openstream"
+  emit sink code.Deserialization at args[0]
+}
+
+binding archiveEntryWrite4 {
+  requires {
+    dependency("olefile")
+  }
+  query pattern callExpr where callee.method == "write_sect"
+  emit sink code.ArchiveEntryWrite at args[0]
+}
+
+binding archiveEntryWrite5 {
+  requires {
+    dependency("olefile")
+  }
+  query pattern callExpr where callee.method == "write_stream"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.dart.generated.m406e3b46;
+
+binding userControlledData0 {
+  requires {
+    dependency("image_picker_for_web")
+  }
+  query pattern callExpr where callee.method == "getMedia"
+  emit source core.UserControlledData at call.result
+}

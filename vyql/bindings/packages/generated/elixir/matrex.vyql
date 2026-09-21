@@ -1,0 +1,17 @@
+module bindings.elixir.generated.m95ec9b88;
+
+binding deserialization0 {
+  requires {
+    dependency("matrex")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("matrex")
+  }
+  query pattern callExpr where callee.method == "read!"
+  emit sink code.Deserialization at args[0]
+}

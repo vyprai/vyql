@@ -1,0 +1,219 @@
+# Rank 1501 / CVE-2026-33757 (GHSA-7q7g-x6vg-xpc3, CWE-384): OpenBao's OIDC
+# direct callback mode issued a login token on the authorization code alone, so
+# a login link sent to a logged-in browser minted a token for the attacker's
+# client. pathCallback in builtin/credential/jwt/path_oidc.go at e321039519^
+# reads state, code, error and client_nonce from the request, validates the
+# OAuth state entry, and in direct callback mode *skips* the client_nonce check
+# ("unless using the direct callback mode (when we instead check in poll)") and
+# goes straight to the cap/oidc exchange and processToken: no step asks the
+# user to confirm the sign-in, so a request the user did not knowingly make
+# completes a login. The fix e321039519 (squash-merge of openbao#2710) inserts
+# a confirmation gate in front of the exchange: when the role's callback mode
+# is direct and oidc_disable_confirmation is unset, a callback carrying no
+# confirmation parameter returns an HTML page naming the requester IP and role
+# (logical.HTTPRawBody + text/html through confirmHTML) with the OAuth state
+# kept alive, and only a second request carrying confirmation=... proceeds.
+#
+# ## What fires, both revisions
+#
+# `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB` over
+# builtin/credential/jwt (33 go files + the embedded test_ui.html) at
+# e321039519^ and at e321039519, three runs each, reports the identical 4
+# findings on every run: VYQL-SEC-002 high on the hardcoded constant at
+# path_config.go:418, and two VYQL-INJ-009 plus one VYQL-RF-002 whose DomInput
+# source and LogOutput/RedirectTargetSink sinks are all inside test_ui.html's
+# embedded script -- present verbatim at both revisions. The flags view adds 42
+# flags at the vulnerable revision and 43 at the fixed one (the delta is a
+# single core.ResourceRelease in the fix's own test code); every flag is a
+# resource, concurrency or crypto label, and none is an auth review concept.
+# Nothing fires on pathCallback, pathCallbackPost or authURL at either
+# revision. `vyql match` on path_oidc.go labels 12 nodes, all in pathPoll,
+# authURL and createOIDCRequest -- none inside pathCallback.
+#
+# ## Why no binding ships
+#
+# The missing thing is an interaction step between the browser and the user,
+# not a dataflow: the callback validates everything it is given, and the code
+# exchange itself (cap/oidc Provider.Exchange) is the documented, correct API
+# and appears identically at both revisions. So the discriminator has to be the
+# *presence* of a confirmation, and the only spellings of one in the fixed
+# revision are the fixing commit's own -- the `confirmation` query field that
+# commit adds to the path definition, and its own confirmHTML helper. A negation
+# keyed on either names the fix's own layout, which this loop refuses. Keying
+# the neutraliser on the generic raw-response channel instead
+# (logical.HTTPContentType "text/html" + logical.HTTPRawBody) would demand that
+# every authorization-code callback render an HTML interstitial, and would flag
+# every conventional server-side callback -- including this same file's
+# callbackModePost flow and its test_ui.html popup, which issue tokens with no
+# interstitial and are not vulnerable.
+#
+# Considered for reuse and rejected: the auth review vocabulary shipped after
+# the first pass covers adjacent shapes, none of them this one --
+# code.MissingSessionRotationAfterAuthentication (VYQL-AUTH-074, session-id
+# rotation, Java binding), code.EmptyVerifierAcceptance (challenge/answer
+# equality on a missing stored value), code.AuthCallbackAmbientPolicyReuse
+# (ambient policy parameter reuse, C# binding),
+# code.DeepLinkTerminalInputWithoutConfirmation (argv into a terminal,
+# CWE-78), code.EmailChangeReauthMissingReview, code.HttpPersistentAuthReuse,
+# code.GatedSecretVerificationBypass, code.DeviceVerificationKeyBindingMissing.
+# None states "a login flow completes without proof the user initiated it";
+# rank 1592 (PolarLearn login CSRF, TypeScript) is the same family held for the
+# same reason. Minting that concept buys nothing without a binding under it,
+# and every identifier available here is OpenBao's own (callbackModeDirect,
+# oidc_disable_confirmation) or the fix's own, so it detects this server rather
+# than the weakness. Not an ENGINE-GAPS.md entry: the engine handles every
+# construct in the flow, and what is missing is a way to state the
+# user-presence condition, which is vocabulary design, not a mechanical
+# correction.
+#
+# ## Recheck measurements (knowledge base tip 160eab081)
+#
+# Three --cache off runs per revision at this tip, as above: the same 4
+# findings and the same fingerprints (42d9390e SEC-002, a3d7d864/e2db049c
+# INJ-009, bdbff384 RF-002) at e321039519^ and at e321039519, zero variance
+# across runs. The full findings view and the -flags only view agree: no
+# finding and no flag on pathCallback at either revision.
+#
+# verify_current_expected: attention-analysis-gap, both revisions rejected
+
+test "rank1501: the direct callback exchanges the code and issues the token with no confirmation round"
+  lang go
+  file builtin/credential/jwt/path_oidc.go
+  reject VYQL-AUTH-001
+  code
+  ```
+  package jwt
+
+  import (
+	  "context"
+	  "fmt"
+
+	  "github.com/openbao/openbao/vault/helper/cidrutil"
+	  "github.com/openbao/openbao/vault/logical"
+  )
+
+  func (b *jwtAuthBackend) pathCallback(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
+	  stateID := d.Get("state").(string)
+
+	  oidcReq := b.getOIDCRequest(stateID)
+	  if oidcReq == nil || oidcReq.auth != nil {
+		  return logical.ErrorResponse(errLoginFailed + " Expired or missing OAuth state."), nil
+	  }
+
+	  roleName := oidcReq.rolename
+	  role, err := b.role(ctx, req.Storage, roleName)
+	  if err != nil {
+		  return nil, err
+	  }
+
+	  useHttp := false
+	  if role.CallbackMode == callbackModeDirect {
+		  useHttp = true
+	  }
+
+	  clientNonce := d.Get("client_nonce").(string)
+
+	  // If a client_nonce was provided at the start of the auth process as part of the auth_url
+	  // request, require that it is present and matching during the callback phase
+	  // unless using the direct callback mode (when we instead check in poll).
+	  if oidcReq.clientNonce != "" && clientNonce != oidcReq.clientNonce && role.CallbackMode != callbackModeDirect {
+		  return logical.ErrorResponse("invalid client_nonce"), nil
+	  }
+
+	  if len(role.TokenBoundCIDRs) > 0 {
+		  if !cidrutil.RemoteAddrIsOk(req.Connection.RemoteAddr, role.TokenBoundCIDRs) {
+			  return nil, logical.ErrPermissionDenied
+		  }
+	  }
+
+	  provider, err := b.getProvider(config)
+	  if err != nil {
+		  return nil, fmt.Errorf("error getting provider for login operation: %w", err)
+	  }
+
+	  code := d.Get("code").(string)
+	  if code == "" {
+		  return loginFailedResponse(useHttp, "No code or id_token received."), nil
+	  }
+
+	  // Exchange the authorization code for an ID token and access token.
+	  // ID token verification takes place in provider.Exchange.
+	  token, err := provider.Exchange(ctx, oidcReq, stateID, code)
+	  if err != nil {
+		  return loginFailedResponse(useHttp, fmt.Sprintf("Error exchanging oidc code: %q.", err.Error())), nil
+	  }
+
+	  return b.processToken(ctx, req, config, oidcCtx, provider, roleName, role, token, token.StaticTokenSource(), stateID, oidcReq, useHttp)
+  }
+  ```
+
+test "rank1501: the fixed revision returns a confirmation page before the exchange"
+  lang go
+  file builtin/credential/jwt/path_oidc.go
+  reject VYQL-AUTH-001
+  code
+  ```
+  package jwt
+
+  import (
+	  "context"
+	  "fmt"
+	  "net/http"
+
+	  "github.com/openbao/openbao/vault/logical"
+  )
+
+  func (b *jwtAuthBackend) pathCallback(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
+	  stateID := d.Get("state").(string)
+
+	  oidcReq := b.getOIDCRequest(stateID)
+	  if oidcReq == nil || oidcReq.auth != nil {
+		  return logical.ErrorResponse(errLoginFailed + " Expired or missing OAuth state."), nil
+	  }
+
+	  roleName := oidcReq.rolename
+	  role, err := b.role(ctx, req.Storage, roleName)
+	  if err != nil {
+		  return nil, err
+	  }
+
+	  // For direct callback mode, require explicit user confirmation to reduce
+	  // attack surface before processing the authorization code.
+	  if role.CallbackMode == callbackModeDirect && !role.OIDCDisableConfirmation {
+		  confirmation := d.Get("confirmation").(string)
+		  if confirmation == "" {
+			  deleteRequest = false // preserve state for the confirmed follow-up request
+			  resp := &logical.Response{}
+			  resp.Data = map[string]interface{}{
+				  logical.HTTPContentType: "text/html",
+				  logical.HTTPStatusCode:  http.StatusOK,
+				  logical.HTTPRawBody:     []byte(confirmHTML(oidcReq.requesterIP, oidcReq.rolename)),
+			  }
+			  return resp, nil
+		  }
+	  }
+
+	  useHttp := false
+	  if role.CallbackMode == callbackModeDirect {
+		  useHttp = true
+	  }
+
+	  clientNonce := d.Get("client_nonce").(string)
+	  if oidcReq.clientNonce != "" && clientNonce != oidcReq.clientNonce && role.CallbackMode != callbackModeDirect {
+		  return logical.ErrorResponse("invalid client_nonce"), nil
+	  }
+
+	  provider, err := b.getProvider(config)
+	  if err != nil {
+		  return nil, fmt.Errorf("error getting provider for login operation: %w", err)
+	  }
+
+	  code := d.Get("code").(string)
+	  token, err := provider.Exchange(ctx, oidcReq, stateID, code)
+	  if err != nil {
+		  return loginFailedResponse(useHttp, fmt.Sprintf("Error exchanging oidc code: %q.", err.Error())), nil
+	  }
+
+	  return b.processToken(ctx, req, config, oidcCtx, provider, roleName, role, token, token.StaticTokenSource(), stateID, oidcReq, useHttp)
+  }
+  ```

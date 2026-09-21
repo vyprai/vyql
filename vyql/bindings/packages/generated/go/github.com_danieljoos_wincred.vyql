@@ -1,0 +1,49 @@
+module bindings.go.generated.m4e7c5794;
+
+binding secretValue0 {
+  requires {
+    dependency("github.com/danieljoos/wincred")
+  }
+  query pattern callExpr where callee.method == "GetGenericCredential"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("github.com/danieljoos/wincred")
+  }
+  query pattern callExpr where callee.method == "GetDomainPassword"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue2 {
+  requires {
+    dependency("github.com/danieljoos/wincred")
+  }
+  query pattern callExpr where callee.method == "List"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue3 {
+  requires {
+    dependency("github.com/danieljoos/wincred")
+  }
+  query pattern callExpr where callee.method == "FilteredList"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue4 {
+  requires {
+    dependency("github.com/danieljoos/wincred")
+  }
+  query pattern callExpr where callee.method == "sysCredRead"
+  emit source code.SecretValue at call.result
+}
+
+binding storedDataWrite5 {
+  requires {
+    dependency("github.com/danieljoos/wincred")
+  }
+  query pattern callExpr where callee.method == "sysCredWrite"
+  emit sink code.StoredDataWrite at args[0]
+}

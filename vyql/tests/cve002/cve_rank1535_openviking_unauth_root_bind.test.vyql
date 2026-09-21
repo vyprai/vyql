@@ -1,0 +1,273 @@
+# Rank 1535 / CVE-2026-22207: OpenViking's server ran unauthenticated
+# with administrator identity whenever no root API key was configured,
+# and its default bind address was 0.0.0.0, so any network request to a
+# default deployment executed ROOT operations (missing authentication on
+# an exposed endpoint, CWE-306/CWE-862; PR #310). resolve_identity in
+# openviking/server/auth.py resolves every request to ROOT when
+# root_api_key is unset ("dev mode"), ServerConfig in
+# openviking/server/config.py defaults host to 0.0.0.0 while
+# root_api_key stays Optional[None], and openviking/server/bootstrap.py
+# and openviking_cli/cli/commands/serve.py start the app with
+# uvicorn.run(app, host=config.host, ...) and no startup validation.
+# The fixing commit 9e69113ad0 ("fix(server): when root_api_key is not
+# configured only allow localhost binding"; the task list's commit?
+# flag resolves to the same commit) adds validate_server_config in
+# openviking/server/config.py: with no root_api_key and a host outside
+# _LOCALHOST_HOSTS the server refuses to start (logger.error +
+# sys.exit(1)), the default host becomes 127.0.0.1, and dev mode logs a
+# warning naming the loopback bind.
+#
+# ATTENTION, secure-default startup guard. The defect is a
+# configuration-pair invariant -- unauthenticated admin mode is only
+# safe on a loopback bind -- and nothing in the corpus can ask "is the
+# auth-disabled mode constrained to safe network bindings", the same
+# decision-completeness family as ranks 1519 (capability gates) and
+# 1556 (route groups): the guard belongs at startup, before any request
+# path the auth rules observe. A binding on OpenViking's own
+# validate_server_config or root_api_key field names detects this
+# application rather than the weakness. The bind call itself is also
+# invisible: vyql match on bootstrap.py reports no sink at all for
+# uvicorn.run, the generated uvicorn package bindings label only
+# get_subprocess/subprocess_started as CommandExecution, and the one
+# bind-shaped concept code.NetworkBind is consumed by no rule in
+# packs/, so a documentation-answerable uvicorn.run host binding stays
+# inert until a rule wants it.
+#
+# Re-probed at the recheck span tip, which carries every definition and
+# engine change shipped since the first pass (loaded: concepts=1007
+# rules=879 bindings=32982 reviews=678; binary built in the worktree,
+# data directory resolving to the worktree's own vyql/). Measured 3x
+# --cache off / timeout 180 / --max-ram 6GB per revision on the real
+# checkout, vulnerable parent 9e69113ad0^ against fix 9e69113ad0:
+#
+#   openviking/ (the package holding server/app.py, server/config.py,
+#   server/auth.py, server/bootstrap.py) -- 803/803/803 findings at the
+#   vulnerable revision, 805/805/805 at the fix, 348 at or above high
+#   each, deterministic. The only delta rows are the fix's own new
+#   code: two added VYQL-SEC-045 on its logger.error/logger.warning
+#   lines naming root_api_key (app.py:77, config.py:104) plus
+#   fingerprint shifts on the pre-existing SEC-045/SEC-042 rows from
+#   the line move. The flags view moves 191 -> 192, the one addition a
+#   core.PathAccessCheck flag on the fix's own `host in
+#   _LOCALHOST_HOSTS` test at config.py:80. openviking_cli/ (the
+#   serve.py bind site, untouched by the fix) reports 89/89/89 at both
+#   revisions. No VYQL-AUTH row names server/app.py, server/config.py
+#   or server/auth.py at either revision; VYQL-AUTH-001 fires once on
+#   routers/admin.py delete_account at BOTH revisions with the same
+#   fingerprint, because the FastAPI Depends(require_role(...)) guard
+#   is not observed -- it cannot discriminate a fix that changes only
+#   startup validation. A whole-repository scan aborts at the 180s
+#   timeout bound (3x, SIGTERM) on the vendored C++ under third_party/;
+#   both Python trees that carry the defect are covered above.
+#
+# Path 1 does not convert: the AUTH additions since the first pass
+# (VYQL-AUTH-160 through VYQL-AUTH-179) are logout invalidation, result
+# staging, admission policy, request-scope policy, host validation,
+# ignored-authorization-result, local-request bypass and their kin --
+# none names a startup bind or an auth-disabled mode, and no concept in
+# ontology/ or review/concepts/review/ pairs a network bind with an
+# authentication state (the nearest are code.NetworkBind, a taint sink
+# with zero consuming rules, and code.PublicNetworkExposure, issued
+# only from config-file analysis keys like config.terraform.open_cidr).
+# Path 2 was a hard zero in both views, not a misread one. Path 3 is
+# not shippable today: a bare wildcard-bind rule fires on every server
+# that listens on 0.0.0.0 behind real authentication -- ordinary code,
+# the measured-unshippable breadth -- and the missing discriminator is
+# exactly the ontology piece named above, whether the application's
+# authentication is off, which is application state reachable only
+# through OpenViking's own config field names. No definition change
+# shipped. Spec cve_rank1535 records the dev-mode ROOT resolution, the
+# wildcard-default config, the unvalidated startup and the safe
+# key-configured wildcard bind, all asserting reject VYQL-AUTH-079:
+# when secure-default vocabulary lands, the first three must flip to
+# expect and the fixed and key-configured forms must stay reject.
+
+test "rank1535: dev mode resolves every request to ROOT"
+  lang python
+  file openviking/server/auth.py
+  reject VYQL-AUTH-079
+  code
+  ```
+  from typing import Optional
+
+  from fastapi import Header, Request
+
+  from openviking.server.identity import ResolvedIdentity, Role
+
+
+  async def resolve_identity(
+      request: Request,
+      x_api_key: Optional[str] = Header(None),
+      authorization: Optional[str] = Header(None),
+      x_openviking_account: Optional[str] = Header(None, alias="X-OpenViking-Account"),
+      x_openviking_user: Optional[str] = Header(None, alias="X-OpenViking-User"),
+      x_openviking_agent: Optional[str] = Header(None, alias="X-OpenViking-Agent"),
+  ) -> ResolvedIdentity:
+      api_key_manager = getattr(request.app.state, "api_key_manager", None)
+
+      if api_key_manager is None:
+          return ResolvedIdentity(
+              role=Role.ROOT,
+              account_id=x_openviking_account or "default",
+              user_id=x_openviking_user or "default",
+              agent_id=x_openviking_agent or "default",
+          )
+
+      api_key = x_api_key
+      if not api_key and authorization:
+          if authorization.startswith("Bearer "):
+              api_key = authorization[7:]
+
+      if not api_key:
+          raise UnauthenticatedError("Missing API Key")
+
+      identity = api_key_manager.resolve(api_key)
+      return identity
+  ```
+
+test "rank1535: the server config defaults to a wildcard bind with an optional key"
+  lang python
+  file openviking/server/config.py
+  reject VYQL-AUTH-079
+  code
+  ```
+  from dataclasses import dataclass, field
+  from typing import List, Optional
+
+
+  @dataclass
+  class ServerConfig:
+      """Server configuration (from the ``server`` section of ov.conf)."""
+
+      host: str = "0.0.0.0"
+      port: int = 1933
+      root_api_key: Optional[str] = None
+      cors_origins: List[str] = field(default_factory=lambda: ["*"])
+
+
+  def load_server_config(config_path: Optional[str] = None) -> ServerConfig:
+      path = resolve_config_path(config_path, OPENVIKING_CONFIG_ENV, DEFAULT_OV_CONF)
+      data = load_json_config(path)
+      server_data = data.get("server", {})
+
+      config = ServerConfig(
+          host=server_data.get("host", "0.0.0.0"),
+          port=server_data.get("port", 1933),
+          root_api_key=server_data.get("root_api_key"),
+          cors_origins=server_data.get("cors_origins", ["*"]),
+      )
+
+      return config
+  ```
+
+test "rank1535: the unvalidated dev-mode startup binds every interface"
+  lang python
+  file openviking/server/bootstrap.py
+  reject VYQL-AUTH-079
+  code
+  ```
+  import os
+
+  from openviking.server.app import create_app
+  from openviking.server.config import load_server_config
+
+
+  def main():
+      parser = argparse.ArgumentParser(description="OpenViking HTTP Server")
+      parser.add_argument("--config", type=str, default=None)
+      parser.add_argument("--host", type=str, default=None)
+      parser.add_argument("--port", type=int, default=None)
+      args = parser.parse_args()
+
+      if args.config is not None:
+          os.environ["OPENVIKING_CONFIG_FILE"] = args.config
+
+      config = load_server_config(args.config)
+      if args.host is not None:
+          config.host = args.host
+      if args.port is not None:
+          config.port = args.port
+
+      app = create_app(config)
+      print(f"OpenViking HTTP Server is running on {config.host}:{config.port}")
+      uvicorn.run(app, host=config.host, port=config.port, log_config=None)
+  ```
+
+test "rank1535: the fixed revision refuses an unauthenticated non-loopback bind"
+  lang python
+  file openviking/server/config.py
+  reject VYQL-AUTH-079
+  code
+  ```
+  import sys
+
+  from dataclasses import dataclass, field
+  from typing import List, Optional
+
+
+  @dataclass
+  class ServerConfig:
+      host: str = "127.0.0.1"
+      port: int = 1933
+      root_api_key: Optional[str] = None
+
+
+  _LOCALHOST_HOSTS = {"127.0.0.1", "localhost", "::1"}
+
+
+  def _is_localhost(host: str) -> bool:
+      """Return True if *host* resolves to a loopback address."""
+      return host in _LOCALHOST_HOSTS
+
+
+  def validate_server_config(config: ServerConfig) -> None:
+      """Validate server config for safe startup.
+
+      When ``root_api_key`` is not set, authentication is disabled (dev mode).
+      This is only acceptable when the server binds to localhost.
+      """
+      if config.root_api_key:
+          return
+
+      if not _is_localhost(config.host):
+          logger.error(
+              "SECURITY: server.root_api_key is not configured and server.host "
+              "is '%s' (non-localhost). This would expose an unauthenticated "
+              "ROOT endpoint to the network.",
+              config.host,
+          )
+          sys.exit(1)
+  ```
+
+test "rank1535: a wildcard bind with a root key configured stays legitimate"
+  lang python
+  file openviking/server/app.py
+  reject VYQL-AUTH-079
+  code
+  ```
+  from openviking.server.api_keys import APIKeyManager
+  from openviking.server.config import ServerConfig
+
+
+  def create_app(config: ServerConfig) -> FastAPI:
+      app = FastAPI(title="OpenViking API", lifespan=lifespan)
+
+      if config.root_api_key:
+          api_key_manager = APIKeyManager(
+              root_key=config.root_api_key,
+              agfs_url=service._agfs_url,
+          )
+          await api_key_manager.load()
+          app.state.api_key_manager = api_key_manager
+          logger.info("APIKeyManager initialized")
+      else:
+          app.state.api_key_manager = None
+
+      app.state.config = config
+      return app
+
+
+  def serve(config: ServerConfig):
+      app = create_app(config)
+      uvicorn.run(app, host="0.0.0.0", port=config.port)
+  ```

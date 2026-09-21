@@ -1,0 +1,7 @@
+module code;
+
+review code.IndexAccess {
+  category: memory
+  kind: attention
+  text: "review index/subscript access and the dominating bounds checks"
+}

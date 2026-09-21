@@ -1,0 +1,139 @@
+# Rank 1527 / CVE-2023-2977: OpenSC's CardOS initializer asks the card
+# for its installed packages and walks the response as ASN.1 TLVs with a
+# cursor variable that doubles as the tag-search result pointer
+# (out-of-bounds read, CWE-125; issue #2785). The loop in
+# cardos_have_verifyrc_package (src/pkcs15init/pkcs15-cardos.c) did
+# `p = sc_asn1_find_tag(card->ctx, p, len, 0xe1, &tlen); if (p == NULL)
+# return 0; ... q = sc_asn1_find_tag(card->ctx, p, tlen, 0x01, &ilen);`
+# then advanced `p += tlen; len -= tlen + 2;`. The search returns the
+# found tag's value position, which is the cursor base plus whatever the
+# walk skipped plus the tag header, so after the first assignment p no
+# longer names the position the length is accounted from: the next
+# window is [value_end, value_pos + len - 2), and whenever the 0xe1 tag
+# does not start exactly at the cursor with a two-byte header that end
+# sits past rbuf + resplen and the next search reads out of bounds. The
+# fixing commit 81944d1529 ("pkcs15init: correct left length calculation
+# to fix buffer overrun bug") gives the outer result its own variable:
+# the search lands in pp, every inner search reads from pp, and p
+# remains only the loop's cursor, so the window can only shrink inside
+# the response buffer.
+#
+# ## What fires, both revisions
+#
+# Three --cache off runs per revision over the whole tree report 6532
+# findings each run at the vulnerable parent fe7cb49 and at 81944d1
+# alike, and the union of finding positions over the three runs is
+# byte-identical: 7103 unique `code.X @ file:line` positions, zero diff.
+# On src/pkcs15init/pkcs15-cardos.c both revisions carry the same 15
+# rows (RawMemoryCopySize at :493/:799/:810/:833 and eleven NullableDeref
+# rows), and none of the six runs places a finding inside
+# cardos_have_verifyrc_package (:870-:915). The nearest cursor-shaped
+# analyses fire on neither revision: pointer_offset.missing_remaining_size
+# requires a `ptr+len+1>end` guard this loop never states, and the
+# prefix-offset family (VYQL-MEM-074) is a strncmp over-read construct.
+#
+# ## Why no binding converts it
+#
+# The fixing commit changes only which variable receives the search
+# result; `p += tlen` and `len -= tlen + 2` are identical at both
+# revisions, so every fact about the walk other than the assignment
+# target is shared. Measured with probe bindings (since reverted): the
+# function's context tokens carry `assign:p=sc_asn1_find_tag` at the
+# vulnerable revision and `assign:pp=sc_asn1_find_tag` at the fixed one
+# -- the assign token reduces a call to its callee name -- while
+# `call_arg:sc_asn1_find_tag:p` (the range base), the assign_shape token
+# (ID=call(...), identifiers erased), `assign:p=tlen`,
+# `assign:len=tlen+2` and the loop guard are identical at both. The
+# assignment target's spelling is the only differing token. An
+# exact-token binding on `p=sc_asn1_find_tag` discriminates the minimal
+# pair 1 -> 0 and the real tree 6 -> 5, but the six hold
+# card-akis.c:191, card-gids.c:227/:535, pkcs15-cardos.c:776 and
+# gids-tool.c:309 beside the CVE function: ordinary walks whose result
+# target merely happens to be spelled `p`. That binding detects the
+# variable's name, not the role confusion -- the same defect in a walk
+# spelled `cur` or `left` walks past it -- so it answers this commit
+# rather than the library's documentation. The generic fact, that the
+# assignment target of a pointer-returning search is the same identifier
+# as the call's range-base argument while a parallel remaining-length
+# counter is decremented from the pre-search base, is an identity
+# relation between an assignment's left side and one call argument; no
+# token or analysis carries it, and it is the native-parser bounds walk
+# family recorded in ENGINE-GAPS (whose entry names this TLV-cursor
+# shape among its read-side sub-shapes and judges the relation not
+# mechanical).
+#
+# Both blocks below reject VYQL-MEM-006: the cursor-clobbering walk and
+# the pp-separated form are equally unreported. When pointer-role
+# vocabulary lands, the clobbering form must flip to expect.
+
+test "rank1527: the tag search clobbers its own cursor"
+  lang c
+  file src/pkcs15init/pkcs15-cardos.c
+  reject VYQL-MEM-006
+  code
+  ```
+  #include <stdint.h>
+  #include <stddef.h>
+
+  #define SC_MAX_APDU_BUFFER_SIZE 261
+
+  const uint8_t *sc_asn1_find_tag(void *ctx, const uint8_t *buf, size_t len, unsigned int tag, size_t *taglen);
+
+  int have_verifyrc_package(uint8_t *rbuf, size_t len, int card_type)
+  {
+      const uint8_t *p = rbuf, *q;
+      size_t tlen = 0, ilen = 0;
+
+      while (len != 0) {
+          p = sc_asn1_find_tag(NULL, p, len, 0xe1, &tlen);
+          if (p == NULL)
+              return 0;
+          if (card_type == 1) {
+              q = sc_asn1_find_tag(NULL, p, tlen, 0x01, &ilen);
+              if (q == NULL || ilen != 4)
+                  return 0;
+              if (q[0] == 0x07)
+                  return 1;
+          }
+          p += tlen;
+          len -= tlen + 2;
+      }
+      return 0;
+  }
+  ```
+
+test "rank1527: the fixed revision keeps the cursor and the result separate"
+  lang c
+  file src/pkcs15init/pkcs15-cardos.c
+  reject VYQL-MEM-006
+  code
+  ```
+  #include <stdint.h>
+  #include <stddef.h>
+
+  #define SC_MAX_APDU_BUFFER_SIZE 261
+
+  const uint8_t *sc_asn1_find_tag(void *ctx, const uint8_t *buf, size_t len, unsigned int tag, size_t *taglen);
+
+  int have_verifyrc_package(uint8_t *rbuf, size_t len, int card_type)
+  {
+      const uint8_t *p = rbuf, *q, *pp;
+      size_t tlen = 0, ilen = 0;
+
+      while (len != 0) {
+          pp = sc_asn1_find_tag(NULL, p, len, 0xe1, &tlen);
+          if (pp == NULL)
+              return 0;
+          if (card_type == 1) {
+              q = sc_asn1_find_tag(NULL, pp, tlen, 0x01, &ilen);
+              if (q == NULL || ilen != 4)
+                  return 0;
+              if (q[0] == 0x07)
+                  return 1;
+          }
+          p += tlen;
+          len -= tlen + 2;
+      }
+      return 0;
+  }
+  ```

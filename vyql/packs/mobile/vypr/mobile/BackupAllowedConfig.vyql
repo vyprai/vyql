@@ -1,0 +1,10 @@
+module vypr.mobile;
+
+rule BackupAllowedConfig {
+  meta {
+    cwe: [CWE_922]
+    id: "VYQL-MOB-006"
+    severity: medium
+  }
+  issue code.BackupAllowedConfig as b
+}

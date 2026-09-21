@@ -1,0 +1,11 @@
+module code;
+
+concept SignatureCompactEncodingAccepted : issue {
+  cwe: [CWE_347]
+  reviewAssumption: "attackers can freely choose the encoding of the signature bytes they submit, and the calling scheme relies on a signature identifying exactly one commitment"
+  reviewCategory: crypto
+  reviewCondition: "a bytes-form signature recovery entry accepts the 64-byte EIP-2098 compact encoding alongside the canonical 65-byte (r, s, v) form"
+  reviewConfidence: high
+  reviewEvidence: "signature recovery context {pattern} dispatches on the signature's length into both the 65-byte (r, s, v) and the 64-byte (r, vs) decodings"
+  vulnerableTo: [crypto.ImproperSignatureCheck]
+}

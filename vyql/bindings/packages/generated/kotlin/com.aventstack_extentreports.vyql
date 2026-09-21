@@ -1,0 +1,73 @@
+module bindings.kotlin.generated.m7ec5cd6a;
+
+binding filePathAccess0 {
+  requires {
+    dependency("com.aventstack:extentreports")
+  }
+  query pattern callExpr where callee.method == "addScreenCaptureFromPath"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("com.aventstack:extentreports")
+  }
+  query pattern callExpr where callee.method == "addVideoFromPath"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("com.aventstack:extentreports")
+  }
+  query pattern callExpr where callee.method == "createScreenCaptureFromPath"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("com.aventstack:extentreports")
+  }
+  query pattern callExpr where callee.method == "createVideoFromPath"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("com.aventstack:extentreports")
+  }
+  query pattern callExpr where callee.method == "Video"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess5 {
+  requires {
+    dependency("com.aventstack:extentreports")
+  }
+  query pattern callExpr where callee.method == "ScreenCapture"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess6 {
+  requires {
+    dependency("com.aventstack:extentreports")
+  }
+  query pattern callExpr where callee.method == "tryResolveMediaPath"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess7 {
+  requires {
+    dependency("com.aventstack:extentreports")
+  }
+  query pattern callExpr where callee.method == "JsonFormatter"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding deserialization8 {
+  requires {
+    dependency("com.aventstack:extentreports")
+  }
+  query pattern callExpr where callee.method == "loadJSONConfig"
+  emit sink code.Deserialization at args[0]
+}

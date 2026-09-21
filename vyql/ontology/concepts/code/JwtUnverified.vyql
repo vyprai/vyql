@@ -1,0 +1,6 @@
+module code;
+
+concept JwtUnverified : issue {
+  cwe: [CWE_347]
+  vulnerableTo: [crypto.ImproperSignatureCheck]
+}

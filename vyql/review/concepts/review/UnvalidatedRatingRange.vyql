@@ -1,0 +1,8 @@
+module code;
+
+review code.UnvalidatedRatingRange {
+  category: input_validation
+  expected: [core.InputValidation]
+  kind: attention
+  text: "review server-side range validation before applying user-submitted rating values"
+}

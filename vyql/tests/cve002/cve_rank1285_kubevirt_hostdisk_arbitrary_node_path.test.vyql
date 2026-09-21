@@ -1,0 +1,241 @@
+# Rank 1285 / CVE-2020-14316: KubeVirt let anyone who could create a
+# VirtualMachineInstance mount an arbitrary path from the node's filesystem
+# into their VM. pkg/virt-controller/services/template.go's pod-template
+# builder took `volume.HostDisk.Path` -- a field on the admitted VMI object,
+# populated verbatim from the caller's request body during admission
+# (pkg/util/webhooks/webhooks.go's GetAdmissionReview does
+# `json.Unmarshal(body, ar)`; vmi-create-admitter.go's Admit then does
+# `json.Unmarshal(ar.Request.Object.Raw, &newVMI)`) -- and used it, with only
+# `filepath.Dir()` applied, as a Kubernetes HostPath volume source:
+#
+#   volumes = append(volumes, k8sv1.Volume{
+#     Name: volume.Name,
+#     VolumeSource: k8sv1.VolumeSource{
+#       HostPath: &k8sv1.HostPathVolumeSource{
+#         Path: filepath.Dir(volume.HostDisk.Path),
+#         Type: &hostPathType,
+#       },
+#     },
+#   })
+#
+# filepath.Dir neither canonicalizes nor restricts the result to any root --
+# `filepath.Dir("/etc/shadow")` is still `/etc` -- so any user permitted to
+# create a VMI could point a HostPath mount, and therefore the VM's virtual
+# disk, at any directory on the node (CWE-284/CWE-862). Fix
+# 7f5e7551554d6a7827988c932120e4d01d70033b (a merge that cherry-picks
+# 42316512 onto release-0.30; its diff against its first parent 2ea6ba41
+# carries the real change, so the pool's `nocommit` flag is a false
+# positive -- this is the actual fix, not a release bump) adds a
+# `HostDiskGate` feature gate (pkg/virt-config/feature-gates.go) and rejects
+# the volume in vmi-create-admitter.go's validateVolumes unless a cluster
+# admin has opted in with `config.HostDiskEnabled()`. It does not sanitize
+# or restrict the path itself -- even with the gate on, the path is still
+# unrestricted; the mitigation is an authorization gate on a dangerous feature, not
+# a path check.
+#
+# ATTENTION: unreached source and an off-site fix. The composite literal is
+# NOT an engine gap -- it is a bindable call. `k8sv1.HostPathVolumeSource{
+# Path: ..., Type: ...}` lowers to a Call node (path=k8sv1.HostPathVolume-
+# Source) whose argument list carries each keyed field's value, and a
+# scratch binding (`callee.path ~= "HostPathVolumeSource"`, `emit sink
+# code.FilePathAccess at args[0]`) both labels the construction and lets
+# VYQL-PATH-001 fire on the vulnerable snippet below, where the request-
+# sourced path and the literal sit in one function: 9/9 `--cache off` runs,
+# taint path Get -> HostDisk literal -> Volume literal -> range variable ->
+# filepath.Dir -> the Path argument. Address-of, nesting inside two further
+# literals, append into a slice, the nil-guard branch, and an external
+# package's field type all propagate -- each measured with a one-variable
+# probe pair. This supersedes the first pass's lowering claim
+# ("composite-literal-derived calls are not exposed as bindable sinks"),
+# which rested on `vyql resolve` call-site counts -- a property of the code,
+# not of any binding -- and on `vyql match`, which serves the persistent
+# scan cache and cannot take `--cache off`.
+#
+# What keeps the rank a miss:
+#
+#   * No shipped binding labels the k8s type, and shipping one is not
+#     justified by anything measurable. The reachable set is enumerated,
+#     not sampled: the whole kubevirt tree holds three HostPathVolumeSource
+#     constructions outside tests (template.go:374, the constant
+#     "/sys/devices/"; template.go:445, this one; deployments.go:463, fed
+#     from a same-file literal's field), and across every corpus clone the
+#     only construction whose path is not a constant is this one. A sink
+#     binding here can fire on no real tree, only on hand-built repros.
+#   * In the real code the path crosses a component boundary -- the webhook
+#     decodes the request, etcd stores the object, the controller re-reads
+#     it from its informer -- so no source label reaches RenderLaunch-
+#     Manifest's vmi parameter. With the scratch binding present,
+#     pkg/virt-controller/services and pkg/virt-api/webhooks report 0
+#     findings on 3/3 `--cache off` runs at both the fix's parent 2ea6ba41
+#     and the fix 7f5e7551.
+#   * The remediation is an admission-time feature gate in
+#     vmi-create-admitter.go, a different file from the construction, and
+#     template.go is byte-identical in both revisions -- so a construction-
+#     side finding cannot separate them, while an admitter-side negation
+#     would have to key on the fix's own `HostDiskEnabled()` call, the
+#     fixing commit's own layout.
+#
+# The first test pins the vulnerable construction with the source in the
+# same function; the second pins the gated admission form the fix actually
+# ships; the isolating pair holds the baseline (an ordinary call argument
+# reports) against the unlabelled construction (no binding names the type).
+#
+# verify_current_expected: attention-unreachable-source, both revisions rejected.
+
+test "rank1285: an admitted VMI's HostDisk.Path becomes an unrestricted node HostPath mount"
+  lang go
+  reject VYQL-PATH-001
+  reject VYQL-AUTH-080
+  code
+  ```
+  package services
+
+  import (
+  	"net/http"
+  	"path/filepath"
+
+  	k8sv1 "k8s.io/api/core/v1"
+  )
+
+  type HostDisk struct {
+  	Path string
+  	Type string
+  }
+
+  type Volume struct {
+  	Name     string
+  	HostDisk *HostDisk
+  }
+
+  type VirtualMachineInstanceSpec struct {
+  	Volumes []Volume
+  }
+
+  func renderPodTemplate(w http.ResponseWriter, r *http.Request) []k8sv1.Volume {
+  	requestedPath := r.URL.Query().Get("hostDiskPath")
+  	spec := VirtualMachineInstanceSpec{
+  		Volumes: []Volume{{Name: "disk0", HostDisk: &HostDisk{Path: requestedPath}}},
+  	}
+
+  	var volumes []k8sv1.Volume
+  	for _, volume := range spec.Volumes {
+  		if volume.HostDisk != nil {
+  			var hostPathType k8sv1.HostPathType
+  			volumes = append(volumes, k8sv1.Volume{
+  				Name: volume.Name,
+  				VolumeSource: k8sv1.VolumeSource{
+  					HostPath: &k8sv1.HostPathVolumeSource{
+  						Path: filepath.Dir(volume.HostDisk.Path),
+  						Type: &hostPathType,
+  					},
+  				},
+  			})
+  		}
+  	}
+  	return volumes
+  }
+  ```
+
+test "rank1285: the same HostDisk.Path is gated behind an admin feature flag before it reaches the mount"
+  lang go
+  reject VYQL-PATH-001
+  reject VYQL-AUTH-080
+  code
+  ```
+  package admitters
+
+  import (
+  	"net/http"
+  )
+
+  type HostDisk struct {
+  	Path string
+  	Type string
+  }
+
+  type Volume struct {
+  	Name     string
+  	HostDisk *HostDisk
+  }
+
+  type VirtualMachineInstanceSpec struct {
+  	Volumes []Volume
+  }
+
+  type ClusterConfig struct {
+  	hostDiskGateEnabled bool
+  }
+
+  func (c *ClusterConfig) HostDiskEnabled() bool {
+  	return c.hostDiskGateEnabled
+  }
+
+  type StatusCause struct {
+  	Message string
+  }
+
+  func validateVolumes(volumes []Volume, config *ClusterConfig) []StatusCause {
+  	var causes []StatusCause
+  	for _, volume := range volumes {
+  		if volume.HostDisk != nil {
+  			if !config.HostDiskEnabled() {
+  				causes = append(causes, StatusCause{Message: "HostDisk feature gate is not enabled"})
+  			}
+  		}
+  	}
+  	return causes
+  }
+
+  func admit(w http.ResponseWriter, r *http.Request, config *ClusterConfig) []StatusCause {
+  	requestedPath := r.URL.Query().Get("hostDiskPath")
+  	spec := VirtualMachineInstanceSpec{
+  		Volumes: []Volume{{Name: "disk0", HostDisk: &HostDisk{Path: requestedPath}}},
+  	}
+  	return validateVolumes(spec.Volumes, config)
+  }
+  ```
+
+# Isolating pair: the same tainted value, the only difference is whether it
+# reaches a plain call argument or a composite-literal field. Names no
+# Kubernetes or CVE-specific API -- `Sink` here is a project-local type, not
+# `k8sv1.HostPathVolumeSource`, so this isolates the construct alone. The
+# literal lowers to a bindable Call (verified with a scratch sink binding:
+# the label lands and PATH-001 fires), so this second case pins the missing
+# vocabulary, not a lowering capability.
+
+test "rank1285: tainted data into a call argument is caught (baseline)"
+  lang go
+  expect VYQL-PATH-001
+  code
+  ```
+  package repro
+
+  import (
+  	"net/http"
+  	"os"
+  )
+
+  func handler(w http.ResponseWriter, r *http.Request) {
+  	name := r.URL.Query().Get("name")
+  	os.Create(name)
+  }
+  ```
+
+test "rank1285: the identical tainted data into a struct-literal field is not caught (no binding names the type)"
+  lang go
+  reject VYQL-PATH-001
+  code
+  ```
+  package repro
+
+  import "net/http"
+
+  type Sink struct {
+  	Path string
+  }
+
+  func handler(w http.ResponseWriter, r *http.Request) Sink {
+  	name := r.URL.Query().Get("name")
+  	return Sink{Path: name}
+  }
+  ```

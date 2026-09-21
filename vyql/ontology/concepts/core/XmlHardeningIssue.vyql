@@ -1,0 +1,8 @@
+module core;
+
+concept XmlHardeningIssue : issue {
+  applies: path
+  cwe: [CWE_611]
+  internalRoles: [same_receiver_guard]
+  neutralizes: [deserialization.Xxe]
+}

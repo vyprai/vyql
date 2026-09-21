@@ -1,0 +1,31 @@
+test "scala: empty double-submit csrf token comparison is reported"
+  lang scala
+  expect VYQL-RF-006
+  code
+  ```
+  trait CsrfDirectives {
+    def randomTokenCsrfProtection(): Unit = {
+      if (submitted == cookie) {
+        pass
+      } else {
+        reject
+      }
+    }
+  }
+  ```
+
+test "scala: csrf token comparison with non-empty cookie check is clean"
+  lang scala
+  reject VYQL-RF-006
+  code
+  ```
+  trait CsrfDirectives {
+    def randomTokenCsrfProtection(): Unit = {
+      if (submitted == cookie && !cookie.isEmpty) {
+        pass
+      } else {
+        reject
+      }
+    }
+  }
+  ```

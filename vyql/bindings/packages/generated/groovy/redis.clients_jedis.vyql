@@ -1,0 +1,9 @@
+module bindings.groovy.generated.maf61e7f1;
+
+binding databaseRead0 {
+  requires {
+    dependency("redis.clients:jedis")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.DatabaseReadSink at args[0]
+}

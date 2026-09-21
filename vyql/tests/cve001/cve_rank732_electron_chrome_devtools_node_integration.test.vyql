@@ -1,0 +1,41 @@
+test "rank732: Electron chrome-devtools URLs force nodeIntegration on"
+  lang javascript
+  file init.js
+  expect VYQL-DSK-002
+  expect_review code.ElectronPrivilegedUrlNodeIntegration
+  code
+  ```
+  let nodeIntegration = 'false'
+
+  if (window.location.protocol === 'chrome-devtools:') {
+    require('./inspector')
+    nodeIntegration = 'true'
+  } else if (window.location.protocol === 'chrome:') {
+    nodeIntegration = 'false'
+  }
+
+  if (nodeIntegration === 'true') {
+    global.require = require
+  }
+  ```
+
+test "rank732: Electron chrome-devtools URLs keep nodeIntegration off"
+  lang javascript
+  file init.js
+  reject VYQL-DSK-002
+  reject_review code.ElectronPrivilegedUrlNodeIntegration
+  code
+  ```
+  let nodeIntegration = 'false'
+
+  if (window.location.protocol === 'chrome-devtools:') {
+    require('./inspector')
+    nodeIntegration = 'false'
+  } else if (window.location.protocol === 'chrome:') {
+    nodeIntegration = 'false'
+  }
+
+  if (nodeIntegration === 'true') {
+    global.require = require
+  }
+  ```

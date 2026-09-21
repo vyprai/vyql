@@ -1,0 +1,6 @@
+module injection;
+
+threat UnrestrictedUpload {
+  cwe: [CWE_434]
+  desc: "Untrusted filename/destination when saving an uploaded file"
+}

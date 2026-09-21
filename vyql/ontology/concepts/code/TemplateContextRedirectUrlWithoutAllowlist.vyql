@@ -1,0 +1,11 @@
+module code;
+
+concept TemplateContextRedirectUrlWithoutAllowlist : issue {
+  cwe: [CWE_601]
+  reviewAssumption: "an attacker can place an absolute or scheme-relative URL in the request parameter and the rendered page round-trips the reflected value into a redirect"
+  reviewCategory: request_forgery
+  reviewCondition: "template context building reflects a request-sourced redirect destination without same-origin validation"
+  reviewConfidence: high
+  reviewEvidence: "get_context_data context {pattern} stores a request parameter into a redirect-named context slot before is_safe_url or equivalent allowlist validation"
+  vulnerableTo: [request_forgery.OpenRedirect]
+}

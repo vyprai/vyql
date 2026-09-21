@@ -1,0 +1,11 @@
+module code;
+
+concept CountDerivedElementAccessSink : sink {
+  cwe: [CWE_129, CWE_125, CWE_787]
+  reviewAssumption: "a malformed or attacker-influenced container can have zero elements"
+  reviewCategory: memory
+  reviewCondition: "an element accessor uses a count-derived last index without a visible non-empty guard"
+  reviewConfidence: medium
+  reviewEvidence: "element accessor {pattern} receives Count()-derived index"
+  vulnerableTo: [memory.OobRead, memory.OobWrite]
+}

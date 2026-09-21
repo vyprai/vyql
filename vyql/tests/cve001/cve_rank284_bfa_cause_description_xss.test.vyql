@@ -1,0 +1,54 @@
+# Rank 284 / CVE-2013-6374: Jenkins Build Failure Analyzer rendered stored
+# failure-cause descriptions as raw HTML in Groovy and Jelly views.
+
+test "rank284: BFA Groovy cause description is rendered raw"
+  lang groovy
+  expect VYQL-INJ-004
+  code
+  ```
+  shallowCauses.each { cause ->
+    td {
+      raw(cause.getDescription())
+    }
+  }
+  ```
+
+test "rank284: BFA Groovy cause description is passed through Jenkins markup formatter"
+  lang groovy
+  reject VYQL-INJ-004
+  code
+  ```
+  shallowCauses.each { cause ->
+    td {
+      raw(app.markupFormatter.translate(cause.getDescription()))
+    }
+  }
+  ```
+
+test "rank284: BFA Jelly cause description expression is rendered unescaped"
+  lang config
+  file summary.jelly
+  expect VYQL-INJ-004
+  code
+  ```
+  <?jelly escape-by-default='true'?>
+  <j:jelly xmlns:j="jelly:core">
+    <td>
+      ${cause.description}
+    </td>
+  </j:jelly>
+  ```
+
+test "rank284: BFA Jelly cause description uses Jenkins markup formatter"
+  lang config
+  file summary.jelly
+  reject VYQL-INJ-004
+  code
+  ```
+  <?jelly escape-by-default='true'?>
+  <j:jelly xmlns:j="jelly:core">
+    <td>
+      ${app.markupFormatter.translate(cause.description)}
+    </td>
+  </j:jelly>
+  ```

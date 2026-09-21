@@ -1,0 +1,25 @@
+module bindings.rust.generated.m25e02174;
+
+binding deserialization0 {
+  requires {
+    dependency("const-oid")
+  }
+  query pattern callExpr where callee.method == "from_bytes"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("const-oid")
+  }
+  query pattern callExpr where callee.method == "from_bytes_sized"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("const-oid")
+  }
+  query pattern callExpr where callee.method == "from_str"
+  emit sink code.Deserialization at args[0]
+}

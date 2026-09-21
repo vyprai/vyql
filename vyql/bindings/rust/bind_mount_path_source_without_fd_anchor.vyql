@@ -1,0 +1,60 @@
+module bindings.rust.bind_mount_path_source_without_fd_anchor;
+
+// mount(2) takes its source as a path, and the kernel resolves that name when
+// the mount runs -- not when the caller last looked at it. A bind mount is the
+// form where the source's content is the point: MS_BIND makes the mounted
+// object be whatever the source path resolves to at mount time. The documented
+// alternative is to hold the object rather than its name -- open the source
+// once, stat and verify the file descriptor, and build the mount from the fd
+// (open_tree with an empty path, move_mount onto an fd for the target). Code
+// that mounts by name after validating the same name earlier has validated one
+// resolution of the path and mounted another: between the two syscalls a
+// planted link or an overmount redirects the source, and the mount then binds
+// attacker-chosen content over the target. Container runtimes hit this shape
+// wherever they mask paths by binding a fixed special file -- a device like
+// /dev/null -- over entries of a root filesystem the container image supplied,
+// because by then the process resolves paths inside the container's own mount
+// namespace.
+//
+// What the binding recognises is the naming half in one function: a mount
+// call whose flag argument carries MS_BIND -- nix's MsFlags::MS_BIND and the
+// libc constant both spell it that way -- together with a path built from a
+// string literal, the spelling of a source fixed by the program rather than
+// chosen per call -- an absolute path literal, because a bind source is an
+// absolute path and a per-call name arriving as a parameter is not this
+// shape.
+//
+// Both needles are chosen around two measured constraints on a call-argument
+// predicate, and neither is about the shape. A presence binding with no
+// explicit requirement gates itself on its longest identifier-like literal:
+// the program is skipped unless that literal occurs verbatim, and the
+// frontend records a lone flag argument by its dotted name
+// (call_arg:syscall.mount:MsFlags.MS_BIND, :: collapsed) while the source
+// only ever spells MsFlags::MS_BIND -- a needle carrying the dotted form
+// disables the binding for every file, which reads as a clean zero. The bare
+// flag name occurs in the source under both spellings, so it is both matched
+// and sound to gate on; an explicit `requires { content(...) }` is the other
+// way past the gate and is not needed here. And a needle containing the
+// literal's opening quote matches no argument atom at all, so the path needle
+// stops at the slash and relies on the absolute-path prefix rather than the
+// quoted literal.
+//
+// The negation is what turns "carries MS_BIND" into "is a plain bind". The
+// two excluded flags are the documented forms that do not take a fresh
+// source: MS_REMOUNT reconfigures a mount that already exists and ignores the
+// source argument, and MS_REC applied to a bind turns it into a recursive
+// bind of a subtree the caller already holds rather than a single named file.
+// Everything else stays in: a plain bind of a hardcoded path over a target
+// the caller does not fully control is the shape, whatever the source names.
+//
+// The judgement lives in the pack rule; this binding only recognises the
+// atoms. Residual, false-negative direction only: a bind mount whose source
+// path arrives as a parameter rather than a literal is not recognised, and a
+// source anchored by an fd in a helper function leaves no atom in the
+// mounting function to see either way -- the fd-anchored form produces no
+// bare MS_BIND argument at all, so it falls outside this binding by
+// construction rather than by a negation keyed on any helper's name.
+binding bindMountPathSourceWithoutFdAnchor {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.call in ["mount"] and containsAny(node.context.callArg, ["MS_BIND"]) and containsAny(node.context.callArg, ["Path.new:/", "PathBuf.from:/"]) and not (containsAny(node.context.callArg, ["MS_REC", "MS_REMOUNT"]))
+  emit issue code.BindMountPathSourceWithoutFdAnchor at node
+}

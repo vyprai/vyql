@@ -1,0 +1,49 @@
+module bindings.javascript.request_path_segment_screen;
+
+// A wiki or CMS that stores its content under a root directory resolves a
+// requested page or asset by decoding the request path, splitting it into
+// segments, screening the segments, and re-joining them onto the storage
+// root. Every spellings of the decode is documented: `querystring.unescape`
+// decodes percent-encoding (and the legacy global `unescape` with it), which
+// is the right treatment for a path that arrives encoded. The screening is
+// what makes the function a screen rather than a splitter: dropping empty
+// segments, trimming, rejecting the wrong locale — the author has declared
+// the function the place where unsafe segments die.
+//
+// Dot segments are the one form such a screen must reject, because the
+// re-joined path is resolved against a filesystem or storage root, and
+// `path.join(root, '../../elsewhere')` resolves outside it. A screen that
+// rejects empty segments or unknown characters while no dot-segment literal
+// (`..`) appears anywhere in the function, and nothing normalizes or
+// canonicalizes the path, passes traversal segments through untouched.
+//
+// The judgement lives in the pack rule (VYQL-PATH-041); this binding only
+// recognises the shape of the screen. The conjuncts are node-level —
+// literals and call paths come from AST nodes, so prose in a comment cannot
+// satisfy the negated clause, and each route out is spelled by the code
+// itself: rejecting `'..'`, or normalizing, both remove the first positive
+// conjunct's weakness rather than rebranding it.
+//
+// Costs. The screen and the resolution live in different functions, so the
+// binding cannot see where the re-joined path lands; a screen whose output
+// never reaches a path resolution is reported with the same confidence as
+// one whose does. Measured, the shape is rare: across the reachable set of
+// every clone in the current corpus (any file carrying the decode call at
+// all), the four conjuncts co-occur in one function only at the real defect
+// — the decode-and-rejoin idiom in vendored client bundles splits its calls
+// across functions. And the decode anchor is the `unescape` spelling only:
+// widening it to `decodeURIComponent` was measured and rejected, as it
+// reported two minified form-serialization bundles with no traversal in
+// reach.
+
+binding requestPathSegmentScreenMissingTraversal {
+  query pattern presenceNode where node.scope == "function"
+    and node.context.language == "javascript"
+    and node.context.callPath contains "unescape"
+    and node.context.callPath contains "split"
+    and node.context.callPath contains "filter"
+    and node.context.callPath contains "join"
+    and not (node.context.literal contains "..")
+    and not (node.context.callPath contains "normalize")
+  emit issue code.IncompleteDotSegmentRequestScreen at node
+}

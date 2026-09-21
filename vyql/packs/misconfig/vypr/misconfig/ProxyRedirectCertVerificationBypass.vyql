@@ -1,0 +1,11 @@
+module vypr.misconfig;
+
+rule ProxyRedirectCertVerificationBypass {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_295]
+    id: "VYQL-CFG-023"
+    severity: high
+  }
+  issue code.ProxyRedirectCertVerificationBypass as c
+}

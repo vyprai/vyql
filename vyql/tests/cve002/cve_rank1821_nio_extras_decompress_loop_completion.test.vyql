@@ -1,0 +1,286 @@
+# swift-nio-extras through 1.9.0 (CVE-2022-3252) decompresses received HTTP
+# bodies in a driver loop bounded only by the compressed body's remaining
+# byte count. Both NIOHTTPRequestDecompressor and NIOHTTPResponseDecompressor
+# run, in channelRead's .body case:
+#
+#     while part.readableBytes > 0 {
+#         var buffer = context.channel.allocator.buffer(capacity: 16384)
+#         try self.decompressor.decompress(part: &part, buffer: &buffer, compressedLength: compression.compressedLength)
+#         context.fireChannelRead(self.wrapInboundOut(.body(buffer)))
+#     }
+#
+# The zlib wrapper underneath (HTTPDecompression.swift) does receive inflate's
+# return code but consumes Z_STREAM_END only as one half of an error-code
+# guard and discards the completion bit, returning the number of bytes
+# written. Nothing between the two layers records that the compressed stream
+# ended, so a peer who appends data behind the compressed stream keeps the
+# driver inflating past the end of the message -- the advisory's spin/zip-bomb
+# vector -- and a truncated stream ends without anyone noticing. The fixed revision
+# e8000754be4dc63fea88f121bb8f1703f4a6a5af propagates an InflateResult out of
+# the wrapper, breaks the loop on result.complete via a decompressionComplete
+# flag, and fires ExtraDecompressionError.invalidTrailingData (bytes left
+# after completion) and .truncatedData (message ended before completion).
+#
+# What fired before, union over three `timeout 180 ./bin/vyql scan --cache
+# off --max-ram 6GB` runs per revision: 14 findings on the vulnerable tree
+# (29e4c0a, the fixed revision's parent) and the identical 14 on the fixed tree, all
+# VYQL-MOB-002 WebViewJsInterface / VYQL-RES-001 rows on test files and the
+# performance tester; nothing at all on Sources/NIOHTTPCompression, and
+# `vyql match` on HTTPResponseDecompressor.swift labels only the
+# context.write calls (the broad write-method HtmlRender sink). After the
+# binding below: 17 on the vulnerable tree -- the three compression sources
+# now carry VYQL-DOS-042 (the wrapper that discards the completion bit, plus
+# both handler drivers) -- and the same 14 as before on the fixed tree, where
+# decompressionComplete suppresses all three; the non-DOS findings are
+# byte-identical between the two revisions. Renaming the fixed revision's own
+# vocabulary across the patched sources (decompressionComplete ->
+# decompressionFinished, result.complete -> result.finished) leaves the
+# fixed tree at zero, so the discrimination is the completion-spelling
+# family, not the names this particular fix minted.
+#
+# Vocabulary reused, none minted: this is the Swift member of the streaming
+# decompression family whose Python and Rust bindings
+# (bindings/python/streaming_decompression_output_without_cap.vyql,
+# bindings/rust/...) emit code.UnboundedResourceOperation for
+# VYQL-DOS-042. Each member discriminates on its ecosystem's documented
+# bounding vocabulary -- max_length/output_buffer_limit for Python's
+# decompressor steps, min/clamp/take/truncate for Rust's output pipeline,
+# io.LimitReader for Go's reader-drain loops. Swift's is the completion
+# protocol: a driver that consults a completion state names it, in any of
+# the usual spellings (complete, finished, done), and any such identifier in
+# the file suppresses -- the same policy the Python binding states, that the
+# finding is about the driver ignoring completion rather than about which
+# construct consults it.
+#
+# Two Swift facts shape the binding and are why it anchors at file scope.
+# swift.go emits exactly one context node per file (analysis.module.context)
+# and never populates per-function context facts, so `node.scope ==
+# "function"` matches nothing in any .swift file; and while-statements lower
+# to nir.Loop{Body} with no condition kept at all (swift.go, the
+# for/while/repeat case), so the loop's exit clause -- the exact thing this
+# fix extends -- exists nowhere in the IR. The binding therefore approximates
+# "a decompression step driven by the compressed remainder" by the file
+# containing both the step (an exact decompress or inflate call, the two
+# spellings the API documents, so the NIOHTTPRequestDecompressor constructor
+# does not reach) and the ByteBuffer remainder read (readableBytes), and
+# anchors the finding at the file.
+#
+# Measured reachable set, exhaustively enumerated across the 438
+# repositories cloned in this environment: five .swift files contain both an
+# exact decompress/inflate call and readableBytes, all five in this
+# repository. The two test files among them carry genuine completion
+# identifiers (waitUntilComplete, whenComplete, finish) and stay silent at
+# both revisions. No file in any other repository reaches the anchor, so the
+# wider corpus contributes no collateral.
+#
+# Residuals, stated rather than hidden: a decompression step spelled
+# differently (gunzip, a bespoke inflateStream) does not anchor; a
+# completion state spelled outside the family (atEnd, exhausted) does not
+# suppress; the wrapper's Z_STREAM_END error-code guard deliberately does
+# not count, because it is present in both revisions and is exactly the
+# shape that discards the completion bit; and file-wide scope means an
+# unrelated completion-spelled identifier anywhere in the file suppresses --
+# the false-negative direction, the same residual the Python member
+# documents for positional bounds.
+
+test "swift-nio-extras: the body decompression driver loops on the compressed remainder with no completion state anywhere"
+  lang swift
+  file Sources/NIOHTTPCompression/HTTPResponseDecompressor.swift
+  profile generic
+  expect VYQL-DOS-042
+  expect_review code.UnboundedResourceOperation
+  code
+  ```
+  import NIO
+  import NIOHTTP1
+
+  public final class NIOHTTPResponseDecompressor: ChannelDuplexHandler {
+      private var compression: Compression?
+      private var decompressor: NIOHTTPDecompression.Decompressor
+
+      public init(limit: NIOHTTPDecompression.DecompressionLimit) {
+          self.decompressor = NIOHTTPDecompression.Decompressor(limit: limit)
+      }
+
+      public func channelRead(context: ChannelHandlerContext, data: NIOAny) {
+          switch self.unwrapInboundIn(data) {
+          case .body(var part):
+              guard var compression = self.compression else {
+                  context.fireChannelRead(data)
+                  return
+              }
+
+              do {
+                  compression.compressedLength += part.readableBytes
+                  while part.readableBytes > 0 {
+                      var buffer = context.channel.allocator.buffer(capacity: 16384)
+                      try self.decompressor.decompress(part: &part, buffer: &buffer, compressedLength: compression.compressedLength)
+                      context.fireChannelRead(self.wrapInboundOut(.body(buffer)))
+                  }
+
+                  // assign the changed local property back to the class state
+                  self.compression = compression
+              }
+              catch {
+                  context.fireErrorCaught(error)
+              }
+          default:
+              context.fireChannelRead(data)
+          }
+      }
+  }
+  ```
+
+test "swift-nio-extras: the patched driver tracks the inflate result's completion and stops on it"
+  lang swift
+  file Sources/NIOHTTPCompression/HTTPResponseDecompressorPatched.swift
+  profile generic
+  reject VYQL-DOS-042
+  reject_review code.UnboundedResourceOperation
+  code
+  ```
+  import NIO
+  import NIOHTTP1
+
+  public final class NIOHTTPResponseDecompressorPatched: ChannelDuplexHandler {
+      private var compression: Compression?
+      private var decompressor: NIOHTTPDecompression.Decompressor
+      private var decompressionComplete: Bool
+
+      public init(limit: NIOHTTPDecompression.DecompressionLimit) {
+          self.decompressor = NIOHTTPDecompression.Decompressor(limit: limit)
+          self.decompressionComplete = false
+      }
+
+      public func channelRead(context: ChannelHandlerContext, data: NIOAny) {
+          switch self.unwrapInboundIn(data) {
+          case .body(var part):
+              guard var compression = self.compression else {
+                  context.fireChannelRead(data)
+                  return
+              }
+
+              do {
+                  compression.compressedLength += part.readableBytes
+                  while part.readableBytes > 0 && !self.decompressionComplete {
+                      var buffer = context.channel.allocator.buffer(capacity: 16384)
+                      let result = try self.decompressor.decompress(part: &part, buffer: &buffer, compressedLength: compression.compressedLength)
+                      if result.complete {
+                          self.decompressionComplete = true
+                      }
+
+                      context.fireChannelRead(self.wrapInboundOut(.body(buffer)))
+                  }
+
+                  if part.readableBytes > 0 {
+                      context.fireErrorCaught(NIOHTTPDecompression.ExtraDecompressionError.invalidTrailingData)
+                  }
+
+                  self.compression = compression
+              }
+              catch {
+                  context.fireErrorCaught(error)
+              }
+          case .end:
+              if self.compression != nil {
+                  let wasDecompressionComplete = self.decompressionComplete
+
+                  self.decompressor.deinitializeDecoder()
+                  self.compression = nil
+                  self.decompressionComplete = false
+
+                  if !wasDecompressionComplete {
+                      context.fireErrorCaught(NIOHTTPDecompression.ExtraDecompressionError.truncatedData)
+                  }
+              }
+
+              context.fireChannelRead(data)
+          default:
+              context.fireChannelRead(data)
+          }
+      }
+  }
+  ```
+
+test "swift-nio-extras: the same fix with the completion state spelled finished, not complete"
+  lang swift
+  file Sources/NIOHTTPCompression/HTTPResponseDecompressorFinished.swift
+  profile generic
+  reject VYQL-DOS-042
+  reject_review code.UnboundedResourceOperation
+  code
+  ```
+  import NIO
+  import NIOHTTP1
+
+  public final class NIOHTTPResponseDecompressorFinished: ChannelDuplexHandler {
+      private var compression: Compression?
+      private var decompressor: NIOHTTPDecompression.Decompressor
+      private var decompressionFinished: Bool
+
+      public init(limit: NIOHTTPDecompression.DecompressionLimit) {
+          self.decompressor = NIOHTTPDecompression.Decompressor(limit: limit)
+          self.decompressionFinished = false
+      }
+
+      public func channelRead(context: ChannelHandlerContext, data: NIOAny) {
+          switch self.unwrapInboundIn(data) {
+          case .body(var part):
+              guard var compression = self.compression else {
+                  context.fireChannelRead(data)
+                  return
+              }
+
+              do {
+                  compression.compressedLength += part.readableBytes
+                  while part.readableBytes > 0 && !self.decompressionFinished {
+                      var buffer = context.channel.allocator.buffer(capacity: 16384)
+                      let result = try self.decompressor.decompress(part: &part, buffer: &buffer, compressedLength: compression.compressedLength)
+                      if result.finished {
+                          self.decompressionFinished = true
+                      }
+
+                      context.fireChannelRead(self.wrapInboundOut(.body(buffer)))
+                  }
+
+                  self.compression = compression
+              }
+              catch {
+                  context.fireErrorCaught(error)
+              }
+          default:
+              context.fireChannelRead(data)
+          }
+      }
+  }
+  ```
+
+test "swift-nio-extras: a one-shot decompression step that no readable-byte remainder drives"
+  lang swift
+  file Sources/NIOHTTPCompression/OneShotDecompress.swift
+  profile generic
+  reject VYQL-DOS-042
+  reject_review code.UnboundedResourceOperation
+  code
+  ```
+  import NIO
+
+  public final class OneShotDecompress {
+      private var decompressor: NIOHTTPDecompression.Decompressor
+
+      public init(limit: NIOHTTPDecompression.DecompressionLimit) {
+          self.decompressor = NIOHTTPDecompression.Decompressor(limit: limit)
+      }
+
+      public func channelRead(context: ChannelHandlerContext, data: NIOAny) {
+          do {
+              var part = self.unwrapInboundIn(data)
+              var buffer = context.channel.allocator.buffer(capacity: 16384)
+              try self.decompressor.decompress(part: &part, buffer: &buffer, compressedLength: 0)
+              context.fireChannelRead(self.wrapInboundOut(.body(buffer)))
+          } catch {
+              context.fireErrorCaught(error)
+          }
+      }
+  }
+  ```

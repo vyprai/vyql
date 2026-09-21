@@ -1,0 +1,24 @@
+module bindings.rust.type_erasure_missing_lifetime_bound;
+
+// A function erases one of its own generic parameters behind an untyped raw
+// pointer -- `Arc::into_raw(wake) as *const ()` -- while no type parameter it
+// declares carries a lifetime bound.
+//
+// A raw pointer keeps no trace of the lifetime of what it points at, and the
+// untyped spelling drops the type as well, so whatever receives the pointer --
+// a raw vtable, a struct field, a return value -- can restore the type and
+// call into it after the original value is gone. That is use after free, and
+// the borrow checker cannot object, because the pointer type carries nothing
+// to check. The signature is the only place left to state the constraint, so
+// the erasure is only checkable when the erased parameter carries a lifetime
+// bound ('static or a named lifetime).
+//
+// Only parameters the function declares itself count: a method whose receiver
+// type comes from the surrounding impl carries its obligation there, and a
+// non-generic function erases a concrete type with no lifetime to lose. The
+// fact is emitted by the frontend from the syntax tree, so comments and prose
+// cannot satisfy or defeat it.
+binding typeErasureMissingLifetimeBound {
+  query pattern presenceNode where node.kind == "any" and node.analysis == "rust.type_erasure_missing_lifetime_bound"
+  emit issue code.TypeErasureMissingLifetimeBound at node
+}

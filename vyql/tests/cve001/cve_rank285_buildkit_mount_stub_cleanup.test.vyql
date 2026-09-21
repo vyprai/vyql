@@ -1,0 +1,77 @@
+# Rank 285 / CVE-2024-23652: BuildKit's mount-stub cleanup trusted paths
+# collected before container execution, allowing symlink replacement to steer
+# cleanup outside the root.
+
+test "rank285: buildkit mount stub cleanup removes saved paths without root recheck"
+  lang go
+  expect VYQL-PATH-009
+  code
+  ```
+  package executor
+
+  import (
+    "os"
+    "path/filepath"
+  )
+
+  func MountStubsCleaner(paths []string) func() {
+    return func() {
+      for _, p := range paths {
+        st, err := os.Lstat(p)
+        if err != nil {
+          continue
+        }
+        if st.Size() != 0 {
+          continue
+        }
+        dir := filepath.Dir(p)
+        if err := os.Remove(p); err != nil {
+          continue
+        }
+        _ = os.Chtimes(dir, st.ModTime(), st.ModTime())
+      }
+    }
+  }
+  ```
+
+test "rank285: buildkit mount stub cleanup revalidates path under root"
+  lang go
+  reject VYQL-PATH-009
+  code
+  ```
+  package executor
+
+  import (
+    "os"
+    "path/filepath"
+    "strings"
+
+    "github.com/containerd/continuity/fs"
+  )
+
+  func MountStubsCleaner(dir string, paths []string) func() {
+    return func() {
+      for _, p := range paths {
+        p, err := fs.RootPath(dir, strings.TrimPrefix(p, dir))
+        if err != nil {
+          continue
+        }
+        st, err := os.Lstat(p)
+        if err != nil {
+          continue
+        }
+        if st.Size() != 0 {
+          continue
+        }
+        parent := filepath.Dir(p)
+        if realPath, err := fs.RootPath(dir, strings.TrimPrefix(parent, dir)); err != nil || realPath != parent {
+          continue
+        }
+        if err := os.Remove(p); err != nil {
+          continue
+        }
+        _ = os.Chtimes(parent, st.ModTime(), st.ModTime())
+      }
+    }
+  }
+  ```

@@ -1,0 +1,352 @@
+# Rank 1210 / CVE-2026-33897: Incus applies pongo2 templates from an
+# instance's own template directory whenever a lifecycle trigger (start,
+# copy, rename, ...) fires, on the theory that a custom pongo2.Loader
+# restricts the template to reading and writing only inside the instance's
+# rootfs. The fixing commit is 487edf5984fad89b0f762c03a7e211fdd38396fb,
+# "incusd/instance: Use restricted pongo2 parser", whose own message states
+# "This addresses CVE-2026-33897".
+#
+# driver_lxc.go's templateApplyNow (and driver_qemu.go's equivalent, inside
+# an immediately-invoked closure) build
+# tplSet := pongo2.NewSet(name, ChrootLoader{Path: d.RootfsPath()}), where
+# ChrootLoader (internal/server/template/chroot.go, which the fix deletes)
+# is a pongo2.TemplateLoader whose Get resolves symlinks and checks a path
+# prefix before reading. pongo2 resolves the file-reaching tags' paths
+# itself: for a template parsed from a string the resolver returns the
+# tag's path unchanged without consulting the loader's Abs, so {% ssi %}'s
+# plain text mode reads the path with ioutil.ReadFile directly, outside
+# the loader entirely, and {% include %}, {% extends %} and {% import %}
+# name their targets without the loader's path rewriting (template_sets.go
+# resolveFilenameForLoader, tags_ssi.go, tags_include.go, tags_extends.go,
+# tags_import.go -- extends, import, include and ssi are the four
+# file-reaching tags). Any instance template file placed by whoever built
+# the image can therefore read or write arbitrary host paths as root once
+# the daemon applies the template. The fix drops ChrootLoader and routes
+# both call sites through internal/util.RenderTemplateFile, which builds
+# the Set on pongo2.DefaultLoader and bans those four tags with BanTag --
+# the template string itself stays exactly as attacker-influenced as
+# before; what changed is which of pongo2's own tags can act on it.
+#
+# Two detections hold this rank up. A taint-side one:
+# vyql/bindings/packages/generated/go/github.com_flosch_pongo2_v6.vyql
+# names FromString/FromFile/FromCache's args[0] as a code.TemplateRender
+# sink, so an http.Request-sourced template string handed to
+# pongo2.FromString fires VYQL-INJ-008 while the identical call with a
+# fixed template string and only the render context varying by request
+# data does not. That route cannot carry the real code, because the real
+# template string is os.ReadFile(d.TemplatesPath()+"/"+tpl.Template)
+# reached through a struct receiver -- image-authored disk content, which
+# no source concept represents -- and the fixed revision renders the same
+# string through the same sink, so taint alone cannot separate the
+# revisions at all.
+#
+# The revision-discriminating detection is the review binding
+# vyql/bindings/go/pongo2_custom_loader_unsandboxed_render.vyql: a pongo2
+# set built on an application-defined loader that parses a template from a
+# string with no BanTag in the same body is incomplete template
+# validation (VYQL-INJ-024), the same family as the Twig custom-loader
+# unsandboxed render. pongo2's own doc comments state the engine's loaders
+# claim no confinement (DefaultLoader is "the default un-sandboxed access
+# to the local file system"), so a loader of the application's own is a
+# confinement claim the string-parse path does not honor; BanTag is the
+# documented restriction. Measured on the real checkout: the vulnerable
+# revision's internal/server/instance/drivers subtree reports
+# VYQL-INJ-024 on driver_lxc.go's templateApplyNow and on driver_qemu.go's
+# closure, and the fixed revision's subtree reports none -- with the rest
+# of the drivers findings identical at 33 (21 VYQL-RES-001, 11
+# VYQL-RACE-001, 3 VYQL-LIFE-001, 1 VYQL-PATH-076) on both sides across
+# three --cache off runs each.
+#
+# verify_current_expected: fixed-review; the isolating pair pins the taint
+# sink and three reject forms pin each clearing clause of the review
+# binding (the engine's own loaders, BanTag, and the real fixed shape).
+
+test "rank1210: a pongo2 template string sourced from the request is template injection"
+  lang go
+  file render.go
+  expect VYQL-INJ-008
+  reject VYQL-INJ-024
+  code
+  ```
+  package render
+
+  import (
+      "net/http"
+
+      "github.com/flosch/pongo2/v6"
+  )
+
+  func RenderFromRequest(w http.ResponseWriter, r *http.Request) {
+      tpl := r.FormValue("tpl")
+      rendered, err := pongo2.FromString(tpl)
+      if err != nil {
+          return
+      }
+
+      out, _ := rendered.Execute(pongo2.Context{})
+      w.Write([]byte(out))
+  }
+  ```
+
+test "rank1210: a fixed pongo2 template with only render-context data from the request is safe"
+  lang go
+  file render.go
+  reject VYQL-INJ-008
+  reject VYQL-INJ-024
+  code
+  ```
+  package render
+
+  import (
+      "net/http"
+
+      "github.com/flosch/pongo2/v6"
+  )
+
+  func RenderFixed(w http.ResponseWriter, r *http.Request) {
+      rendered, err := pongo2.FromString("Hello {{ name }}")
+      if err != nil {
+          return
+      }
+
+      out, _ := rendered.Execute(pongo2.Context{"name": r.FormValue("name")})
+      w.Write([]byte(out))
+  }
+  ```
+
+test "rank1210: an instance template rendered on the daemon's own pongo2 loader is unsandboxed"
+  lang go
+  file driver_lxc.go
+  expect VYQL-INJ-024
+  reject VYQL-INJ-008
+  code
+  ```
+  package instance
+
+  import (
+      "fmt"
+      "io"
+      "os"
+      "strings"
+
+      "github.com/flosch/pongo2/v6"
+  )
+
+  type ChrootLoader struct {
+      Path string
+  }
+
+  func (l ChrootLoader) Abs(base string, name string) string {
+      return l.Path + "/" + name
+  }
+
+  func (l ChrootLoader) Get(path string) (io.Reader, error) {
+      return os.Open(path)
+  }
+
+  type templateEntry struct {
+      Template string
+  }
+
+  type lxc struct {
+      name           string
+      expandedConfig map[string]string
+  }
+
+  func (d *lxc) rootfsPath() string { return "/var/lib/incus/containers/" + d.name + "/rootfs" }
+  func (d *lxc) templatesPath() string {
+      return "/var/lib/incus/containers/" + d.name + "/templates"
+  }
+
+  func (d *lxc) templateApplyNow(tplPath string, tpl templateEntry, w io.WriteCloser) error {
+      tplString, err := os.ReadFile(d.templatesPath() + "/" + tpl.Template)
+      if err != nil {
+          return fmt.Errorf("Failed to read template file: %w", err)
+      }
+
+      tplSet := pongo2.NewSet(fmt.Sprintf("%s-%s", d.name, tpl.Template), ChrootLoader{Path: d.rootfsPath()})
+
+      tplRender, err := tplSet.FromString("{% autoescape off %}" + string(tplString) + "{% endautoescape %}")
+      if err != nil {
+          return fmt.Errorf("Failed to render template: %w", err)
+      }
+
+      configGet := func(confKey, confDefault *pongo2.Value) *pongo2.Value {
+          val, ok := d.expandedConfig[confKey.String()]
+          if !ok {
+              return confDefault
+          }
+
+          return pongo2.AsValue(strings.TrimRight(val, "\r\n"))
+      }
+
+      err = tplRender.ExecuteWriter(pongo2.Context{
+          "path":       tplPath,
+          "config":     d.expandedConfig,
+          "config_get": configGet,
+      }, w)
+      if err != nil {
+          return err
+      }
+
+      return w.Close()
+  }
+  ```
+
+test "rank1210: the restricted render through the default loader with the file tags banned"
+  lang go
+  file driver_lxc.go
+  reject VYQL-INJ-024
+  reject VYQL-INJ-008
+  code
+  ```
+  package instance
+
+  import (
+      "errors"
+      "fmt"
+      "io"
+      "os"
+      "strings"
+
+      "github.com/flosch/pongo2/v6"
+  )
+
+  var bannedTemplateTags = []string{"extends", "import", "include", "ssi"}
+
+  func renderTemplateFile(w io.Writer, template string, ctx pongo2.Context) error {
+      custom := pongo2.NewSet("render-template", pongo2.DefaultLoader)
+
+      for _, tag := range bannedTemplateTags {
+          err := custom.BanTag(tag)
+          if err != nil {
+              return fmt.Errorf("Failed to configure custom pongo2 parser: Failed to block tag tag %q: %w", tag, err)
+          }
+      }
+
+      tpl, err := custom.FromString("{% autoescape off %}" + template + "{% endautoescape %}")
+      if err != nil {
+          return err
+      }
+
+      err = tpl.ExecuteWriter(ctx, w)
+      if err != nil {
+          return err
+      }
+
+      return nil
+  }
+
+  type templateEntry struct {
+      Template string
+  }
+
+  type lxc struct {
+      name           string
+      expandedConfig map[string]string
+  }
+
+  func (d *lxc) templatesPath() string {
+      return "/var/lib/incus/containers/" + d.name + "/templates"
+  }
+
+  func (d *lxc) templateApplyNow(tplPath string, tpl templateEntry, w io.WriteCloser) error {
+      tplString, err := os.ReadFile(d.templatesPath() + "/" + tpl.Template)
+      if err != nil {
+          return fmt.Errorf("Failed to read template file: %w", err)
+      }
+
+      configGet := func(confKey, confDefault *pongo2.Value) *pongo2.Value {
+          val, ok := d.expandedConfig[confKey.String()]
+          if !ok {
+              return confDefault
+          }
+
+          return pongo2.AsValue(strings.TrimRight(val, "\r\n"))
+      }
+
+      err = renderTemplateFile(w, string(tplString), pongo2.Context{
+          "path":       tplPath,
+          "config":     d.expandedConfig,
+          "config_get": configGet,
+      })
+      if err != nil {
+          return errors.New("Failed to render template: " + err.Error())
+      }
+
+      return w.Close()
+  }
+  ```
+
+test "rank1210: a set on the engine's own loader renders without a confinement claim"
+  lang go
+  file render.go
+  reject VYQL-INJ-024
+  code
+  ```
+  package render
+
+  import (
+      "io"
+
+      "github.com/flosch/pongo2/v6"
+  )
+
+  func RenderOwn(w io.Writer, tpl string) error {
+      set := pongo2.NewSet("app", pongo2.DefaultLoader)
+
+      parsed, err := set.FromString(tpl)
+      if err != nil {
+          return err
+      }
+
+      return parsed.ExecuteWriter(pongo2.Context{}, w)
+  }
+  ```
+
+test "rank1210: banning the file-reaching tags on a custom loader is the documented restriction"
+  lang go
+  file render.go
+  reject VYQL-INJ-024
+  code
+  ```
+  package render
+
+  import (
+      "io"
+      "os"
+      "path"
+
+      "github.com/flosch/pongo2/v6"
+  )
+
+  type prefixLoader struct {
+      root string
+  }
+
+  func (l prefixLoader) Abs(base string, name string) string {
+      return path.Join(l.root, name)
+  }
+
+  func (l prefixLoader) Get(p string) (io.Reader, error) {
+      return os.Open(p)
+  }
+
+  func RenderConfined(w io.Writer, tpl string) error {
+      set := pongo2.NewSet("app", prefixLoader{root: "/srv/templates"})
+
+      for _, tag := range []string{"extends", "import", "include", "ssi"} {
+          err := set.BanTag(tag)
+          if err != nil {
+              return err
+          }
+      }
+
+      parsed, err := set.FromString(tpl)
+      if err != nil {
+          return err
+      }
+
+      return parsed.ExecuteWriter(pongo2.Context{}, w)
+  }
+  ```

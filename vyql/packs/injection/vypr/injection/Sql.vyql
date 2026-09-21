@@ -1,0 +1,12 @@
+module vypr.injection;
+
+rule Sql {
+  meta {
+    benchmark: sqli
+    cwe: [CWE_89]
+    id: "VYQL-INJ-001"
+    severity: high
+  }
+  taint core.UserControlledData -> code.SqlExecution
+  unless path coveredBy core.SqlParameterization
+}

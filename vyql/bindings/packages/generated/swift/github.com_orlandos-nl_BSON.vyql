@@ -1,0 +1,9 @@
+module bindings.swift.generated.m1cc6a67a;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/orlandos-nl/BSON")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

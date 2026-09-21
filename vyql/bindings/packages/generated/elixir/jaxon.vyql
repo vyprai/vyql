@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mea64ee63;
+
+binding deserialization0 {
+  requires {
+    dependency("jaxon")
+  }
+  query pattern callExpr where callee.method == "decode!"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,181 @@
+# Rank 1132 / CVE-2022-29173: go-tuf's update client downloaded and trusted
+# new timestamp/snapshot metadata without first loading whatever metadata it
+# had already verified and stored locally, so it held no last-known-good
+# version to compare a newly-served file against, letting a malicious or
+# compromised repository roll a client back to older, superseded metadata
+# (CWE-354). TUF's rollback protection depends entirely on the client already
+# having the previous timestamp/snapshot version in memory when it inspects a
+# new download; a consumer's Update call is correct code doing what the library
+# documents, and whether the library skips its load-prior-trusted-state step is
+# invisible from the consumer, so the report that belongs to this CVE is the
+# dependency finding: a pin below v0.3.0, the release the advisory names as
+# first fixed.
+
+test "rank1132: a go-tuf pin below the first rollback-protected release is a dependency finding"
+  lang go
+  file main.go
+  code
+  ```
+  package main
+
+  import (
+      "fmt"
+      "log"
+
+      tuf "github.com/theupdateframework/go-tuf/client"
+  )
+
+  func main() {
+      log.SetFlags(0)
+
+      remote, err := tuf.HTTPRemoteStore("https://updates.example.com", nil, nil)
+      if err != nil {
+          log.Fatalln("ERROR:", err)
+      }
+      c := tuf.NewClient(tuf.MemoryLocalStore(), remote)
+
+      if _, err := update(c); err != nil {
+          log.Fatalln("ERROR:", err)
+      }
+  }
+
+  func update(c *tuf.Client) error {
+      if _, err := c.Update(); err != nil && !tuf.IsLatestSnapshot(err) {
+          return fmt.Errorf("update: %w", err)
+      }
+      return nil
+  }
+  ```
+  file go.mod
+  code
+  ```
+  module example.com/fleet-updater
+
+  go 1.16
+
+  require github.com/theupdateframework/go-tuf v0.2.0
+  ```
+  expect VYQL-SCA-001
+  expect VYQL-SCA-002
+  expect_evidence VYQL-SCA-001 CVE-2022-29173
+
+test "rank1132: a go-tuf pin at the first rollback-protected release is clean"
+  lang go
+  file main.go
+  code
+  ```
+  package main
+
+  import (
+      "fmt"
+      "log"
+
+      tuf "github.com/theupdateframework/go-tuf/client"
+  )
+
+  func main() {
+      log.SetFlags(0)
+
+      remote, err := tuf.HTTPRemoteStore("https://updates.example.com", nil, nil)
+      if err != nil {
+          log.Fatalln("ERROR:", err)
+      }
+      c := tuf.NewClient(tuf.MemoryLocalStore(), remote)
+
+      if _, err := update(c); err != nil {
+          log.Fatalln("ERROR:", err)
+      }
+  }
+
+  func update(c *tuf.Client) error {
+      if _, err := c.Update(); err != nil && !tuf.IsLatestSnapshot(err) {
+          return fmt.Errorf("update: %w", err)
+      }
+      return nil
+  }
+  ```
+  file go.mod
+  code
+  ```
+  module example.com/fleet-updater
+
+  go 1.16
+
+  require github.com/theupdateframework/go-tuf v0.3.0
+  ```
+  reject VYQL-SCA-001
+  reject VYQL-SCA-002
+
+# The library's own update sequence, both revisions, held here so a later
+# reader can see the patched form rather than inferring it from the advisory
+# text. No code-level rule reports either shape: code.ProtocolStateReview
+# carries this CWE family but every Go binding for it is a named analysis of
+# one incident's calls, and the discriminator here is an ordering requirement
+# across two methods (load-and-verify local metadata before trusting a new
+# download) that the flat per-function context facts cannot express, so the
+# reviews stay pinned as non-reporting.
+
+test "rank1132: Update downloads new metadata with no prior trusted version loaded"
+  lang go
+  file client.go
+  code
+  ```
+  package client
+
+  func (c *Client) Update() (data.TargetFiles, error) {
+      if err := c.UpdateRoots(); err != nil {
+          return nil, err
+      }
+
+      // Get timestamp.json, extract snapshot.json file meta and save the
+      // timestamp.json locally
+      timestampJSON, err := c.downloadMetaUnsafe("timestamp.json", defaultTimestampDownloadLimit)
+      if err != nil {
+          return nil, err
+      }
+      snapshotMeta, err := c.decodeTimestamp(timestampJSON)
+      if err != nil {
+          return nil, err
+      }
+      if err := c.local.SetMeta("timestamp.json", timestampJSON); err != nil {
+          return nil, err
+      }
+      return nil, nil
+  }
+  ```
+  reject_review code.ProtocolStateReview
+
+test "rank1132: Update loads and verifies prior trusted metadata before downloading anything new"
+  lang go
+  file client.go
+  code
+  ```
+  package client
+
+  func (c *Client) Update() (data.TargetFiles, error) {
+      if err := c.UpdateRoots(); err != nil {
+          return nil, err
+      }
+
+      // Load trusted metadata files, if any, and verify them against the latest root
+      c.getLocalMeta()
+
+      // 5.4.1 - Download the timestamp metadata
+      timestampJSON, err := c.downloadMetaUnsafe("timestamp.json", defaultTimestampDownloadLimit)
+      if err != nil {
+          return nil, err
+      }
+      // 5.4.(2,3 and 4) - Verify timestamp against various attacks
+      // Returns the extracted snapshot metadata
+      snapshotMeta, err := c.decodeTimestamp(timestampJSON)
+      if err != nil {
+          return nil, err
+      }
+      // 5.4.5 - Persist the timestamp metadata
+      if err := c.local.SetMeta("timestamp.json", timestampJSON); err != nil {
+          return nil, err
+      }
+      return nil, nil
+  }
+  ```
+  reject_review code.ProtocolStateReview

@@ -1,0 +1,300 @@
+# Rank 1300 / CVE-2024-45492: libexpat's DTD content-model scaffold builder,
+# nextScaffoldPart() in expat/lib/xmlparse.c, sizes its first scaffIndex
+# allocation with an unchecked multiplication:
+#
+#   if (! dtd->scaffIndex) {
+#     dtd->scaffIndex = (int *)MALLOC(parser, parser->m_groupSize * sizeof(int));
+#     ...
+#   }
+#
+# parser->m_groupSize is not copied from any single read call. It is an
+# unsigned int counter that only ever grows by doubling, driven by the
+# nesting depth of parenthesised groups in a DTD content model
+# (XML_ROLE_GROUP_OPEN, same file, ~line 5391: `if (parser->m_prologState.level
+# >= parser->m_groupSize) { ... parser->m_groupSize *= 2; ... }`). A crafted
+# DTD with enough nested `(...)` groups drives m_groupSize up to the
+# UINT_MAX/2u ceiling its own doubling guard allows; on a platform where
+# UINT_MAX >= SIZE_MAX (32-bit), `m_groupSize * sizeof(int)` wraps, MALLOC
+# returns a too-small buffer, and the following `dtd->scaffIndex[0] = 0` and
+# later scaffold writes overflow it (CWE-190 -> CWE-131/787). The sibling
+# realloc path in the same function, and the growth path a few hundred lines
+# above, both carry the matching `(size_t)(-1) / ... / sizeof(...)` guard;
+# only this first-allocation copy lacked it. The fixed revision
+# (9bf0f2c16ee86f644dd1432507edff94c08dc232, "lib: Detect integer overflow in
+# function nextScaffoldPart") adds that guard immediately ahead of this MALLOC.
+#
+# The rank line's 29ef43a0bab633b41e71dd6d900fff5f6b3ad5e4 is the GitHub
+# merge commit for PR #892; `git show` on it alone prints only the merge
+# message with no diff. The single commit the PR actually contains,
+# 9bf0f2c16ee86f644dd1432507edff94c08dc232, touches only nextScaffoldPart and
+# is exactly the 9-line diff the advisory describes. The pool row uses that
+# commit as the fixing change and its parent (ed4090a) as the vulnerable state.
+#
+# Rechecked (three `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB`
+# runs per revision over the real checkout): 642 findings on every run, both
+# sides, deterministic, with an identical 19-rule union; the only fingerprint
+# differences between the two trees are VYQL-MEM-006 rows re-fingerprinted
+# where the fix's nine inserted lines shift line numbers. 171 of the 642
+# findings touch expat/lib/xmlparse.c and none on any run sits at the
+# scaffIndex MALLOC (7561) or anywhere in its first-allocation block. The
+# rows that do land inside nextScaffoldPart (7602, 7604) are index-access
+# labels on `dtd->scaffold[next]`, present at both revisions. `vyql match` at
+# the vulnerable revision shows the 7561 multiplication carries
+# code.ComputedSizeValue (source) and code.IntegerSizeArithmeticSink (sink) on
+# the same node, and `vyql trace -from core.UserControlledData -to
+# code.IntegerSizeArithmeticSink` still reports no source reaching a sink;
+# `vyql explain` and `vyql resolve` have nothing to say about the site, so no
+# `unless` is suppressing a report that is otherwise earned.
+#
+# ATTENTION, engine gap, held on recheck. Three conversion routes closed:
+#
+# 1. Later-shipped vocabulary does not reach it. The C analyses shipped since
+#    this was filed -- destination-capacity consultation, stack-fallback
+#    stride underallocation, the narrow-declared-width bounds-check
+#    observation, the X509_NAME_oneline_ex and h2o_url_init out-param
+#    bindings -- all operate on other axes. The narrow-width observation asks
+#    its question about a *present* relational check over two 32-bit-declared
+#    *locals*; here there is no check at all and the operand is a struct
+#    field, so it cannot fire at the vulnerable revision, and at the fixed
+#    revision the added check compares a field against a division bound, not
+#    a sum of locals.
+# 2. No existing detection was misread away. Every size-arithmetic issue
+#    concept in the numeric pack (IntegerSizeArithmetic,
+#    SizeSensitiveIntegerArithmetic, IntegerSizeArithmeticSink) is
+#    `enabledBy: [taint.UntrustedData]`, and m_groupSize never receives that
+#    taint: its only writes are `*= 2` inside the guarded growth branch, so
+#    no rule can fire at either revision.
+# 3. A new binding cannot discriminate. The blocking fact is not only the
+#    missing taint: at the *vulnerable* revision nextScaffoldPart's own body
+#    already contains `if (dtd->scaffSize > (size_t)(-1) / 2u /
+#    sizeof(CONTENT_SCAFFOLD))` (line 7579) for the sibling product at 7585,
+#    so a guard negation scoped to the function, the body text, or even the
+#    `(-1)/sizeof` spelling is satisfied by the sibling product's guard and
+#    reports nothing at the vulnerable revision. Discriminating requires
+#    attributing a specific bound to a specific multiplication, which is a
+#    value-level fact the extractors do not produce. The unscoped form --
+#    any allocation sized `X * sizeof(T)` where X is never compared in the
+#    enclosing function -- is measured unshippable: it occurs at 54 sites in
+#    asterisk (1319 C files) and 32 in gpac (665 C files), and the weakness
+#    it would name is 32-bit-only, whereas on the LP64 model the scanner
+#    actually analyses an `unsigned int` multiplicand is promoted to size_t
+#    before the product and cannot wrap.
+#
+# Not mechanical, re-affirmed: making a loop-doubled counter carry taint by
+# how many times its growth condition observed input is a new dataflow
+# relation (taint derived from control flow / iteration count, not from a
+# value read or copied), and the per-product guard attribution above is a
+# second new relation on top of it. UnboundedAllocationReview (VYQL-DOS-041)
+# came the closest of any existing detection, but both its C bindings are
+# hand-extracted for one exact idiom each (`total += *elem` immediately
+# preceding `new T[total]`, ccAccumulatedAllocationRe); neither the
+# doubling-loop shape nor a plain C malloc call matches, and the growth here
+# is itself guarded, so a "growth without a bound" binding would be reporting
+# the guarded code.
+#
+# verify_current_expected: attention-engine-gap, rechecked; the vulnerable and
+# fixed forms both reject, the sibling-product pin rejects, and the minimal
+# pair still discriminates.
+
+test "rank1300: nextScaffoldPart's first scaffIndex allocation multiplies an unchecked doubling-loop counter"
+  lang c
+  file xmlparse.c
+  reject VYQL-NUM-001
+  reject VYQL-NUM-003
+  code
+  ```
+  #include <stddef.h>
+  #include <stdlib.h>
+
+  typedef struct {
+    unsigned int m_groupSize;
+  } XML_ParserStruct;
+  typedef XML_ParserStruct *XML_Parser;
+
+  typedef struct {
+    int *scaffIndex;
+    int scaffCount;
+  } DTD;
+
+  #define MALLOC(parser, s) malloc(s)
+
+  static int
+  nextScaffoldPart(XML_Parser parser, DTD *dtd) {
+    if (! dtd->scaffIndex) {
+      dtd->scaffIndex = (int *)MALLOC(parser, parser->m_groupSize * sizeof(int));
+      if (! dtd->scaffIndex)
+        return -1;
+      dtd->scaffIndex[0] = 0;
+    }
+    return 0;
+  }
+  ```
+
+test "rank1300: the fixed revision adds the same UINT_MAX/SIZE_MAX overflow guard the growth path carries"
+  lang c
+  file xmlparse.c
+  reject VYQL-NUM-001
+  reject VYQL-NUM-003
+  code
+  ```
+  #include <limits.h>
+  #include <stddef.h>
+  #include <stdlib.h>
+
+  typedef struct {
+    unsigned int m_groupSize;
+  } XML_ParserStruct;
+  typedef XML_ParserStruct *XML_Parser;
+
+  typedef struct {
+    int *scaffIndex;
+    int scaffCount;
+  } DTD;
+
+  #define MALLOC(parser, s) malloc(s)
+
+  static int
+  nextScaffoldPart(XML_Parser parser, DTD *dtd) {
+    if (! dtd->scaffIndex) {
+  #if UINT_MAX >= SIZE_MAX
+      if (parser->m_groupSize > ((size_t)(-1) / sizeof(int))) {
+        return -1;
+      }
+  #endif
+      dtd->scaffIndex = (int *)MALLOC(parser, parser->m_groupSize * sizeof(int));
+      if (! dtd->scaffIndex)
+        return -1;
+      dtd->scaffIndex[0] = 0;
+    }
+    return 0;
+  }
+  ```
+
+test "rank1300: at the vulnerable revision the same function already guards a sibling product, so a function-scoped guard negation cannot discriminate"
+  lang c
+  file xmlparse.c
+  reject VYQL-NUM-001
+  reject VYQL-NUM-003
+  code
+  ```
+  #include <limits.h>
+  #include <stddef.h>
+  #include <stdlib.h>
+
+  typedef struct {
+    unsigned int m_groupSize;
+  } XML_ParserStruct;
+  typedef XML_ParserStruct *XML_Parser;
+
+  #define INIT_SCAFFOLD_ELEMENTS 32
+  #define MALLOC(parser, s) malloc(s)
+  #define REALLOC(parser, p, s) realloc(p, s)
+
+  typedef struct {
+    int firstchild;
+    int lastchild;
+    int childcnt;
+    int nextsib;
+  } CONTENT_SCAFFOLD;
+
+  typedef struct {
+    int *scaffIndex;
+    unsigned int scaffCount;
+    unsigned int scaffSize;
+    CONTENT_SCAFFOLD *scaffold;
+    int scaffLevel;
+  } DTD;
+
+  static int
+  nextScaffoldPart(XML_Parser parser, DTD *dtd) {
+    if (! dtd->scaffIndex) {
+      dtd->scaffIndex = (int *)MALLOC(parser, parser->m_groupSize * sizeof(int));
+      if (! dtd->scaffIndex)
+        return -1;
+      dtd->scaffIndex[0] = 0;
+    }
+
+    if (dtd->scaffCount >= dtd->scaffSize) {
+      CONTENT_SCAFFOLD *temp;
+      if (dtd->scaffold) {
+        /* Detect and prevent integer overflow */
+        if (dtd->scaffSize > UINT_MAX / 2u) {
+          return -1;
+        }
+  #if UINT_MAX >= SIZE_MAX
+        if (dtd->scaffSize > (size_t)(-1) / 2u / sizeof(CONTENT_SCAFFOLD)) {
+          return -1;
+        }
+  #endif
+
+        temp = (CONTENT_SCAFFOLD *)REALLOC(
+            parser, dtd->scaffold, dtd->scaffSize * 2 * sizeof(CONTENT_SCAFFOLD));
+        if (temp == NULL)
+          return -1;
+        dtd->scaffSize *= 2;
+      } else {
+        temp = (CONTENT_SCAFFOLD *)MALLOC(parser, INIT_SCAFFOLD_ELEMENTS
+                                                    * sizeof(CONTENT_SCAFFOLD));
+        if (temp == NULL)
+          return -1;
+        dtd->scaffSize = INIT_SCAFFOLD_ELEMENTS;
+      }
+      dtd->scaffold = temp;
+    }
+    dtd->scaffCount++;
+    return 0;
+  }
+  ```
+
+test "rank1300: minimal pair -- a count copied directly from a source into a size multiplication is caught"
+  lang c
+  file xmlparse.c
+  expect VYQL-NUM-003
+  code
+  ```
+  #include <stdio.h>
+  #include <stdlib.h>
+
+  static void *alloc_buf(unsigned int n) {
+    return malloc(n * sizeof(int));
+  }
+
+  void read_and_alloc(FILE *f) {
+    char tmp[64];
+    unsigned int n = fread(tmp, 1, sizeof(tmp), f);
+    alloc_buf(n);
+  }
+  ```
+
+test "rank1300: minimal pair -- the identical multiplication where the count grows through a doubling loop is not"
+  lang c
+  file xmlparse.c
+  reject VYQL-NUM-003
+  code
+  ```
+  #include <stdio.h>
+  #include <stdlib.h>
+
+  typedef struct { unsigned int group_size; unsigned int level; } Parser;
+
+  static void grow_group(Parser *p) {
+    while (p->level >= p->group_size) {
+      p->group_size = p->group_size ? p->group_size * 2 : 32;
+    }
+  }
+
+  static void *alloc_scaff(Parser *p) {
+    return malloc(p->group_size * sizeof(int));
+  }
+
+  void parse_groups(Parser *p, FILE *f) {
+    int c;
+    while ((c = fgetc(f)) != EOF) {
+      if (c == '(') {
+        p->level++;
+        grow_group(p);
+      }
+    }
+    alloc_scaff(p);
+  }
+  ```

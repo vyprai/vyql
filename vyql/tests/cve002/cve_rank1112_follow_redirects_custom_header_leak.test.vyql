@@ -1,0 +1,197 @@
+# Rank 1112 / CVE-2026-40895: follow-redirects strips only three hardcoded
+# header names (`authorization`, `proxy-authorization`, `cookie`) when a
+# redirect crosses domains or downgrades protocol, so a custom authentication
+# header the application attached -- `X-Api-Key`, `X-Auth-Token` and the like --
+# is copied to the next request unchanged and reaches whatever host the 3xx
+# pointed at (CWE-200, CWE-212). The report that belongs to this CVE is the
+# dependency finding: the fix (844c4d3, released in 1.16.0) adds a
+# `sensitiveHeaders` request option and builds the strip pattern from the three
+# built-in names plus the caller's list, so the release is the first that can
+# strip a caller-named credential header at all. A caller that does not pass
+# the option behaves identically before and after the upgrade; the pin below
+# 1.16.0 is the necessary condition and the reportable one.
+#
+# The credential-header redirect family (VYQL-SEC-052) is deliberately not this
+# CVE's report: its binding fires on a redirect follower that never names any
+# credential header, and this library deletes the three standard ones in every
+# revision -- the defect is the headers outside that list, which no code-level
+# fact in the library or the application states on its own. The last two tests
+# pin that boundary on the library's own vulnerable and fixed forms.
+
+test "rank1112: a follow-redirects pin below the first release that can strip caller-named headers is a dependency finding"
+  lang javascript
+  file app.js
+  code
+  ```
+  const followRedirects = require('follow-redirects');
+
+  function fetchWithApiKey(url, apiKey) {
+    return followRedirects.https.request(url, {
+      headers: { 'X-Api-Key': apiKey },
+    });
+  }
+
+  module.exports = { fetchWithApiKey };
+  ```
+  file package.json
+  code
+  ```
+  {
+    "name": "billing-sync",
+    "dependencies": {
+      "follow-redirects": "1.15.11"
+    }
+  }
+  ```
+  expect VYQL-SCA-001
+  expect_evidence VYQL-SCA-001 CVE-2026-40895
+  reject VYQL-SEC-052
+  reject VYQL-SEC-025
+
+test "rank1112: a pin at the first fixed release is clean"
+  lang javascript
+  file app.js
+  code
+  ```
+  const followRedirects = require('follow-redirects');
+
+  function fetchWithApiKey(url, apiKey) {
+    return followRedirects.https.request(url, {
+      headers: { 'X-Api-Key': apiKey },
+    });
+  }
+
+  module.exports = { fetchWithApiKey };
+  ```
+  file package.json
+  code
+  ```
+  {
+    "name": "billing-sync",
+    "dependencies": {
+      "follow-redirects": "1.16.0"
+    }
+  }
+  ```
+  reject VYQL-SCA-001
+  reject VYQL-SEC-052
+
+test "rank1112: a caret pin on the fixed minor line is past the fix"
+  lang javascript
+  file app.js
+  code
+  ```
+  const followRedirects = require('follow-redirects');
+
+  function fetchWithApiKey(url, apiKey) {
+    return followRedirects.https.request(url, {
+      headers: { 'X-Api-Key': apiKey },
+    });
+  }
+
+  module.exports = { fetchWithApiKey };
+  ```
+  file package.json
+  code
+  ```
+  {
+    "name": "billing-sync",
+    "dependencies": {
+      "follow-redirects": "^1.16.2"
+    }
+  }
+  ```
+  reject VYQL-SCA-001
+
+# The completing application-side change the fixed release makes possible:
+# naming the header so the client strips it across origins. Kept so a later
+# reader can see the remediation shape the advisory recommends rather than
+# inferring it from the pin report.
+
+test "rank1112: the application names its sensitive header after upgrading"
+  lang javascript
+  file app.js
+  code
+  ```
+  const followRedirects = require('follow-redirects');
+
+  function fetchWithApiKey(url, apiKey) {
+    return followRedirects.https.request(url, {
+      headers: { 'X-Api-Key': apiKey },
+      sensitiveHeaders: ['X-Api-Key'],
+    });
+  }
+
+  module.exports = { fetchWithApiKey };
+  ```
+  file package.json
+  code
+  ```
+  {
+    "name": "billing-sync",
+    "dependencies": {
+      "follow-redirects": "1.16.0"
+    }
+  }
+  ```
+  reject VYQL-SCA-001
+  reject VYQL-SEC-052
+
+# The library's own revisions, kept so a later reader can see what changed
+# inside follow-redirects rather than inferring it from the advisory text.
+# Both name the standard credential headers -- the vulnerable one in a fixed
+# strip pattern, the fixed one in the built-in list the caller extends -- so
+# the follower family is deliberately silent on both; its weakness class is a
+# follower that considers no credential header at all.
+
+test "rank1112: the vulnerable revision strips a fixed three-name pattern"
+  lang javascript
+  file index.js
+  code
+  ```
+  RedirectableRequest.prototype._processResponse = function (response) {
+    var location = response.headers.location;
+    // ...
+    if (++this._redirectCount > this._options.maxRedirects) {
+      throw new TooManyRedirectsError();
+    }
+    // ...
+    var redirectUrl = resolveUrl(location, currentUrl);
+    spreadUrlObject(redirectUrl, this._options);
+
+    // Drop confidential headers when redirecting to a less secure protocol
+    // or to a different domain that is not a superdomain
+    if (redirectUrl.protocol !== currentUrlParts.protocol &&
+       redirectUrl.protocol !== "https:" ||
+       redirectUrl.host !== currentHost &&
+       !isSubdomain(redirectUrl.host, currentHost)) {
+      removeMatchingHeaders(/^(?:(?:proxy-)?authorization|cookie)$/i, this._options.headers);
+    }
+
+    this._performRequest();
+  };
+  ```
+  reject VYQL-SEC-052
+
+test "rank1112: the fixed revision builds the strip pattern from the built-in names plus the caller's"
+  lang javascript
+  file index.js
+  code
+  ```
+  var sensitiveHeaders = [
+    "Authorization",
+    "Proxy-Authorization",
+    "Cookie",
+  ];
+
+  function RedirectableRequest(options, responseCallback) {
+    // ...
+    // Create filter for sensitive HTTP headers
+    this._headerFilter = new RegExp("^(?:" +
+        sensitiveHeaders.concat(options.sensitiveHeaders).map(escapeRegex).join("|") +
+      ")$", "i");
+
+    this._performRequest();
+  }
+  ```
+  reject VYQL-SEC-052

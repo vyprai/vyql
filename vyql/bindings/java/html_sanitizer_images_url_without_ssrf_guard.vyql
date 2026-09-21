@@ -1,0 +1,41 @@
+module bindings.java.html_sanitizer_images_url_without_ssrf_guard;
+
+// The OWASP Java HTML Sanitizer's javadoc states what each stock factory in
+// `Sanitizers` concedes: `IMAGES` "allows 'img' elements with 'src' allowing
+// http, https, and relative URLs". That is a URL-bearing, resource-fetching
+// attribute admitted with no attribute value policy at all -- any host the
+// markup names survives cleaning. The neighboring `LINKS` factory concedes
+// `a href`, which a reader navigates rather than a renderer fetches, so it is
+// not this recognition. A sanitizer composition that includes `IMAGES` is
+// therefore handing every downstream consumer a set of attacker-chosen URLs,
+// and the consumer decides the impact: a browser display makes the client
+// fetch them, while a server-side renderer -- the HTML-to-PDF, preview and
+// mail-rendering pipelines this pattern feeds -- performs the fetch itself
+// from the server's network position, which is server-side request forgery
+// through markup the application cleaned. The stock factory cannot be
+// parameterised, so the only remedies are dropping it from the composition or
+// replacing it with a builder that re-allows the attribute through
+// `.matching(policy)`, which is what an application that needs images in
+// sanitized markup written for a fetching consumer has to do.
+//
+// The anchor is the qualified `Sanitizers.IMAGES` attribute read -- the
+// library's own public constant, the one token that identifies the conceded
+// image-source policy regardless of how the rest of the composition is built.
+// The judgement lives in the pack rule; this binding only recognises the
+// shape.
+//
+// Residual, stated rather than hidden: the static-import spelling
+// (`import static org.owasp.html.Sanitizers.*;` then `.and(IMAGES)`) lowers
+// to a bare identifier with no receiver, and a bare `IMAGES` name is not a
+// recognisable fact, so that spelling is missed (recall direction). A custom
+// `HtmlPolicyBuilder` chain that allows the attribute without a value policy
+// concedes the same URLs but is not recognised, because the builder's
+// `.matching(...)` continuation is a sibling call in a field initializer
+// where no context tokens exist, so its absence cannot be told from a chain
+// that guards the attribute one step later (recall direction, chosen over a
+// negation that would fire on the guarded form).
+binding owaspSanitizerImagesUrlWithoutSsrfGuard {
+  query pattern presenceNode where node.kind == "attr"
+    and node.path == "Sanitizers.IMAGES"
+  emit issue code.SanitizerImageUrlWithoutSsrfGuard at node
+}

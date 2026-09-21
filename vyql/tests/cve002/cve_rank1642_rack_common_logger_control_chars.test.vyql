@@ -1,0 +1,174 @@
+# Rank 1642 / CVE-2022-30123 (CWE-117): Rack::CommonLogger formats the
+# request's method, path and query string into an access-log line and hands
+# the result to the logger unescaped, so control characters in a request
+# method such as "GET\b" forge the log output. The fixed revision escapes
+# non-printable characters first:
+#
+#	msg.gsub!(/[^[:print:]\n]/) { |c| "\\x#{c.ord}" }
+#
+# Detection is a taint route with a split clearing side. The sink binding
+# labels logger.write's argument code.LogOutput; the source is the
+# request.query_string read. The clearing side is core.LogEscape, and the
+# two String#gsub spellings need different coverage because they escape at
+# different places. String#gsub returns an escaped copy, so the clean value
+# is the one that leaves the call node and path coverage is exact. String#gsub!
+# rewrites its receiver in place: nothing flows out of the call node, and the
+# pre-mutation value keeps a direct route to the sink, so the rule's
+# `unless v.dominates` clause is what clears it -- every later read inside the
+# region the call dominates sees the escaped text. Splitting the bindings by
+# method matters: a concrete check carries exactly one coverage mode, and two
+# bindings emitting the same concept on one node compete for the label, so a
+# single binding matching both spellings can only declare one of the two.
+#
+# The fourth case pins the boundary the split draws. A non-bang gsub whose
+# result is discarded escapes nothing -- the receiver is untouched -- so it
+# must not clear anything, and it does not, because only the bang spelling
+# carries dominance coverage.
+#
+# Measured on the real checkout (timeout 180, --max-ram 6GB, --cache off,
+# three runs per revision, every count stable): 46 findings with 1
+# VYQL-INJ-009 at the vulnerable parent (source request.query_string at
+# common_logger.rb:62, sink logger.write at :72) and 45 with 0 at the fixed
+# revision -- the delta is exactly the escaped write. Collateral across ten
+# Ruby trees under /tmp/cve-work (vagrant, publify, publify_core,
+# view_component, puma, thrift, webrick, uri, protobuf, zammad): identical
+# totals and identical VYQL-INJ-009 counts both ways, including thrift's 94;
+# the control-char gsub idiom occurs at exactly one site outside rack
+# (webrick accesslog.rb:153, the non-bang spelling, which keeps path
+# coverage) and that file reports no log finding either way.
+#
+# Residual, measured: dominance does not check that the escaped receiver is
+# the value the sink reads. A gsub! on a different local that dominates the
+# write also clears the finding. No site in the swept corpus has that shape,
+# and the same looseness is shared with every other dominance-covered check
+# (VYQL-CFG-014, VYQL-DESER-003).
+
+test "rack common logger writes request-controlled text to the log unescaped"
+  lang ruby
+  expect VYQL-INJ-009
+  code
+  ```
+  module Rack
+    class CommonLogger
+      FORMAT = %{%s - %s [%s] "%s %s%s%s %s" %d %s %0.4f\n}
+
+      def log(env, status, response_headers, began_at)
+        request = Rack::Request.new(env)
+
+        msg = sprintf(FORMAT,
+          request.ip || "-",
+          request.get_header("REMOTE_USER") || "-",
+          request.request_method,
+          request.path_info,
+          request.query_string.empty? ? "" : "?#{request.query_string}",
+          status.to_s[0..3])
+
+        logger = @logger || request.get_header(RACK_ERRORS)
+        if logger.respond_to?(:write)
+          logger.write(msg)
+        else
+          logger << msg
+        end
+      end
+    end
+  end
+  ```
+
+test "the rebinding gsub spelling escapes the copy that reaches the write"
+  lang ruby
+  reject VYQL-INJ-009
+  code
+  ```
+  module Rack
+    class CommonLogger
+      FORMAT = %{%s - %s [%s] "%s %s%s%s %s" %d %s %0.4f\n}
+
+      def log(env, status, response_headers, began_at)
+        request = Rack::Request.new(env)
+
+        msg = sprintf(FORMAT,
+          request.ip || "-",
+          request.get_header("REMOTE_USER") || "-",
+          request.request_method,
+          request.path_info,
+          request.query_string.empty? ? "" : "?#{request.query_string}",
+          status.to_s[0..3])
+
+        msg = msg.gsub(/[^[:print:]\n]/) { |c| "\\x#{c.ord}" }
+
+        logger = @logger || request.get_header(RACK_ERRORS)
+        if logger.respond_to?(:write)
+          logger.write(msg)
+        else
+          logger << msg
+        end
+      end
+    end
+  end
+  ```
+
+test "the fixed revision's own in-place gsub! spelling escapes the receiver"
+  lang ruby
+  reject VYQL-INJ-009
+  code
+  ```
+  module Rack
+    class CommonLogger
+      FORMAT = %{%s - %s [%s] "%s %s%s%s %s" %d %s %0.4f\n}
+
+      def log(env, status, response_headers, began_at)
+        request = Rack::Request.new(env)
+
+        msg = sprintf(FORMAT,
+          request.ip || "-",
+          request.get_header("REMOTE_USER") || "-",
+          request.request_method,
+          request.path_info,
+          request.query_string.empty? ? "" : "?#{request.query_string}",
+          status.to_s[0..3])
+
+        msg.gsub!(/[^[:print:]\n]/) { |c| "\\x#{c.ord}" }
+
+        logger = @logger || request.get_header(RACK_ERRORS)
+        if logger.respond_to?(:write)
+          logger.write(msg)
+        else
+          logger << msg
+        end
+      end
+    end
+  end
+  ```
+
+test "a non-bang gsub whose result is discarded escapes nothing"
+  lang ruby
+  expect VYQL-INJ-009
+  code
+  ```
+  module Rack
+    class CommonLogger
+      FORMAT = %{%s - %s [%s] "%s %s%s%s %s" %d %s %0.4f\n}
+
+      def log(env, status, response_headers, began_at)
+        request = Rack::Request.new(env)
+
+        msg = sprintf(FORMAT,
+          request.ip || "-",
+          request.get_header("REMOTE_USER") || "-",
+          request.request_method,
+          request.path_info,
+          request.query_string.empty? ? "" : "?#{request.query_string}",
+          status.to_s[0..3])
+
+        msg.gsub(/[^[:print:]\n]/) { |c| "\\x#{c.ord}" }
+
+        logger = @logger || request.get_header(RACK_ERRORS)
+        if logger.respond_to?(:write)
+          logger.write(msg)
+        else
+          logger << msg
+        end
+      end
+    end
+  end
+  ```

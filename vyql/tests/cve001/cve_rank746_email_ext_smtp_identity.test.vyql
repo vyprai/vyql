@@ -1,0 +1,63 @@
+# Rank 746 / CVE-2020-2253: Jenkins email-ext configured JavaMail SMTP
+# SSL without enabling RFC 2595 server identity checks.
+
+test "rank746: JavaMail SMTP SSL socket factory lacks server identity verification"
+  lang java
+  expect VYQL-CRY-021
+  expect_review code.JavaMailSmtpSslIdentityVerificationMissing
+  code
+  ```
+  import java.util.Properties;
+
+  class MailConfig {
+      void createSession(MailAccount acc) {
+          Properties props = new Properties(System.getProperties());
+          if (acc.getSmtpHost() != null) {
+              props.put("mail.smtp.host", acc.getSmtpHost());
+          }
+          if (acc.isUseSsl()) {
+              if (props.getProperty("mail.smtp.socketFactory.port") == null) {
+                  String port = acc.getSmtpPort() == null ? "465" : acc.getSmtpPort();
+                  props.put("mail.smtp.port", port);
+                  props.put("mail.smtp.socketFactory.port", port);
+              }
+              if (props.getProperty("mail.smtp.socketFactory.class") == null) {
+                  props.put("mail.smtp.socketFactory.class", "javax.net.ssl.SSLSocketFactory");
+              }
+              props.put("mail.smtp.socketFactory.fallback", "false");
+          }
+      }
+  }
+  ```
+
+test "rank746: JavaMail SMTP SSL server identity verification is clean"
+  lang java
+  reject VYQL-CRY-021
+  reject_review code.JavaMailSmtpSslIdentityVerificationMissing
+  code
+  ```
+  import java.util.Properties;
+
+  class MailConfig {
+      void createSession(MailAccount acc) {
+          Properties props = new Properties(System.getProperties());
+          if (acc.getSmtpHost() != null) {
+              props.put("mail.smtp.host", acc.getSmtpHost());
+          }
+          if (acc.isUseSsl()) {
+              if (props.getProperty("mail.smtp.socketFactory.port") == null) {
+                  String port = acc.getSmtpPort() == null ? "465" : acc.getSmtpPort();
+                  props.put("mail.smtp.port", port);
+                  props.put("mail.smtp.socketFactory.port", port);
+              }
+              if (props.getProperty("mail.smtp.socketFactory.class") == null) {
+                  props.put("mail.smtp.socketFactory.class", "javax.net.ssl.SSLSocketFactory");
+              }
+              props.put("mail.smtp.socketFactory.fallback", "false");
+              if (props.getProperty("mail.smtp.ssl.checkserveridentity") == null) {
+                  props.put("mail.smtp.ssl.checkserveridentity", "true");
+              }
+          }
+      }
+  }
+  ```

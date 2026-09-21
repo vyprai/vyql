@@ -1,0 +1,8 @@
+module code;
+
+review code.IsolateLevelIncrementWithoutCap {
+  category: memory
+  expected: [core.MemoryBoundsCheck]
+  kind: target
+  text: "review bidi isolate nesting level updates for a cap before isolate-level array indexing"
+}

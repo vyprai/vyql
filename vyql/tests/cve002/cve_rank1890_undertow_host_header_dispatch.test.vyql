@@ -1,0 +1,200 @@
+# Rank 1890 / CVE-2025-12543 (undertow 8318dd36fdc2, the 2.3.x backport merge of
+# PR #1860, UNDERTOW-2656): the HTTP/1 request path consulted the Host header
+# only for count and, behind the REQUIRE_HOST_HTTP11 option, presence:
+#
+#   HeaderValues host = httpServerExchange.getRequestHeaders().get(Headers.HOST);
+#   if (host != null && host.size() > 1) { sendBadRequestAndClose(...); return; }
+#   if (requireHostHeader && httpServerExchange.getProtocol().equals(Protocols.HTTP_1_1)) {
+#       if (host == null || host.size() == 0 || host.getFirst().isEmpty()) { ... return; }
+#   }
+#   if (!Connectors.areRequestHeadersValid(httpServerExchange.getRequestHeaders())) { ... return; }
+#   Connectors.executeRootHandler(connection.getRootHandler(), httpServerExchange);
+#
+# The value itself is never checked. A Host header carrying a malformed
+# authority -- a bad port, a broken IP literal, percent-encoding that is not
+# hex, characters outside the reg-name grammar -- reached the application
+# handler chain intact, and everything downstream that trusts the exchange's
+# authority (routing, redirects, cache keys, proxying) consumed it, which is
+# the cache-poisoning / internal-scan / session-hijack advisory impact. RFC
+# 7230 section 5.4 requires the opposite: a Host header that is missing,
+# duplicated, or not a valid authority MUST be answered with 400. The fixed revision adds
+# a handler that checks presence, count, port range and form, IPv4/IPv6/
+# IPvFuture literals and reg-name characters, wires it in front of the root
+# handler in HttpReadListener, and removes the inline count/presence checks.
+#
+# FIXED. There is no taint path to wait for -- the attacker's input is the
+# header block the exchange carries -- so the weakness is a property
+# of the dispatch method, judged by code.UnvalidatedHostHeaderDispatch and
+# rule VYQL-VAL-037 (CWE-20). The Java binding names the method by the three
+# things that make it the obligation site, all in one method: it consults the
+# request header store (HttpServerExchange.getRequestHeaders(), documented),
+# it names the Host header (Headers.HOST, or the HTTP/2 form that copies the
+# :authority pseudo-header into Host), and it executes the root handler
+# (Connectors.executeRootHandler, documented). Connectors.areRequestHeadersValid
+# is deliberately not a discharge -- it reconciles Transfer-Encoding against
+# Content-Length and never looks at the Host value -- and the middleware
+# handlers that re-dispatch a buffered exchange (RequestBufferingHandler,
+# AsyncReceiverImpl) consult the header store without naming Host and are not
+# reported, pinned as the third reject.
+#
+# The negation lists the spellings that check a host value's grammar:
+# String/Matcher.matches and NetworkUtils' documented address parsers. The
+# second reject discharges the obligation with a plain matches() grammar test,
+# a spelling the fixing patch does not use, so the binding does not key on the
+# fix's own HostHeaderHandler.WRAPPER vocabulary; the first reject is the
+# patched dispatch itself, where the Host consult has moved into the wrapping
+# handler and the method does not name Host at all.
+#
+# Measured bounded (timeout 180, --max-ram 6GB, --cache off), identical across
+# three runs per revision. The whole undertow tree at 8318dd36fdc^: 2 findings
+# of VYQL-VAL-037 -- HttpReadListener.java:139 (the CVE method, handleEvent)
+# and Http2ReceiveListener.java:132, the HTTP/2 sibling that copies :authority
+# into Host and dispatches unvalidated, which this backport does not wrap and
+# which the fixed revision's own merge leaves as the same weakness. At 8318dd36fdc: 1
+# finding, the HTTP/2 sibling only; the CVE method's row is the one that
+# moves. No other clone under /tmp/cve-work/rank*/ contains
+# Connectors.executeRootHandler at all, and none of getRequestHeaders,
+# Headers.HOST or executeRootHandler appears in the OWASP Java Benchmark
+# corpus.
+
+test "rank1890: an HTTP/1 request dispatch that reads the Host header and executes the root handler without validating the authority value"
+  lang java
+  file core/src/main/java/io/undertow/server/protocol/http/HttpReadListener.java
+  expect VYQL-VAL-037
+  expect_review code.UnvalidatedHostHeaderDispatch
+  code
+  ```
+  package io.undertow.server.protocol.http;
+
+  import io.undertow.server.Connectors;
+  import io.undertow.server.HttpServerExchange;
+  import io.undertow.util.HeaderValues;
+  import io.undertow.util.Headers;
+  import io.undertow.util.Protocols;
+
+  final class HttpReadListener {
+      private final boolean requireHostHeader;
+      private final ServerConnection connection;
+
+      void handleEvent(HttpServerExchange httpServerExchange) {
+          try {
+              HeaderValues host = httpServerExchange.getRequestHeaders().get(Headers.HOST);
+              if (host != null && host.size() > 1) {
+                  sendBadRequestAndClose();
+                  return;
+              }
+              if (requireHostHeader && httpServerExchange.getProtocol().equals(Protocols.HTTP_1_1)) {
+                  if (host == null || host.size() == 0 || host.getFirst().isEmpty()) {
+                      sendBadRequestAndClose();
+                      return;
+                  }
+              }
+              if (!Connectors.areRequestHeadersValid(httpServerExchange.getRequestHeaders())) {
+                  sendBadRequestAndClose();
+                  return;
+              }
+              Connectors.executeRootHandler(connection.getRootHandler(), httpServerExchange);
+          } catch (Throwable t) {
+              sendBadRequestAndClose();
+          }
+      }
+
+      private void sendBadRequestAndClose() {
+      }
+  }
+  ```
+
+test "rank1890: the patched dispatch delegates the Host check to a wrapping handler and keeps no Host consult of its own"
+  lang java
+  file core/src/main/java/io/undertow/server/protocol/http/HttpReadListener.java
+  reject VYQL-VAL-037
+  code
+  ```
+  package io.undertow.server.protocol.http;
+
+  import io.undertow.server.Connectors;
+  import io.undertow.server.HttpServerExchange;
+  import io.undertow.server.handlers.HostHeaderHandler;
+
+  final class HttpReadListener {
+      private final ServerConnection connection;
+
+      void handleEvent(HttpServerExchange httpServerExchange) {
+          try {
+              if (!Connectors.areRequestHeadersValid(httpServerExchange.getRequestHeaders())) {
+                  sendBadRequestAndClose();
+                  return;
+              }
+              Connectors.executeRootHandler(HostHeaderHandler.WRAPPER.wrap(connection.getRootHandler()), httpServerExchange);
+          } catch (Throwable t) {
+              sendBadRequestAndClose();
+          }
+      }
+
+      private void sendBadRequestAndClose() {
+      }
+  }
+  ```
+
+test "rank1890: a dispatch that checks the Host value inline against a grammar is not reported"
+  lang java
+  file core/src/main/java/io/undertow/server/protocol/http/HttpReadListener.java
+  reject VYQL-VAL-037
+  code
+  ```
+  package io.undertow.server.protocol.http;
+
+  import io.undertow.server.Connectors;
+  import io.undertow.server.HttpServerExchange;
+  import io.undertow.util.HeaderValues;
+  import io.undertow.util.Headers;
+
+  final class HttpReadListener {
+      private final ServerConnection connection;
+
+      void handleEvent(HttpServerExchange httpServerExchange) {
+          try {
+              HeaderValues host = httpServerExchange.getRequestHeaders().get(Headers.HOST);
+              if (host != null && host.size() > 1) {
+                  sendBadRequestAndClose();
+                  return;
+              }
+              if (host != null && !host.getFirst().matches("(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)*[a-z]{2,}")) {
+                  sendBadRequestAndClose();
+                  return;
+              }
+              Connectors.executeRootHandler(connection.getRootHandler(), httpServerExchange);
+          } catch (Throwable t) {
+              sendBadRequestAndClose();
+          }
+      }
+
+      private void sendBadRequestAndClose() {
+      }
+  }
+  ```
+
+test "rank1890: a middleware handler that re-dispatches a buffered exchange without naming Host is not reported"
+  lang java
+  file core/src/main/java/io/undertow/server/handlers/RequestBufferingHandler.java
+  reject VYQL-VAL-037
+  code
+  ```
+  package io.undertow.server.handlers;
+
+  import io.undertow.server.Connectors;
+  import io.undertow.server.HttpServerExchange;
+  import io.undertow.util.HttpContinue;
+
+  final class RequestBufferingHandler {
+      private final Object next;
+
+      void handleRequest(HttpServerExchange exchange) {
+          if (!exchange.isRequestComplete() && !HttpContinue.requiresContinueResponse(exchange.getRequestHeaders())) {
+              Connectors.executeRootHandler(next, exchange);
+              return;
+          }
+          Connectors.executeRootHandler(next, exchange);
+      }
+  }
+  ```

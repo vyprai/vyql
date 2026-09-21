@@ -1,0 +1,25 @@
+module bindings.rust.generated.m21a9cbf5;
+
+binding logOutput0 {
+  requires {
+    dependency("slog")
+  }
+  query pattern callExpr where callee.method == "log"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput1 {
+  requires {
+    dependency("slog")
+  }
+  query pattern callExpr where callee.method == "flush"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput2 {
+  requires {
+    dependency("slog")
+  }
+  query pattern callExpr where callee.method == "file"
+  emit sink code.LogOutput at args[0]
+}

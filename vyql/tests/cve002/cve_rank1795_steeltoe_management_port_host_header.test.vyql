@@ -1,0 +1,157 @@
+# Steeltoe's management port middleware isolated the actuator endpoints by
+# port: requests whose path is under the management path are only served when
+# they arrived on the configured management:endpoints:port, and everything else
+# is only served when it does not. The gate reads that port from
+# HttpContext.Request.Host.Port, which is the port component of the client's
+# Host header rather than the listener that accepted the connection, so a
+# caller on the public application port could name the management port in its
+# Host header and reach every actuator, and a caller on the management port
+# could name the application port and skip the gate (CWE-290, CWE-346). The fixed revision
+# reads HttpContext.Connection.LocalPort, the server-side endpoint.
+#
+# FIXED by a concept, a rule and one binding. Nothing fired before: the scan of
+# the vulnerable revision reports nothing on ManagementPortMiddleware.cs.
+# code.HostHeaderPortAccessCondition states the class -- a request gate that
+# branches on the port the caller claims in its Host header. The C# binding
+# keys on the port component reaching a branch condition rather than a
+# rendering, so the neighbouring code that interpolates request.Host into a URL
+# or prints the port for logging stays unflagged, and it names no middleware
+# convention and no configured-port field. It fires once at the vulnerable
+# revision and not at the fixed one, where the gate reads Connection.LocalPort.
+# Residual: the same file's GetBaseUrl compares request.Host.Port against a
+# scheme-default literal to decide how to spell a URL out, and is flagged with
+# it -- one benign function, the only other reader of the property across the
+# 43k C# files of the corpus.
+
+test "rank1795: management port gate reads the port the caller claims in its Host header"
+  lang csharp
+  file Steeltoe/Management/src/EndpointCore/ManagementPort/ManagementPortMiddleware.cs
+  expect VYQL-AUTH-159
+  expect_review code.HostHeaderPortAccessCondition
+  code
+  ```
+  using Microsoft.AspNetCore.Http;
+  using Microsoft.Extensions.Logging;
+  using System;
+  using System.Collections.Generic;
+  using System.Linq;
+  using System.Threading.Tasks;
+
+  namespace Steeltoe.Management.Endpoint.ManagementPort
+  {
+      public class ManagementPortMiddleware
+      {
+          private readonly RequestDelegate _next;
+          private readonly ILogger<ManagementPortMiddleware> _logger;
+          private readonly IManagementOptions _managementOptions;
+
+          public ManagementPortMiddleware(RequestDelegate next, IEnumerable<IManagementOptions> managementOptions, ILogger<ManagementPortMiddleware> logger = null)
+          {
+              _next = next;
+              _logger = logger;
+              _managementOptions = managementOptions.OfType<ManagementEndpointOptions>().First();
+          }
+
+          public async Task InvokeAsync(HttpContext context)
+          {
+              string contextPath = _managementOptions.Path;
+              bool isManagementPath = context.Request.Path.ToString().StartsWith(contextPath, StringComparison.OrdinalIgnoreCase);
+
+              bool allowRequest = string.IsNullOrEmpty(_managementOptions.Port);
+              allowRequest = allowRequest || (context.Request.Host.Port.ToString() == _managementOptions.Port && isManagementPath);
+              allowRequest = allowRequest || (context.Request.Host.Port.ToString() != _managementOptions.Port && !isManagementPath);
+
+              if (!allowRequest)
+              {
+                  context.Response.StatusCode = StatusCodes.Status404NotFound;
+                  return;
+              }
+
+              await _next(context);
+          }
+      }
+  }
+  ```
+
+test "rank1795: the same gate reading the connection's local port"
+  lang csharp
+  file Steeltoe/Management/src/EndpointCore/ManagementPort/ManagementPortMiddleware.cs
+  reject VYQL-AUTH-159
+  reject_review code.HostHeaderPortAccessCondition
+  code
+  ```
+  using Microsoft.AspNetCore.Http;
+  using Microsoft.Extensions.Logging;
+  using System;
+  using System.Collections.Generic;
+  using System.Linq;
+  using System.Threading.Tasks;
+
+  namespace Steeltoe.Management.Endpoint.ManagementPort
+  {
+      public class ManagementPortMiddleware
+      {
+          private readonly RequestDelegate _next;
+          private readonly ILogger<ManagementPortMiddleware> _logger;
+          private readonly IManagementOptions _managementOptions;
+
+          public ManagementPortMiddleware(RequestDelegate next, IEnumerable<IManagementOptions> managementOptions, ILogger<ManagementPortMiddleware> logger = null)
+          {
+              _next = next;
+              _logger = logger;
+              _managementOptions = managementOptions.OfType<ManagementEndpointOptions>().First();
+          }
+
+          public async Task InvokeAsync(HttpContext context)
+          {
+              string contextPath = _managementOptions.Path;
+              bool isManagementPath = context.Request.Path.ToString().StartsWith(contextPath, StringComparison.OrdinalIgnoreCase);
+
+              bool allowRequest = string.IsNullOrEmpty(_managementOptions.Port);
+              allowRequest = allowRequest || (context.Connection.LocalPort.ToString() == _managementOptions.Port && isManagementPath);
+              allowRequest = allowRequest || (context.Connection.LocalPort.ToString() != _managementOptions.Port && !isManagementPath);
+
+              if (!allowRequest)
+              {
+                  context.Response.StatusCode = StatusCodes.Status404NotFound;
+                  return;
+              }
+
+              await _next(context);
+          }
+      }
+  }
+  ```
+
+test "rank1795: the Host header rendered into a URL is not a gate"
+  lang csharp
+  file Steeltoe/Management/src/EndpointCore/Hypermedia/ActuatorHypermediaEndpointMiddleware.cs
+  reject VYQL-AUTH-159
+  reject_review code.HostHeaderPortAccessCondition
+  code
+  ```
+  using Microsoft.AspNetCore.Http;
+
+  namespace Steeltoe.Management.Endpoint.Hypermedia
+  {
+      public class ActuatorHypermediaEndpointMiddleware
+      {
+          public string GetBaseUrl(HttpContext context)
+          {
+              string scheme = "http";
+              // request.Host automatically includes or excludes the port based on whether it is standard for the scheme
+              if (scheme == "https")
+              {
+                  return $"{scheme}://{context.Request.Host.Host}{context.Request.PathBase}{context.Request.Path}";
+              }
+
+              return $"{scheme}://{context.Request.Host}{context.Request.PathBase}{context.Request.Path}";
+          }
+
+          public void Note(HttpContext context)
+          {
+              _logger?.LogDebug("saw {0} on {1}", context.Request.Path, context.Request.Host.Port);
+          }
+      }
+  }
+  ```

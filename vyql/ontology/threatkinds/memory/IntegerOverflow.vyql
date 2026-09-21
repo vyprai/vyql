@@ -1,0 +1,6 @@
+module memory;
+
+threat IntegerOverflow {
+  cwe: [CWE_190]
+  desc: "Integer overflow/wraparound"
+}

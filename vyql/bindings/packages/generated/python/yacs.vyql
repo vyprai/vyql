@@ -1,0 +1,17 @@
+module bindings.python.generated.mf4444d32;
+
+binding deserialization0 {
+  requires {
+    dependency("yacs")
+  }
+  query pattern callExpr where callee.method == "yacs.config.CfgNode.load_cfg"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("yacs")
+  }
+  query pattern callExpr where callee.method == "yacs.config.CfgNode.merge_from_file"
+  emit sink code.Deserialization at args[0]
+}

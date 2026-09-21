@@ -1,0 +1,41 @@
+module bindings.go.generated.m46077ab1;
+
+binding networkData0 {
+  requires {
+    dependency("github.com/NYTimes/gziphandler")
+  }
+  query pattern callExpr where callee.method == "GzipHandler"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData1 {
+  requires {
+    dependency("github.com/NYTimes/gziphandler")
+  }
+  query pattern callExpr where callee.method == "GzipHandlerWithOpts"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData2 {
+  requires {
+    dependency("github.com/NYTimes/gziphandler")
+  }
+  query pattern callExpr where callee.method == "NewGzipLevelHandler"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData3 {
+  requires {
+    dependency("github.com/NYTimes/gziphandler")
+  }
+  query pattern callExpr where callee.method == "NewGzipLevelAndMinSize"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData4 {
+  requires {
+    dependency("github.com/NYTimes/gziphandler")
+  }
+  query pattern callExpr where callee.method == "MustNewGzipLevelHandler"
+  emit source code.NetworkData at call.result
+}

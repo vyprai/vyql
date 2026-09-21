@@ -1,0 +1,43 @@
+module bindings.rust.absent_extended_header_override;
+
+// POSIX pax extended headers exist to carry values the fixed ustar fields
+// cannot, and the format gives the size record plain precedence: when an
+// extended header precedes an entry, its size value is the size of that
+// entry's data, overriding the octal field in the base header. A parser that
+// sizes the entry's data read from the base field alone and never consults
+// the extended-header records frames the same archive differently from every
+// reader that honours them -- an entry can declare a small header size and a
+// large extended size, and the lenient reader ends the entry early, exposing
+// whatever the inflated region hides (a second header, a symlink) to its own
+// entry walk.
+//
+// The tar crate family publishes both halves of the shape: Header::entry_size
+// reads the base header's size field, and the reader's take call bounds the
+// bytes handed to the entry. What is recognised here is the function that
+// reads the base size and bounds a data read with it while no
+// extended-header consult appears among its own call paths: in this crate
+// family the consult goes through the pax_extensions iterator (a bare
+// function value passed to map, a direct call, or the pax_extensions_value
+// lookup helper), so the absence of that name among the call paths is
+// the absence of the consult. The conditional half of the same weakness --
+// the record consulted but applied only when the base field is zero -- is a
+// separate binding on its own atoms and stays separate, because its
+// evidence names a comparison this shape does not carry.
+//
+// The negation is over the function's own call paths, which the frontend
+// derives from the AST: a consult in a sibling function does not clear the
+// flag on the sizer, and prose in a comment satisfies neither side. It keys
+// on the call-path route rather than any token mentioning the name, because
+// the framing function also names the pax_extensions field when it builds the
+// entry struct -- initialising that field to nothing is not consulting the
+// records. Every positive clause is an exact-token match, so a call whose
+// last segment merely contains the name does not qualify.
+//
+// Deliberately uncovered: a parser consulting the records through an
+// accessor this family does not name -- the negation keys on the published
+// pax_extensions surface, so a differently-named consult reads as absent.
+
+binding absentExtendedHeaderOverride {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.call in ["entry_size"] and node.context.call in ["take"] and not (node.context.callPath contains "pax_extensions")
+  emit issue code.AbsentExtendedHeaderOverride at node
+}

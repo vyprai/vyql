@@ -1,0 +1,33 @@
+module bindings.perl.generated.m923fa815;
+
+binding deserialization0 {
+  requires {
+    dependency("Cache-RedisDB")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("Cache-RedisDB")
+  }
+  query pattern callExpr where callee.method == "mget"
+  emit sink code.Deserialization at args[0]
+}
+
+binding storedDataWrite2 {
+  requires {
+    dependency("Cache-RedisDB")
+  }
+  query pattern callExpr where callee.method == "set"
+  emit sink code.StoredDataWrite at args[0]
+}
+
+binding storedDataWrite3 {
+  requires {
+    dependency("Cache-RedisDB")
+  }
+  query pattern callExpr where callee.method == "set_nw"
+  emit sink code.StoredDataWrite at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.bash.generated.m06442c8c;
+
+binding commandExecution0 {
+  requires {
+    dependency("spaceman-diff")
+  }
+  query pattern callExpr where callee.path ~= "spaceman-diff"
+  emit sink code.CommandExecution at args[0]
+}

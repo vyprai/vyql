@@ -1,0 +1,50 @@
+module bindings.python.restricted_eval_nested_scope_name_filter_gap;
+
+// A Python sandbox around eval() decides which names the evaluated
+// expression may use. The route CPython documents for that decision is to
+// compile the expression and filter the resulting code object's `co_names`
+// against an allowlist, and that route is incomplete on its own:
+// `co_names` holds only the names the top-level code object itself loads,
+// while a lambda body and a generator expression each compile to a
+// separate code object that the outer one reaches through `co_consts`.
+// Names used only inside the nested scope never reach the filter and still
+// execute, so the allowlist is a boundary the expression can step over --
+// `len.__self__` written inside a lambda is the canonical recovery of the
+// real builtins module from inside a `{'__builtins__': {}}` eval.
+//
+// The binding reads the guard's own attribute reads rather than the
+// spelling of any one fix. It anchors on the builtin `compile()` spelled
+// without a receiver (an exact call-path comparison, so `re.compile` and
+// every other dotted compile is out of scope) and requires a `co_names`
+// read in the same function. The negation is on the `co_consts` attribute
+// itself, so a guard that descends into nested code objects satisfies it
+// whether the descent is written inline, before or after the `co_names`
+// loop, or in a recursive helper called from the same function. Attribute
+// names are matched on their own segment with `endsWith` rather than a
+// substring, so the receiver's name is irrelevant -- `code.co_names`,
+// `c.co_names` and `fn.__code__.co_names` are the same read -- while
+// `co_varnames` and `co_filename` do not match.
+//
+// An expression filter built on the `ast` module never reads `co_names` at
+// all, so it is outside this binding either way, as is a filter built on
+// `symtable`. Every clause reads AST-derived call-path and attribute
+// tokens, so the module's comments cannot satisfy the anchor or silence
+// the negation: prose naming `co_consts` is not a descent.
+//
+// Residual, in the false-positive direction and stated rather than hidden:
+// a guard that keeps the `co_names` loop in the filtering function and
+// puts the `co_consts` descent in a helper it calls is reported, because
+// the enclosing function's context facts do not carry what a callee reads.
+// That is the function-local control-attribution limit, not a property of
+// this guard. The measured reachable set does not contain the shape: across
+// the 94k Python files of the corpus checkouts, six functions read
+// `.co_names` and call bare `compile()`, and the one that also reads
+// `co_consts` is excluded by the negation.
+binding restrictedEvalNameFilterOmitsNestedScopes {
+  query pattern presenceNode where node.scope == "function"
+    and node.context.language == "python"
+    and node.context.callPath == "compile"
+    and node.context.selector endsWith "co_names"
+    and not (node.context.selector endsWith "co_consts")
+  emit issue code.RestrictedEvalNestedScopeNameFilterGap at node
+}

@@ -1,0 +1,11 @@
+module code;
+
+concept UncheckedPrefixOffsetArithmetic : issue {
+  cwe: [CWE_125]
+  reviewAssumption: "the compared input can be exactly as long as the prefix the guard matched"
+  reviewCategory: memory
+  reviewCondition: "a pointer is advanced past the bytes a successful bounded prefix comparison verified, inside the branch that comparison guards"
+  reviewConfidence: medium
+  reviewEvidence: "prefix-offset context {pattern} advances the compared pointer beyond the longest prefix its own guard compared"
+  vulnerableTo: [memory.OobRead]
+}

@@ -1,0 +1,30 @@
+module bindings.scala.generated.mf1617c93;
+
+binding inputValidation0 {
+  requires {
+    dependency("com.github.miemiedev:mybatis-paginator")
+  }
+  query pattern callExpr where callee.method == "isSQLInjection"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding sqlExecution1 {
+  requires {
+    dependency("com.github.miemiedev:mybatis-paginator")
+  }
+  query pattern callExpr where callee.method == "getLimitString"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution2 {
+  requires {
+    dependency("com.github.miemiedev:mybatis-paginator")
+  }
+  query pattern callExpr where callee.method == "getCountString"
+  emit sink code.SqlExecution at args[0]
+}

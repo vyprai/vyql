@@ -1,0 +1,7 @@
+module code;
+
+review code.SignatureCompactEncodingAccepted {
+  category: crypto
+  kind: attention
+  text: "review a bytes-form signature recovery entry that accepts the compact EIP-2098 encoding alongside the canonical one, for a caller that assumes signature uniqueness"
+}

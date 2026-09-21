@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule IncompleteHtmlEntityEscape {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_79]
+    id: "VYQL-INJ-034"
+    severity: high
+  }
+  issue code.IncompleteHtmlEntityEscape as sink
+}

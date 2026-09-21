@@ -1,0 +1,43 @@
+test "rank1488: group chooser appends server-supplied owner names into markup"
+  lang javascript
+  expect VYQL-INJ-004
+  code
+  ```
+  $(function() {
+
+      var $group_chooser = $("#group_chooser");
+
+      var loadGroups = function(webindex_url) {
+          var url = webindex_url + "load_chgrp_groups/?" + OME.get_tree_selection();
+          $.getJSON(url, function(data){
+              var ownernames = [];
+              for (var o=0; o<data.owners.length; o++) {ownernames.push(data.owners[o][1]);}
+              var headerTxt = "<p>Move data owned by " + ownernames.join(", ") + ".</p>" +
+                              "<h1>Please choose target group below:</h1>";
+              $group_chooser.append(headerTxt);
+          });
+      };
+  });
+  ```
+
+test "rank1488: group chooser escaping the owner names before appending is clean"
+  lang javascript
+  reject VYQL-INJ-004
+  code
+  ```
+  $(function() {
+
+      var $group_chooser = $("#group_chooser");
+
+      var loadGroups = function(webindex_url) {
+          var url = webindex_url + "load_chgrp_groups/?" + OME.get_tree_selection();
+          $.getJSON(url, function(data){
+              var ownernames = [];
+              for (var o=0; o<data.owners.length; o++) {ownernames.push(data.owners[o][1]);}
+              var headerTxt = "<p>Move data owned by " + ownernames.join(", ").escapeHTML() + ".</p>" +
+                              "<h1>Please choose target group below:</h1>";
+              $group_chooser.append(headerTxt);
+          });
+      };
+  });
+  ```

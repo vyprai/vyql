@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule MfaRedirectBypass {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_288]
+    id: "VYQL-AUTH-004"
+    severity: high
+  }
+  issue code.MfaRedirectBypass as bypass
+}

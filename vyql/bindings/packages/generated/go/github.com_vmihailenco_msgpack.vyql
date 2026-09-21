@@ -1,0 +1,17 @@
+module bindings.go.generated.m5756014b;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/vmihailenco/msgpack")
+  }
+  query pattern callExpr where callee.method == "Unmarshal"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/vmihailenco/msgpack")
+  }
+  query pattern callExpr where callee.method == "Decoder.Decode"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,158 @@
+# Rank 1106 / CVE-2021-24028: fbthrift's table-based deserializer
+# placement-news a new active Thrift union member without destructing the
+# member currently live, so wire data with two fields for the same union leaks
+# the first member and, if the second field is truncated, unwinds the stack
+# through the destructor of whichever member the active-field id still names
+# (CWE-763, CWE-401). The duplicate field re-enters read()'s union branch in
+# thrift/lib/cpp2/protocol/TableBasedSerializer.cpp, which runs
+# structInfo.unionExt->initMember[...] unconditionally; the clear that
+# releases the live member exists only on the empty-union early return, a
+# sibling branch that returns before any initialization. Fix bfda1efa547d
+# reads the active-field id and, when a member is set, calls
+# structInfo.unionExt->clear(object) inside the initializing branch before
+# initMember, and corrects the id accessor's width from FieldID to int.
+#
+# The binding that reports this is unionMemberInitWithoutClear
+# (vyql/bindings/cpp/union_member_init_without_clear.vyql): UnionExt's own
+# header documents initMember as "Value initializes using placement new into
+# the member" and clear as "Clear union before setting a field", so the
+# binding reports a member initialization whose branch carries no unionExt
+# clear. The clear is matched inside the initialization's own branch or
+# nested under it -- where the active-member guard puts it -- and not from a
+# sibling branch, so the empty-union clear that both revisions carry does not
+# satisfy the contract on the vulnerable side.
+#
+# Measured bounded (timeout 180, --max-ram 6GB, --cache off, three runs per
+# revision): a whole-tree fbthrift scan aborts at the 6GB ceiling at 5.6 GiB
+# resident, so the A/B runs against thrift/lib/cpp2/protocol, the subtree
+# holding the vulnerable file. The vulnerable revision reports 394 findings
+# each run (390 VYQL-MEM-006, 3 VYQL-MEM-016, and VYQL-MEM-069 high at
+# TableBasedSerializer.cpp:599); the fixed revision reports 393 each run
+# with no VYQL-MEM-069 anywhere. Exhaustive grep over the vulnerable tree:
+# unionExt.initMember has exactly one call site and unionExt.clear exactly
+# one, both in TableBasedSerializer.cpp.
+
+test "rank1106: the union member is constructed over the active member without clearing it"
+  lang cpp
+  file thrift/lib/cpp2/protocol/TableBasedSerializer.cpp
+  expect VYQL-MEM-069
+  code
+  ```
+  struct FieldInfo {
+    std::int16_t id;
+    const TypeInfo* typeInfo;
+  };
+
+  typedef void (*VoidFuncPtr)(void*);
+
+  struct UnionExt {
+    // Clear union before setting a field.
+    VoidFuncPtr clear;
+
+    std::ptrdiff_t unionTypeOffset;
+
+    // Value initializes using placement new into the member.
+    VoidFuncPtr initMember[4];
+  };
+
+  struct StructInfo {
+    std::int16_t numFields;
+    const char* name;
+    const UnionExt* unionExt;
+    FieldInfo fieldInfos[4];
+  };
+
+  const FieldID& activeUnionMemberId(const void* object, std::ptrdiff_t offset) {
+    return *reinterpret_cast<const FieldID*>(
+        offset + static_cast<const char*>(object));
+  }
+
+  template <typename Protocol_>
+  void read(Protocol_* iprot, const StructInfo& structInfo, void* object) {
+    ProtocolReaderStructReadState<Protocol_> readState;
+    readState.readStructBegin(iprot);
+    readState.fieldId = 0;
+    readState.readFieldBegin(iprot);
+    if (readState.atStop()) {
+      structInfo.unionExt->clear(object);
+      readState.readStructEnd(iprot);
+      return;
+    }
+    const auto* fieldInfo = findFieldInfo(iprot, readState, structInfo);
+    // Found it.
+    if (fieldInfo) {
+      void* unionVal = getMember(*fieldInfo, object);
+      // Default construct and placement new into the member union.
+      structInfo.unionExt->initMember[fieldInfo - structInfo.fieldInfos](
+          unionVal);
+      read(iprot, *fieldInfo->typeInfo, readState, unionVal);
+      const_cast<FieldID&>(activeUnionMemberId(
+          object, structInfo.unionExt->unionTypeOffset)) = fieldInfo->id;
+    } else {
+      skip(iprot, readState);
+    }
+  }
+  ```
+
+test "rank1106: the active member is cleared before the new one is constructed"
+  lang cpp
+  file thrift/lib/cpp2/protocol/TableBasedSerializer.cpp
+  reject VYQL-MEM-069
+  code
+  ```
+  struct FieldInfo {
+    std::int16_t id;
+    const TypeInfo* typeInfo;
+  };
+
+  typedef void (*VoidFuncPtr)(void*);
+
+  struct UnionExt {
+    // Clear union before setting a field.
+    VoidFuncPtr clear;
+
+    std::ptrdiff_t unionTypeOffset;
+
+    // Value initializes using placement new into the member.
+    VoidFuncPtr initMember[4];
+  };
+
+  struct StructInfo {
+    std::int16_t numFields;
+    const char* name;
+    const UnionExt* unionExt;
+    FieldInfo fieldInfos[4];
+  };
+
+  // Returns a reference to the data member that holds the active field id for
+  // a Thrift union object.
+  const int& getActiveId(const void* object, const StructInfo& info) {
+    return *reinterpret_cast<const int*>(
+        static_cast<const char*>(object) + info.unionExt->unionTypeOffset);
+  }
+
+  template <typename Protocol_>
+  void read(Protocol_* iprot, const StructInfo& structInfo, void* object) {
+    ProtocolReaderStructReadState<Protocol_> readState;
+    readState.readStructBegin(iprot);
+    readState.fieldId = 0;
+    readState.readFieldBegin(iprot);
+    if (readState.atStop()) {
+      structInfo.unionExt->clear(object);
+      readState.readStructEnd(iprot);
+      return;
+    }
+    if (const auto* fieldInfo = findFieldInfo(iprot, readState, structInfo)) {
+      auto& activeId = const_cast<int&>(getActiveId(object, structInfo));
+      if (activeId != 0) {
+        structInfo.unionExt->clear(object);
+      }
+      void* value = getMember(*fieldInfo, object);
+      structInfo.unionExt->initMember[fieldInfo - structInfo.fieldInfos](value);
+      read(iprot, *fieldInfo->typeInfo, readState, value);
+      activeId = fieldInfo->id;
+    } else {
+      skip(iprot, readState);
+    }
+  }
+  ```

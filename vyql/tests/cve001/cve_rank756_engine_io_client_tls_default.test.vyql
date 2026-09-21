@@ -1,0 +1,58 @@
+# Rank 756 / CVE-2016-10536: engine.io-client defaulted
+# rejectUnauthorized to null and propagated it into transport TLS options.
+
+test "rank756: engine.io-client rejectUnauthorized null default reaches transport"
+  lang javascript
+  file socket.js
+  expect VYQL-CFG-004
+  expect_review code.CertValidationDisabled
+  code
+  ```
+  function Socket(uri, opts) {
+    opts = opts || {};
+    this.pfx = opts.pfx || null;
+    this.key = opts.key || null;
+    this.cert = opts.cert || null;
+    this.ca = opts.ca || null;
+    this.rejectUnauthorized = opts.rejectUnauthorized === undefined ? null : opts.rejectUnauthorized;
+  }
+
+  Socket.prototype.createTransport = function(name) {
+    var transport = new transports[name]({
+      pfx: this.pfx,
+      key: this.key,
+      cert: this.cert,
+      ca: this.ca,
+      rejectUnauthorized: this.rejectUnauthorized
+    });
+    return transport;
+  };
+  ```
+
+test "rank756: engine.io-client rejectUnauthorized defaults to true"
+  lang javascript
+  file socket.js
+  reject VYQL-CFG-004
+  reject_review code.CertValidationDisabled
+  code
+  ```
+  function Socket(uri, opts) {
+    opts = opts || {};
+    this.pfx = opts.pfx || null;
+    this.key = opts.key || null;
+    this.cert = opts.cert || null;
+    this.ca = opts.ca || null;
+    this.rejectUnauthorized = opts.rejectUnauthorized === undefined ? true : opts.rejectUnauthorized;
+  }
+
+  Socket.prototype.createTransport = function(name) {
+    var transport = new transports[name]({
+      pfx: this.pfx,
+      key: this.key,
+      cert: this.cert,
+      ca: this.ca,
+      rejectUnauthorized: this.rejectUnauthorized
+    });
+    return transport;
+  };
+  ```

@@ -1,0 +1,9 @@
+module bindings.php.generated.m9600bd31;
+
+binding weakRandomValue0 {
+  requires {
+    dependency("jms/security-extra-bundle")
+  }
+  query pattern callExpr where callee.method == "JMS\\SecurityExtraBundle\\Command\\InitSecureRandomCommand::execute"
+  emit issue code.WeakRandomValue at call
+}

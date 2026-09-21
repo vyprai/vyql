@@ -1,0 +1,9 @@
+module bindings.scala.generated.m74f6a6ca;
+
+binding deserialization0 {
+  requires {
+    dependency("com.squareup.retrofit2:converter-moshi")
+  }
+  query pattern callExpr where callee.method == "convert"
+  emit sink code.Deserialization at args[0]
+}

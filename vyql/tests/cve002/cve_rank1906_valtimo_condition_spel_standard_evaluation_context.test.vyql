@@ -1,0 +1,207 @@
+# Valtimo at the fixed revision fe2d5c282 (CVE-2026-42555,
+# valtimo-platform/valtimo, kotlin). Two classes evaluate SpEL expressions
+# that arrive as configuration rather than program source, using
+# StandardEvaluationContext -- the context Spring documents as granting
+# unrestricted access to Java types and methods.
+#
+# Condition.resolveValue (contract module) strips the ${...} wrapper from the
+# condition's configured value, parses the remainder with SpelExpressionParser
+# and evaluates it against a StandardEvaluationContext:
+#
+#     val context = StandardEvaluationContext()
+#     context.setRootObject(expressionContextRoot)
+#     val spelExpression = parser.parseExpression(expressionWithoutPrefixSuffix)
+#     val value = spelExpression.getValue(context)
+#
+# DocumentMigrationService (case module, moved from document) does the same
+# for the `source`/`target` fields of a migration patch:
+#
+#     val evaluationContext = StandardEvaluationContext()
+#     evaluationContext.addPropertyAccessor(MapAccessor())
+#     evaluationContext.addPropertyAccessor(jsonPropertyAccessor)
+#     return SpelExpressionParser().parseExpression(expression, parserContext)
+#         .getValue(evaluationContext)
+#
+# With a StandardEvaluationContext the evaluated string reaches
+# T(java.lang.Runtime).getRuntime().exec(...), T(java.lang.System).getenv()
+# and T(java.lang.Class).forName(...) -- RCE and credential exfiltration for
+# an ADMIN who can write the configuration. The fixed revision swaps both for
+# SimpleEvaluationContext (forReadOnlyDataBinding / forPropertyAccessors),
+# Spring's documented restricted context, which has no TypeLocator and so
+# rejects every T(...) reference while still evaluating property paths on the
+# root object. The parse call and the configured value survive at both revisions; only
+# the context class changes, so the discriminator is the unrestricted context
+# itself -- the same boundary the JXPath (VYQL-INJ-189) and unsandboxed jinja
+# bindings key on. A follow-up commit one hour later (f9d56f079) added
+# DataBindingMethodResolver.forInstanceMethodInvocation() on top, which keeps
+# the SimpleEvaluationContext boundary; both spellings of the patched form
+# must stay rejected.
+#
+# The Condition shape sits entirely inside `(value as? String)?.let { ... }`
+# in return position, so it needs the trailing-lambda statements of a return
+# expression lowered -- the kotlin.go return case now inlines them ahead of
+# the return, the way the call-expression and expression-body cases
+# do; the DocumentMigrationService shape is straight-line and exercises the
+# binding on its own.
+#
+# Residual, pinned by the last test: an expression the program wrote as a
+# literal under an unrestricted context also reports, because Kotlin
+# call-argument tokens strip a literal's quotes, so the argument's form
+# cannot be read on this route. Measured cost: across the rank clones no
+# Kotlin file outside valtimo constructs a StandardEvaluationContext at all.
+# The other residual is the form-flow processor shape, where the unrestricted
+# context is a primary-constructor parameter default outside the evaluating
+# function -- a scope-call clause cannot reach it, and the constructor
+# parameter subtree is the known Kotlin frontend gap.
+
+test "rank1906: a configured value's SpEL expression evaluated with a StandardEvaluationContext is expression injection"
+  lang kotlin
+  expect VYQL-INJ-279
+  code
+  ```
+  package com.ritense.valtimo.contract.conditions
+
+  import org.springframework.expression.spel.standard.SpelExpressionParser
+  import org.springframework.expression.spel.support.StandardEvaluationContext
+
+  class Condition(
+      val path: String,
+      val value: Comparable<Any>
+  ) {
+      fun resolveValue(value: Comparable<Any>): Any? {
+          return (value as? String)?.let {
+              if (it.isNotEmpty() && it.startsWith("\${") && it.endsWith('}')) {
+                  val parser = SpelExpressionParser()
+                  val expressionWithoutPrefixSuffix = it.substringAfter("\${").substringBefore("}")
+
+                  val context = StandardEvaluationContext()
+                  context.setRootObject(getExpressionContextRoot())
+
+                  val spelExpression = parser.parseExpression(expressionWithoutPrefixSuffix)
+
+                  val value = spelExpression.getValue(context)
+                  return value
+              } else {
+                  value
+              }
+          } ?: value
+      }
+
+      fun getExpressionContextRoot(): Any {
+          return Object()
+      }
+  }
+  ```
+
+test "rank1906: the restricted SimpleEvaluationContext is the patched form"
+  lang kotlin
+  reject VYQL-INJ-279
+  code
+  ```
+  package com.ritense.valtimo.contract.conditions
+
+  import org.springframework.expression.spel.standard.SpelExpressionParser
+  import org.springframework.expression.spel.support.DataBindingMethodResolver
+  import org.springframework.expression.spel.support.SimpleEvaluationContext
+
+  class Condition(
+      val path: String,
+      val value: Comparable<Any>
+  ) {
+      fun resolveValue(value: Comparable<Any>): Any? {
+          return (value as? String)?.let {
+              if (it.isNotEmpty() && it.startsWith("\${") && it.endsWith('}')) {
+                  val parser = SpelExpressionParser()
+                  val expressionWithoutPrefixSuffix = it.substringAfter("\${").substringBefore("}")
+
+                  val context = SimpleEvaluationContext
+                      .forReadOnlyDataBinding()
+                      .withMethodResolvers(DataBindingMethodResolver.forInstanceMethodInvocation())
+                      .withRootObject(getExpressionContextRoot())
+                      .build()
+
+                  val spelExpression = parser.parseExpression(expressionWithoutPrefixSuffix)
+
+                  val value = spelExpression.getValue(context)
+                  return value
+              } else {
+                  value
+              }
+          } ?: value
+      }
+
+      fun getExpressionContextRoot(): Any {
+          return Object()
+      }
+  }
+  ```
+
+test "rank1906: a migration patch expression evaluated with a StandardEvaluationContext is expression injection"
+  lang kotlin
+  expect VYQL-INJ-279
+  code
+  ```
+  package com.ritense.document.service
+
+  import org.springframework.expression.common.TemplateParserContext
+  import org.springframework.expression.spel.standard.SpelExpressionParser
+  import org.springframework.expression.spel.support.StandardEvaluationContext
+  import org.springframework.integration.json.JsonPropertyAccessor
+
+  class DocumentMigrationService {
+      fun handleSpelExpression(expression: String): Any? {
+          val jsonPropertyAccessor = JsonPropertyAccessor()
+          val evaluationContext = StandardEvaluationContext()
+          evaluationContext.addPropertyAccessor(MapAccessor())
+          evaluationContext.addPropertyAccessor(jsonPropertyAccessor)
+          return SpelExpressionParser()
+              .parseExpression(expression, TemplateParserContext())
+              .getValue(evaluationContext)
+      }
+  }
+  ```
+
+test "rank1906: the migration patch's restricted context is the patched form"
+  lang kotlin
+  reject VYQL-INJ-279
+  code
+  ```
+  package com.ritense.document.service
+
+  import org.springframework.expression.common.TemplateParserContext
+  import org.springframework.expression.spel.standard.SpelExpressionParser
+  import org.springframework.expression.spel.support.SimpleEvaluationContext
+  import org.springframework.integration.json.JsonPropertyAccessor
+
+  class DocumentMigrationService {
+      fun handleSpelExpression(expression: String): Any? {
+          val jsonPropertyAccessor = JsonPropertyAccessor()
+          val evaluationContext = SimpleEvaluationContext
+              .forPropertyAccessors(MapAccessor(), jsonPropertyAccessor)
+              .build()
+          return SpelExpressionParser()
+              .parseExpression(expression, TemplateParserContext())
+              .getValue(evaluationContext)
+      }
+  }
+  ```
+
+test "rank1906: a program-written expression literal under an unrestricted context also reports -- the pinned residual"
+  lang kotlin
+  expect VYQL-INJ-279
+  code
+  ```
+  package com.example
+
+  import org.springframework.expression.spel.standard.SpelExpressionParser
+  import org.springframework.expression.spel.support.StandardEvaluationContext
+
+  class HealthCheck {
+      fun probe(): Boolean {
+          val context = StandardEvaluationContext()
+          return SpelExpressionParser()
+              .parseExpression("systemProperties['ready'] == true")
+              .getValue(context, Boolean::class.java)
+      }
+  }
+  ```

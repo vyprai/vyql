@@ -1,0 +1,44 @@
+module bindings.cpp.converted_buffer_source_length;
+
+// Qt's SQL module converts QStrings into the driver's SQLTCHAR encoding
+// with toSQLTCHAR(), and SQLTCHAR's width follows the platform: where
+// SQLTCHAR is 8 or 32 bits wide the converted array holds a different
+// number of elements than the QString's UTF-16 length reports, so the
+// conversion's result and its input string disagree about size. The only
+// length an ODBC call can trust beside such a buffer is the conversion
+// result's own size, and an unnamed temporary cannot be measured: code
+// that hands a call toSQLTCHAR(s).data() inline has no way to pass that
+// buffer's size, so whatever length lands next to it describes the source
+// string, and the driver walks past the conversion's allocation. Naming
+// the result first -- encoded = toSQLTCHAR(s), then encoded.data(),
+// encoded.size() -- is the one shape that measures what it hands over,
+// and it takes the accessor on a variable, not on an inline call. That is
+// the fact read here: the call_path token of an accessor taken on an
+// unnamed conversion result spells the conversion's own name
+// (toSQLTCHAR.data), while the named form spells the variable.
+//
+// The confined callees are the ODBC family that takes (buffer, length)
+// pairs with the length in characters, plus the byte-count copy
+// constructor the converted buffer is stashed through on its way to a
+// bound parameter, and the exclusions sit at exactly the length positions
+// the interfaces document for them. SQL_NTS is the ODBC interface's
+// self-terminating sentinel -- the driver stops at the NUL the conversion
+// appends, so a sentinel length does not describe the buffer at all --
+// and a length that is itself a second conversion of the same string
+// measures the converted form, which is the buffer in hand; that
+// exclusion reads the conversion's own size accessor as a call_path
+// token, so a cast wrapped around the length expression cannot defeat
+// it. Which conversion re-encodes into a width other than its input's is
+// a property of the library, not of the language, and stays here in
+// data: toSQLTCHAR is the spelling the Qt SQL module documents.
+//
+// Residuals, all false-negative: the correlation is function-scoped, so a
+// sentinel-spelled call in the same function vouches for a mismatched one
+// beside it; the context token list is capped, so a sentinel token pushed
+// past the cap by a large body leaves the exclusion vacuous; and the
+// compacted argument text keeps comments, so a commented-out sentinel
+// still clears.
+binding convertedBufferSourceLength {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "cpp" and containsAny(node.context.callPath, ["toSQLTCHAR.data", "toSQLTCHAR.constData"]) and node.context.call in ["SQLExecDirect", "SQLPrepare", "SQLSetConnectAttr", "SQLDriverConnect", "SQLTables", "SQLPrimaryKeys", "SQLSpecialColumns", "SQLColumns", "QByteArray"] and not (containsAny(node.context.callArgAt, ["SQLExecDirect:2:SQL_NTS", "SQLPrepare:2:SQL_NTS", "SQLSetConnectAttr:3:SQL_NTS", "SQLDriverConnect:3:SQL_NTS", "SQLTables:2:SQL_NTS", "SQLTables:4:SQL_NTS", "SQLTables:6:SQL_NTS", "SQLTables:8:SQL_NTS", "SQLPrimaryKeys:2:SQL_NTS", "SQLPrimaryKeys:4:SQL_NTS", "SQLPrimaryKeys:6:SQL_NTS", "SQLSpecialColumns:3:SQL_NTS", "SQLSpecialColumns:5:SQL_NTS", "SQLSpecialColumns:7:SQL_NTS", "SQLColumns:2:SQL_NTS", "SQLColumns:4:SQL_NTS", "SQLColumns:6:SQL_NTS", "SQLColumns:8:SQL_NTS"])) and not (containsAny(node.context.callPath, ["toSQLTCHAR.size", "toSQLTCHAR.length"]))
+  emit issue code.ConvertedBufferSourceLength at node
+}

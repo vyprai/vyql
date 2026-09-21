@@ -1,0 +1,61 @@
+module bindings.scala.generated.md6a20ec1;
+
+binding authorizationCheck0 {
+  requires {
+    dependency("org.springframework.security:spring-security-data")
+  }
+  query pattern callExpr where callee.method == "setPermissionEvaluator"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck1 {
+  requires {
+    dependency("org.springframework.security:spring-security-data")
+  }
+  query pattern callExpr where callee.method == "setSecurityContextHolderStrategy"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck2 {
+  requires {
+    dependency("org.springframework.security:spring-security-data")
+  }
+  query pattern callExpr where callee.method == "setTrustResolver"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck3 {
+  requires {
+    dependency("org.springframework.security:spring-security-data")
+  }
+  query pattern callExpr where callee.method == "setRoleHierarchy"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck4 {
+  requires {
+    dependency("org.springframework.security:spring-security-data")
+  }
+  query pattern callExpr where callee.method == "getRootObject"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

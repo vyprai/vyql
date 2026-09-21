@@ -1,0 +1,26 @@
+module bindings.c.narrow_declared_bounds_check;
+
+// A bounds check written as `left + right REL limit` over two locals the
+// function declares at a 32-bit integer width bounds nothing for a large
+// enough pair: the addition the check exists to bound is itself the addition
+// that wraps, the wrapped sum passes as a small value, and the code proceeds
+// past the check it just made. Every C reference frames the wrap at these
+// widths -- the narrower spellings are promoted to int before the addition
+// and a promoted pair cannot overflow the int the sum is computed in -- so
+// the canonical remediation widens the operands, and both spellings of it
+// read here: redeclaring either operand wide at its declaration, or casting
+// either operand to a wider type at the addition.
+//
+// The fact is emitted by the C frontend (ccNarrowDeclaredBoundsCheckObservations,
+// internal/extract/frontend/treesitter/c.go) from the compacted function
+// body, so the declaration walk and the comparison match cannot be satisfied
+// by prose, and only locals declared in the function itself count: a check
+// over narrow parameters is a sibling construct this does not reach, and
+// operands reached through a member selection or a call result never match.
+// Whether the pair is attacker-chosen is the rule's question, not this
+// binding's: the label says the check was written over arithmetic that can
+// wrap beneath it, and the review weighs who can choose the values.
+binding narrowDeclaredBoundsCheck {
+  query pattern presenceNode where node.kind == "any" and node.analysis == "narrow_width.bounds_check"
+  emit issue code.OffsetLengthBoundsOverflow at node
+}

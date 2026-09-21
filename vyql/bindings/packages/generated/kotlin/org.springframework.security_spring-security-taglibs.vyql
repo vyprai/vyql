@@ -1,0 +1,38 @@
+module bindings.kotlin.generated.m4f469e2e;
+
+binding htmlEscape0 {
+  requires {
+    dependency("org.springframework.security:spring-security-taglibs")
+  }
+  query pattern callExpr where callee.method == "writeMessage"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding csrfProtection1 {
+  requires {
+    dependency("org.springframework.security:spring-security-taglibs")
+  }
+  query pattern callExpr where callee.method == "handleToken"
+  emit check core.CsrfProtection at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck2 {
+  requires {
+    dependency("org.springframework.security:spring-security-taglibs")
+  }
+  query pattern callExpr where callee.method == "authorizeUsingUrlCheck"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

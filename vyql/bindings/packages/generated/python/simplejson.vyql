@@ -1,0 +1,33 @@
+module bindings.python.generated.m2e933192;
+
+binding deserialization0 {
+  requires {
+    dependency("simplejson")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("simplejson")
+  }
+  query pattern callExpr where callee.method == "loads"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("simplejson")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("simplejson")
+  }
+  query pattern callExpr where callee.method == "raw_decode"
+  emit sink code.Deserialization at args[0]
+}

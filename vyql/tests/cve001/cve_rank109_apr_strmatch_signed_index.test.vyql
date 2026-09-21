@@ -1,0 +1,46 @@
+# Rank 109 / CVE-2009-0023: apr_strmatch_precompile built its Boyer-Moore
+# shift table indexing by plain (int)-cast char and uncast apr_tolower
+# results -- negative subscripts where char is signed. The fix casts every
+# index to (unsigned char).
+
+test "rank109: shift table indexed by int-cast char"
+  lang c
+  expect VYQL-NUM-018
+  code
+  ```
+  #include <ctype.h>
+  void precompile(int *shift, const char *s, int length) {
+      int i;
+      for (i = 0; i < length - 1; i++) {
+          shift[(int)s[i]] = length - i - 1;
+      }
+  }
+  ```
+
+test "rank109: shift table indexed by uncast tolower"
+  lang c
+  expect VYQL-NUM-018
+  code
+  ```
+  #include <ctype.h>
+  void precompile(int *shift, const char *s, int length) {
+      int i;
+      for (i = 0; i < length - 1; i++) {
+          shift[tolower(s[i])] = length - i - 1;
+      }
+  }
+  ```
+
+test "rank109: shift table indexed by unsigned char cast"
+  lang c
+  reject VYQL-NUM-018
+  code
+  ```
+  #include <ctype.h>
+  void precompile(int *shift, const char *s, int length) {
+      int i;
+      for (i = 0; i < length - 1; i++) {
+          shift[(unsigned char)tolower(s[i])] = length - i - 1;
+      }
+  }
+  ```

@@ -1,0 +1,193 @@
+# CVE-2017-1000458: Bro's TCP content-line analyzer writes a zero byte before
+# the start of its line buffer. DoDeliverOnce holds the line in buf with a
+# running offset, and on '\n' after a '\r' it drops the carriage return by
+# decrementing:
+#
+#   case '\n':
+#     if ( last_char == '\r' )
+#       {
+#       --offset; // remove '\r'
+#       EMIT_LINE
+#       }
+#
+# with EMIT_LINE a macro whose first statement is buf[offset] = '\0'. A packet
+# ending in '\r' can leave offset at 0 while last_char stays '\r', so the next
+# packet starting with '\n' decrements to -1 and the macro writes buf[-1]
+# (CWE-787). The fixed revision adds the lower bound: when offset is 0 it
+# swallows the character and re-sets last_char instead of decrementing.
+#
+# The write that lands out of bounds is inside the #define EMIT_LINE body, so
+# the parse holds no subscript node for it at all: the macro's text is a raw
+# preproc_def value and no statement ever sees buf[offset] except through
+# expansion, which does not happen. The semicolon-less EMIT_LINE in the
+# case '\r' branch does produce a subscript node, but it is an error-recovery
+# artifact that glues the macro name to the following else-branch
+# (EMIT_LINE.__subscript with the else swallowed as an ERROR node); it is
+# identical in the vulnerable and fixed revisions and must never be judged.
+#
+# Detection of the decrement-past-zero axis needs, in order: the C++ subscript
+# index to be read through its subscript_argument_list wrapper (the index field
+# the C frontend reads is empty for C++), the index gate to accept a plain
+# local rather than only -> or . expressions, the macro body to be observable
+# at the use site, and the guard analysis to know a lower bound rather than
+# only upper bounds. None of these exists yet, so the inline form below is
+# visible as code.IndexAccess and still unjudged, and every form asserts
+# reject VYQL-MEM-010 as a pinned miss.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1032: the real layout, macro defined inside the function, decrement can reach the write"
+  lang cpp
+  file src/analyzer/protocol/tcp/ContentLine.cc
+  reject VYQL-MEM-010
+  code
+  ```
+  int DoDeliverOnce(int len, const unsigned char* data, unsigned char* buf,
+  	int buf_len, int& offset, int& last_char, int CR_LF_as_EOL, int CR_as_EOL)
+  	{
+  	for ( ; len > 0; --len, ++data )
+  		{
+  		if ( offset >= buf_len )
+  			InitBuffer(buf_len * 2);
+
+  		int c = data[0];
+
+  #define EMIT_LINE \
+  	{ \
+  	buf[offset] = '\0'; \
+  	ForwardStream(offset, buf, 1); \
+  	offset = 0; \
+  	return 1; \
+  	}
+
+  		switch ( c ) {
+  		case '\r':
+  			// Look ahead for '\n'.
+  			if ( len > 1 && data[1] == '\n' )
+  				{
+  				--len; ++data;
+  				last_char = c;
+  				c = data[0];
+  				EMIT_LINE
+  				}
+
+  			else if ( CR_LF_as_EOL & CR_as_EOL )
+  				EMIT_LINE
+
+  			else
+  				buf[offset++] = c;
+  			break;
+
+  		case '\n':
+  			if ( last_char == '\r' )
+  				{
+  				--offset; // remove '\r'
+  				EMIT_LINE
+  				}
+
+  			else
+  				buf[offset++] = c;
+  			break;
+
+  		default:
+  			buf[offset++] = c;
+  			break;
+  		}
+  		}
+
+  	return 0;
+  	}
+  ```
+
+test "rank1032: same decrement with the write spelled out inline, so the access is visible and still unjudged"
+  lang cpp
+  file src/analyzer/protocol/tcp/ContentLine.cc
+  reject VYQL-MEM-010
+  code
+  ```
+  int DoDeliverOnce(int len, const unsigned char* data, unsigned char* buf,
+  	int buf_len, int& offset, int& last_char)
+  	{
+  	char c = data[0];
+  	if ( c == '\n' )
+  		{
+  		if ( last_char == '\r' )
+  			{
+  			--offset;
+  			buf[offset] = '\0';
+  			ForwardStream(offset, buf, 1);
+  			offset = 0;
+  			return 1;
+  			}
+  		}
+  	return 0;
+  	}
+  ```
+
+test "rank1032: fix swallows the character when there is nothing to remove"
+  lang cpp
+  file src/analyzer/protocol/tcp/ContentLine.cc
+  reject VYQL-MEM-010
+  code
+  ```
+  int DoDeliverOnce(int len, const unsigned char* data, unsigned char* buf,
+  	int buf_len, int& offset, int& last_char, int CR_LF_as_EOL, int CR_as_EOL)
+  	{
+  	for ( ; len > 0; --len, ++data )
+  		{
+  		if ( offset >= buf_len )
+  			InitBuffer(buf_len * 2);
+
+  		int c = data[0];
+
+  #define EMIT_LINE \
+  	{ \
+  	buf[offset] = '\0'; \
+  	ForwardStream(offset, buf, 1); \
+  	offset = 0; \
+  	return 1; \
+  	}
+
+  		switch ( c ) {
+  		case '\r':
+  			// Look ahead for '\n'.
+  			if ( len > 1 && data[1] == '\n' )
+  				{
+  				--len; ++data;
+  				last_char = c;
+  				c = data[0];
+  				EMIT_LINE
+  				}
+
+  			else if ( CR_LF_as_EOL & CR_as_EOL )
+  				EMIT_LINE
+
+  			else
+  				buf[offset++] = c;
+  			break;
+
+  		case '\n':
+  			if ( last_char == '\r' )
+  				{
+  				if ( offset == 0 )
+  					{
+  					last_char = c;
+  					break;
+  					}
+  				--offset; // remove '\r'
+  				EMIT_LINE
+  				}
+
+  			else
+  				buf[offset++] = c;
+  			break;
+
+  		default:
+  			buf[offset++] = c;
+  			break;
+  		}
+  		}
+
+  	return 0;
+  	}
+  ```

@@ -1,0 +1,289 @@
+# Rank 1560 / CVE-2025-32947: PeerTube's ActivityPub collection crawler
+# incremented its loop counter only at the bottom of the loop body, so a
+# branch that continued past it never advanced the budget and the crawl
+# looped forever (loop with unreachable exit, CWE-835; the advisory:
+# infinite loop in the AP crawler). crawlCollectionPage in
+# server/core/lib/activitypub/crawl.ts ran `while (nextLink && i < limit)
+# { if (typeof nextLink === 'string') { const remoteHost = new
+# URL(nextLink).host; if (remoteHost === WEBSERVER.HOST) continue; ... } ...
+# nextLink = body.next; i++; ... }` -- the don't-crawl-ourselves `continue`
+# jumps back to the condition without executing the i++ further down, so a
+# hostile collection whose next link stays on the instance's own host spins
+# the loop with i frozen below limit. Commit 76226d8568 ("Fix infinite loop
+# in AP crawl") moves the increment to the top of the loop body (`while
+# (nextLink && i < limit) { i++; ... }`) so every iteration advances the
+# budget whatever branch it takes.
+#
+# Detection is the structural loop-restart fact: a while, do-while or
+# update-less for(;;) loop whose body carries a `continue` dominated by no
+# progress step for the variables the loop's exit reads -- no assignment,
+# augmented assignment or update writing one, no method call receiving one
+# as its receiver, and no call to a closure defined in the same function
+# whose body carries such evidence -- re-tests an unchanged exit and takes
+# the same branch forever. Evidence counts only where it dominates the
+# restart, so a sibling branch's progress step never covers a restart that
+# branch does not execute. VYQL-DOS-050 (code.LoopRestartWithoutProgressCheck)
+# reports it and stays quiet on the benign forms: the top-increment fix, a
+# condition that assigns (`while ((line = read()) != null)`), which
+# advances every iteration; a loop with no body progress whose exit is
+# external; a receiver advance before the restart; a restart covered
+# through a closure the same function defines (`getArg()` shifting the
+# argument vector the condition reads); and a restart whose dominating path
+# carries a call the fact cannot interpret -- an import, a parameter, or a
+# callback whose body advances the exit -- which is neutralised in data by
+# the rule's `unless` over core.LoopProgressCallSideEffect, not suppressed
+# in the frontend.
+
+test "rank1560: the self-host continue skips the loop's only progress"
+  lang javascript
+  file server/core/lib/activitypub/crawl.ts
+  expect VYQL-DOS-050
+  code
+  ```
+  const WEBSERVER = { HOST: 'example.com' };
+  const ACTIVITY_PUB = { FETCH_PAGE_LIMIT: 100 };
+
+  async function crawlCollectionPage(argUrl, handler) {
+    let url = argUrl;
+
+    const response = await fetchAP(url);
+    const firstBody = response.body;
+
+    const limit = ACTIVITY_PUB.FETCH_PAGE_LIMIT;
+    let i = 0;
+    let nextLink = firstBody.first;
+    while (nextLink && i < limit) {
+      let body;
+
+      if (typeof nextLink === 'string') {
+        const remoteHost = new URL(nextLink).host;
+        if (remoteHost === WEBSERVER.HOST) continue
+
+        url = nextLink;
+
+        const res = await fetchAP(url);
+        body = res.body;
+      } else {
+        body = nextLink;
+      }
+
+      nextLink = body.next
+      i++
+    }
+  }
+  ```
+
+test "rank1560: the fixed revision advances the budget before any branch"
+  lang javascript
+  file server/core/lib/activitypub/crawl.ts
+  reject VYQL-DOS-050
+  code
+  ```
+  const WEBSERVER = { HOST: 'example.com' };
+  const ACTIVITY_PUB = { FETCH_PAGE_LIMIT: 100 };
+
+  async function crawlCollectionPage(argUrl, handler) {
+    let url = argUrl;
+
+    const response = await fetchAP(url);
+    const firstBody = response.body;
+
+    const limit = ACTIVITY_PUB.FETCH_PAGE_LIMIT;
+    let i = 0;
+    let nextLink = firstBody.first;
+    while (nextLink && i < limit) {
+      i++
+
+      let body;
+
+      if (typeof nextLink === 'string') {
+        const remoteHost = new URL(nextLink).host;
+        if (remoteHost === WEBSERVER.HOST) continue
+
+        url = nextLink;
+
+        const res = await fetchAP(url);
+        body = res.body;
+      } else {
+        body = nextLink;
+      }
+
+      nextLink = body.next
+    }
+  }
+  ```
+
+test "rank1560: a condition that assigns advances on every iteration"
+  lang javascript
+  file server/core/lib/activitypub/crawl.ts
+  reject VYQL-DOS-050
+  code
+  ```
+  async function crawlLines(path, handler) {
+    const reader = openReader(path);
+
+    let line;
+    let i = 0;
+    while ((line = reader.readLine()) != null && i < 100) {
+      if (line.isEmpty()) continue
+
+      await handler(line)
+      i++
+    }
+  }
+  ```
+
+test "rank1560: a loop with no body progress exits elsewhere"
+  lang javascript
+  file server/core/lib/activitypub/crawl.ts
+  reject VYQL-DOS-050
+  code
+  ```
+  let running = true;
+
+  async function eventLoop(dispatch) {
+    while (running) {
+      const event = await nextEvent();
+      if (event == null) continue
+
+      await dispatch(event)
+    }
+  }
+  ```
+
+test "rank1560: a receiver call before the continue advances the cursor"
+  lang javascript
+  file server/core/lib/activitypub/crawl.ts
+  reject VYQL-DOS-050
+  code
+  ```
+  async function crawlItems(items, handler) {
+    const it = items.iterator();
+    while (it.hasNext()) {
+      const item = it.next();
+      if (skip(item)) continue
+
+      await handler(item)
+    }
+  }
+  ```
+
+test "rank1560: an update-less for loop has no clause for the restart to run"
+  lang javascript
+  file server/core/lib/activitypub/crawl.ts
+  expect VYQL-DOS-050
+  code
+  ```
+  async function crawlCollectionPage(argUrl, handler) {
+    let url = argUrl;
+
+    const firstBody = (await fetchAP(url)).body;
+
+    const limit = ACTIVITY_PUB.FETCH_PAGE_LIMIT;
+    let i = 0;
+    let nextLink = firstBody.first;
+    for (;;) {
+      if (i >= limit) break
+
+      if (typeof nextLink === 'string') {
+        const remoteHost = new URL(nextLink).host;
+        if (remoteHost === WEBSERVER.HOST) continue
+
+        url = nextLink;
+        nextLink = (await fetchAP(url)).body.next;
+      } else {
+        nextLink = nextLink.next
+      }
+
+      i++
+    }
+  }
+  ```
+
+test "rank1560: an augmented assignment advances the budget like an increment"
+  lang javascript
+  file server/core/lib/activitypub/crawl.ts
+  expect VYQL-DOS-050
+  code
+  ```
+  async function crawlCollectionPage(argUrl, handler) {
+    const firstBody = (await fetchAP(argUrl)).body;
+
+    const limit = ACTIVITY_PUB.FETCH_PAGE_LIMIT;
+    let i = 0;
+    let nextLink = firstBody.first;
+    while (nextLink && i < limit) {
+      if (typeof nextLink === 'string' && new URL(nextLink).host === WEBSERVER.HOST) continue
+
+      nextLink = nextLink.next
+      i += 1
+    }
+  }
+  ```
+
+test "rank1560: a sibling branch's progress does not cover its own restart"
+  lang javascript
+  file server/core/lib/activitypub/crawl.ts
+  expect VYQL-DOS-050
+  code
+  ```
+  async function crawlCollectionPage(argUrl, handler) {
+    const firstBody = (await fetchAP(argUrl)).body;
+
+    const limit = ACTIVITY_PUB.FETCH_PAGE_LIMIT;
+    let i = 0;
+    let nextLink = firstBody.first;
+    while (nextLink && i < limit) {
+      if (nextLink === firstBody.first) { i += 1; continue }
+
+      if (new URL(nextLink).host === WEBSERVER.HOST) continue
+
+      nextLink = nextLink.next
+      i++
+    }
+  }
+  ```
+
+test "rank1560: a closure the function defines can carry the loop's progress"
+  lang javascript
+  file server/core/lib/activitypub/crawl.ts
+  reject VYQL-DOS-050
+  code
+  ```
+  async function crawlCollectionPage(argUrl, handler) {
+    const queue = [argUrl];
+
+    function getArg() {
+      const arg = queue.shift();
+      return arg
+    }
+
+    while (queue.length) {
+      const arg = getArg();
+      if (new URL(arg).host === WEBSERVER.HOST) continue
+
+      await fetchAP(arg)
+    }
+  }
+  ```
+
+test "rank1560: progress inside a callback argument is the callee's contract"
+  lang javascript
+  file server/core/lib/activitypub/crawl.ts
+  reject VYQL-DOS-050
+  code
+  ```
+  async function crawlCollectionPage(argUrl, handler) {
+    let src = argUrl;
+
+    while (src) {
+      if (handlers.some((h) => {
+        const token = h(src);
+        src = src.substring(token.raw.length);
+        return token != null
+      })) continue
+
+      await fetchAP(src)
+    }
+  }
+  ```

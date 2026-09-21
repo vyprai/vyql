@@ -1,0 +1,98 @@
+# Rank 1068 / CVE-2026-26216: crawl4ai's Docker API runs Python that the request
+# carries: UserHookManager.compile_hook builds a namespace whose builtins include
+# __import__ and then calls exec on hook code from the /crawl body (CWE-94).
+#
+# VYQL-INJ-003 fires when request-supplied hook code reaches exec, and clears
+# when the manager compiles only shipped hooks. Vulnerable snippet expects the
+# finding; fixed snippet rejects it.
+#
+# verify_current_expected: skip-fresh-target
+
+test "rank1068: hook code from the request body is executed"
+  lang python
+  file deploy/docker/hook_manager.py
+  profile api
+  expect VYQL-INJ-003
+  code
+  ```
+  from fastapi import FastAPI
+  from pydantic import BaseModel
+
+  app = FastAPI()
+
+
+  class CrawlRequest(BaseModel):
+      urls: list
+      hooks: dict
+
+
+  class UserHookManager:
+      def compile_hook(self, hook_code: str, hook_point: str):
+          namespace = {}
+          namespace["__builtins__"] = {
+              "print": print,
+              "len": len,
+              "__import__": __import__,
+          }
+          exec(hook_code, namespace)
+          return namespace.get(hook_point)
+
+
+  def process_user_hooks_with_manager(hooks_input: dict, manager: UserHookManager):
+      compiled = {}
+      for hook_point, hook_code in hooks_input.items():
+          compiled[hook_point] = manager.compile_hook(hook_code, hook_point)
+      return compiled
+
+
+  @app.post("/crawl")
+  async def crawl(crawl_request: CrawlRequest):
+      manager = UserHookManager()
+      return process_user_hooks_with_manager(crawl_request.hooks, manager)
+  ```
+
+test "rank1068: the same manager compiling hooks it ships with"
+  lang python
+  file deploy/docker/hook_manager.py
+  profile api
+  reject VYQL-INJ-003
+  code
+  ```
+  from fastapi import FastAPI
+  from pydantic import BaseModel
+
+  app = FastAPI()
+
+  BUILTIN_HOOKS = {
+      "before_goto": "async def before_goto(page, context, url):\n    return page\n",
+  }
+
+
+  class CrawlRequest(BaseModel):
+      urls: list
+      hooks: dict
+
+
+  class UserHookManager:
+      def compile_hook(self, hook_code: str, hook_point: str):
+          namespace = {}
+          namespace["__builtins__"] = {
+              "print": print,
+              "len": len,
+          }
+          exec(hook_code, namespace)
+          return namespace.get(hook_point)
+
+
+  def process_builtin_hooks(manager: UserHookManager):
+      compiled = {}
+      for hook_point, hook_code in BUILTIN_HOOKS.items():
+          compiled[hook_point] = manager.compile_hook(hook_code, hook_point)
+      return compiled
+
+
+  @app.post("/crawl")
+  async def crawl(crawl_request: CrawlRequest):
+      manager = UserHookManager()
+      return process_builtin_hooks(manager)
+  ```

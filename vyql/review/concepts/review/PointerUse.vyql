@@ -1,0 +1,7 @@
+module code;
+
+review code.PointerUse {
+  category: memory
+  kind: attention
+  text: "review pointer use and whether lifetime/initialization is guaranteed"
+}

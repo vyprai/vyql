@@ -1,0 +1,11 @@
+module code;
+
+concept DomainWalkMissingPublicSuffixBoundary : issue {
+  cwe: [CWE_200, CWE_346]
+  reviewAssumption: "the walked name comes from user input or a DNS answer, so one label up can be a registrable or public suffix that any unrelated party may own"
+  reviewCategory: request_forgery
+  reviewCondition: "a DNS-driven lookup climbs the label hierarchy by dropping the leftmost label and reuses the shortened domain as a trusted target without a public-suffix or registrable-domain boundary test"
+  reviewConfidence: medium
+  reviewEvidence: "domain walk context {pattern} resolves DNS records and shortens the domain by one label with no public-suffix, registrable-domain or second-level-domain test on the result"
+  vulnerableTo: [request_forgery.Ssrf, validation.ImproperInputValidation]
+}

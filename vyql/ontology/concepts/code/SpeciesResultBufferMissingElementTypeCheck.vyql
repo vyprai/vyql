@@ -1,0 +1,11 @@
+module code;
+
+concept SpeciesResultBufferMissingElementTypeCheck : issue {
+  cwe: [CWE_843, CWE_787]
+  reviewAssumption: "script picks the species constructor, so the result can be a typed array with a different element type and a smaller buffer than the source"
+  reviewCategory: memory
+  reviewCondition: "a raw memory copy fills the buffer of a species-created result without reading that result's own element type or size"
+  reviewConfidence: high
+  reviewEvidence: "typed array builtin context {pattern} copies into the species-created result's raw buffer and never reads the result's element metadata"
+  vulnerableTo: [memory.TypeConfusion, memory.OobWrite]
+}

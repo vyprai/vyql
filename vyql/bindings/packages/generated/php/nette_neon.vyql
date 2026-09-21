@@ -1,0 +1,57 @@
+module bindings.php.generated.mbbfcbacd;
+
+binding deserialization0 {
+  requires {
+    dependency("nette/neon")
+  }
+  query pattern callExpr where callee.method == "NetteNeonDecoder::decode"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("nette/neon")
+  }
+  query pattern callExpr where callee.method == "NetteNeonDecoder::parseToNode"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("nette/neon")
+  }
+  query pattern callExpr where callee.method == "NetteNeonNeon::decode"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("nette/neon")
+  }
+  query pattern callExpr where callee.method == "NetteNeonNeon::decodeFile"
+  emit sink code.Deserialization at args[0]
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("nette/neon")
+  }
+  query pattern callExpr where callee.method == "NetteNeonNeon::decodeFile"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("nette/neon")
+  }
+  query pattern callExpr where callee.method == "NetteNeonLexer::tokenize"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization6 {
+  requires {
+    dependency("nette/neon")
+  }
+  query pattern callExpr where callee.method == "NetteNeonParser::parse"
+  emit sink code.Deserialization at args[0]
+}

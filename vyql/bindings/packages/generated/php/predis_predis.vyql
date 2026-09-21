@@ -1,0 +1,25 @@
+module bindings.php.generated.md47d0bbb;
+
+binding networkConnect0 {
+  requires {
+    dependency("predis/predis")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding nosqlQuery1 {
+  requires {
+    dependency("predis/predis")
+  }
+  query pattern callExpr where callee.method == "executeRaw"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery2 {
+  requires {
+    dependency("predis/predis")
+  }
+  query pattern callExpr where callee.method == "executeCommand"
+  emit sink code.NosqlQuery at args[0]
+}

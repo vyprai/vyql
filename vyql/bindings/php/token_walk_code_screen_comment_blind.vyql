@@ -1,0 +1,6 @@
+module bindings.php.token_walk_code_screen_comment_blind;
+
+binding tokenWalkCodeScreenCommentBlind {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and containsAny(node.token, ["assign_call:token_get_all", "assign_call:@token_get_all", "assign_call: token_get_all"]) and node.token contains "T_EVAL" and node.token contains "T_WHITESPACE" and not (node.token contains "T_COMMENT")
+  emit issue code.IncompleteCommentTokenCodeScreen at node
+}

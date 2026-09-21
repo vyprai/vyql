@@ -1,0 +1,10 @@
+module vypr.auth;
+
+rule DebugEnabled {
+  meta {
+    cwe: [CWE_489]
+    id: "VYQL-AUTH-102"
+    severity: medium
+  }
+  issue code.DebugEnabled as c
+}

@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule RequestBackedFooterScriptXss {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_79]
+    id: "VYQL-INJ-177"
+    severity: high
+  }
+  issue code.RequestBackedFooterScriptXss as sink
+}

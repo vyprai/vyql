@@ -1,0 +1,9 @@
+module bindings.php.generated.m5298a98c;
+
+binding codeEval0 {
+  requires {
+    dependency("kartik-v/yii2-grid")
+  }
+  query pattern callExpr where callee.method == "parseValue"
+  emit sink code.CodeEval at args[0]
+}

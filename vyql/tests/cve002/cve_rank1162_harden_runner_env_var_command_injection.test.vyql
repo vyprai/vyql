@@ -1,0 +1,90 @@
+# Rank 1162 / CVE-2024-52587: harden-runner built shell commands with
+# node:child_process's execSync by string-interpolating values an attacker
+# can influence -- an exported endpoint list in arc-runner.ts, and
+# process.env.USER / getRunnerTempDir()'s process.env.RUNNER_TEMP in
+# setup.ts -- so a crafted value injects shell metacharacters into the one
+# command string execSync hands to the shell (CWE-78). The fix (30636fb, PR
+# #475, merged as df8a07c, an ancestor of pool commit 0080882f) replaces
+# every such call with execFileSync-based helpers (echo, chownForFolder)
+# that pass the value as one argv element with no shell in between.
+#
+# Detection is the formatted-command-string construct, not the env var:
+# javascript's jsExecSyncFormattedCommandString labels a function that calls
+# an execSync spelling while building a string by template interpolation,
+# and VYQL-INJ-119 reports it critical. On the real checkout that separates
+# the revisions on its own -- the vulnerable src/ reports VYQL-INJ-119 four
+# times (arc-runner.ts:34/51/56/60) and VYQL-INJ-002 twice (arc-runner.ts:40
+# and :53, the exported parameter reaching the command through
+# code.ExternalEntryInput), the fixed src/ reports neither.
+#
+# The setup.ts sites named by the advisory stay unreported and are pinned
+# below as the recorded miss: setup.ts's whole main body is an immediately
+# invoked async arrow, which the frontend inlines into module scope with no
+# analysis.function.context node, so every node.scope == "function" binding
+# is blind inside it. See ENGINE-GAPS.md.
+
+test "rank1162: an interpolated value reaches execSync's single command string"
+  lang javascript
+  file arc-runner.ts
+  code
+  ```
+  import * as cp from "child_process";
+
+  export function sendAllowedEndpoints(endpoints: string): void {
+    const allowedEndpoints = endpoints.split(" ");
+
+    for (const endpoint of allowedEndpoints) {
+      if (endpoint) {
+        const encodedEndpoint = Buffer.from(endpoint).toString("base64");
+        cp.execSync(
+          `echo "${endpoint}" > "${getRunnerTempDir()}/step_policy_endpoint_${encodedEndpoint}"`
+        );
+      }
+    }
+  }
+
+  function getRunnerTempDir(): string {
+    return process.env["RUNNER_TEMP"] || "/tmp";
+  }
+  ```
+  expect VYQL-INJ-119
+
+test "rank1162: the value reaches execFileSync as one argv element, no shell in between"
+  lang javascript
+  file arc-runner.ts
+  code
+  ```
+  import * as cp from "child_process";
+
+  function echo(content: string) {
+    cp.execFileSync("echo", [content]);
+  }
+
+  export function sendAllowedEndpoints(endpoints: string): void {
+    const allowedEndpoints = endpoints.split(" ");
+
+    for (const endpoint of allowedEndpoints) {
+      if (endpoint) {
+        const encodedEndpoint = Buffer.from(endpoint).toString("base64");
+        echo(`step_policy_endpoint_${encodedEndpoint}`);
+      }
+    }
+  }
+  ```
+  reject VYQL-INJ-119
+
+test "rank1162: the same interpolation inside an immediately invoked arrow is not seen"
+  lang javascript
+  file setup.ts
+  code
+  ```
+  import * as cp from "child_process";
+
+  (async () => {
+    if (process.env.USER) {
+      cp.execSync(`sudo chown -R ${process.env.USER} /home/agent`);
+    }
+    cp.execSync("sudo mkdir -p /home/agent");
+  })();
+  ```
+  reject VYQL-INJ-119

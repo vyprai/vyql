@@ -1,0 +1,41 @@
+module bindings.objc.generated.mea34866a;
+
+binding httpInput0 {
+  requires {
+    dependency("YTKNetwork")
+  }
+  query pattern callExpr where callee.method == "requestUrl"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput1 {
+  requires {
+    dependency("YTKNetwork")
+  }
+  query pattern callExpr where callee.method == "requestArgument"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput2 {
+  requires {
+    dependency("YTKNetwork")
+  }
+  query pattern callExpr where callee.method == "requestHeaderFieldValueDictionary"
+  emit source code.HttpInput at call.result
+}
+
+binding networkData3 {
+  requires {
+    dependency("YTKNetwork")
+  }
+  query pattern callExpr where callee.method == "responseObject"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData4 {
+  requires {
+    dependency("YTKNetwork")
+  }
+  query pattern callExpr where callee.method == "responseString"
+  emit source code.NetworkData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m4e09960d;
+
+binding cliArgument0 {
+  requires {
+    dependency("exfmt")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit source code.CliArgument at call.result
+}

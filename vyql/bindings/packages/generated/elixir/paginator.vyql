@@ -1,0 +1,25 @@
+module bindings.elixir.generated.m470abfc0;
+
+binding sqlExecution0 {
+  requires {
+    dependency("paginator")
+  }
+  query pattern callExpr where callee.method == "Paginator.Ecto.Query.maybe_where"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution1 {
+  requires {
+    dependency("paginator")
+  }
+  query pattern callExpr where callee.method == "Paginator.Ecto.Query.build_where_expression"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution2 {
+  requires {
+    dependency("paginator")
+  }
+  query pattern callExpr where callee.method == "Paginator.Ecto.Query.reverse_order_bys"
+  emit sink code.SqlExecution at args[0]
+}

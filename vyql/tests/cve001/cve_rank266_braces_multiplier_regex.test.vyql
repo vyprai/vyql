@@ -1,0 +1,28 @@
+# Rank 266 / CVE-2018-1109: braces used a nested ambiguous multiplier
+# regex that could backtrack heavily on crafted brace/comma input.
+
+test "rank266: nested multiplier regex is catastrophic"
+  lang javascript
+  expect VYQL-DOS-003
+  expect_review code.CatastrophicRegex
+  code
+  ```
+  function parse() {
+    var m = this.match(/^\{(,+(?:(\{,+\})*),*|,*(?:(\{,+\})*),+)\}/);
+    if (!m) return;
+    return m[0];
+  }
+  ```
+
+test "rank266: optimized multiplier regex avoids nested ambiguous branch"
+  lang javascript
+  reject VYQL-DOS-003
+  reject_review code.CatastrophicRegex
+  code
+  ```
+  function parse() {
+    var m = this.match(/^\{((?:,|\{,+\})+)\}/);
+    if (!m) return;
+    return m[0];
+  }
+  ```

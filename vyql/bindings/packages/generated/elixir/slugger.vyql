@@ -1,0 +1,43 @@
+module bindings.elixir.generated.mc02e5a58;
+
+binding inputValidation0 {
+  requires {
+    dependency("slugger")
+  }
+  query pattern callExpr where callee.method == "slugify"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("slugger")
+  }
+  query pattern callExpr where callee.method == "slugify"
+  emit source core.UserControlledData at call.result
+}
+
+binding inputValidation2 {
+  requires {
+    dependency("slugger")
+  }
+  query pattern callExpr where callee.method == "slugify_downcase"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("slugger")
+  }
+  query pattern callExpr where callee.method == "slugify_downcase"
+  emit source core.UserControlledData at call.result
+}

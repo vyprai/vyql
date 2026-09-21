@@ -1,0 +1,11 @@
+module vypr.crypto;
+
+rule SignatureCompactEncodingAccepted {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_347]
+    id: "VYQL-CRY-058"
+    severity: high
+  }
+  issue code.SignatureCompactEncodingAccepted as recovery
+}

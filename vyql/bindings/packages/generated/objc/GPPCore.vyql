@@ -1,0 +1,25 @@
+module bindings.objc.generated.m8d44f2ec;
+
+binding httpInput0 {
+  requires {
+    dependency("GPPCore")
+  }
+  query pattern callExpr where callee.method == "handleURL"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput1 {
+  requires {
+    dependency("GPPCore")
+  }
+  query pattern callExpr where callee.method == "readDeepLinkAfterInstall"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput2 {
+  requires {
+    dependency("GPPCore")
+  }
+  query pattern callExpr where callee.method == "source"
+  emit source code.HttpInput at call.result
+}

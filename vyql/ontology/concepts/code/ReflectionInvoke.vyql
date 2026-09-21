@@ -1,0 +1,7 @@
+module code;
+
+concept ReflectionInvoke : sink {
+  cwe: [CWE_470]
+  enabledBy: [taint.UntrustedData]
+  vulnerableTo: [deserialization.UnsafeReflection]
+}

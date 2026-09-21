@@ -1,0 +1,9 @@
+module bindings.go.generated.mdadfe99a;
+
+binding expressionEval0 {
+  requires {
+    dependency("gonum.org/v1/plot")
+  }
+  query pattern callExpr where callee.method == "vg.ParseLength"
+  emit sink code.ExpressionEval at args[0]
+}

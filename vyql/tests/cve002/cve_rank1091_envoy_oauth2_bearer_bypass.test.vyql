@@ -1,0 +1,320 @@
+# Rank 1091 / CVE-2022-29226: Envoy's OAuth2 filter finishes the
+# authentication flow on the mere presence of a client-supplied
+# Authorization: Bearer header, with no validation call at all (CWE-306).
+# At the parent of the fix (7ffda4e809^) the filter reads the header the
+# caller sent about itself:
+#
+#   std::string OAuth2Filter::extractAccessToken(const Http::RequestHeaderMap& headers) const {
+#     const Http::HeaderEntry* authorization = headers.getInline(authorization_handle.handle());
+#     if (authorization != nullptr) {
+#       const auto value = StringUtil::trim(authorization->value().getStringView());
+#       const auto& bearer_prefix = bearerPrefix();
+#       if (absl::StartsWithIgnoreCase(value, bearer_prefix)) {
+#         return std::string(StringUtil::ltrim(value.substr(bearer_prefix.length())));
+#       }
+#     }
+#     ... // the named query-string parameter, same treatment
+#   }
+#
+# and decodeHeaders turns any non-empty result into completed authentication:
+#
+#   access_token_ = extractAccessToken(headers);
+#   if (!access_token_.empty()) {
+#     found_bearer_token_ = true;
+#     finishFlow();
+#     return Http::FilterHeadersStatus::Continue;
+#   }
+#
+# finishFlow's found_bearer_token_ branch then commits the caller's own
+# credential into the forwarded request -- setBearerToken(*request_headers_,
+# access_token_) lowers to headers.setInline(authorization_handle.handle(),
+# absl::StrCat("Bearer ", token)) -- bumps the success counter and calls
+# decoder_callbacks_->continueDecoding(). Per the filter's own documentation
+# a request is only authenticated once a signed cookie set after a real
+# token exchange is present; this branch let any caller manufacture that
+# state by sending any non-empty Authorization header. The fix deletes
+# extractAccessToken and the whole branch and instead strips the incoming
+# header before the filter logic runs (headers.removeInline), so the only
+# path to a privileged Authorization write is the HMAC-validated cookie.
+#
+# The first pass recorded a vocabulary gap: no concept said "a client's
+# credential claim is accepted as authentication state". That vocabulary
+# now exists -- code.UnverifiedCredential (source) and
+# code.ConnectionStateWrite (sink), paired by VYQL-AUTH-152 -- and a
+# two-line probe pair labels both endpoints on the vulnerable file
+# (source code.UnverifiedCredential at filter.cc:210 getInline, sink
+# code.ConnectionStateWrite at filter.cc:116 setInline, confirmed with
+# vyql match). The path between them is the defect's own dataflow and is
+# real. It does not fire, and three already-recorded gaps each block it:
+#
+#  1. The credential-header read cannot be qualified where a flowing
+#     source needs it. A callExpr binding supports only callee.method,
+#     callee.path, callee.receiver.type, args.count and args.any.literal
+#     (the 1198/1209 entry); callArgShapeAt exists but is presence-only,
+#     and a presenceNode cannot emit a source that flows. The bare form
+#     (callee.method == "getInline") is not shippable: grep over the
+#     reachable set shows getInline in 15 files under source/, and the
+#     CORS filter both reads and writes non-credential headers with it
+#     (cors_filter.cc:141 reflects the Origin header through
+#     setInline(access_control_allow_origin_handle, ...)), so an
+#     unqualified pair would label origin/etag/compressor traffic as
+#     credential claims and fire on correct code. The fixed revision has
+#     no getInline read of the credential handle at all (only the
+#     setInline write and the new removeInline strip), so a qualified
+#     binding would discriminate 1 -> 0 once the flow carries.
+#  2. extractAccessToken is a member function defined out of line
+#     (std::string OAuth2Filter::extractAccessToken(...) const -- the
+#     ordinary .h-declares/.cc-defines layout), and out-of-line member
+#     definitions extract nameless (the 1851(a) entry): vyql trace
+#     dead-ends at its analysis.function.return with "callee not traced
+#     -- external or cross-package". Minimal pair below
+#     (member_inline expects / member_outofline rejects).
+#  3. decodeHeaders commits the credential to the member access_token_
+#     (and request_headers_) and finishFlow reads it back; no argument
+#     connects them. A field written on this in one method is invisible
+#     to a different method (the aliasReceiverSelf family, 1198/1287/
+#     1740/1842/1879; the C++ instance is this rank's). Minimal pair
+#     below (field_same_function expects / field_cross_function rejects).
+#
+# What fires today, measured on the real checkout
+# (source/extensions/filters/http/oauth2, three --cache off runs per
+# revision, timeout 180, --max-ram 6GB): 7 findings at the parent and 6
+# at the fix, all VYQL-MEM-006 NullableDeref, stable across runs; the
+# one-row difference is the deleted branch's own deref, not the defect.
+# With the probe pair added in-tree the counts stay 7 and 6 and
+# VYQL-AUTH-152 fires zero times on both sides. A whole-tree scan of the
+# repository (8044 files) aborts at the hard memory ceiling: "the scan
+# reached 5.6 GiB of resident memory, past the ceiling of -max-ram 6GB;
+# stopping" at 1m55s. The query-parameter leg of extractAccessToken
+# (params.find("token")) has a literal argument the DSL could key on,
+# but it dies on the same field hop and the parameter name is the
+# filter's own constant, so it is not a route either.
+#
+# verify_current_expected: attention-engine-gap. A future fix must flip
+# filter_vuln to expect VYQL-AUTH-152 (needs the qualified-argument
+# predicate, both engine hops, and a shipped binding pair) and must keep
+# filter_fixed rejecting it; member_inline and field_same_function expect
+# VYQL-INJ-002 today and must keep reporting; member_outofline and
+# field_cross_function flip to expect once their named engine fixes land.
+
+test "rank1091: the oauth2 filter finishes the flow on the caller's own bearer header"
+  lang cpp
+  file source/extensions/filters/http/oauth2/filter.cc
+  reject VYQL-AUTH-152
+  code
+  ```
+  #include <string>
+
+  namespace Http {
+  class HeaderEntry { public: std::string_view value(); };
+  class RequestHeaderMap {
+  public:
+    const HeaderEntry* getInline(int handle) const;
+    void setInline(int handle, const std::string& value);
+    const HeaderEntry* Path() const;
+  };
+  } // namespace Http
+
+  struct InlineHeaderHandle { int handle() const; };
+  static const InlineHeaderHandle authorization_handle{};
+
+  namespace StringUtil {
+  std::string_view trim(std::string_view v);
+  std::string_view ltrim(std::string_view v);
+  }
+  namespace absl { bool StartsWithIgnoreCase(std::string_view v, std::string_view p); }
+
+  namespace Envoy {
+
+  // Sets the auth token as the Bearer token in the authorization header.
+  void setBearerToken(Http::RequestHeaderMap& headers, const std::string& token) {
+    headers.setInline(authorization_handle.handle(), std::string("Bearer ") + token);
+  }
+
+  // filter.cc:206 at the parent: the caller's own header, returned as a
+  // credential with no validation call anywhere in the function.
+  std::string OAuth2Filter::extractAccessToken(const Http::RequestHeaderMap& headers) const {
+    const Http::HeaderEntry* authorization = headers.getInline(authorization_handle.handle());
+    if (authorization != nullptr) {
+      const auto value = StringUtil::trim(authorization->value().getStringView());
+      const auto& bearer_prefix = bearerPrefix();
+      if (absl::StartsWithIgnoreCase(value, bearer_prefix)) {
+        const size_t start = bearer_prefix.length();
+        return std::string(StringUtil::ltrim(value.substr(start)));
+      }
+    }
+    return std::string();
+  }
+
+  // filter.cc:238: the cookie path validates an HMAC before any
+  // privileged write; the bearer branch below skips all of it.
+  Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
+    if (canSkipOAuth(headers)) {
+      return Http::FilterHeadersStatus::Continue;
+    }
+    if (config_->forwardBearerToken()) {
+      request_headers_ = &headers;
+    }
+    access_token_ = extractAccessToken(headers);
+    if (!access_token_.empty()) {
+      found_bearer_token_ = true;
+      finishFlow();
+      return Http::FilterHeadersStatus::Continue;
+    }
+    redirectToAuthServer(headers);
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+
+  // filter.cc:441: the caller's credential is committed into the
+  // forwarded request and decoding continues as if authenticated.
+  void OAuth2Filter::finishFlow() {
+    if (found_bearer_token_) {
+      if (config_->forwardBearerToken()) {
+        setBearerToken(*request_headers_, access_token_);
+      }
+      config_->stats().oauth_success_.inc();
+      decoder_callbacks_->continueDecoding();
+      return;
+    }
+  }
+  ```
+
+test "rank1091: the fixed filter strips the incoming credential header"
+  lang cpp
+  file source/extensions/filters/http/oauth2/filter.cc
+  reject VYQL-AUTH-152
+  code
+  ```
+  #include <string>
+
+  namespace Http {
+  class HeaderEntry { public: std::string_view value(); };
+  class RequestHeaderMap {
+  public:
+    const HeaderEntry* getInline(int handle) const;
+    void setInline(int handle, const std::string& value);
+    void removeInline(int handle);
+  };
+  } // namespace Http
+
+  struct InlineHeaderHandle { int handle() const; };
+  static const InlineHeaderHandle authorization_handle{};
+
+  namespace Envoy {
+
+  // Sets the auth token as the Bearer token in the authorization header.
+  void setBearerToken(Http::RequestHeaderMap& headers, const std::string& token) {
+    headers.setInline(authorization_handle.handle(), std::string("Bearer ") + token);
+  }
+
+  // filter.cc at the fix: the incoming Authorization header is removed
+  // before anything else runs, so a client cannot speak for itself.
+  Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
+    headers.removeInline(authorization_handle.handle());
+
+    if (canSkipOAuth(headers)) {
+      return Http::FilterHeadersStatus::Continue;
+    }
+    if (config_->forwardBearerToken()) {
+      request_headers_ = &headers;
+    }
+    redirectToAuthServer(headers);
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+
+  // The only privileged Authorization write left takes its value from the
+  // HMAC-validated cookie, not from the request's own header.
+  bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
+    validator_->setParams(headers, config_->tokenSecret());
+    if (validator_->isValid()) {
+      if (config_->forwardBearerToken() && !validator_->token().empty()) {
+        setBearerToken(headers, validator_->token());
+      }
+      return true;
+    }
+    return false;
+  }
+  ```
+
+# Minimal pair for the first engine hop: the extraction is a member
+# function, and only the out-of-line spelling is used by filter.cc.
+
+test "rank1091: minimal pair, extraction defined in class -- the return carries"
+  lang cpp
+  file member_inline.cc
+  expect VYQL-INJ-002
+  code
+  ```
+  #include <cstdlib>
+  #include <string>
+
+  struct FilterCtl {
+    std::string extractInline() const { return std::string(getenv("X")); }
+    void run() {
+      std::string t = extractInline();
+      system(t.c_str());
+    }
+  };
+  ```
+
+test "rank1091: minimal pair, same extraction out of line -- the return never links"
+  lang cpp
+  file member_outofline.cc
+  reject VYQL-INJ-002
+  code
+  ```
+  #include <cstdlib>
+  #include <string>
+
+  struct FilterCtl {
+    std::string extractOut() const;
+    void run() {
+      std::string t = extractOut();
+      system(t.c_str());
+    }
+  };
+  std::string FilterCtl::extractOut() const { return std::string(getenv("X")); }
+  ```
+
+# Minimal pair for the second engine hop: the credential crosses from
+# decodeHeaders to finishFlow through a member field, not an argument.
+
+test "rank1091: minimal pair, field stored and read in one function -- carries"
+  lang cpp
+  file field_same_function.cc
+  expect VYQL-INJ-002
+  code
+  ```
+  #include <cstdlib>
+  #include <string>
+
+  struct FilterCtl {
+    std::string access_token_;
+    void decode() {
+      access_token_ = std::string(getenv("X"));
+      system(access_token_.c_str());
+    }
+  };
+  ```
+
+test "rank1091: minimal pair, field read in a sibling method -- silent"
+  lang cpp
+  file field_cross_function.cc
+  reject VYQL-INJ-002
+  code
+  ```
+  #include <cstdlib>
+  #include <string>
+
+  // decodeHeaders hands access_token_ to finishFlow exactly this way:
+  // committed in one member function, read in another, no argument
+  // connecting them.
+  struct FilterCtl {
+    std::string access_token_;
+    void decode() {
+      access_token_ = std::string(getenv("X"));
+      finishFlow();
+    }
+    void finishFlow() { system(access_token_.c_str()); }
+  };
+  ```

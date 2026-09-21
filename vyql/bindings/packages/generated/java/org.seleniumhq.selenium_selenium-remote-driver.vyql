@@ -1,0 +1,9 @@
+module bindings.java.generated.m44cf7a92;
+
+binding codeEval0 {
+  requires {
+    dependency("org.seleniumhq.selenium:selenium-remote-driver")
+  }
+  query pattern callExpr where callee.method == "executeScript"
+  emit sink code.CodeEval at args[0]
+}

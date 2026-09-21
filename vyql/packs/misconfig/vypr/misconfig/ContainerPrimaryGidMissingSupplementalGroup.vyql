@@ -1,0 +1,11 @@
+module vypr.misconfig;
+
+rule ContainerPrimaryGidMissingSupplementalGroup {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_284, CWE_732]
+    id: "VYQL-CFG-019"
+    severity: high
+  }
+  issue code.ContainerPrimaryGidMissingSupplementalGroup as p
+}

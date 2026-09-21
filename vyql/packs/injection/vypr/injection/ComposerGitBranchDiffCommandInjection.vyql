@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule ComposerGitBranchDiffCommandInjection {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_78, CWE_88]
+    id: "VYQL-INJ-096"
+    severity: critical
+  }
+  issue code.ComposerGitBranchDiffCommandInjection as sink
+}

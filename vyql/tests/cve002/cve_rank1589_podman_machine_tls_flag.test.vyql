@@ -1,0 +1,171 @@
+# Rank 1589 / CVE-2025-6032: podman machine init handed its image
+# pull an insecure-by-default TLS posture by negating a two-state
+# verify flag into the registry skip option, so the zero value of the
+# bool (TLSVerify=false, never initialized from the default-true CLI
+# flag) composed to InsecureSkipVerify=true and every machine-init
+# image pull verified no certificates -- a network attacker could
+# serve the image (certificate validation disabled by inverted
+# default, CWE-295). Both call sites in pkg/machine/ocipull/ read
+# `DockerInsecureSkipTLSVerify: types.NewOptionalBool(!options.
+# TLSVerify)` (pull.go, and the same with o.pullOptions in
+# ociartifact.go's getDestArtifact) against containers/image's
+# types.SystemContext, whose documented default for the field is nil =
+# verify. Pool commit 726b506acc is the real fix (COMMIT_OK --
+# "machine init: fix tls check. Ensure we verify the TLS connection
+# when pulling the OCI image."): the option becomes `SkipTLSVerify
+# types.OptionalBool` -- unset means verify -- and both assignments
+# pass it through without negation or construction. No pool
+# correction.
+#
+# ATTENTION, inverted security defaults, held on recheck. The defect
+# is a default-posture composition: a tri-state intention (unset /
+# verify / skip) is encoded in a two-state bool whose zero value maps
+# to the insecure state through one negation, and the flag itself is
+# consumed correctly -- no rule can ask "does the secure option's
+# default compose to a secure configuration", the same absent
+# vocabulary the Rust leg of this family records (rank 1405: no
+# concept or rule anywhere expresses "a security setting assigned the
+# logical negation of the option that requests it"; the
+# defaults-against-flags want in ENGINE-GAPS.md). Measured at this
+# tip (3 x --cache off per revision, timeout 180, --max-ram 6GB): the
+# ocipull directory reports exactly two findings at the vulnerable
+# revision and the same two at the fixed one -- VYQL-RES-001 on
+# oci.go:74 and ocidir.go:79, both about resource handles, nothing on
+# either assignment, so later-shipped vocabulary changes nothing.
+# Token-level probes on the minimal pair: the negation lowers to a
+# code.Unary node (path=__unary.not) feeding the NewOptionalBool
+# argument, but goAtomToken (internal/extract/frontend/golang/
+# golang.go) has no *ast.UnaryExpr case, so no call_arg: or assign:
+# token ever carries it -- a probe on call_arg:"types.NewOptionalBool:
+# !options.TLSVerify" labels zero functions at either revision; the
+# field:DockerInsecureSkipTLSVerify token and the selector:TLSVerify
+# token both fire at BOTH revisions (SkipTLSVerify contains
+# TLSVerify); the only token that discriminates is the
+# NewOptionalBool call itself, which is the fix's own layout and
+# fires on every legitimate explicit opt-out -- buildah's
+# pkg/parse/parse.go:415 assigns exactly that constructor from a
+# plain insecure flag. Reachable set over 170,491 Go files in the
+# campaign clones: NewOptionalBool(! appears nowhere outside this
+# tree; the wider family InsecureSkipVerify: !<verify flag> has six
+# sites in consul, harbor and neuvector, every one a correct wiring
+# whose source flag defaults to verify, and podman's own tree carries
+# the identical negated idiom at five cmd/podman sites (login.go:70,
+# auto-update.go:77, artifact/push.go:154, artifact/pull.go:92,
+# kube/play.go:220) whose cobra flags default --tls-verify=true -- the
+# same text is correct and vulnerable inside one tree, so the
+# separator is the source flag's default, a cross-file fact no local
+# predicate reads. No definition change shipped. Spec cve_rank1589
+# records the negated handoff, the fixed pass-through, the identical
+# correct wiring on a default-true flag, and the explicit opt-out,
+# all four asserting reject VYQL-CFG-004: when default-posture
+# vocabulary and a unary atom land, the first block must flip to
+# expect and the third must stay reject.
+
+test "rank1589: the machine-init pull negates a two-state verify flag into the skip option"
+  lang go
+  file pkg/machine/ocipull/pull.go
+  reject VYQL-CFG-004
+  code
+  ```
+  package ocipull
+
+  import (
+      "github.com/containers/image/v5/types"
+  )
+
+  // PullOptions includes data to alter certain knobs when pulling a source
+  // image.
+  type PullOptions struct {
+      // Require HTTPS and verify certificates when accessing the registry.
+      TLSVerify bool
+      // [username[:password]] to use when connecting to the registry.
+      Credentials string
+  }
+
+  func Pull(ctx context.Context, imageInput types.ImageReference, localDestPath string, options PullOptions) error {
+      sysCtx := &types.SystemContext{
+          DockerInsecureSkipTLSVerify: types.NewOptionalBool(!options.TLSVerify),
+      }
+      return nil
+  }
+  ```
+
+test "rank1589: the fixed revision passes the optional skip flag through"
+  lang go
+  file pkg/machine/ocipull/pull.go
+  reject VYQL-CFG-004
+  code
+  ```
+  package ocipull
+
+  import (
+      "github.com/containers/image/v5/types"
+  )
+
+  // PullOptions includes data to alter certain knobs when pulling a source
+  // image.
+  type PullOptions struct {
+      // Skip TLS verification when accessing the registry.
+      SkipTLSVerify types.OptionalBool
+      // [username[:password]] to use when connecting to the registry.
+      Credentials string
+  }
+
+  func Pull(ctx context.Context, imageInput types.ImageReference, localDestPath string, options PullOptions) error {
+      sysCtx := &types.SystemContext{
+          DockerInsecureSkipTLSVerify: options.SkipTLSVerify,
+      }
+      return nil
+  }
+  ```
+
+test "rank1589: the identical negation on a flag that defaults to verify is correct"
+  lang go
+  file cmd/podman/artifact/pull.go
+  reject VYQL-CFG-004
+  code
+  ```
+  package artifact
+
+  import (
+      "github.com/containers/image/v5/types"
+  )
+
+  type PullOptions struct {
+      // TLSVerifyCLI is bound to --tls-verify, whose default is true.
+      TLSVerifyCLI bool
+  }
+
+  func pullImage(pullOptions PullOptions) error {
+      opts := options{
+          InsecureSkipTLSVerify: types.NewOptionalBool(!pullOptions.TLSVerifyCLI),
+      }
+      _ = opts
+      return nil
+  }
+
+  type options struct {
+      InsecureSkipTLSVerify types.OptionalBool
+  }
+  ```
+
+test "rank1589: an explicit opt-out constructs the skip option from a plain insecure flag"
+  lang go
+  file pkg/parse/parse.go
+  reject VYQL-CFG-004
+  code
+  ```
+  package parse
+
+  import (
+      "github.com/containers/image/v5/types"
+  )
+
+  func SystemContextFromFlags(insecure bool) *types.SystemContext {
+      ctx := &types.SystemContext{}
+      if insecure {
+          ctx.DockerInsecureSkipTLSVerify = types.NewOptionalBool(insecure)
+      }
+      return ctx
+  }
+  ```

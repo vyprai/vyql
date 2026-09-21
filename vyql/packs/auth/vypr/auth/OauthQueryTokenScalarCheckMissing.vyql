@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule OauthQueryTokenScalarCheckMissing {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_943, CWE_287]
+    id: "VYQL-AUTH-147"
+    severity: critical
+  }
+  issue code.OauthQueryTokenScalarCheckMissing as credential
+}

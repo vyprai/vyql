@@ -1,0 +1,11 @@
+module code;
+
+concept CryptoScalarRandomBitsByteLengthConfusion : issue {
+  cwe: [CWE_331, CWE_330]
+  reviewAssumption: "callers may supply a byte count instead of a bit count, biasing security-sensitive scalar or nonce generation"
+  reviewCategory: crypto
+  reviewCondition: "elliptic-curve scalar or nonce generation may pass a byte-length value to a random-bits API"
+  reviewConfidence: high
+  reviewEvidence: "random scalar helper context {pattern} calls try_random_bits(rng, bit_length) and only rejects zero or values above the curve order"
+  vulnerableTo: [crypto.InsufficientEntropy]
+}

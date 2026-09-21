@@ -1,0 +1,95 @@
+# Rank 1078 / CVE-2026-35172: the registry's repository-scoped blob descriptor
+# cache revokes a repository's access to a digest by clearing the shared digest
+# descriptor only, leaving the repository's own membership set entry in place
+# (CWE-284). A repository that deletes a blob keeps its membership record for
+# it, and once any other repository referencing the same digest repopulates the
+# shared descriptor, the deleting repository can stat the blob again -- an
+# explicit delete does not stick. The fix's own regression test states the
+# contract directly: Clear must remove the repository's membership entry
+# (SIsMember on the repository's blob set key returns false afterwards) and the
+# repository's scoped hash, in one transaction alongside the shared hash's
+# three fields.
+#
+# ATTENTION: analysis gap. The membership check is correct; what it guards is
+# an invalidation that omits the removal the membership record exists to
+# enforce. Go exposes the function-confined tokens a binding would need -- a
+# call to SIsMember negated on SRem discriminates the two snippets below -- but
+# the fact that this redis set is an access grant is distribution's own design,
+# documented in this file's comments rather than in the go-redis API: go-redis
+# documents SIsMember and SRem as set operations and says nothing about
+# authorization or revocation, so no binding keyed on them is answerable to the
+# library's documentation. The same shape without a function-name anchor also
+# labels the scoped Stat, which reads membership correctly and revokes nothing,
+# at both revisions. Both snippets reject VYQL-AUTH-081.
+#
+# verify_current_expected: attention-analysis-gap, both revisions rejected.
+
+test "rank1078: the scoped clear leaves the repository's membership in place"
+  lang go
+  file registry/storage/cache/redis/redis.go
+  reject VYQL-AUTH-081
+  code
+  ```
+  package redis
+
+  import (
+  	"context"
+
+  	"github.com/opencontainers/go-digest"
+  )
+
+  func (rsrbds *repositoryScopedRedisBlobDescriptorService) Clear(ctx context.Context, dgst digest.Digest) error {
+  	if err := dgst.Validate(); err != nil {
+  		return err
+  	}
+
+  	member, err := rsrbds.upstream.pool.SIsMember(ctx, rsrbds.repositoryBlobSetKey(rsrbds.repo), dgst.String()).Result()
+  	if err != nil {
+  		return err
+  	}
+  	if !member {
+  		return ErrBlobUnknown
+  	}
+
+  	return rsrbds.upstream.Clear(ctx, dgst)
+  }
+  ```
+
+test "rank1078: the scoped clear revokes the repository's membership"
+  lang go
+  file registry/storage/cache/redis/redis.go
+  reject VYQL-AUTH-081
+  code
+  ```
+  package redis
+
+  import (
+  	"context"
+
+  	"github.com/opencontainers/go-digest"
+  )
+
+  func (rsrbds *repositoryScopedRedisBlobDescriptorService) Clear(ctx context.Context, dgst digest.Digest) error {
+  	if err := dgst.Validate(); err != nil {
+  		return err
+  	}
+
+  	pool := rsrbds.upstream.pool
+
+  	member, err := pool.SIsMember(ctx, rsrbds.repositoryBlobSetKey(rsrbds.repo), dgst.String()).Result()
+  	if err != nil {
+  		return err
+  	}
+  	if !member {
+  		return ErrBlobUnknown
+  	}
+
+  	pipe := pool.TxPipeline()
+  	pipe.SRem(ctx, rsrbds.repositoryBlobSetKey(rsrbds.repo), dgst.String())
+  	pipe.Del(ctx, rsrbds.blobDescriptorHashKey(dgst))
+  	pipe.HDel(ctx, rsrbds.upstream.blobDescriptorHashKey(dgst), "digest", "size", "mediatype")
+
+  	_, err = pipe.Exec(ctx)
+  	return err
+  }
+  ```

@@ -1,0 +1,40 @@
+module bindings.php.proxy_config_from_request_data;
+
+// PHP documents $_SERVER as an array of "headers, paths, and script
+// locations": under every SAPI the HTTP_* entries are the request's own
+// headers. The keyed-read bindings (php.input) label a $_SERVER subscript
+// by its literal key, and deliberately only the always-request-derived
+// keys -- server-configured keys such as DOCUMENT_ROOT stay unlabelled,
+// a line the cecil 404 spec pins. One shape slips between those posts:
+// a case-folded copy of the superglobal, array_change_key_case($_SERVER,
+// CASE_LOWER), maps lowercase names onto the request's header values, so
+// a lookup of 'http_proxy' on the folded array reads the `Proxy:` request
+// header (exported as HTTP_PROXY). The folded copy is request data even
+// though every key in it looks like server configuration.
+//
+// CURLOPT_PROXY is curl's "HTTP proxy to tunnel requests through": its
+// value argument names the host the following curl_exec() connects to
+// first, the direct analogue of urllib3.ProxyManager(url), which the
+// python set already binds as code.UrlFetch. Request data reaching that
+// argument sends the fetch through a host the request chose (the httpoxy
+// shape: os.environ.get("HTTP_PROXY") and getenv("HTTP_*") are already
+// sources in the python and php sets, the python one with its own
+// coverage test).
+//
+// Measured with --cache off: on the motivating tree the pair moves
+// VYQL-RF-001 from 5 rows to 13 at the vulnerable revision (all 8 new on
+// the curl proxy option) and to 7 at the fixed one (the 2 new are the
+// getenv residual the spec header there documents); no other rule moves.
+// On two unrelated PHP trees (767 files, 43 reading $_SERVER) the folded
+// source adds no finding and the sink labels no argument outside curl
+// proxy options.
+
+binding serverSuperglobalCaseFoldedRead {
+  query pattern callExpr where callee.path == "array_change_key_case" and (args.any.literal contains "$_SERVER" or args.any.literal contains "$HTTP_SERVER_VARS")
+  emit source code.HttpInput at call.result
+}
+
+binding curlProxyOption {
+  query pattern callExpr where callee.path == "curl_setopt" and args.any.literal contains "CURLOPT_PROXY"
+  emit sink code.UrlFetch at args[2]
+}

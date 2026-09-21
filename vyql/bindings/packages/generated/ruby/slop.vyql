@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m8709d240;
+
+binding cliArgument0 {
+  requires {
+    dependency("slop")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit source code.CliArgument at call.result
+}

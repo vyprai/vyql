@@ -1,0 +1,8 @@
+module code;
+
+review code.JoinedPathCopyWithoutContainment {
+  category: path
+  expected: [core.PathAccessCheck]
+  kind: attention
+  text: "check the resolved path stays under its base directory before copying files from joined components"
+}

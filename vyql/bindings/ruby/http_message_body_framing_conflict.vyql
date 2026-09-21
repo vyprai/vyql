@@ -1,0 +1,63 @@
+module bindings.ruby.http_message_body_framing_conflict;
+
+// RFC 7230 gives an HTTP/1 message exactly one body length, and says what to do
+// when the headers offer two. Section 3.3.2: a message with more than one
+// Content-Length field "MUST either reject the message as invalid or replace
+// the duplicated field-values with a single valid Content-Length field".
+// Section 3.3.3: a message carrying both Transfer-Encoding and Content-Length
+// "might indicate an attempt to perform request smuggling ... and ought to be
+// handled as an error", and a sender forwarding it "MUST remove the received
+// Content-Length field". A Ruby request reader that stores whichever framing
+// value it sees and moves on is not wrong on its own bytes -- it is wrong
+// relative to the next implementation on the connection, which may take the
+// other reading, so one TCP stream becomes two different request sequences.
+//
+// The method this labels is the one where that obligation lands: the request
+// reader that holds both framing values. In a Rack server the header store is
+// the environment hash (the Rack spec documents CONTENT_LENGTH and the CGI
+// HTTP_TRANSFER_ENCODING spelling), so the identification is a method that
+// assigns both the transfer-encoding value and the content-length value out of
+// that store, in a file that also asks the chunked question -- String#casecmp
+// against the chunked constant, or a call into a chunked-body reader, the two
+// spellings a Ruby parser uses for "is this the chunked framing". Puma's
+// request reader spells it `te = @env[TRANSFER_ENCODING2]` falling through to
+// `cl = @env[CONTENT_LENGTH]` whenever the encoding is neither chunked nor
+// recognised, which silently takes the fixed-length reading of a message the
+// front-end framed by the other header.
+//
+// The negation is the removal remedy RFC 7230 names, in the spellings a Ruby
+// parser uses for it: deleting the conflicting framing key from the
+// environment, or from a parsed header hash. It deliberately does not include
+// the other remedy -- refusing the message -- because a raise statement in Ruby
+// is reachable from this predicate only at file scope, and request readers
+// commonly raise in sibling methods for unrelated malformed input (Puma's own
+// reader raises ConnectionError and EOFError for socket conditions two methods
+// away), so keying refusal would silence the finding on readers that never
+// reconcile the two framings at all. A reader that remediates only by refusing
+// the message is therefore still reported; the deletion is the one remedy whose
+// spelling is not routine elsewhere in a request-parsing file.
+//
+// The two store reads are matched on assign tokens, which stay inside the
+// method; the chunked question and the deletion are call tokens, which a Ruby
+// file shares across its methods, so those two conjuncts hold at file scope: a
+// file that asks the chunked question anywhere satisfies the identification,
+// and a file that deletes the framing key anywhere is not reported. Recall
+// residuals: an env value read without an assignment, a fetch-spelled
+// env.fetch("HTTP_TRANSFER_ENCODING"), and a chunked question asked only as a
+// bare `== "chunked"` comparison in a file whose calls name nothing chunked,
+// all keep the weakness and are not reported.
+//
+// This is a property of the request reader rather than of any value flowing
+// through it -- there is no untrusted argument to follow, because the
+// attacker's input is the header block the method is reading -- so it is a
+// presence fact on the method context, not a taint sink.
+
+binding rubyHttpMessageBodyFramingConflict {
+  query pattern presenceNode where node.scope == "function"
+    and node.context.language == "ruby"
+    and containsAny(node.context.assign, ["env[TRANSFER_ENCODING", "env[HTTP_TRANSFER_ENCODING", "env['transfer-encoding'", "env[\"transfer-encoding\"", "env['HTTP_TRANSFER_ENCODING'", "env[\"HTTP_TRANSFER_ENCODING\""])
+    and containsAny(node.context.assign, ["env[CONTENT_LENGTH", "env['CONTENT_LENGTH'", "env[\"CONTENT_LENGTH\"", "env['content-length'", "env[\"content-length\""])
+    and containsAny(node.context.call, ["casecmp", "chunked"])
+    and not (containsAny(node.context.callPath, ["env.delete", "headers.delete"]))
+  emit issue code.AmbiguousMessageBodyFraming at node
+}

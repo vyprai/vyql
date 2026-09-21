@@ -1,0 +1,41 @@
+module bindings.objc.generated.m7832e90c;
+
+binding secretValue0 {
+  requires {
+    dependency("FXKeychain")
+  }
+  query pattern callExpr where callee.method == "setObject:forKey:"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("FXKeychain")
+  }
+  query pattern callExpr where callee.method == "setObject:forKeyedSubscript:"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue2 {
+  requires {
+    dependency("FXKeychain")
+  }
+  query pattern callExpr where callee.method == "objectForKey:"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue3 {
+  requires {
+    dependency("FXKeychain")
+  }
+  query pattern callExpr where callee.method == "objectForKeyedSubscript:"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue4 {
+  requires {
+    dependency("FXKeychain")
+  }
+  query pattern callExpr where callee.method == "dataForKey:"
+  emit source code.SecretValue at call.result
+}

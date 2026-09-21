@@ -1,0 +1,50 @@
+# Rank 1009 / CVE-2026-44643: angular-expressions remote code execution through
+# filters. compile("a | __proto__")({}, {}) escapes the expression sandbox: the
+# filter name is resolved against JavaScript objects without rejecting
+# prototype-sensitive names, and the generated code reaches the Function
+# constructor, giving arbitrary code execution (CWE-95, CWE-1321). The fixed
+# revision ("Improve security hardening layers", the core of the 1.5.1 ->
+# 1.5.2 hardening series) blocks __proto__ property keys, protects the
+# Function.prototype.constructor descriptor, and iterates with
+# null-prototype contexts -- and its own README update states the hardening is
+# not a sandbox and untrusted expressions can still reach code execution.
+#
+# Detection: the exploitable surface is consumer-side. expressions.compile()
+# is documented to turn an expression string into a callable evaluator of the
+# same class as the other template and expression compilers
+# (Handlebars.compile, ejs.compile, pug.compile, nunjucks.compile,
+# lodash.template), so compile's argument is bound as code.TemplateRender
+# (VYQL-INJ-008): an expression an attacker controls selects the program the
+# evaluator runs, while untrusted scope data only feeds the program's inputs.
+# A binding on the library's own AST compiler internals would be repro-shaped,
+# answerable only to this CVE's fix layout, and is not how this rank detects.
+
+test "rank1009: compiling an attacker-controlled angular expression is template injection"
+  lang javascript
+  file consumer.js
+  expect VYQL-INJ-008
+  code
+  ```
+  const expressions = require("angular-expressions");
+
+  function render(req, res) {
+    const evaluate = expressions.compile(req.query.expr);
+    const result = evaluate({}, {});
+    res.send(String(result));
+  }
+  ```
+
+test "rank1009: compiling a fixed expression and only letting scope data vary is safe"
+  lang javascript
+  file consumer.js
+  reject VYQL-INJ-008
+  code
+  ```
+  const expressions = require("angular-expressions");
+
+  function render(req, res) {
+    const evaluate = expressions.compile("user.name | uppercase");
+    const result = evaluate({ user: req.query.user }, {});
+    res.send(String(result));
+  }
+  ```

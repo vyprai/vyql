@@ -1,0 +1,261 @@
+# Rank 1408 / CVE-2015-2320: Mono's own TLS stack, Mono.Security.Protocol.Tls,
+# accepted an SSL 2.0 handshake. RecordProtocol.ReadRecordBuffer dispatched on
+# the raw first byte of the record and treated 0x80 -- the SSLv2 record-length
+# high bit -- as a legacy SSLv2 CLIENT-HELLO:
+#
+#   private byte[] ReadRecordBuffer (int contentType, Stream record)
+#   {
+#       switch (contentType)
+#       {
+#           case 0x80:
+#               return this.ReadClientHelloV2(record);
+#           default:
+#               if (!Enum.IsDefined(typeof(ContentType), (ContentType)contentType))
+#                   throw new TlsException(AlertDescription.DecodeError);
+#               return this.ReadStandardRecordBuffer(record);
+#       }
+#   }
+#
+# ReadClientHelloV2 then took the protocol version straight out of the peer's
+# message -- int protocol = (message[1] << 8 | message[2]); Context.ChangeProtocol
+# ((short)protocol) -- selected the cipher suite from the v2 cipher-spec list via
+# ProcessCipherSpecV2Buffer, and set ProtocolNegotiated = true. MapV2CipherCode,
+# the table that turns an SSLv2 3-byte cipher code into a suite, resolved the v2
+# codes onto the 40-bit RSA_EXPORT_* suites. Nothing on that path enforced a
+# minimum protocol version or refused the obsolete record format, so a peer, or
+# an active man in the middle rewriting the first record, could pull the
+# handshake onto the SSLv2 path and onto export-grade key material. RFC 6176
+# prohibits SSL 2.0 outright and requires that an SSLv2-compatible CLIENT-HELLO
+# not be accepted. The fixed revision deletes the branch, ReadClientHelloV2,
+# ProcessCipherSpecV2Buffer and MapV2CipherCode: any record whose content type is
+# not a defined ContentType is now a decode error.
+#
+# This is a protocol-version and cipher downgrade, not certificate validation.
+# No chain is built, no host name is compared and no trust decision is reached on
+# this path -- the advisory database's CWE-295 on this row is wrong; the class is
+# CWE-757 with CWE-327.
+#
+# The pool row named 9c38772f09, which is the next commit ("Remove the EXPORT
+# ciphers and related code path", CVE-2015-2319) and whose parent is this fix, so
+# the SSLv2 fallback is gone at that row's <fix>^: measured, RecordProtocol.cs
+# holds ReadClientHelloV2 twice at 1509226c4 and at b371da6b2^ and zero times at
+# b371da6b2, 9c38772f09^ and 9c38772f09. Mono shipped the three March 2015 TLS
+# fixes as three consecutive commits -- 1509226c4 handshake-order validation
+# (CVE-2015-2318), b371da6b2 the SSLv2 fallback (CVE-2015-2320), 9c38772f09 the
+# EXPORT ciphers (CVE-2015-2319) -- and NVD's github.com reference for
+# CVE-2015-2320 is b371da6b2. The row is repointed there.
+#
+# Detection reuses code.WeakCipher, which VYQL-CRY-002 judges and which
+# the C++ bindings use for an obsolete protocol selection
+# (TLSv1_client_method). The C# binding keys on the IANA cipher-suite name: a
+# string literal whose text carries _EXPORT_WITH_ or _EXPORT1024_WITH_ names a
+# registered export-grade suite -- 40-bit or 56-bit RSA key exchange -- and a
+# program that writes one is registering, requesting or resolving it. That is
+# derivable from the IANA TLS cipher-suite registry alone, and it survives
+# renaming: the vulnerable snippet still reports with MapV2CipherCode renamed,
+# the class renamed and the namespace renamed, so nothing here keys on Mono's own
+# vocabulary.
+#
+# NULL-cipher suite names are deliberately excluded. netty's SslUtils.java uses
+# "SSL_NULL_WITH_NULL_NULL" as an INVALID_CIPHER sentinel, so a _NULL_WITH_
+# fragment reads a rejection constant as an enablement; that shape is measured
+# and dropped rather than shipped.
+#
+# What this does not cover: the record dispatch itself. Whether a record reader
+# accepts an SSLv2-format CLIENT-HELLO is a fact about a switch case on 0x80 --
+# a byte value that appears as an ASN.1 context tag and a sign-bit mask
+# throughout the same tree -- and about Mono's own ChangeProtocol and
+# ProtocolNegotiated members. Keying on those is a repro-shaped patch, and 0x80
+# alone flags ordinary code, so the acceptance axis stays uncovered and the
+# export-suite resolution inside the removed path is what is detected.
+#
+# Measured bounded (timeout 180, --max-ram 6GB, --cache off), every count
+# identical across three runs. mcs/class/Mono.Security at b371da6b2^ (198 csharp
+# files): 90 findings and 15 VYQL-CRY-002 before the binding, 93 and 18 after,
+# the three added rows at RecordProtocol.cs:1086 (MapV2CipherCode) and
+# CipherSuiteFactory.cs:106 and :185 (GetTls1SupportedCiphers and
+# GetSsl3SupportedCiphers, the export-suite registration tables that 9c38772f09
+# removes). At b371da6b2: 92 and 17, with no row on RecordProtocol.cs. The
+# discriminating row is the one the fixed revision deletes.
+#
+# Confinement holds on real code. CipherSuiteFactory.cs has three methods and
+# only the two carrying export literals report -- GetSupportedCiphers at line 41
+# does not -- and RecordProtocol.cs reports once in a file of dozens of methods,
+# so the AST-routed literal predicate did not leak to siblings the way rank
+# 1398 measured in Python.
+#
+# Collateral, enumerated rather than sampled: across the 2834 csharp files in the
+# 120 CVE clones under /tmp/cve-work, no file outside this one holds a literal
+# matching either fragment, so no scan of them can produce a new row. The
+# binding names no Java or Python identifier.
+
+test "rank1408: an SSLv2 cipher-code mapper that resolves the legacy codes onto export-grade RSA suites"
+  lang csharp
+  file mcs/class/Mono.Security/Mono.Security.Protocol.Tls/RecordProtocol.cs
+  expect VYQL-CRY-002
+  code
+  ```
+  using System;
+
+  namespace Mono.Security.Protocol.Tls
+  {
+      internal abstract class RecordProtocol
+      {
+          private CipherSuite MapV2CipherCode(string prefix, int code)
+          {
+              try
+              {
+                  switch (code)
+                  {
+                      case 65664:
+                          // TLS_RC4_128_WITH_MD5
+                          return this.Context.SupportedCiphers[prefix + "RSA_WITH_RC4_128_MD5"];
+
+                      case 131200:
+                          // TLS_RC4_128_EXPORT40_WITH_MD5
+                          return this.Context.SupportedCiphers[prefix + "RSA_EXPORT_WITH_RC4_40_MD5"];
+
+                      case 196736:
+                          // TLS_RC2_CBC_128_CBC_WITH_MD5
+                          return this.Context.SupportedCiphers[prefix + "RSA_EXPORT_WITH_RC2_CBC_40_MD5"];
+
+                      default:
+                          return null;
+                  }
+              }
+              catch
+              {
+                  return null;
+              }
+          }
+      }
+  }
+  ```
+
+test "rank1408: the fixed record reader rejects any undefined content type and carries no SSLv2 cipher mapping"
+  lang csharp
+  file mcs/class/Mono.Security/Mono.Security.Protocol.Tls/RecordProtocol.cs
+  reject VYQL-CRY-002
+  code
+  ```
+  using System;
+  using System.IO;
+
+  namespace Mono.Security.Protocol.Tls
+  {
+      internal abstract class RecordProtocol
+      {
+          private byte[] ReadRecordBuffer (int contentType, Stream record)
+          {
+              if (!Enum.IsDefined(typeof(ContentType), (ContentType)contentType))
+              {
+                  throw new TlsException(AlertDescription.DecodeError);
+              }
+
+              byte[] header = new byte[4];
+              if (record.Read (header, 0, 4) != 4)
+                  throw new TlsException ("buffer underrun");
+              return header;
+          }
+      }
+  }
+  ```
+
+test "rank1408: the same switch shape resolving only registered non-export suites is not reported"
+  lang csharp
+  file mcs/class/Mono.Security/Mono.Security.Protocol.Tls/RecordProtocol.cs
+  reject VYQL-CRY-002
+  code
+  ```
+  using System;
+
+  namespace Mono.Security.Protocol.Tls
+  {
+      internal abstract class RecordProtocol
+      {
+          private CipherSuite MapCipherCode(string prefix, int code)
+          {
+              switch (code)
+              {
+                  case 49199:
+                      return this.Context.SupportedCiphers[prefix + "ECDHE_RSA_WITH_AES_128_GCM_SHA256"];
+
+                  case 49200:
+                      return this.Context.SupportedCiphers[prefix + "ECDHE_RSA_WITH_AES_256_GCM_SHA384"];
+
+                  default:
+                      return null;
+              }
+          }
+      }
+  }
+  ```
+
+test "rank1408: a supported-suite table that registers export-grade suites"
+  lang csharp
+  file mcs/class/Mono.Security/Mono.Security.Protocol.Tls/CipherSuiteFactory.cs
+  expect VYQL-CRY-002
+  code
+  ```
+  namespace Mono.Security.Protocol.Tls
+  {
+      internal sealed class CipherSuiteFactory
+      {
+          private static CipherSuiteCollection GetTls1SupportedCiphers()
+          {
+              CipherSuiteCollection scs = new CipherSuiteCollection(SecurityProtocolType.Tls);
+
+              scs.Add((0x00 << 0x08) | 0x2F, "TLS_RSA_WITH_AES_128_CBC_SHA", CipherAlgorithmType.Aes128, HashAlgorithmType.Sha1, ExchangeAlgorithmType.RsaKeyX, false, true, 16, 16, 128, 16, 16);
+              scs.Add((0x00 << 0x08) | 0x03, "TLS_RSA_EXPORT_WITH_RC4_40_MD5", CipherAlgorithmType.Rc4, HashAlgorithmType.Md5, ExchangeAlgorithmType.RsaKeyX, true, false, 5, 16, 40, 0, 0);
+              scs.Add((0x00 << 0x08) | 0x08, "TLS_RSA_EXPORT_WITH_DES40_CBC_SHA", CipherAlgorithmType.Des, HashAlgorithmType.Sha1, ExchangeAlgorithmType.RsaKeyX, true, true, 5, 8, 40, 8, 8);
+
+              return scs;
+          }
+      }
+  }
+  ```
+
+test "rank1408: the same table with the export registrations gone is not reported"
+  lang csharp
+  file mcs/class/Mono.Security/Mono.Security.Protocol.Tls/CipherSuiteFactory.cs
+  reject VYQL-CRY-002
+  code
+  ```
+  namespace Mono.Security.Protocol.Tls
+  {
+      internal sealed class CipherSuiteFactory
+      {
+          private static CipherSuiteCollection GetTls1SupportedCiphers()
+          {
+              CipherSuiteCollection scs = new CipherSuiteCollection(SecurityProtocolType.Tls);
+
+              scs.Add((0x00 << 0x08) | 0x2F, "TLS_RSA_WITH_AES_128_CBC_SHA", CipherAlgorithmType.Aes128, HashAlgorithmType.Sha1, ExchangeAlgorithmType.RsaKeyX, false, true, 16, 16, 128, 16, 16);
+              scs.Add((0x00 << 0x08) | 0x35, "TLS_RSA_WITH_AES_256_CBC_SHA", CipherAlgorithmType.Aes256, HashAlgorithmType.Sha1, ExchangeAlgorithmType.RsaKeyX, false, true, 32, 32, 256, 16, 16);
+
+              return scs;
+          }
+      }
+  }
+  ```
+
+test "rank1408: a test helper that filters export suites out of a list is not read as enabling them"
+  lang csharp
+  file mcs/class/Mono.Security/Test/tools/tlstest/tlstest.cs
+  reject VYQL-CRY-002
+  code
+  ```
+  using System.Collections.Generic;
+  using System.Linq;
+
+  namespace Mono.Security.Test
+  {
+      public class TlsTest
+      {
+          static IEnumerable<string> StrongCiphers(IEnumerable<string> allCiphers)
+          {
+              var ciphers = from cipher in allCiphers where !cipher.Contains ("EXPORT") select cipher;
+              return ciphers;
+          }
+      }
+  }
+  ```

@@ -1,0 +1,9 @@
+module bindings.python.generated.m3e2f1546;
+
+binding archiveEntryWrite0 {
+  requires {
+    dependency("xlsxwriter")
+  }
+  query pattern callExpr where callee.method == "write_url"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

@@ -1,0 +1,33 @@
+module bindings.elixir.generated.m7758ee8c;
+
+binding secretValue0 {
+  requires {
+    dependency("json_web_token")
+  }
+  query pattern callExpr where callee.method == "sign"
+  emit source code.SecretValue at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("json_web_token")
+  }
+  query pattern callExpr where callee.method == "sign"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("json_web_token")
+  }
+  query pattern callExpr where callee.method == "verify"
+  emit source core.UserControlledData at call.result
+}
+
+binding secretValue3 {
+  requires {
+    dependency("json_web_token")
+  }
+  query pattern callExpr where callee.method == "verify"
+  emit source code.SecretValue at call.result
+}

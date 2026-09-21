@@ -1,0 +1,156 @@
+# Rank 1537 / CVE-2022-35961: OpenZeppelin's ECDSA library accepted a
+# second, compact signature encoding alongside the standard one, so the
+# same commitment recovered through two different encodings let signature
+# schemes that assume uniqueness (nonces, replay guards) be bypassed
+# (signature malleability, CWE-347; PR #3610, fixed in 4.7.2).
+#
+# tryRecover(bytes32, bytes memory) in contracts/utils/cryptography/ECDSA.sol
+# dispatched on the signature's length: the 65-byte arm unpacked the
+# standard (r, s, v) form in assembly and delegated to
+# tryRecover(hash, v, r, s), while a second arm on
+# `signature.length == 64` unpacked the EIP-2098 compact (r, vs) form and
+# delegated to tryRecover(hash, r, vs). The doc block on that entry
+# promises the opposite of what the second arm does -- "The ecrecover EVM
+# opcode allows for malleable (non-unique) signatures: this function
+# rejects them by requiring the s value to be in the lower half order,
+# and the v value to be either 27 or 28" -- because the compact encoding
+# maps ambiguously onto (v, s) pairs: a signature and its malleable twin
+# both recover, so the entry accepts two encodings of one commitment.
+#
+# The fixing commit d693d89d99 ("Fix ECDSA signature malleability (#3610)")
+# removes the 64-byte arm entirely: the standard 65-byte form is the only
+# encoding the bytes-form entry accepts, and the compact form stays
+# reachable only through the explicit-field overload
+# tryRecover(hash, r, vs), where the caller names the encoding.
+#
+# code.SignatureCompactEncodingAccepted / VYQL-CRY-058 holds both
+# directions: the dual-encoding dispatcher below expects the finding, and
+# the canonical-only form rejects it -- including the explicit (r, vs)
+# overload sitting beside it, which must not fire. The three VYQL-CRY-003
+# findings the real file carries at both revisions sit on the
+# abi.encodePacked hash helpers below the recovery code and cannot
+# discriminate.
+#
+# Measured on the real checkout: ECDSA.sol reports 3 findings at the fixed
+# revision and 4 at the parent (the fourth being VYQL-CRY-058 on the
+# tryRecover definition line); the full contracts tree reports 9 and 10,
+# three runs each. Solady's assembly-switch dispatcher over
+# mload(signature) -- a dialect whose own header documents dual acceptance
+# as an intentional contract with a non-malleability warning -- reports
+# nothing, and neither does any other tree in the corpus.
+
+test "rank1537: the recovery entry accepts a second compact encoding"
+  lang solidity
+  file contracts/utils/cryptography/ECDSA.sol
+  expect VYQL-CRY-058
+  expect_review code.SignatureCompactEncodingAccepted
+  code
+  ```
+  // SPDX-License-Identifier: MIT
+  // OpenZeppelin Contracts (last updated v4.7.0) (utils/cryptography/ECDSA.sol)
+
+  pragma solidity ^0.8.0;
+
+  library ECDSA {
+      enum RecoverError {
+          NoError,
+          InvalidSignature,
+          InvalidSignatureLength,
+          InvalidSignatureS
+      }
+
+      function tryRecover(bytes32 hash, bytes memory signature) internal pure returns (address, RecoverError) {
+          // Check the signature length
+          // - case 65: r,s,v signature (standard)
+          // - case 64: r,vs signature (cf https://eips.ethereum.org/EIPS/eip-2098) _Available since v4.1._
+          if (signature.length == 65) {
+              bytes32 r;
+              bytes32 s;
+              uint8 v;
+              // ecrecover takes the signature parameters, and the only way to get them
+              // currently is to use assembly.
+              /// @solidity memory-safe-assembly
+              assembly {
+                  r := mload(add(signature, 0x20))
+                  s := mload(add(signature, 0x40))
+                  v := byte(0, mload(add(signature, 0x60)))
+              }
+              return tryRecover(hash, v, r, s);
+          } else if (signature.length == 64) {
+              bytes32 r;
+              bytes32 vs;
+              // ecrecover takes the signature parameters, and the only way to get them
+              // currently is to use assembly.
+              /// @solidity memory-safe-assembly
+              assembly {
+                  r := mload(add(signature, 0x20))
+                  vs := mload(add(signature, 0x40))
+              }
+              return tryRecover(hash, r, vs);
+          } else {
+              return (address(0), RecoverError.InvalidSignatureLength);
+          }
+      }
+
+      function tryRecover(bytes32 hash, uint8 v, bytes32 r, bytes32 s) internal pure returns (address, RecoverError) {
+          revert("not implemented in snippet");
+      }
+
+      function tryRecover(bytes32 hash, bytes32 r, bytes32 vs) internal pure returns (address, RecoverError) {
+          revert("not implemented in snippet");
+      }
+  }
+  ```
+
+test "rank1537: the fixed revision keeps only the canonical encoding"
+  lang solidity
+  file contracts/utils/cryptography/ECDSA.sol
+  reject VYQL-CRY-058
+  reject_review code.SignatureCompactEncodingAccepted
+  code
+  ```
+  // SPDX-License-Identifier: MIT
+  // OpenZeppelin Contracts (last updated v4.7.0) (utils/cryptography/ECDSA.sol)
+
+  pragma solidity ^0.8.0;
+
+  library ECDSA {
+      enum RecoverError {
+          NoError,
+          InvalidSignature,
+          InvalidSignatureLength,
+          InvalidSignatureS
+      }
+
+      function tryRecover(bytes32 hash, bytes memory signature) internal pure returns (address, RecoverError) {
+          // Check the signature length
+          // - case 65: r,s,v signature (standard)
+          if (signature.length == 65) {
+              bytes32 r;
+              bytes32 s;
+              uint8 v;
+              // ecrecover takes the signature parameters, and the only way to get them
+              // currently is to use assembly.
+              /// @solidity memory-safe-assembly
+              assembly {
+                  r := mload(add(signature, 0x20))
+                  s := mload(add(signature, 0x40))
+                  v := byte(0, mload(add(signature, 0x60)))
+              }
+              return tryRecover(hash, v, r, s);
+          } else {
+              return (address(0), RecoverError.InvalidSignatureLength);
+          }
+      }
+
+      function tryRecover(bytes32 hash, uint8 v, bytes32 r, bytes32 s) internal pure returns (address, RecoverError) {
+          revert("not implemented in snippet");
+      }
+
+      function tryRecover(bytes32 hash, bytes32 r, bytes32 vs) internal pure returns (address, RecoverError) {
+          bytes32 s = vs & bytes32(0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
+          uint8 v = uint8((uint256(vs) >> 255) + 27);
+          return tryRecover(hash, v, r, s);
+      }
+  }
+  ```

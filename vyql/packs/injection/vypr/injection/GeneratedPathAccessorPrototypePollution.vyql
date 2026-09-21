@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule GeneratedPathAccessorPrototypePollution {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_1321, CWE_94]
+    id: "VYQL-INJ-179"
+    severity: high
+  }
+  issue code.GeneratedPathAccessorPrototypePollution as sink
+}

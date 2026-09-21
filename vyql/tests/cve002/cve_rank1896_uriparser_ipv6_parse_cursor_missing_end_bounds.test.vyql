@@ -1,0 +1,311 @@
+# Rank 1896 / CVE-2018-20721 (uriparser/uriparser, recorded language c; the
+# axis is CWE-125, an out-of-bounds read). The *Ex* parse entry points take an
+# explicit half-open range [first, afterLast) rather than a NUL-terminated
+# string, so every cursor walk inside the parser owes its loop a comparison
+# against afterLast. ParseIPv6address2 (src/UriParse.c:566) honours that
+# contract twice: the outer for(;;) re-checks `first >= afterLast` at the top
+# of each round (:591), and the quad-eating do-while in the no-dot-yet branch
+# carries `first < afterLast` in its own condition. The third loop -- the
+# "eat rest of IPv4 address" for(;;) entered once an embedded IPv4 address has
+# begun (:599) -- dereferences and advances the cursor with no bounds
+# comparison anywhere in the loop: `switch (*first)` ... `first++` (:694) and
+# back to the top. An authority string such as "//[::44.1" whose buffer ends
+# exactly at the '1' therefore walks `first` past afterLast and keeps reading
+# heap memory until a byte happens to stop the switch; the parse can only end
+# through the StopSyntax cases of bytes it has no right to touch. The fixed revision
+# cef25028 adds the missing comparison right after the increment:
+# `if (first >= afterLast) { StopSyntax(state, first, memory); return NULL; }`.
+#
+# Detected by the range-bounded cursor-walk fact, emitted at the loop:
+# ccCursorLoopMissingEndSentinelObservations
+# (internal/extract/frontend/treesitter/c.go) -> analysis.cursor_loop.
+# missing_end_sentinel -> code.PointerOffsetBoundsCheck / VYQL-NUM-006,
+# binding vyql/bindings/c/cursor_loop_missing_end_sentinel.vyql. The fact
+# pairs a walk with the end its own signature states: a parameter standing
+# alone as one side of a relational comparison whose other side is the bare
+# cursor names that parameter as the walk's end, and a loop that dereferences
+# and advances the cursor while relating it to nothing anywhere in its own
+# subtree has no bound of its own. The pairing is read from the tree, so
+# neither half is satisfiable by prose or by an unrelated identifier.
+#
+# Measured on the real checkout, three --cache off runs per revision (timeout
+# 180, --max-ram 6GB), before and after the fact landed: 267 findings on the
+# parent with exactly one VYQL-NUM-006 row at src/UriParse.c:599 -- the
+# vulnerable loop -- against 267 on the fixed revision with none; every other
+# row is byte-identical between the two binaries on both revisions. Before
+# the fact, both revisions reported the same 266/267 set with nothing inside
+# :599-:695 and four VYQL-MEM-006 rows on the safe do-while sibling's
+# derefs -- findings in the function are not coverage.
+#
+# Precision, measured two ways. A regex census of the shape over every
+# available C clone (324 roots, ~47k files) returns one candidate besides
+# the target -- zephyr's parse_flag, whose `*argidx >= argc` compares a
+# dereference rather than the bare cursor and is excluded by the bare-operand
+# requirement -- so the expected collateral across the corpus is zero. The
+# scanner itself, old binary against new on redis (13368 findings), RIOT
+# (9611), unbound (6667) and tcpdump, reports the same finding set both
+# sides with no new VYQL-NUM-006 row. Two near-miss idioms are what keep it
+# narrow: `p < zl + zlbytes` is an allocation base plus an offset, not a
+# range parameter, and the NUL-terminated walk has no range parameter to
+# compare against at all -- the ordinary safe C idiom when the contract is a
+# terminator rather than a range, pinned by the fourth case.
+#
+# Residuals, all false-negative: the pairing is intra-function, so a range
+# maintained across calls in a helper is invisible; a cursor spelled
+# differently at the comparison and the loop does not pair; and a loop whose
+# bound is an equality test against a terminator value rather than a
+# relational comparison of the cursor is not this fact's subject.
+#
+# verify_current_expected: fixed, case 1 expects and cases 2-4 reject.
+
+test "rank1896: IPv4 tail loop advances the cursor past afterLast with no bounds comparison in the loop"
+  lang c
+  file UriParse.c
+  expect VYQL-NUM-006
+  expect_review code.PointerOffsetBoundsCheck
+  code
+  ```
+  typedef struct { int errorCode; const char * errorPos; } ParserState;
+  typedef struct { unsigned char data[16]; } UriIp6;
+
+  static void StopSyntax(ParserState * state, const char * first) {
+      state->errorCode = 1;
+      state->errorPos = first;
+  }
+
+  static int uriGetOctetValue(const unsigned char * digits, int digitCount) {
+      int value = 0;
+      while (digitCount-- > 0) {
+          value = 10 * value + *digits++;
+      }
+      return value;
+  }
+
+  /* Modelled on ParseIPv6address2 with the no-dot-yet branch stripped: the
+     outer loop bounds the cursor, the inner "eat rest of IPv4 address"
+     loop does not -- first++ at the bottom sends the cursor past afterLast
+     and the switch reads it. */
+  static const char * ParseIPv6address2(ParserState * state,
+          const char * first, const char * afterLast, UriIp6 * ip6) {
+      int digitCount = 0;
+      unsigned char digitHistory[4];
+      int ip4OctetsDone = 1;
+
+      for (;;) {
+          if (first >= afterLast) {
+              StopSyntax(state, first);
+              return 0;
+          }
+
+          /* Inside IPv4 part? */
+          if (ip4OctetsDone > 0) {
+              /* Eat rest of IPv4 address */
+              for (;;) {
+                  switch (*first) {
+                  case '0': case '1': case '2': case '3': case '4':
+                  case '5': case '6': case '7': case '8': case '9':
+                      if (digitCount == 4) {
+                          StopSyntax(state, first);
+                          return 0;
+                      }
+                      digitHistory[digitCount++] =
+                              (unsigned char)(9 + *first - '9');
+                      break;
+
+                  case '.':
+                      if ((ip4OctetsDone == 4)
+                              || (digitCount == 0)
+                              || (digitCount == 4)) {
+                          StopSyntax(state, first);
+                          return 0;
+                      }
+                      ip6->data[16 - 4 + ip4OctetsDone] =
+                              uriGetOctetValue(digitHistory, digitCount);
+                      digitCount = 0;
+                      ip4OctetsDone++;
+                      break;
+
+                  case ']':
+                      if ((ip4OctetsDone != 3)
+                              || (digitCount == 0)
+                              || (digitCount == 4)) {
+                          StopSyntax(state, first);
+                          return 0;
+                      }
+                      ip6->data[16 - 4 + 3] =
+                              uriGetOctetValue(digitHistory, digitCount);
+                      return first + 1;
+
+                  default:
+                      StopSyntax(state, first);
+                      return 0;
+                  }
+                  first++;
+              }
+          }
+      }
+  }
+  ```
+
+test "rank1896: fix bounds the cursor at the bottom of the IPv4 tail loop"
+  lang c
+  file UriParse_fixed.c
+  reject VYQL-NUM-006
+  reject_review code.PointerOffsetBoundsCheck
+  code
+  ```
+  typedef struct { int errorCode; const char * errorPos; } ParserState;
+  typedef struct { unsigned char data[16]; } UriIp6;
+
+  static void StopSyntax(ParserState * state, const char * first) {
+      state->errorCode = 1;
+      state->errorPos = first;
+  }
+
+  static int uriGetOctetValue(const unsigned char * digits, int digitCount) {
+      int value = 0;
+      while (digitCount-- > 0) {
+          value = 10 * value + *digits++;
+      }
+      return value;
+  }
+
+  static const char * ParseIPv6address2(ParserState * state,
+          const char * first, const char * afterLast, UriIp6 * ip6) {
+      int digitCount = 0;
+      unsigned char digitHistory[4];
+      int ip4OctetsDone = 1;
+
+      for (;;) {
+          if (first >= afterLast) {
+              StopSyntax(state, first);
+              return 0;
+          }
+
+          /* Inside IPv4 part? */
+          if (ip4OctetsDone > 0) {
+              /* Eat rest of IPv4 address */
+              for (;;) {
+                  switch (*first) {
+                  case '0': case '1': case '2': case '3': case '4':
+                  case '5': case '6': case '7': case '8': case '9':
+                      if (digitCount == 4) {
+                          StopSyntax(state, first);
+                          return 0;
+                      }
+                      digitHistory[digitCount++] =
+                              (unsigned char)(9 + *first - '9');
+                      break;
+
+                  case '.':
+                      if ((ip4OctetsDone == 4)
+                              || (digitCount == 0)
+                              || (digitCount == 4)) {
+                          StopSyntax(state, first);
+                          return 0;
+                      }
+                      ip6->data[16 - 4 + ip4OctetsDone] =
+                              uriGetOctetValue(digitHistory, digitCount);
+                      digitCount = 0;
+                      ip4OctetsDone++;
+                      break;
+
+                  case ']':
+                      if ((ip4OctetsDone != 3)
+                              || (digitCount == 0)
+                              || (digitCount == 4)) {
+                          StopSyntax(state, first);
+                          return 0;
+                      }
+                      ip6->data[16 - 4 + 3] =
+                              uriGetOctetValue(digitHistory, digitCount);
+                      return first + 1;
+
+                  default:
+                      StopSyntax(state, first);
+                      return 0;
+                  }
+                  first++;
+
+                  if (first >= afterLast) {
+                      StopSyntax(state, first);
+                      return 0;
+                  }
+              }
+          }
+      }
+  }
+  ```
+
+test "rank1896: sibling quad-eating loop bounds the same cursor in its own condition"
+  lang c
+  file UriParse_sibling.c
+  reject VYQL-NUM-006
+  reject_review code.PointerOffsetBoundsCheck
+  code
+  ```
+  typedef struct { int errorCode; const char * errorPos; } ParserState;
+
+  static void StopSyntax(ParserState * state, const char * first) {
+      state->errorCode = 1;
+      state->errorPos = first;
+  }
+
+  /* The no-dot-yet branch of the same function: identical dereference and
+     increment, but the do-while condition re-bounds the cursor against
+     afterLast every round. */
+  static const char * EatWhileNoDotInSight(ParserState * state,
+          const char * first, const char * afterLast) {
+      int digitCount = 0;
+      int walking = 1;
+
+      do {
+          switch (*first) {
+          case '0': case '1': case '2': case '3': case '4':
+          case '5': case '6': case '7': case '8': case '9':
+              if (digitCount == 4) {
+                  StopSyntax(state, first);
+                  return 0;
+              }
+              digitCount++;
+              break;
+
+          default:
+              StopSyntax(state, first);
+              return 0;
+          }
+          first++;
+      } while (walking && (first < afterLast));
+
+      return first;
+  }
+  ```
+
+test "rank1896: NUL-terminated walk owes its loop no end-sentinel comparison"
+  lang c
+  file UriParse_nulwalk.c
+  reject VYQL-NUM-006
+  reject_review code.PointerOffsetBoundsCheck
+  code
+  ```
+  /* The ordinary safe C idiom when the contract is a terminator rather than
+     a range: a loop that dereferences and advances a cursor with no
+     end-pointer comparison anywhere. The function takes no range parameter
+     and never compares the cursor bare against one, so it is not a
+     range-bounded walk and the fact stays off it. */
+  static int countHexDigits(const char * first) {
+      int digitCount = 0;
+      while (*first) {
+          switch (*first) {
+          case '0': case '1': case '2': case '3': case '4':
+          case '5': case '6': case '7': case '8': case '9':
+              digitCount++;
+              break;
+          default:
+              return digitCount;
+          }
+          first++;
+      }
+      return digitCount;
+  }
+  ```

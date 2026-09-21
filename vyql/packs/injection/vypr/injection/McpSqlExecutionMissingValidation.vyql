@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule McpSqlExecutionMissingValidation {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_89, CWE_863]
+    id: "VYQL-INJ-149"
+    severity: critical
+  }
+  issue code.McpSqlExecutionMissingValidation as sink
+}

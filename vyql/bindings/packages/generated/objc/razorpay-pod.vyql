@@ -1,0 +1,66 @@
+module bindings.objc.generated.m42f45fae;
+
+binding userControlledData0 {
+  requires {
+    dependency("razorpay-pod")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("razorpay-pod")
+  }
+  query pattern callExpr where callee.method == "openMagicXWithStorefrontUrl"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("razorpay-pod")
+  }
+  query pattern callExpr where callee.method == "authorize"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("razorpay-pod")
+  }
+  query pattern callExpr where callee.method == "openCheckoutWithDict"
+  emit source core.UserControlledData at call.result
+}
+
+binding deserialization4 {
+  requires {
+    dependency("razorpay-pod")
+  }
+  query pattern callExpr where callee.method == "decodeURIFrom"
+  emit sink code.Deserialization at args[0]
+}
+
+binding redirectTarget5 {
+  requires {
+    dependency("razorpay-pod")
+  }
+  query pattern callExpr where callee.method == "handleRedirection"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}
+
+binding deserialization6 {
+  requires {
+    dependency("razorpay-pod")
+  }
+  query pattern callExpr where callee.method == "viewControllerForPayload"
+  emit sink code.Deserialization at args[0]
+}
+
+binding networkConnect7 {
+  requires {
+    dependency("razorpay-pod")
+  }
+  query pattern callExpr where callee.method == "startTransaction"
+  emit sink code.NetworkConnectSink at args[0]
+}

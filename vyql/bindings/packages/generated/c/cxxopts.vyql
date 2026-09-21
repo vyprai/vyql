@@ -1,0 +1,17 @@
+module bindings.c.generated.m908e68cc;
+
+binding storedDataWrite0 {
+  requires {
+    dependency("cxxopts")
+  }
+  query pattern callExpr where callee.method == "IsFalseText"
+  emit sink code.StoredDataWrite at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("cxxopts")
+  }
+  query pattern callExpr where callee.method == "Value"
+  emit sink code.Deserialization at args[0]
+}

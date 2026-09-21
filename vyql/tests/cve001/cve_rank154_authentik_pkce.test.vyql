@@ -1,0 +1,80 @@
+# Rank 154 / CVE-2024-23647: authentik's token endpoint validated PKCE in one
+# direction only. A stored authorization code that carries a code_challenge
+# forces a matching verifier, but a token request presenting a code_verifier
+# against a code stored without a challenge is accepted untouched, so a client
+# holding a intercepted code downgrades the flow to plain and redeems it. The
+# fix rejects the asymmetric pair: a stored challenge of none together with a
+# presented verifier is an invalid_grant.
+
+test "rank154: python token request presents a verifier no stored challenge asked for"
+  lang python
+  expect VYQL-AUTH-082
+  expect_review code.ProtocolStateReview
+  code
+  ```
+  from authentik.providers.oauth2.models import AuthorizationCode
+
+  PKCE_METHOD_S256 = "S256"
+
+  class TokenError(Exception):
+      pass
+
+  class TokenParams:
+      def __post_init_code(self, raw_code, request):
+          self.authorization_code = AuthorizationCode.objects.filter(code=raw_code).first()
+          if not self.authorization_code:
+              raise TokenError("invalid_grant")
+
+          # Validate PKCE parameters.
+          if self.authorization_code.code_challenge:
+              # Authorization code had PKCE but we didn't get one
+              if not self.code_verifier:
+                  raise TokenError("invalid_request")
+              if self.authorization_code.code_challenge_method == PKCE_METHOD_S256:
+                  new_code_challenge = urlsafe_b64encode(sha256(self.code_verifier.encode("ascii")).digest()).decode("utf-8").replace("=", "")
+              else:
+                  new_code_challenge = self.code_verifier
+
+              if new_code_challenge != self.authorization_code.code_challenge:
+                  LOGGER.warning("Code challenge not matching")
+                  raise TokenError("invalid_grant")
+  ```
+
+test "rank154: python token request with a verifier and no stored challenge is rejected"
+  lang python
+  reject VYQL-AUTH-082
+  reject_review code.ProtocolStateReview
+  code
+  ```
+  from authentik.providers.oauth2.models import AuthorizationCode
+
+  PKCE_METHOD_S256 = "S256"
+
+  class TokenError(Exception):
+      pass
+
+  class TokenParams:
+      def __post_init_code(self, raw_code, request):
+          self.authorization_code = AuthorizationCode.objects.filter(code=raw_code).first()
+          if not self.authorization_code:
+              raise TokenError("invalid_grant")
+
+          # Validate PKCE parameters.
+          if self.authorization_code.code_challenge:
+              # Authorization code had PKCE but we didn't get one
+              if not self.code_verifier:
+                  raise TokenError("invalid_grant")
+              if self.authorization_code.code_challenge_method == PKCE_METHOD_S256:
+                  new_code_challenge = urlsafe_b64encode(sha256(self.code_verifier.encode("ascii")).digest()).decode("utf-8").replace("=", "")
+              else:
+                  new_code_challenge = self.code_verifier
+
+              if new_code_challenge != self.authorization_code.code_challenge:
+                  LOGGER.warning("Code challenge not matching")
+                  raise TokenError("invalid_grant")
+
+          # Token request had a code_verifier but code did not have a code challenge
+          # Prevent downgrade
+          if not self.authorization_code.code_challenge and self.code_verifier:
+              raise TokenError("invalid_grant")
+  ```

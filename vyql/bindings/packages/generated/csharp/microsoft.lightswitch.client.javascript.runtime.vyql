@@ -1,0 +1,49 @@
+module bindings.csharp.generated.m18f63b07;
+
+binding userControlledData0 {
+  requires {
+    dependency("microsoft.lightswitch.client.javascript.runtime")
+  }
+  query pattern callExpr where callee.method == "getUrlParameter"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("microsoft.lightswitch.client.javascript.runtime")
+  }
+  query pattern callExpr where callee.method == "removeUrlParameter"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("microsoft.lightswitch.client.javascript.runtime")
+  }
+  query pattern callExpr where callee.method == "getCookieValue"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("microsoft.lightswitch.client.javascript.runtime")
+  }
+  query pattern callExpr where callee.method == "getAllCookieValues"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData4 {
+  requires {
+    dependency("microsoft.lightswitch.client.javascript.runtime")
+  }
+  query pattern callExpr where callee.method == "parseUrl"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData5 {
+  requires {
+    dependency("microsoft.lightswitch.client.javascript.runtime")
+  }
+  query pattern callExpr where callee.method == "parseUrlHash"
+  emit source core.UserControlledData at call.result
+}

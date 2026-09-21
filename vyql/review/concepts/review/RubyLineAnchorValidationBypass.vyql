@@ -1,0 +1,7 @@
+module code;
+
+review code.RubyLineAnchorValidationBypass {
+  category: resource
+  kind: attention
+  text: "review Ruby validators that use ^ and $ anchors; use \\A and \\z for whole-string matching"
+}

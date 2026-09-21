@@ -1,0 +1,35 @@
+module bindings.php.twig_array_callback_filter_partial_override;
+
+// Twig's array filters `filter`, `map` and `reduce` each pass their arrow
+// value to PHP as a callable -- array_filter, a variable-function call and
+// array_reduce respectively -- so a template expression naming a PHP
+// function executes it. Re-registering a filter name from an extension
+// replaces the built-in, which is Twig's documented override mechanism and
+// the only way an application can put a guard in front of those three. An
+// extension that overrides a strict subset of the three leaves the rest on
+// the engine's stock callable-accepting implementation: the override is
+// itself the declaration that template authors must not pass arbitrary
+// callables, so every un-overridden sibling reintroduces exactly what the
+// overridden ones guard against. The set of three is Twig's own -- its
+// 1.x line documents no arrow for `sort` or `find`, which name no callable
+// there -- and the registration is read at module scope because the filter
+// table is a per-extension, per-file fact. Names registered through a
+// computed name (`TwigFilter($name, ...)`) enumerate no literal here, so
+// that form is left to the unsandboxed-render binding that clears on it.
+// All clauses are text-level over the module context, so a commented-out
+// registration of the missing name counts as registering it: false-negative
+// direction only.
+binding twigArrayCallbackFilterMissingReduce {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and containsAny(node.token, ["TwigFilter('filter'", "TwigFilter(\"filter\"", "Twig_Filter('filter'", "Twig_Filter(\"filter\"", "TwigFilter('map'", "TwigFilter(\"map\"", "Twig_Filter('map'", "Twig_Filter(\"map'"]) and not containsAny(node.token, ["TwigFilter('reduce'", "TwigFilter(\"reduce\"", "Twig_Filter('reduce'", "Twig_Filter(\"reduce'"])
+  emit issue code.IncompleteTemplateValidation at node
+}
+
+binding twigArrayCallbackFilterMissingMap {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and containsAny(node.token, ["TwigFilter('filter'", "TwigFilter(\"filter\"", "Twig_Filter('filter'", "Twig_Filter(\"filter\"", "TwigFilter('reduce'", "TwigFilter(\"reduce\"", "Twig_Filter('reduce'", "Twig_Filter(\"reduce'"]) and not containsAny(node.token, ["TwigFilter('map'", "TwigFilter(\"map'", "Twig_Filter('map'", "Twig_Filter(\"map'"])
+  emit issue code.IncompleteTemplateValidation at node
+}
+
+binding twigArrayCallbackFilterMissingFilter {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and containsAny(node.token, ["TwigFilter('map'", "TwigFilter(\"map\"", "Twig_Filter('map'", "Twig_Filter(\"map'", "TwigFilter('reduce'", "TwigFilter(\"reduce\"", "Twig_Filter('reduce'", "Twig_Filter(\"reduce'"]) and not containsAny(node.token, ["TwigFilter('filter'", "TwigFilter(\"filter\"", "Twig_Filter('filter'", "Twig_Filter(\"filter'"])
+  emit issue code.IncompleteTemplateValidation at node
+}

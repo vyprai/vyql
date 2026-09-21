@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule IncompleteShellSubstitutionDenylist {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_77]
+    id: "VYQL-INJ-272"
+    severity: high
+  }
+  issue code.IncompleteShellSubstitutionDenylist as sink
+}

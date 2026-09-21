@@ -1,0 +1,89 @@
+module bindings.cpp.generated.m844a02b5;
+
+binding deserialization0 {
+  requires {
+    dependency("wil")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("wil")
+  }
+  query pattern callExpr where callee.method == "query_dispatch"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("wil")
+  }
+  query pattern callExpr where callee.method == "query_to"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("wil")
+  }
+  query pattern callExpr where callee.method == "try_query_to"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("wil")
+  }
+  query pattern callExpr where callee.method == "copy_to"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("wil")
+  }
+  query pattern callExpr where callee.method == "try_copy_to"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization6 {
+  requires {
+    dependency("wil")
+  }
+  query pattern callExpr where callee.method == "com_query"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization7 {
+  requires {
+    dependency("wil")
+  }
+  query pattern callExpr where callee.method == "com_query_failfast"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization8 {
+  requires {
+    dependency("wil")
+  }
+  query pattern callExpr where callee.method == "com_query_to"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization9 {
+  requires {
+    dependency("wil")
+  }
+  query pattern callExpr where callee.method == "com_query_to_failfast"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization10 {
+  requires {
+    dependency("wil")
+  }
+  query pattern callExpr where callee.method == "com_query_to_nothrow"
+  emit sink code.Deserialization at args[0]
+}

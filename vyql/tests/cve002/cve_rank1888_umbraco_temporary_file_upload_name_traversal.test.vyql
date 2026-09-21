@@ -1,0 +1,436 @@
+# Umbraco's temporary-file upload takes the stored file's name from the
+# multipart part. CreateTemporaryFileController binds
+# `[FromForm] CreateTemporaryFileRequestModel model`, the view-model map copies
+# `target.FileName = source.File.FileName`, and TemporaryFileService.Validate
+# checked only the extension:
+#
+#     private TemporaryFileOperationStatus Validate(TemporaryFileModelBase temporaryFileModel)
+#         => IsAllowedFileExtension(temporaryFileModel) == false
+#             ? TemporaryFileOperationStatus.FileExtensionNotAllowed
+#             : TemporaryFileOperationStatus.Success;
+#
+# LocalFileSystemTemporaryFileRepository.SaveAsync then joins that name onto
+# the per-key directory and writes through a helper:
+#
+#     var fullFileName = Path.Combine(fileDirectory.FullName, model.FileName);
+#     ...
+#     CreateActualFile(model, fullFileName)   //  File.Create(fullFilePath)
+#
+# so a name carrying `..` segments escapes the temporary-file root and the
+# uploaded bytes land at an attacker-chosen path (path traversal, CWE-22;
+# GHSA-q62r-8ppj-xvf4). The fixed revision adds a filename-character rejection to the
+# service:
+#
+#     private static bool IsValidFileName(string fileName) =>
+#         !string.IsNullOrEmpty(fileName) && fileName.IndexOfAny(Path.GetInvalidFileNameChars()) < 0;
+#
+# `File.Create` had no sink at all in the C# vocabulary, so the write surface
+# itself lacks a label: every other System.IO path-taking entry point
+# (File.Open, File.OpenRead, File.OpenText, File.Copy, File.Move,
+# File.WriteAllText, File.WriteAllBytes, File.Delete, File.Exists,
+# FileStream, StreamReader) is bound as code.FilePathAccess and File.Create
+# and File.OpenWrite are the two gaps. filePathAccess590/591 bind them.
+# VYQL-PATH-001 then reports the chain end to end: the `[FromForm]` model
+# parameter, the mapper, the DI'd repository interface, the object-initializer
+# property hop, Path.Combine, Task.WhenAll and the helper call all carry the
+# taint to File.Create. Measured on the whole src/ tree, union of three
+# --cache off runs per side: 47 distinct VYQL-PATH-001 sink lines before,
+# 48 after, the delta exactly LocalFileSystemTemporaryFileRepository.cs:139
+# and nothing removed. The File.Create site in PhysicalFileSystem.cs:187 and
+# the four File.OpenWrite sites in PackagesRepository.cs and
+# CreatedPackageSchemaRepository.cs add no findings (no source reaches them),
+# and the File.Create/File.OpenWrite reachable set across every other clone
+# under /tmp/cve-work/rank*/ is empty.
+#
+# The second block pins the patched revision. The fixed revision's guard is recognised --
+# pathAccessCheck403 labels IsValidFileName's function context
+# core.PathAccessCheck -- but endpointGuarded is function-local, so a check
+# two classes away from the sink cannot cover it: `unless endpoint coveredBy
+# core.PathAccessCheck` reports "no guard on sink" and the finding stays. That
+# is the delegated-check attribution family measured at ranks 1377,
+# 1389, 1397, 1399 (Go), 1364 (Rust), 1372 (TypeScript), 1394 (PHP) and 1437
+# (C#); the counterweight of rank 1380 does not apply, because the fixed revision leaves
+# no documented-API call inside the method it guards -- IsValidFileName is
+# project-local. This block expects the finding today and flips when that
+# family lands.
+#
+# verify_current_expected: vulnerable +1 finding at the File.Create sink,
+# patched identical (the guard is labelled but not attributed).
+
+test "rank1888: a form-bound upload file name joined onto the per-key directory reaches File.Create"
+  lang csharp
+  file src/Umbraco.Cms.Api.Management/Controllers/TemporaryFile/CreateTemporaryFileController.cs
+  code
+  ```
+  using Microsoft.AspNetCore.Http;
+  using Microsoft.AspNetCore.Mvc;
+
+  namespace Umbraco.Cms.Api.Management.Controllers.TemporaryFile
+  {
+      public class CreateTemporaryFileRequestModel
+      {
+          public required System.Guid Id { get; set; }
+          public required IFormFile File { get; set; }
+      }
+
+      public abstract class TemporaryFileControllerBase : ManagementApiControllerBase { }
+
+      public class CreateTemporaryFileController : TemporaryFileControllerBase
+      {
+          private readonly TemporaryFileService _temporaryFileService;
+
+          [HttpPost("")]
+          public async Task<IActionResult> Create(
+              CancellationToken cancellationToken,
+              [FromForm] CreateTemporaryFileRequestModel model)
+          {
+              var createModel = new CreateTemporaryFileModel
+              {
+                  FileName = model.File.FileName,
+                  Key = model.Id,
+                  OpenReadStream = model.File.OpenReadStream
+              };
+
+              var result = await _temporaryFileService.CreateAsync(createModel);
+              return Ok(result);
+          }
+      }
+  }
+  ```
+  file src/Umbraco.Core/Services/TemporaryFileService.cs
+  code
+  ```
+  using System.IO;
+
+  namespace Umbraco.Cms.Api.Management.Controllers.TemporaryFile
+  {
+      public class TemporaryFileModelBase
+      {
+          public string FileName { get; set; } = string.Empty;
+          public System.Guid Key { get; set; }
+      }
+
+      public class CreateTemporaryFileModel : TemporaryFileModelBase
+      {
+          public required Func<Stream> OpenReadStream { get; set; }
+      }
+
+      public class TemporaryFileModel : CreateTemporaryFileModel
+      {
+          public DateTime AvailableUntil { get; set; }
+      }
+
+      public class TemporaryFileService
+      {
+          private readonly LocalFileSystemTemporaryFileRepository _temporaryFileRepository;
+
+          public async Task<TemporaryFileModel?> CreateAsync(CreateTemporaryFileModel createModel)
+          {
+              if (Validate(createModel) != 0)
+              {
+                  return null;
+              }
+
+              var temporaryFileModel = new TemporaryFileModel
+              {
+                  Key = createModel.Key,
+                  FileName = createModel.FileName,
+                  OpenReadStream = createModel.OpenReadStream,
+                  AvailableUntil = DateTime.Now.AddDays(1)
+              };
+
+              await _temporaryFileRepository.SaveAsync(temporaryFileModel);
+              return temporaryFileModel;
+          }
+
+          private int Validate(TemporaryFileModelBase temporaryFileModel)
+              => IsAllowedFileExtension(temporaryFileModel.FileName) == false ? 1 : 0;
+
+          private bool IsAllowedFileExtension(string fileName)
+          {
+              var extension = Path.GetExtension(fileName)[1..];
+              return extension == "txt";
+          }
+      }
+  }
+  ```
+  file src/Umbraco.Infrastructure/Persistence/Repositories/Implement/LocalFileSystemTemporaryFileRepository.cs
+  expect VYQL-PATH-001
+  code
+  ```
+  using System.IO;
+
+  namespace Umbraco.Cms.Api.Management.Controllers.TemporaryFile
+  {
+      public class LocalFileSystemTemporaryFileRepository
+      {
+          private const string MetaDataFileName = ".metadata";
+
+          public async Task SaveAsync(TemporaryFileModel model)
+          {
+              var fileDirectory = new DirectoryInfo(Path.Combine("/tmp/umbraco", model.Key.ToString()));
+
+              var fullFileName = Path.Combine(fileDirectory.FullName, model.FileName);
+              var metadataFileName = Path.Combine(fileDirectory.FullName, MetaDataFileName);
+
+              await Task.WhenAll(
+                  CreateActualFile(model, fullFileName),
+                  CreateMetadataFile(metadataFileName));
+          }
+
+          private static async Task CreateActualFile(TemporaryFileModel model, string fullFilePath)
+          {
+              FileStream fileStream = File.Create(fullFilePath);
+              await using var dataStream = model.OpenReadStream();
+              await dataStream.CopyToAsync(fileStream);
+              fileStream.Close();
+          }
+
+          private static async Task CreateMetadataFile(string fullFilePath)
+          {
+              await File.WriteAllTextAsync(fullFilePath, "{}");
+          }
+      }
+  }
+  ```
+
+test "rank1888: the fixed revision's filename-character rejection, two classes from the write"
+  lang csharp
+  file src/Umbraco.Cms.Api.Management/Controllers/TemporaryFile/CreateTemporaryFileController.cs
+  code
+  ```
+  using Microsoft.AspNetCore.Http;
+  using Microsoft.AspNetCore.Mvc;
+
+  namespace Umbraco.Cms.Api.Management.Controllers.TemporaryFile
+  {
+      public class CreateTemporaryFileRequestModel
+      {
+          public required System.Guid Id { get; set; }
+          public required IFormFile File { get; set; }
+      }
+
+      public abstract class TemporaryFileControllerBase : ManagementApiControllerBase { }
+
+      public class CreateTemporaryFileController : TemporaryFileControllerBase
+      {
+          private readonly TemporaryFileService _temporaryFileService;
+
+          [HttpPost("")]
+          public async Task<IActionResult> Create(
+              CancellationToken cancellationToken,
+              [FromForm] CreateTemporaryFileRequestModel model)
+          {
+              var createModel = new CreateTemporaryFileModel
+              {
+                  FileName = model.File.FileName,
+                  Key = model.Id,
+                  OpenReadStream = model.File.OpenReadStream
+              };
+
+              var result = await _temporaryFileService.CreateAsync(createModel);
+              return Ok(result);
+          }
+      }
+  }
+  ```
+  file src/Umbraco.Core/Services/TemporaryFileService.cs
+  code
+  ```
+  using System.IO;
+
+  namespace Umbraco.Cms.Api.Management.Controllers.TemporaryFile
+  {
+      public class TemporaryFileModelBase
+      {
+          public string FileName { get; set; } = string.Empty;
+          public System.Guid Key { get; set; }
+      }
+
+      public class CreateTemporaryFileModel : TemporaryFileModelBase
+      {
+          public required Func<Stream> OpenReadStream { get; set; }
+      }
+
+      public class TemporaryFileModel : CreateTemporaryFileModel
+      {
+          public DateTime AvailableUntil { get; set; }
+      }
+
+      public class TemporaryFileService
+      {
+          private readonly LocalFileSystemTemporaryFileRepository _temporaryFileRepository;
+
+          public async Task<TemporaryFileModel?> CreateAsync(CreateTemporaryFileModel createModel)
+          {
+              if (Validate(createModel) != 0)
+              {
+                  return null;
+              }
+
+              var temporaryFileModel = new TemporaryFileModel
+              {
+                  Key = createModel.Key,
+                  FileName = createModel.FileName,
+                  OpenReadStream = createModel.OpenReadStream,
+                  AvailableUntil = DateTime.Now.AddDays(1)
+              };
+
+              await _temporaryFileRepository.SaveAsync(temporaryFileModel);
+              return temporaryFileModel;
+          }
+
+          private int Validate(TemporaryFileModelBase temporaryFileModel)
+          {
+              if (IsAllowedFileExtension(temporaryFileModel.FileName) == false)
+              {
+                  return 1;
+              }
+
+              if (IsValidFileName(temporaryFileModel.FileName) == false)
+              {
+                  return 5;
+              }
+
+              return 0;
+          }
+
+          private bool IsAllowedFileExtension(string fileName)
+          {
+              var extension = Path.GetExtension(fileName)[1..];
+              return extension == "txt";
+          }
+
+          private static bool IsValidFileName(string fileName) =>
+              !string.IsNullOrEmpty(fileName) && fileName.IndexOfAny(Path.GetInvalidFileNameChars()) < 0;
+      }
+  }
+  ```
+  file src/Umbraco.Infrastructure/Persistence/Repositories/Implement/LocalFileSystemTemporaryFileRepository.cs
+  expect VYQL-PATH-001
+  code
+  ```
+  using System.IO;
+
+  namespace Umbraco.Cms.Api.Management.Controllers.TemporaryFile
+  {
+      public class LocalFileSystemTemporaryFileRepository
+      {
+          private const string MetaDataFileName = ".metadata";
+
+          public async Task SaveAsync(TemporaryFileModel model)
+          {
+              var fileDirectory = new DirectoryInfo(Path.Combine("/tmp/umbraco", model.Key.ToString()));
+
+              var fullFileName = Path.Combine(fileDirectory.FullName, model.FileName);
+              var metadataFileName = Path.Combine(fileDirectory.FullName, MetaDataFileName);
+
+              await Task.WhenAll(
+                  CreateActualFile(model, fullFileName),
+                  CreateMetadataFile(metadataFileName));
+          }
+
+          private static async Task CreateActualFile(TemporaryFileModel model, string fullFilePath)
+          {
+              FileStream fileStream = File.Create(fullFilePath);
+              await using var dataStream = model.OpenReadStream();
+              await dataStream.CopyToAsync(fileStream);
+              fileStream.Close();
+          }
+
+          private static async Task CreateMetadataFile(string fullFilePath)
+          {
+              await File.WriteAllTextAsync(fullFilePath, "{}");
+          }
+      }
+  }
+  ```
+
+test "rank1888: the same filename-character rejection in the writing function clears the write"
+  lang csharp
+  file src/Umbraco.Infrastructure/Persistence/Repositories/Implement/LocalFileSystemTemporaryFileRepository.cs
+  reject VYQL-PATH-001
+  code
+  ```
+  using System.IO;
+
+  namespace Umbraco.Cms.Api.Management.Controllers.TemporaryFile
+  {
+      public class LocalFileSystemTemporaryFileRepository
+      {
+          private const string MetaDataFileName = ".metadata";
+
+          public async Task SaveAsync(TemporaryFileModel model)
+          {
+              var fileDirectory = new DirectoryInfo(Path.Combine("/tmp/umbraco", model.Key.ToString()));
+
+              var fullFileName = Path.Combine(fileDirectory.FullName, model.FileName);
+              var metadataFileName = Path.Combine(fileDirectory.FullName, MetaDataFileName);
+
+              await Task.WhenAll(
+                  CreateActualFile(model, fullFileName),
+                  CreateMetadataFile(metadataFileName));
+          }
+
+          private static async Task CreateActualFile(TemporaryFileModel model, string fullFilePath)
+          {
+              if (fullFilePath.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+              {
+                  return;
+              }
+
+              FileStream fileStream = File.Create(fullFilePath);
+              await using var dataStream = model.OpenReadStream();
+              await dataStream.CopyToAsync(fileStream);
+              fileStream.Close();
+          }
+
+          private static async Task CreateMetadataFile(string fullFilePath)
+          {
+              await File.WriteAllTextAsync(fullFilePath, "{}");
+          }
+      }
+  }
+  ```
+
+test "rank1888: a fixed metadata name in a fixed directory keeps File.Create untainted"
+  lang csharp
+  file src/Umbraco.Infrastructure/Persistence/Repositories/Implement/LocalFileSystemTemporaryFileRepository.cs
+  reject VYQL-PATH-001
+  code
+  ```
+  using System.IO;
+
+  namespace Umbraco.Cms.Api.Management.Controllers.TemporaryFile
+  {
+      public class LocalFileSystemTemporaryFileRepository
+      {
+          private const string MetaDataFileName = ".metadata";
+
+          public async Task SaveAsync(TemporaryFileModel model)
+          {
+              var fileDirectory = new DirectoryInfo("/tmp/umbraco");
+
+              var fullFileName = Path.Combine(fileDirectory.FullName, MetaDataFileName);
+              var metadataFileName = Path.Combine(fileDirectory.FullName, MetaDataFileName);
+
+              await Task.WhenAll(
+                  CreateActualFile(model, fullFileName),
+                  CreateMetadataFile(metadataFileName));
+          }
+
+          private static async Task CreateActualFile(TemporaryFileModel model, string fullFilePath)
+          {
+              FileStream fileStream = File.Create(fullFilePath);
+              await using var dataStream = model.OpenReadStream();
+              await dataStream.CopyToAsync(fileStream);
+              fileStream.Close();
+          }
+
+          private static async Task CreateMetadataFile(string fullFilePath)
+          {
+              await File.WriteAllTextAsync(fullFilePath, "{}");
+          }
+      }
+  }
+  ```

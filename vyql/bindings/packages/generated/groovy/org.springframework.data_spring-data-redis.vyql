@@ -1,0 +1,9 @@
+module bindings.groovy.generated.mc922f0ec;
+
+binding deserialization0 {
+  requires {
+    dependency("org.springframework.data:spring-data-redis")
+  }
+  query pattern callExpr where callee.method == "deserializeCacheValue"
+  emit sink code.Deserialization at args[0]
+}

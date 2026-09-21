@@ -1,0 +1,33 @@
+module bindings.groovy.generated.med520b51;
+
+binding storedDataRead0 {
+  requires {
+    dependency("org.apache.maven:maven-settings-builder")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.StoredDataRead at call.result
+}
+
+binding storedDataWrite1 {
+  requires {
+    dependency("org.apache.maven:maven-settings-builder")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.StoredDataWrite at args[0]
+}
+
+binding secretValue2 {
+  requires {
+    dependency("org.apache.maven:maven-settings-builder")
+  }
+  query pattern callExpr where callee.method == "decrypt"
+  emit source code.SecretValue at call.result
+}
+
+binding urlFetch3 {
+  requires {
+    dependency("org.apache.maven:maven-settings-builder")
+  }
+  query pattern callExpr where callee.method == "UrlSettingsSource"
+  emit sink code.UrlFetch at args[0]
+}

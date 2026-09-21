@@ -1,0 +1,35 @@
+module bindings.javascript.fragment_reassembly_without_payload_budget;
+
+// A receiver that reassembles each in-flight message from the frames a peer
+// chooses to split it into carries the peer's choices in its own state: the
+// frame count, the per-frame declared length, and the bytes buffered so far
+// all grow with what arrives, so the libraries that ship one (ws, undici)
+// document a payload-size option the parser is expected to enforce across
+// the fragments of a message, not per frame. Without that budget the frame
+// count is the only bound, and when the accounting call is guarded by the
+// fragment's own length -- `body.length && !this.writeFragments(body)` -- a
+// peer that streams empty frames never reaches even the count. The anchor is
+// the fragment vocabulary of the reassembly (a fragments member on the
+// receiver class) together with that guarded accounting call inside the same
+// class, and the discharge is the documented control: any maxPayload
+// spelling (ws's maxPayload, undici's maxPayloadSize) clears the finding,
+// wherever in the class it is enforced.
+//
+// The class scope is the confinement: the two positive markers join only
+// inside one receiver, and a file-level join of the same two markers across
+// the corpus lands in vendor and UI bundles where "fragments" is DOM
+// document comments or an editor decoration set -- no class there carries
+// both. Residuals, stated: the guard must be the `&&` shape, so a receiver
+// testing emptiness in a separate branch before the call stays unflagged,
+// and the compacted expression token drops conditions over 160 bytes; the
+// negation reads the class text, which keeps comments, so a comment naming
+// the cap suppresses; and a size control spelled without "maxPayload"
+// (a maxMessageSize, say) leaves the class flagged.
+binding fragmentReassemblyWithoutPayloadBudget {
+  query pattern presenceNode where node.scope == "class" and node.context.language == "javascript"
+    and node.context.selector contains "fragments"
+    and node.context.expr contains ".length&&!this."
+    and not (node.token contains "maxPayload")
+
+  emit issue code.UnboundedResourceOperation at node
+}

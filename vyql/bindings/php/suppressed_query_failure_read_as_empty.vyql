@@ -1,0 +1,47 @@
+module bindings.php.suppressed_query_failure_read_as_empty;
+
+// wpdb's read accessors document a falsy failure return: get_var and get_row
+// return null on failure, and get_results returns null when the query does
+// not run -- the state a connection that never became ready leaves the
+// accessor in, because query() returns before the result set is touched.
+// suppress_errors() and hide_errors() make exactly that failure silent, so
+// inside a function that has silenced the database the falsy spelling of
+// "the query did not run" and the falsy spelling of "the query ran and
+// returned nothing" reach the same branch. A read tested in place --
+// `if ( ! $wpdb->get_results( ... ) )`, `if ( $wpdb->get_var( ... ) )`, or
+// the same call under &&, || or while -- has no type or count to consult.
+// Capture is the discriminator: assigning the result first takes the call
+// out of every condition, whatever the assigned value is then compared
+// against, so the bindings require the read and its truthiness test to be
+// one uncaptured expression. The call clause is AST-derived and the
+// condition clause reads the compacted function body, so the two residuals
+// sit on opposite sides: a real read plus a commented-out truthiness test
+// reports, and a read captured into a variable that is then itself coerced
+// is equally ambiguous but does not. get_col is excluded because it
+// documents an array return with no failure spelling, and query because its
+// falsy zero-row return is the ordinary reading of a write. The condition
+// clause names the $wpdb receiver, so a read held on another handle is out
+// of reach of the text and does not match.
+binding suppressedResultsFailureReadAsEmpty {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php"
+    and node.context.call in [suppress_errors, hide_errors]
+    and node.context.call in [get_results]
+    and containsAny(node.token, ["!$wpdb->get_results(", "if($wpdb->get_results(", "&&$wpdb->get_results(", "||$wpdb->get_results(", "while($wpdb->get_results(", "elseif($wpdb->get_results("])
+  emit issue code.SuppressedQueryFailureReadAsEmpty at node
+}
+
+binding suppressedVarFailureReadAsEmpty {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php"
+    and node.context.call in [suppress_errors, hide_errors]
+    and node.context.call in [get_var]
+    and containsAny(node.token, ["!$wpdb->get_var(", "if($wpdb->get_var(", "&&$wpdb->get_var(", "||$wpdb->get_var(", "while($wpdb->get_var(", "elseif($wpdb->get_var("])
+  emit issue code.SuppressedQueryFailureReadAsEmpty at node
+}
+
+binding suppressedRowFailureReadAsEmpty {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php"
+    and node.context.call in [suppress_errors, hide_errors]
+    and node.context.call in [get_row]
+    and containsAny(node.token, ["!$wpdb->get_row(", "if($wpdb->get_row(", "&&$wpdb->get_row(", "||$wpdb->get_row(", "while($wpdb->get_row(", "elseif($wpdb->get_row("])
+  emit issue code.SuppressedQueryFailureReadAsEmpty at node
+}

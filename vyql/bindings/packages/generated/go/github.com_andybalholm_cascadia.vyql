@@ -1,0 +1,49 @@
+module bindings.go.generated.m9e2705dc;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/andybalholm/cascadia")
+  }
+  query pattern callExpr where callee.method == "Parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/andybalholm/cascadia")
+  }
+  query pattern callExpr where callee.method == "ParseWithPseudoElement"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("github.com/andybalholm/cascadia")
+  }
+  query pattern callExpr where callee.method == "ParseGroup"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("github.com/andybalholm/cascadia")
+  }
+  query pattern callExpr where callee.method == "ParseGroupWithPseudoElements"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("github.com/andybalholm/cascadia")
+  }
+  query pattern callExpr where callee.method == "Compile"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("github.com/andybalholm/cascadia")
+  }
+  query pattern callExpr where callee.method == "MustCompile"
+  emit sink code.Deserialization at args[0]
+}

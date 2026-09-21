@@ -1,0 +1,41 @@
+module bindings.objc.generated.mfedb8893;
+
+binding userControlledData0 {
+  requires {
+    dependency("HLSCachingReverseProxyServer")
+  }
+  query pattern callExpr where callee.method == "reverseProxyURL"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("HLSCachingReverseProxyServer")
+  }
+  query pattern callExpr where callee.method == "reverseProxyPlaylist"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("HLSCachingReverseProxyServer")
+  }
+  query pattern callExpr where callee.method == "processPlaylistLine"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("HLSCachingReverseProxyServer")
+  }
+  query pattern callExpr where callee.method == "lineByReplacingURI"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData4 {
+  requires {
+    dependency("HLSCachingReverseProxyServer")
+  }
+  query pattern callExpr where callee.method == "absoluteURL"
+  emit source core.UserControlledData at call.result
+}

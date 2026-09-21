@@ -1,0 +1,23 @@
+module bindings.php.psr7_server_params_input;
+
+// PSR-7's ServerRequestInterface::getServerParams() returns the server
+// parameters of the current request -- the object-shaped mirror of the
+// $_SERVER superglobal, which the php.input bindings already label key by
+// key. The generated package binding for the interface is dependency-gated
+// and PHP dependency resolution reads composer.lock, so an application that
+// ships composer.json alone (the framework itself, or any project that does
+// not commit its lock file) gets no label on the one accessor its request
+// object offers. This binding is ungated for the same reason the $_SERVER
+// reads are: the method is part of the interface contract, not of a
+// particular package's implementation of it.
+//
+// The label sits on the call result, so every key read out of the returned
+// array carries -- including the keys a server sets itself (SCRIPT_NAME).
+// That is the same judgement the superglobal bindings already make for
+// $_SERVER's request-derived keys, applied one hop later, and it is the
+// reason the escape-at-the-write control, not key selection, is what
+// separates a rendered prefix from an escaped one.
+binding httpInputGetServerParams {
+  query pattern callExpr where callee.method == "getServerParams"
+  emit source code.HttpInput at call.result
+}

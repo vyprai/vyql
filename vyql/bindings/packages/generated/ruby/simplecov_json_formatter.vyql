@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m8a0d803c;
+
+binding fileUse0 {
+  requires {
+    dependency("simplecov_json_formatter")
+  }
+  query pattern callExpr where callee.method == "export_formatted_result"
+  emit sink code.FileUseSink at args[0]
+}

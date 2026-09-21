@@ -1,0 +1,9 @@
+module bindings.bash.generated.m5d821c00;
+
+binding cliArgument0 {
+  requires {
+    dependency("yq")
+  }
+  query pattern callExpr where callee.path ~= "yq.argv"
+  emit source code.CliArgument at call.result
+}

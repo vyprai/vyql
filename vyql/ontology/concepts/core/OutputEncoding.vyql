@@ -1,0 +1,7 @@
+module core;
+
+concept OutputEncoding : check {
+  applies: path
+  cwe: [CWE_116]
+  neutralizes: [injection.Xss]
+}

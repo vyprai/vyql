@@ -1,0 +1,25 @@
+module bindings.perl.generated.mfd44b194;
+
+binding cliArgument0 {
+  requires {
+    dependency("Applify")
+  }
+  query pattern callExpr where callee.method == "option_parser"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument1 {
+  requires {
+    dependency("Applify")
+  }
+  query pattern callExpr where callee.method == "subcommand"
+  emit source code.CliArgument at call.result
+}
+
+binding commandExecution2 {
+  requires {
+    dependency("Applify")
+  }
+  query pattern callExpr where callee.method == "_app_run"
+  emit sink code.CommandExecution at args[0]
+}

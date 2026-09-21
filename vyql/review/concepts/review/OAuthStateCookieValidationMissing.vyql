@@ -1,0 +1,8 @@
+module code;
+
+review code.OAuthStateCookieValidationMissing {
+  category: auth
+  expected: [core.CsrfProtection, core.AuthenticationCheck]
+  kind: target
+  text: "review OAuth/SSO callbacks for state cookie/session storage and comparison before token exchange"
+}

@@ -1,0 +1,6 @@
+module code;
+
+concept UnsafeAutoTraitImpl : issue {
+  cwe: [CWE_362, CWE_119]
+  vulnerableTo: [concurrency.RaceCondition, memory.OobRead, memory.OobWrite]
+}

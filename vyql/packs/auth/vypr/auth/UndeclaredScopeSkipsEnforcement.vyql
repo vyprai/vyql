@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule UndeclaredScopeSkipsEnforcement {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_285, CWE_863]
+    id: "VYQL-AUTH-178"
+    severity: high
+  }
+  issue code.UndeclaredScopeSkipsEnforcement as guard
+}

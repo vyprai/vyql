@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule OpenedWindowConcatenatedDocumentWrite {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_79]
+    id: "VYQL-INJ-240"
+    severity: high
+  }
+  issue code.OpenedWindowConcatenatedDocumentWrite as sink
+}

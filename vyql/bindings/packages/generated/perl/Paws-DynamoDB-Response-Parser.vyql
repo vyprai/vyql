@@ -1,0 +1,9 @@
+module bindings.perl.generated.m80c06a83;
+
+binding deserialization0 {
+  requires {
+    dependency("Paws-DynamoDB-Response-Parser")
+  }
+  query pattern callExpr where callee.method == "to_perl"
+  emit sink code.Deserialization at args[0]
+}

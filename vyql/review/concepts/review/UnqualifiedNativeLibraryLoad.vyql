@@ -1,0 +1,7 @@
+module code;
+
+review code.UnqualifiedNativeLibraryLoad {
+  category: path
+  kind: attention
+  text: "review native module loads that name a bare library file for a search-order restriction, so the module cannot be resolved from a writable directory ahead of the system one"
+}

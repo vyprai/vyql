@@ -1,0 +1,157 @@
+# Rank 1573 / CVE-2024-45048: PhpSpreadsheet's XML scanner disarmed
+# external entities by re-encoding every document it loads, but its
+# charset detection only recognised double-quoted encoding
+# declarations, so a crafted workbook declaring `encoding='UTF-7'`
+# with single quotes skipped the re-encoding and smuggled hidden
+# entities through the reader (XXE via quote-blind detection,
+# CWE-611). toUtf8 in src/PhpSpreadsheet/Reader/Security/
+# XmlScanner.php ran `preg_match('/encoding="(.*?)"/', $xml, ...)`
+# and defaulted the charset to UTF-8 when it missed -- the XML
+# grammar allows both quote styles in the declaration -- so a
+# single-quoted non-UTF-8 declaration kept the entity-bearing bytes
+# out of the re-encoding that the custom-entity detection depends
+# on. Pool commit bea2d4b30f is the fix (verified by diff --
+# "Security: prevent XXE (XML External Entity) when loading files"):
+# a findCharSet helper matches both encoding="..." and
+# encoding='...', with regression fixtures for both quote styles.
+#
+# ATTENTION, quote-blind normalization, held on recheck. The guard
+# exists and runs -- its defect is that the pattern recognises only
+# one of the two spellings the XML grammar permits, the same
+# present-but-incomplete family as ranks 1522 (bracket-blind
+# hosts), 1551 (first-quote-only escaping) and 1564 (unquoted bind
+# types): nothing can ask "does this detection pattern cover every
+# syntactic form the grammar allows" -- grammar-completeness
+# vocabulary. A binding on PhpSpreadsheet's own scanner would
+# detect this library rather than the weakness. Measured on the
+# real code (3 x --cache off per revision, timeout 180, --max-ram
+# 6GB): both revisions report 3426 findings, 1990 at or above high,
+# with identical per-rule counts, and XmlScanner.php carries
+# exactly one finding at both revisions (VYQL-PATH-001 on
+# scanFile's file_get_contents, an unrelated heuristic). The
+# PHP-reachable XXE rule VYQL-DESER-015 fires 10 rows on the tree
+# -- eight simplexml_load_string reader sites fed by the scanner's
+# output plus two test files -- with identical fingerprints at both
+# revisions, so it covers the parse sites' loader axis and
+# discriminates nothing here; VYQL-DESER-004 consumes
+# code.XmlParserCreate, which no PHP binding emits. The preg_match
+# pattern argument is labelled code.RegexCompileSink, whose only
+# consumer judges tainted patterns (VYQL-DOS-001), not pattern
+# completeness; mb_convert_encoding carries no binding. No
+# ENGINE-GAPS.md entry: the missing piece is grammar-completeness
+# vocabulary, not a localised construct. No definition change
+# shipped. Spec cve_rank1573 records the one-quote detection and
+# the both-quotes form modelled on the real file, both asserting
+# reject VYQL-DESER-015: when grammar-completeness vocabulary
+# lands, the single-pattern form must flip to expect.
+
+test "rank1573: the charset is detected through one quote style"
+  lang php
+  file src/PhpSpreadsheet/Reader/Security/XmlScanner.php
+  reject VYQL-DESER-015
+  code
+  ```
+  <?php
+
+  namespace PhpOffice\PhpSpreadsheet\Reader\Security;
+
+  use PhpOffice\PhpSpreadsheet\Reader;
+
+  class XmlScanner
+  {
+      private static function forceString(mixed $arg): string
+      {
+          return is_string($arg) ? $arg : '';
+      }
+
+      private function toUtf8(string $xml): string
+      {
+          $pattern = '/encoding="(.*?)"/';
+          $result = preg_match($pattern, $xml, $matches);
+          $charset = strtoupper($result ? $matches[1] : 'UTF-8');
+
+          if ($charset !== 'UTF-8') {
+              $xml = self::forceString(mb_convert_encoding($xml, 'UTF-8', $charset));
+
+              $result = preg_match($pattern, $xml, $matches);
+              $charset = strtoupper($result ? $matches[1] : 'UTF-8');
+              if ($charset !== 'UTF-8') {
+                  throw new Reader\Exception('Suspicious Double-encoded XML, spreadsheet file load() aborted to prevent XXE/XEE attacks');
+              }
+          }
+
+          return $xml;
+      }
+
+      public function scan($xml): string
+      {
+          $xml = "$xml";
+
+          $xml = $this->toUtf8($xml);
+
+          return $xml;
+      }
+  }
+  ```
+
+test "rank1573: the fixed revision detects both quote styles"
+  lang php
+  file src/PhpSpreadsheet/Reader/Security/XmlScanner.php
+  reject VYQL-DESER-015
+  code
+  ```
+  <?php
+
+  namespace PhpOffice\PhpSpreadsheet\Reader\Security;
+
+  use PhpOffice\PhpSpreadsheet\Reader;
+
+  class XmlScanner
+  {
+      private static function forceString(mixed $arg): string
+      {
+          return is_string($arg) ? $arg : '';
+      }
+
+      private function findCharSet(string $xml): string
+      {
+          $patterns = [
+              '/encoding="([^"]*]?)"/',
+              "/encoding='([^']*?)'/",
+          ];
+
+          foreach ($patterns as $pattern) {
+              if (preg_match($pattern, $xml, $matches)) {
+                  return strtoupper($matches[1]);
+              }
+          }
+
+          return 'UTF-8';
+      }
+
+      private function toUtf8(string $xml): string
+      {
+          $charset = $this->findCharSet($xml);
+
+          if ($charset !== 'UTF-8') {
+              $xml = self::forceString(mb_convert_encoding($xml, 'UTF-8', $charset));
+
+              $charset = $this->findCharSet($xml);
+              if ($charset !== 'UTF-8') {
+                  throw new Reader\Exception('Suspicious Double-encoded XML, spreadsheet file load() aborted to prevent XXE/XEE attacks');
+              }
+          }
+
+          return $xml;
+      }
+
+      public function scan($xml): string
+      {
+          $xml = "$xml";
+
+          $xml = $this->toUtf8($xml);
+
+          return $xml;
+      }
+  }
+  ```

@@ -1,0 +1,121 @@
+module bindings.groovy.generated.mb80e1451;
+
+binding nosqlQuery0 {
+  requires {
+    dependency("org.elasticsearch.client:elasticsearch-rest-high-level-client")
+  }
+  query pattern callExpr where callee.method == "search"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery1 {
+  requires {
+    dependency("org.elasticsearch.client:elasticsearch-rest-high-level-client")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery2 {
+  requires {
+    dependency("org.elasticsearch.client:elasticsearch-rest-high-level-client")
+  }
+  query pattern callExpr where callee.method == "split"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery3 {
+  requires {
+    dependency("org.elasticsearch.client:elasticsearch-rest-high-level-client")
+  }
+  query pattern callExpr where callee.method == "putFollow"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery4 {
+  requires {
+    dependency("org.elasticsearch.client:elasticsearch-rest-high-level-client")
+  }
+  query pattern callExpr where callee.method == "putAutoFollowPattern"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery5 {
+  requires {
+    dependency("org.elasticsearch.client:elasticsearch-rest-high-level-client")
+  }
+  query pattern callExpr where callee.method == "deleteAutoFollowPattern"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery6 {
+  requires {
+    dependency("org.elasticsearch.client:elasticsearch-rest-high-level-client")
+  }
+  query pattern callExpr where callee.method == "forgetFollower"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery7 {
+  requires {
+    dependency("org.elasticsearch.client:elasticsearch-rest-high-level-client")
+  }
+  query pattern callExpr where callee.method == "pauseFollow"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery8 {
+  requires {
+    dependency("org.elasticsearch.client:elasticsearch-rest-high-level-client")
+  }
+  query pattern callExpr where callee.method == "resumeFollow"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery9 {
+  requires {
+    dependency("org.elasticsearch.client:elasticsearch-rest-high-level-client")
+  }
+  query pattern callExpr where callee.method == "unfollow"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery10 {
+  requires {
+    dependency("org.elasticsearch.client:elasticsearch-rest-high-level-client")
+  }
+  query pattern callExpr where callee.method == "resumeAutoFollowPattern"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery11 {
+  requires {
+    dependency("org.elasticsearch.client:elasticsearch-rest-high-level-client")
+  }
+  query pattern callExpr where callee.method == "pauseAutoFollowPattern"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery12 {
+  requires {
+    dependency("org.elasticsearch.client:elasticsearch-rest-high-level-client")
+  }
+  query pattern callExpr where callee.method == "getCcrStats"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery13 {
+  requires {
+    dependency("org.elasticsearch.client:elasticsearch-rest-high-level-client")
+  }
+  query pattern callExpr where callee.method == "getFollowStats"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery14 {
+  requires {
+    dependency("org.elasticsearch.client:elasticsearch-rest-high-level-client")
+  }
+  query pattern callExpr where callee.method == "getAutoFollowPattern"
+  emit sink code.NosqlQuery at args[0]
+}

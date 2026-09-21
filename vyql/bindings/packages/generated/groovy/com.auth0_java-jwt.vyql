@@ -1,0 +1,29 @@
+module bindings.groovy.generated.mb3f494c8;
+
+binding userControlledData0 {
+  requires {
+    dependency("com.auth0:java-jwt")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit source core.UserControlledData at call.result
+}
+
+binding deserialization1 {
+  requires {
+    dependency("com.auth0:java-jwt")
+  }
+  query pattern callExpr where callee.method == "decodeJwt"
+  emit sink code.Deserialization at args[0]
+}
+
+binding authenticationCheck2 {
+  requires {
+    dependency("com.auth0:java-jwt")
+  }
+  query pattern callExpr where callee.method == "verify"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

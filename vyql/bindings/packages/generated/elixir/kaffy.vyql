@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m7b89fa3c;
+
+binding htmlRender0 {
+  requires {
+    dependency("kaffy")
+  }
+  query pattern callExpr where callee.method == "build_html_input"
+  emit sink code.HtmlRender at args[0]
+}

@@ -1,0 +1,8 @@
+module code;
+
+review code.ClamavWwpackStructsPointerOobWrite {
+  category: memory
+  expected: [core.MemoryBoundsCheck]
+  kind: attention
+  text: "review WWPack section-table rewrites for containment checks before each computed structs write"
+}

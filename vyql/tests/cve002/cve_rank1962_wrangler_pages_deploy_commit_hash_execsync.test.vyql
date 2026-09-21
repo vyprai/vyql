@@ -1,0 +1,216 @@
+# Rank 1962 / CVE-2026-0933: wrangler's `pages deploy` interpolates the
+# `--commit-hash` flag into a shell command. The command handler is an object
+# method (`async handler(args)`) inside the object literal handed to
+# createCommand, and the flag value arrives through it:
+#
+#   let { branch, commitHash, commitMessage, commitDirty } = args;
+#   ...
+#   commitMessage = execSync(`git show -s --format=%B ${commitHash}`)
+#       .toString()
+#       .trim();
+#
+# Whoever controls the CLI flag controls a fragment of a command string that
+# execSync hands to a shell (CWE-78). The fixed revision, 99b1f328, passes the value as
+# one argv element instead: execFileSync("git", ["show", "-s", "--format=%B",
+# commitHash]), no shell in between.
+#
+# Three things had to come together, and the spec pins each:
+#
+# 1. Vocabulary (shipped here): node:child_process documents execSync as
+#    spawning a shell over ONE command string while execFileSync/spawn take an
+#    argv array, so "an execSync spelling plus a template-built string" is the
+#    review shape code.CommandStringWrapperExecution / VYQL-INJ-119
+#    judges. jsExecSyncFormattedCommandString
+#    (bindings/javascript/command_string_template_execution.vyql) widens that
+#    family to the interpolated-template spelling; the identifier spelling
+#    (command/cmd locals) commandStringWrapperExecution251 covers
+#    stays as is. The negation on the execFile/spawn family follows the
+#    documented remediation and the existing binding's shape.
+# 2. Extraction (method shorthand): a method defined inside an object literal
+#    that is directly a call argument is never lowered when the call is a
+#    declarator's value — the arrow-function spelling of the same property does.
+#    The whole 265-line handler produced no nodes and no function-context
+#    tokens, so nothing could match. Case B pins the miss; it flips to expect
+#    with the callArgObjectMethodFuncDefs fix.
+# 3. Lowering (try/catch constants): the handler probes for a git repo with
+#    try { execSync("git rev-parse ...") } catch { isGitDir = false; } and
+#    guards everything after with if (isGitDir). The catch's assignment is
+#    const-folded and the constant leaks out of the try's control regions, so
+#    opaque-predicate pruning read if (isGitDir) as dead and dropped the
+#    guarded statements — including the vulnerable call — from the graph.
+#    Case E pins the miss through the working process.argv source; it flips
+#    to expect with the nir.Try const-join fix.
+#
+# The presence route (VYQL-INJ-119) reads the function's AST-derived context
+# tokens, so it fires without the lowering fix once the handler is extracted;
+# the taint route (VYQL-INJ-002) needs the sink node and is what case E pins.
+# The handler parameter itself carries no source label — the argv dispatch is
+# framework wiring no documented API exposes in-file — which is why the
+# taint route stays dark on cases A-D and the review rule carries detection.
+#
+# verify_current_expected: A, C and E's INJ-119 arm expect; B rejects until
+# the extraction fix lands, E's INJ-002 arm rejects until the lowering fix
+# lands; D (the fixed revision) rejects both rules.
+
+test "rank1962: an interpolated commit hash reaches execSync's shell command string"
+  lang javascript
+  file deploy.ts
+  expect VYQL-INJ-119
+  code
+  ```
+  import { execSync } from "node:child_process";
+
+  export const pagesDeployCommand = createCommand({
+  	handler: async (args) => {
+  		const { commitHash, commitMessage } = args;
+
+  		if (!commitMessage) {
+  			commitMessage = execSync(`git show -s --format=%B ${commitHash}`)
+  				.toString()
+  				.trim();
+  		}
+  	},
+  });
+  ```
+
+test "rank1962: the same handler written as an object method inside the createCommand argument"
+  lang javascript
+  file deploy.ts
+  expect VYQL-INJ-119
+  code
+  ```
+  import { execSync } from "node:child_process";
+
+  export const pagesDeployCommand = createCommand({
+  	async handler(args) {
+  		const { commitHash, commitMessage } = args;
+
+  		if (!commitMessage) {
+  			commitMessage = execSync(`git show -s --format=%B ${commitHash}`)
+  				.toString()
+  				.trim();
+  		}
+  	},
+  });
+  ```
+
+test "rank1962: the guarded form the real handler uses, after the repo probe"
+  lang javascript
+  file deploy.ts
+  expect VYQL-INJ-119
+  code
+  ```
+  import { execSync } from "node:child_process";
+
+  export const pagesDeployCommand = createCommand({
+  	handler: async (args) => {
+  		const { commitHash, commitMessage } = args;
+
+  		let isGitDir = true;
+  		try {
+  			execSync(`git rev-parse --is-inside-work-tree`, { stdio: "ignore" });
+  		} catch {
+  			isGitDir = false;
+  		}
+
+  		if (isGitDir) {
+  			try {
+  				if (!commitMessage) {
+  					commitMessage = execSync(`git show -s --format=%B ${commitHash}`)
+  						.toString()
+  						.trim();
+  				}
+  			} catch {}
+  		}
+  	},
+  });
+  ```
+
+test "rank1962: the fixed revision passes the commit hash as one argv element, no shell"
+  lang javascript
+  file deploy.ts
+  reject VYQL-INJ-119
+  code
+  ```
+  import { execFileSync, execSync } from "node:child_process";
+
+  export const pagesDeployCommand = createCommand({
+  	handler: async (args) => {
+  		const { commitHash, commitMessage } = args;
+
+  		let isGitDir = true;
+  		try {
+  			execSync(`git rev-parse --is-inside-work-tree`, { stdio: "ignore" });
+  		} catch {
+  			isGitDir = false;
+  		}
+
+  		if (isGitDir) {
+  			try {
+  				if (!commitMessage) {
+  					commitMessage = execFileSync("git", [
+  						"show",
+  						"-s",
+  						"--format=%B",
+  						commitHash,
+  					])
+  						.toString()
+  						.trim();
+  				}
+  			} catch {}
+  		}
+  	},
+  });
+  ```
+
+test "rank1962: a value from the real argv flowing through the same guarded shape"
+  lang javascript
+  file deploy.ts
+  expect VYQL-INJ-119
+  code
+  ```
+  import { execSync } from "node:child_process";
+
+  export const pagesDeployCommand = createCommand({
+  	handler: (args) => {
+  		const hash = process.argv[2];
+
+  		let ok = true;
+  		try {
+  			execSync("git rev-parse", { stdio: "ignore" });
+  		} catch {
+  			ok = false;
+  		}
+
+  		if (ok) {
+  			execSync(`git show -s --format=%B ${hash}`);
+  		}
+  	},
+  });
+  ```
+
+test "rank1962: the taint path through the guarded shape, which needs the sink node to survive the try/catch"
+  lang javascript
+  file deploy.ts
+  expect VYQL-INJ-002
+  code
+  ```
+  import { execSync } from "node:child_process";
+
+  export const pagesDeployCommand = createCommand({
+  	handler: (args) => {
+  		const hash = process.argv[2];
+
+  		let ok = true;
+  		try {
+  			execSync("git rev-parse", { stdio: "ignore" });
+  		} catch {
+  			ok = false;
+  		}
+
+  		if (ok) {
+  			execSync(`git show -s --format=%B ${hash}`);
+  		}
+  	},
+  });
+  ```

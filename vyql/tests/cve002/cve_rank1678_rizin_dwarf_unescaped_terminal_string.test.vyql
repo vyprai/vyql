@@ -1,0 +1,272 @@
+# Rank 1678 / CVE-2024-31668 (GHSA-w87m-4q2m-g66w): rizin parses attacker
+# supplied binaries, and every string the DWARF reader lifts out of the
+# file's debug sections -- compile unit names, producer strings, line table
+# paths -- is kept verbatim until the console prints it. A binary whose
+# .debug_str carries ANSI escape sequences therefore drives rizin's own
+# terminal: the escape bytes written into comments and info dumps move the
+# cursor, rewrite the screen, and in some terminal emulators execute the
+# OSC 8 / paste sequences the attacker chose. The advisory's CWE-78 reading
+# comes from that terminal-command effect; the defect itself is unescaped
+# control characters from a parsed file reaching terminal output
+# (CWE-150/CWE-117).
+#
+# Commit c025dcee40c8 fixes it at the parser's string boundary, not at any
+# print site: read_string() in librz/bin/dwarf/endian_reader.c (the reader
+# every inline DWARF string and, through rz_bin_dwarf_str_get(), every
+# .debug_str/.debug_line_str/.debug_str_offsets lookup goes through) gains
+#     str_escape(&x);
+# before its return, and rz_bin_dwarf_attr_string(), until then a
+# static-inline helper in librz/include/rz_bin_dwarf.h, moves to
+# librz/bin/dwarf/attr.c and returns str_escape_copy(orig) instead of
+# rz_str_dup(orig). Both helpers are new one-line wrappers in
+# librz/bin/dwarf/dwarf_private.h whose bodies call the documented
+# pre-existing API rz_str_escape_utf8(). No display file changes:
+# librz/core/cdwarf.c, which formats these strings into the output buffer
+# with rz_strbuf_appendf(sb, "%s", rz_bin_dwarf_attr_string(...)), is
+# byte-identical at both revisions.
+#
+# ATTENTION, delegated-check attribution gap, rechecked against the current
+# knowledge base. Every measurement below is on the real checkout
+# (c025dcee40c8^ vs c025dcee40c8), three --cache off runs per revision,
+# ~0.6s and 155MB peak each on librz/bin/dwarf.
+#
+# 1. Nothing reports the defect. The full findings view is memory noise at
+#    both revisions and nothing else: 81 findings at the parent (49
+#    VYQL-MEM-006, 21 MEM-008, 8 MEM-016, 2 MEM-007, 1 MEM-010) and 86 at
+#    the fix, identical across all three runs of each. The five extra
+#    findings at the fix are NullableDeref and MEM-007 rows on the fix's own
+#    new dwarf_private.h helpers and on shifted line numbers -- the scanner
+#    reports the remediation's new code and nothing about the unescaped
+#    string. cdwarf.c, the display site, reports 2 MEM-006 rows.
+#    `vyql match` over the reader reports no label on the path at all: no
+#    source on rz_buf_get_string, no sink on rz_strbuf_appendf or
+#    rz_cons_printf, no control on rz_str_escape_utf8. Nothing in the
+#    knowledge base names rizin, no C binding emits code.LogOutput
+#    (VYQL-INJ-009's sink), and the only emitter of
+#    code.UnneutralizedDiagnosticValue (VYQL-INJ-036, CWE-150/117) is the
+#    Python review route.
+# 2. Presence route, re-measured with a throwaway binding whose positive
+#    key is the DWARF string accessor family. The negation is the problem
+#    in both spellings:
+#      * keyed on the documented API (`not callPath contains
+#        "rz_str_escape"`) the label set is 8 -> 8 across the pair,
+#        endian_reader.c:238 included: the patched read_string's only escape
+#        call is the fix's own str_escape helper, and rz_str_escape_utf8
+#        sits one hop down inside str_escape_copy's body in dwarf_private.h.
+#      * keyed on `str_escape` instead (which also matches the documented
+#        rz_str_escape* family) the set goes 8 -> 7, and none of the seven
+#        that keep firing at the fix is a miss the advisory cares about:
+#        unit.c:21, op.c:611 and line.c:99/117 are escaped inside
+#        rz_bin_dwarf_attr_string, line_str.c:21 and str_offsets.c:44 inside
+#        read_string, one resolved hop down and invisible to function-local
+#        facts -- the C instance of the delegated-check attribution gap
+#        (1437; Go 1377/1389/1399, Python 1397, Rust 1364, TypeScript 1372,
+#        PHP 1394) in the unescaped-display variant recorded at 1441 -- and
+#        dwarf.c:48 (read_debuglink) hands its unescaped string to
+#        rz_file_path_join as a path, not to the console. The 1380
+#        counterweight fails too: no documented escape call remains inside
+#        any guarded function at the fixed revision.
+#    Narrowing the positive key to the buffer read alone (the two functions
+#    that call rz_buf_get_string) gives 2 -> 1, and the survivor is that
+#    same path-use read_debuglink -- a false positive, not a residual.
+# 3. Taint route, re-measured with throwaway bindings putting a
+#    core.UserControlledData source on rz_buf_get_string's result, a
+#    code.LogOutput sink on rz_strbuf_appendf/rz_cons_printf and a
+#    core.LogEscape control on rz_str_escape_utf8. With the sink anchored on
+#    the argument, the return edge, the same-file caller hop and the
+#    cross-file caller hop all carry taint (each verified with a two-file
+#    minimal pair), and neither the RZ_IPI declaration nor the
+#    RET_NULL_IF_FAIL body macro blocks it -- so the first pass's reading of
+#    the dead-ends (macro expansion, callee tracing) was the sink anchor's
+#    artifact, not the blocker. The one construct that kills the path is the
+#    store target: value->string = read_string(reader) (attr.c:62) and
+#    entry->path_name = read_string_not_empty(reader) (line.c:162) drop the
+#    taint where a plain local keeps it, because the C frontend lowers an
+#    assignment whose left side is a field to two bare expression statements
+#    (assignmentFallback, internal/extract/frontend/treesitter/c.go:1250)
+#    and only an identifier left side becomes an Assign. That is the C
+#    instance of the field-store family recorded for Go (1485) and PHP
+#    (1842). The fourth and fifth cases below pin it on shipped vocabulary
+#    alone: the identical getenv source and system sink report CRITICAL
+#    VYQL-INJ-002 through a local and go silent through a field, stable over
+#    three runs. 71 field stores of a call result sit in the 18 files of
+#    librz/bin/dwarf and 437 in librz/core, so the gap is ordinary C, not an
+#    incident shape. Closing it would still not report this weakness: the
+#    source label has to name rizin's undocumented buffer accessor.
+# 4. The reader cases below are easier than the real tree, so they cannot
+#    license a binding on their own: with the throwaway binding loaded the
+#    first three go 1 / 0 / 0 (its negation sees the helper's name in the
+#    second case and the documented API in the third) while the real
+#    checkout goes 8 -> 8 or 8 -> 7.
+#
+# Nothing shippable. The positive key exists only inside rizin and
+# rz_buf_get_string is declared in rz_buf.h with no documentation at all, so
+# the judgement that a string lifted from a parsed binary is terminal-bound
+# comes from this incident, not from the API -- the genericity test fails,
+# and the path-use survivor above is what that failure looks like. The
+# negation is a name substring, the shape rejected at 1364/1394. The
+# field-store fix adds flow edges to every C and C++ scan and is design
+# work, not a localized correction.
+#
+# The five cases below pin that state. The first is the vulnerable reader
+# at c025dcee40c8^. The second is the fixed revision, helper escape and
+# all. The third writes the documented API directly in the reader -- the
+# form any future binding must treat as remediation. All three are silent
+# today. The fourth and fifth isolate the store-target construct on
+# shipped vocabulary; the fifth must flip to expect when the field store
+# joins.
+#
+# verify_current_expected: attention-engine-gap, reader cases rejected,
+# store-target pair split expect/reject
+
+test "rank1678: the DWARF reader returns strings lifted from the parsed binary verbatim"
+  lang c
+  file dwarf/endian_reader.c
+  reject VYQL-INJ-036
+  code
+  ```
+  #include <string.h>
+
+  typedef struct { long addr; } RzBuffer;
+  char *rz_buf_get_string(RzBuffer *b, unsigned long addr);
+  int rz_buf_seek(RzBuffer *b, long delta, int whence);
+  unsigned long rz_buf_tell(RzBuffer *b);
+
+  #define RET_NULL_IF_FAIL(x) if (!(x)) { return NULL; }
+
+  typedef struct {
+      RzBuffer *buffer;
+  } RzBinEndianReader;
+
+  /* every inline DWARF string, and through rz_bin_dwarf_str_get() every
+   * .debug_str / .debug_line_str / .debug_str_offsets lookup, passes here */
+  char *read_string(RzBinEndianReader *reader) {
+      long offset = (long)rz_buf_tell(reader->buffer);
+      RET_NULL_IF_FAIL(offset != -1);
+      char *x = rz_buf_get_string(reader->buffer, offset);
+      RET_NULL_IF_FAIL(x);
+      unsigned long len = strlen(x) + 1;
+      rz_buf_seek(reader->buffer, (long)len, 1);
+      return x;
+  }
+  ```
+
+test "rank1678: the fixed revision escapes the string through a one-line helper before returning it"
+  lang c
+  file dwarf/endian_reader.c
+  reject VYQL-INJ-036
+  code
+  ```
+  #include <stdbool.h>
+  #include <stdlib.h>
+  #include <string.h>
+
+  typedef struct { long addr; } RzBuffer;
+  char *rz_buf_get_string(RzBuffer *b, unsigned long addr);
+  int rz_buf_seek(RzBuffer *b, long delta, int whence);
+  unsigned long rz_buf_tell(RzBuffer *b);
+
+  typedef struct { bool dot_nl, esc_bslash, esc_double_quotes, show_asciidot; } RzStrEscOptions;
+  char *rz_str_escape_utf8(const char *p, RzStrEscOptions *opt);
+
+  #define RET_NULL_IF_FAIL(x) if (!(x)) { return NULL; }
+
+  typedef struct {
+      RzBuffer *buffer;
+  } RzBinEndianReader;
+
+  static char *str_escape_copy(const char *p) {
+      RzStrEscOptions opt = { true, true, true, false };
+      return rz_str_escape_utf8(p, &opt);
+  }
+
+  static void str_escape(char **p) {
+      if (!(p && *p)) {
+          return;
+      }
+      char *out = str_escape_copy(*p);
+      free(*p);
+      *p = out;
+  }
+
+  char *read_string(RzBinEndianReader *reader) {
+      long offset = (long)rz_buf_tell(reader->buffer);
+      RET_NULL_IF_FAIL(offset != -1);
+      char *x = rz_buf_get_string(reader->buffer, offset);
+      RET_NULL_IF_FAIL(x);
+      unsigned long len = strlen(x) + 1;
+      rz_buf_seek(reader->buffer, (long)len, 1);
+      str_escape(&x);
+      return x;
+  }
+  ```
+
+test "rank1678: the documented escape API called directly in the reader is the remediation shape"
+  lang c
+  file dwarf/endian_reader.c
+  reject VYQL-INJ-036
+  code
+  ```
+  #include <stdbool.h>
+  #include <stdlib.h>
+  #include <string.h>
+
+  typedef struct { long addr; } RzBuffer;
+  char *rz_buf_get_string(RzBuffer *b, unsigned long addr);
+  int rz_buf_seek(RzBuffer *b, long delta, int whence);
+  unsigned long rz_buf_tell(RzBuffer *b);
+
+  typedef struct { bool dot_nl, esc_bslash, esc_double_quotes, show_asciidot; } RzStrEscOptions;
+  char *rz_str_escape_utf8(const char *p, RzStrEscOptions *opt);
+
+  #define RET_NULL_IF_FAIL(x) if (!(x)) { return NULL; }
+
+  typedef struct {
+      RzBuffer *buffer;
+  } RzBinEndianReader;
+
+  char *read_string(RzBinEndianReader *reader) {
+      long offset = (long)rz_buf_tell(reader->buffer);
+      RET_NULL_IF_FAIL(offset != -1);
+      char *x = rz_buf_get_string(reader->buffer, offset);
+      RET_NULL_IF_FAIL(x);
+      unsigned long len = strlen(x) + 1;
+      rz_buf_seek(reader->buffer, (long)len, 1);
+      RzStrEscOptions opt = { true, true, true, false };
+      return rz_str_escape_utf8(x, &opt);
+  }
+  ```
+
+test "rank1678: a call result stored through a local reaches the command sink"
+  lang c
+  file store_target_local.c
+  expect VYQL-INJ-002
+  code
+  ```
+  char *getenv(const char *name);
+  int system(const char *command);
+
+  void local_form(void) {
+      char *v = getenv("X");
+      system(v);
+  }
+  ```
+
+test "rank1678: the same call result stored into a struct field never reaches the sink"
+  lang c
+  file store_target_field.c
+  reject VYQL-INJ-002
+  code
+  ```
+  char *getenv(const char *name);
+  int system(const char *command);
+
+  typedef struct {
+      char *s;
+  } Box;
+
+  void field_form(Box *box) {
+      box->s = getenv("X");
+      system(box->s);
+  }
+  ```

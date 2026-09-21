@@ -1,0 +1,259 @@
+# Rank 1706 / CVE-2021-25900 (GHSA-43w2-9j62-hq99, CWE-787):
+# smallvec 0.6's bulk insert planned its allocation from an iterator's size
+# hint. `Iterator::size_hint` returns a pair whose first element is only a
+# *lower* bound on how many elements the iterator will yield -- the standard
+# library documentation is explicit that an iterator may return more than its
+# hint, and that the hint "must not be trusted" for anything unsafe -- so
+# `reserve(lower_size_bound)` is sound only as long as the code stops writing
+# once it reaches that bound. insert_many did not:
+#
+#   let (lower_size_bound, _) = iter.size_hint();
+#   self.reserve(lower_size_bound);
+#   unsafe {
+#       let mut ptr = self.as_mut_ptr().offset(index as isize);
+#       ptr::copy(ptr, ptr.offset(lower_size_bound as isize), old_len - index);
+#       self.set_len(index);                       // logical length truncated
+#       let mut num_added = 0;
+#       for element in iter {                      // driven by the iterator
+#           let mut cur = ptr.offset(num_added as isize);
+#           if num_added >= lower_size_bound {     // knows it passed the reserve
+#               self.reserve(1);                   // grows by one element
+#               ptr = self.as_mut_ptr().offset(index as isize);
+#               cur = ptr.offset(num_added as isize);
+#               ptr::copy(cur, cur.offset(1), old_len - index);
+#           }
+#           ptr::write(cur, element);
+#           num_added += 1;
+#       }
+#       self.set_len(old_len + num_added);
+#   }
+#
+# `reserve(additional)` sizes the allocation from the collection's *current
+# length*, and `set_len(index)` has just cut that length to `index` while
+# `ptr::copy` has placed the tail at `lower_size_bound` past it. The in-loop
+# `reserve(1)` therefore guarantees capacity for `index + 1` elements while the
+# write cursor is at `index + num_added`, so from the second element past the
+# bound onward `ptr::write` lands outside the allocation. The advisory's own
+# reproducer needs only `size_hint().0 == 0`, which any filter iterator gives.
+#
+# 5757ac500d4e544485d796b542e4e589749c291b (backport of #254 to the 0.6 branch,
+# fixes #253) removes the re-reserve entirely: the unsafe block writes at most
+# `lower_size_bound` elements via `while num_added < lower_size_bound`, and any
+# surplus is inserted afterwards through the safe per-element
+# `self.insert(index + num_added, element)`, which reserves per element from an
+# accurate length. The pool row is correct: repository, language, CWE and commit
+# all check, the vulnerable construct is present at 7852204 and the remediation
+# at 5757ac5. No corpus correction.
+#
+# Detection is the rust binding rawWritePastSizeHintReservation
+# (vyql/bindings/rust/raw_write_past_size_hint_reservation.vyql), reusing
+# code.FixedChunkCapacityGrowthIndex and VYQL-MEM-042: a function whose body
+# calls size_hint, calls set_len, writes through std::ptr::write, and regrows
+# capacity with `self.reserve(<single-digit literal>)`. The regrow-by-literal
+# is the defective capacity strategy itself, so a reskin that renames every
+# local or inlines the base pointer still matches; the canonical safe form
+# (std's Vec::extend_desugared, `self.reserve(lower.saturating_add(1))` from an
+# accurate length check) reserves a computed amount and does not.
+#
+# The literal is matched as body text because every call-argument token route
+# flow-expands the call's inputs: `self.reserve(lower.saturating_add(1))` reads
+# as though the literal 1 were reserve's own argument, which is why the
+# callArg-narrowed form of this binding reports extend_desugared on every
+# revision (internal/bindings/bindings_match.go, callArgContextTokensScoped).
+# The conjuncts are separate clauses -- size_hint and set_len in one any-of
+# list is a disjunction and matches std's own single-element Vec::insert on
+# set_len alone.
+#
+# Measurements (3 x --cache off, timeout 180, --max-ram 6GB): the vulnerable
+# checkout reports 23 findings with exactly one VYQL-MEM-042 at lib.rs:825
+# (insert_many); the fixed checkout reports 23 findings with none, the delta
+# elsewhere being a CFG-014 on the safe per-element insert the fix adds.
+# Zero VYQL-MEM-042 across the standard library's own alloc sources (sparse
+# checkout of library/alloc/src, and the pinned revisions kept under the
+# in-place-collect pair), the rustfs and rust-phonenumber trees, and the
+# minimal extend_desugared form below. A grep prefilter for all four
+# identifiers in one file over every other Rust tree in the scratch pool
+# matches nothing outside the standard library.
+#
+# Residuals, restated from the binding: prose in a comment can satisfy the
+# literal clause (false positive); a computed regrow (`self.reserve(k + 1)`)
+# or a multi-digit literal is missed (false negative); and the Rust function
+# context carries no ordering fact, so co-membership in one function is the
+# strongest available statement of the shape. If the extractor ever emits a
+# loop or ordering fact for Rust function contexts, tighten this to require
+# the reserve inside the write loop and keep every case below rejected.
+#
+# The four cases differ only in what bounds the raw write: the iterator
+# (vulnerable), the reserved count with a safe fallback (the fixed revision),
+# the accurate length (std's correct form, the false positive any literal
+# token buys) and a single reserved element (correct one-in-one-out, which a
+# bare reserve(1) pairing without the size_hint conjunct buys).
+#
+# verify_current_expected: fixed, first form expects and the rest reject.
+
+test "rank1706: insert_many writes through a raw pointer past a size-hint reservation, growing capacity one element at a time"
+  lang rust
+  file lib.rs
+  expect VYQL-MEM-042
+  expect_review code.FixedChunkCapacityGrowthIndex
+  code
+  ```
+  use std::ptr;
+
+  pub struct SmallVec<T> { data: *mut T, cap: usize, len: usize }
+
+  impl<T> SmallVec<T> {
+      pub fn len(&self) -> usize { self.len }
+      pub fn as_mut_ptr(&mut self) -> *mut T { self.data }
+      pub fn set_len(&mut self, n: usize) { self.len = n }
+      pub fn reserve(&mut self, additional: usize) { let _ = additional; }
+
+      pub fn insert_many<I: IntoIterator<Item=T>>(&mut self, index: usize, iterable: I) {
+          let iter = iterable.into_iter();
+          if index == self.len() {
+              return self.extend(iter);
+          }
+
+          let (lower_size_bound, _) = iter.size_hint();
+          self.reserve(lower_size_bound);
+
+          unsafe {
+              let old_len = self.len();
+              let mut ptr = self.as_mut_ptr().offset(index as isize);
+              ptr::copy(ptr, ptr.offset(lower_size_bound as isize), old_len - index);
+              self.set_len(index);
+
+              let mut num_added = 0;
+              for element in iter {
+                  let mut cur = ptr.offset(num_added as isize);
+                  if num_added >= lower_size_bound {
+                      self.reserve(1);
+                      ptr = self.as_mut_ptr().offset(index as isize);
+                      cur = ptr.offset(num_added as isize);
+                      ptr::copy(cur, cur.offset(1), old_len - index);
+                  }
+                  ptr::write(cur, element);
+                  num_added += 1;
+              }
+              self.set_len(old_len + num_added);
+          }
+      }
+  }
+  ```
+
+test "rank1706: the unsafe write loop bounded by the reserved count, surplus through the safe per-element insert"
+  lang rust
+  file lib.rs
+  reject VYQL-MEM-042
+  reject_review code.FixedChunkCapacityGrowthIndex
+  code
+  ```
+  use std::ptr;
+
+  pub struct SmallVec<T> { data: *mut T, cap: usize, len: usize }
+
+  impl<T> SmallVec<T> {
+      pub fn len(&self) -> usize { self.len }
+      pub fn as_mut_ptr(&mut self) -> *mut T { self.data }
+      pub fn set_len(&mut self, n: usize) { self.len = n }
+      pub fn reserve(&mut self, additional: usize) { let _ = additional; }
+      pub fn insert(&mut self, index: usize, element: T) { let _ = (index, element); }
+
+      pub fn insert_many<I: IntoIterator<Item=T>>(&mut self, index: usize, iterable: I) {
+          let mut iter = iterable.into_iter();
+          if index == self.len() {
+              return self.extend(iter);
+          }
+
+          let (lower_size_bound, _) = iter.size_hint();
+          self.reserve(lower_size_bound);
+          let mut num_added = 0;
+
+          unsafe {
+              let old_len = self.len();
+              let ptr = self.as_mut_ptr().offset(index as isize);
+              ptr::copy(ptr, ptr.offset(lower_size_bound as isize), old_len - index);
+              self.set_len(index);
+
+              while num_added < lower_size_bound {
+                  let element = match iter.next() {
+                      Some(x) => x,
+                      None => break,
+                  };
+                  let cur = ptr.offset(num_added as isize);
+                  ptr::write(cur, element);
+                  num_added += 1;
+              }
+              self.set_len(old_len + num_added);
+          }
+
+          for element in iter {
+              self.insert(index + num_added, element);
+              num_added += 1;
+          }
+      }
+  }
+  ```
+
+test "rank1706: a grow-when-full loop that reserves from an accurate length writes raw safely"
+  lang rust
+  file lib.rs
+  reject VYQL-MEM-042
+  reject_review code.FixedChunkCapacityGrowthIndex
+  code
+  ```
+  use std::ptr;
+
+  pub struct SmallVec<T> { data: *mut T, cap: usize, len: usize }
+
+  impl<T> SmallVec<T> {
+      pub fn len(&self) -> usize { self.len }
+      pub fn capacity(&self) -> usize { self.cap }
+      pub fn as_mut_ptr(&mut self) -> *mut T { self.data }
+      pub fn set_len(&mut self, n: usize) { self.len = n }
+      pub fn reserve(&mut self, additional: usize) { let _ = additional; }
+
+      pub fn extend_desugared<I: Iterator<Item=T>>(&mut self, mut iterator: I) {
+          while let Some(element) = iterator.next() {
+              let len = self.len();
+              if len == self.capacity() {
+                  let (lower, _) = iterator.size_hint();
+                  self.reserve(lower.saturating_add(1));
+              }
+              unsafe {
+                  ptr::write(self.as_mut_ptr().add(len), element);
+                  self.set_len(len + 1);
+              }
+          }
+      }
+  }
+  ```
+
+test "rank1706: a single-element insert that reserves one and writes one"
+  lang rust
+  file lib.rs
+  reject VYQL-MEM-042
+  reject_review code.FixedChunkCapacityGrowthIndex
+  code
+  ```
+  use std::ptr;
+
+  pub struct SmallVec<T> { data: *mut T, cap: usize, len: usize }
+
+  impl<T> SmallVec<T> {
+      pub fn as_mut_ptr(&mut self) -> *mut T { self.data }
+      pub fn reserve(&mut self, additional: usize) { let _ = additional; }
+      pub fn set_len(&mut self, n: usize) { self.len = n }
+
+      pub fn insert(&mut self, index: usize, element: T) {
+          self.reserve(1);
+
+          unsafe {
+              let ptr = self.as_mut_ptr().offset(index as isize);
+              ptr::copy(ptr, ptr.offset(1), 0);
+              ptr::write(ptr, element);
+              self.set_len(index + 1);
+          }
+      }
+  }
+  ```

@@ -1,0 +1,101 @@
+# Rank 1713 / CVE-2020-5261: Sustainsys.Saml2 accepted a replayed SAML
+# assertion. Saml2Response.CreateClaims built TokenValidationParameters,
+# handed them to the token handler's ValidateToken for every assertion element
+# of the response, and never turned on the validation stack's replay check:
+# ValidateTokenReplay stays false and no TokenReplayCache is wired in, so the
+# handler's ValidateTokenReplay is unreachable and a captured assertion
+# re-authenticated for its whole NotOnOrAfter window (CWE-294). The fixed revision sets
+# validationParameters.ValidateTokenReplay = true and supplies
+# options.SPOptions.TokenReplayCache, and the handler override keys the replay
+# entry on the signed assertion ID.
+#
+# FIXED by a concept, a rule and one binding. Nothing fired before: the scan of
+# the vulnerable revision reports nothing on Saml2Response.cs or
+# Saml2PSecurityTokenHandler.cs. code.SamlAssertionReplayBypass states the
+# class -- an assertion accepted for authentication with no replay detection.
+# The C# binding keys on the documented validation API only:
+# TokenValidationParameters plus a ValidateToken call plus an assertion-named
+# member, with the API's own replay switch absent. It fires once at the
+# vulnerable revision (Saml2Response.cs) and not at the fixed one, where the
+# same function carries ValidateTokenReplay = true.
+
+test "rank1713: SAML claims extraction validates assertions with no replay check enabled"
+  lang csharp
+  file Sustainsys.Saml2/SAML2P/Saml2Response.cs
+  expect VYQL-AUTH-148
+  expect_review code.SamlAssertionReplayBypass
+  code
+  ```
+  using System.Collections.Generic;
+  using System.Security.Claims;
+  using Microsoft.IdentityModel.Tokens;
+
+  namespace Sustainsys.Saml2.Saml2P
+  {
+      public class Saml2Response
+      {
+          private IEnumerable<ClaimsIdentity> CreateClaims(IOptions options, IdentityProvider idp)
+          {
+              TokenValidationParameters validationParameters = new TokenValidationParameters();
+              validationParameters.AuthenticationType = "Federation";
+              validationParameters.RequireSignedTokens = false;
+              validationParameters.ValidateIssuer = false;
+              validationParameters.ValidAudience = options.SPOptions.EntityId.Id;
+
+              var handler = options.SPOptions.Saml2PSecurityTokenHandler;
+
+              foreach (XmlElement assertionNode in GetAllAssertionElementNodes(options))
+              {
+                  var principal = handler.ValidateToken(assertionNode.OuterXml, validationParameters, out SecurityToken baseToken);
+                  var token = (Saml2SecurityToken)baseToken;
+                  foreach (var identity in principal.Identities)
+                  {
+                      yield return identity;
+                  }
+              }
+          }
+      }
+  }
+  ```
+
+test "rank1713: the same extraction enabling the token replay check"
+  lang csharp
+  file Sustainsys.Saml2/SAML2P/Saml2Response.cs
+  reject VYQL-AUTH-148
+  reject_review code.SamlAssertionReplayBypass
+  code
+  ```
+  using System.Collections.Generic;
+  using System.Security.Claims;
+  using Microsoft.IdentityModel.Tokens;
+
+  namespace Sustainsys.Saml2.Saml2P
+  {
+      public class Saml2Response
+      {
+          private IEnumerable<ClaimsIdentity> CreateClaims(IOptions options, IdentityProvider idp)
+          {
+              TokenValidationParameters validationParameters = new TokenValidationParameters();
+              validationParameters.AuthenticationType = "Federation";
+              validationParameters.RequireSignedTokens = false;
+              validationParameters.ValidateIssuer = false;
+              validationParameters.ValidAudience = options.SPOptions.EntityId.Id;
+              validationParameters.RequireAudience = false; // Audience restriction optional in SAML2 spec.
+              validationParameters.TokenReplayCache = options.SPOptions.TokenReplayCache;
+              validationParameters.ValidateTokenReplay = true;
+
+              var handler = options.SPOptions.Saml2PSecurityTokenHandler;
+
+              foreach (XmlElement assertionNode in GetAllAssertionElementNodes(options))
+              {
+                  var principal = handler.ValidateToken(assertionNode.OuterXml, validationParameters, out SecurityToken baseToken);
+                  var token = (Saml2SecurityToken)baseToken;
+                  foreach (var identity in principal.Identities)
+                  {
+                      yield return identity;
+                  }
+              }
+          }
+      }
+  }
+  ```

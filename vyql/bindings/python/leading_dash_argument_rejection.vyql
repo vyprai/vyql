@@ -1,0 +1,23 @@
+module bindings.python.leading_dash_argument_rejection;
+
+// `value.startswith('-')` is the argument-vector validation idiom (CWE-88):
+// a value that begins with a dash would be parsed as an option by the command
+// the vector is handed to, so refusing it up front is what stops a positional
+// value from becoming an option. The comparison is anchored where it is
+// evaluated and covers the command endpoints of the function performing it,
+// the same coverage the named-validator checks already carry. The literal
+// match is the dash itself (`-`, `--`, and option spellings like `-I` all
+// carry one), so prefix comparisons against separators, magic bytes and ref
+// namespaces (`startswith('/')`, `startswith(b'#')`, `startswith('refs/')`)
+// stay unlabelled. The control is `core.CommandArgumentValidation`, which
+// only the command-injection rules consume through their endpoint clause, so
+// a mislabelled comparison costs a finding only where a dash comparison and a
+// taint-fed command sink share one function.
+binding leadingDashArgumentRejection {
+  query pattern callExpr where callee.method == "startswith" and containsAny(args.any.literal, ["-"])
+  emit check core.CommandArgumentValidation at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

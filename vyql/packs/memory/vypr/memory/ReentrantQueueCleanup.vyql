@@ -1,0 +1,11 @@
+module vypr.memory;
+
+rule ReentrantQueueCleanup {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_415, CWE_416]
+    id: "VYQL-MEM-019"
+    severity: high
+  }
+  issue code.ReentrantQueueCleanupReview as cleanup
+}

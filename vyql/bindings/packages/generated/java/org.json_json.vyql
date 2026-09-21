@@ -1,0 +1,62 @@
+module bindings.java.generated.mc025dab7;
+
+binding deserialization0 {
+  requires {
+    dependency("org.json:json")
+  }
+  query pattern callExpr where callee.method == "toJSONObject"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("org.json:json")
+  }
+  query pattern callExpr where callee.method == "toJSONArray"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("org.json:json")
+  }
+  query pattern callExpr where callee.method == "rowToJSONObject"
+  emit sink code.Deserialization at args[0]
+}
+
+binding xmlParse3 {
+  requires {
+    dependency("org.json:json")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.XmlParse at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("org.json:json")
+  }
+  query pattern callExpr where callee.method == "JSONObject"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("org.json:json")
+  }
+  query pattern callExpr where callee.method == "JSONArray"
+  emit sink code.Deserialization at args[0]
+}
+
+binding htmlEscape6 {
+  requires {
+    dependency("org.json:json")
+  }
+  query pattern callExpr where callee.method == "escape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

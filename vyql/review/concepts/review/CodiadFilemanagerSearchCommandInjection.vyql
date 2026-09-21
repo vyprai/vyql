@@ -1,0 +1,8 @@
+module code;
+
+review code.CodiadFilemanagerSearchCommandInjection {
+  category: "command-injection"
+  expected: [core.ShellEscape]
+  kind: attention
+  text: "review Codiad Filemanager search and find parameters for escapeshellarg before shell_exec command construction"
+}

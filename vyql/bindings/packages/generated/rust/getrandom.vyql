@@ -1,0 +1,33 @@
+module bindings.rust.generated.m943bf737;
+
+binding weakRandomValue0 {
+  requires {
+    dependency("getrandom")
+  }
+  query pattern callExpr where callee.method == "fill"
+  emit issue code.WeakRandomValue at call
+}
+
+binding weakRandomValue1 {
+  requires {
+    dependency("getrandom")
+  }
+  query pattern callExpr where callee.method == "fill_uninit"
+  emit issue code.WeakRandomValue at call
+}
+
+binding weakRandomValue2 {
+  requires {
+    dependency("getrandom")
+  }
+  query pattern callExpr where callee.method == "u32"
+  emit issue code.WeakRandomValue at call
+}
+
+binding weakRandomValue3 {
+  requires {
+    dependency("getrandom")
+  }
+  query pattern callExpr where callee.method == "u64"
+  emit issue code.WeakRandomValue at call
+}

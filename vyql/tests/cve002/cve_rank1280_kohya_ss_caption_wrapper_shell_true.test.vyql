@@ -1,0 +1,102 @@
+# Rank 1280 / CVE-2024-32022: kohya_ss's Gradio GUI helpers built an OS
+# command as one interpolated string from caption text, folder path and
+# extension fields, then ran it with `subprocess.run(run_cmd, shell=True,
+# env=env)` (CWE-78). basic_caption_gui.py's caption_images did
+#
+#   run_cmd = rf'"{PYTHON}" "{scriptdir}/tools/caption.py"'
+#   run_cmd += f' --caption_text="{caption_text}"'
+#   run_cmd += f' "{images_dir}"'
+#   subprocess.run(run_cmd, shell=True, env=env)
+#
+# with the double quotes around each field providing no protection: a value
+# containing a double quote or shell metacharacter breaks out of its
+# argument and runs as part of the command. The fixed revision (PR #2257
+# "Remove shell=True from scripts") drops `shell=True` from every `subprocess.run(run_cmd, ...)` call across
+# the caption/convert/extract/merge/resize/train GUI wrappers, so `run_cmd`
+# is instead handed to execve as one opaque argv[0] string with no shell to
+# reinterpret it.
+#
+# CAUGHT by VYQL-INJ-119 and VYQL-INJ-202 at critical, both on the
+# unresolved-source review path: the review-condition sink
+# code.CommandStringWrapperExecution fires because a command execution
+# wrapper (subprocess.run(run_cmd, shell=True, ...)) receives one formatted
+# shell command string built from caller-controlled fields, and
+# code.DynamicCommandExec's review fires on the same dynamically assembled
+# string. Scanning the real repository at the vulnerable revision reports
+# both across every kohya_gui/*_gui.py file the fixed revision touches
+# (basic_caption_gui.py, blip_caption_gui.py, convert_lcm_gui.py,
+# convert_model_gui.py, extract_lora_from_dylora_gui.py,
+# extract_lora_gui.py, extract_lycoris_locon_gui.py, finetune_gui.py,
+# git_caption_gui.py, group_images_gui.py, merge_lora_gui.py,
+# merge_lycoris_gui.py, resize_lora_gui.py, svd_merge_lora_gui.py,
+# wd14_caption_gui.py); class_command_executor.py's Popen(shell=True) call
+# is caught separately by VYQL-INJ-002's resolved taint chain from a CLI
+# argument. At the patched revision every one of those findings disappears
+# — dropping from 42 to 11 VYQL-INJ-119/202 occurrences, the 11 remaining
+# all in setup/setup_common.py and setup/setup_runpod.py, files this commit
+# does not touch.
+#
+# No definition change; the existing rules discriminate the two
+# revisions correctly.
+
+test "rank1280: caption_images builds one shell command string from GUI fields and runs it with shell=True"
+  lang python
+  file basic_caption_gui.py
+  expect VYQL-INJ-119
+  expect VYQL-INJ-202
+  code
+  ```
+  import os
+  import subprocess
+  import sys
+
+  PYTHON = sys.executable
+  scriptdir = "/opt/kohya"
+
+
+  def caption_images(caption_text, images_dir, overwrite, caption_ext):
+      if caption_text:
+          run_cmd = rf'"{PYTHON}" "{scriptdir}/tools/caption.py"'
+          run_cmd += f' --caption_text="{caption_text}"'
+
+          if overwrite:
+              run_cmd += f" --overwrite"
+          if caption_ext:
+              run_cmd += f' --caption_file_ext="{caption_ext}"'
+
+          run_cmd += f' "{images_dir}"'
+
+          env = os.environ.copy()
+          subprocess.run(run_cmd, shell=True, env=env)
+  ```
+
+test "rank1280: the same wrapper runs the argv string without a shell"
+  lang python
+  file basic_caption_gui.py
+  reject VYQL-INJ-119
+  reject VYQL-INJ-202
+  code
+  ```
+  import os
+  import subprocess
+  import sys
+
+  PYTHON = sys.executable
+  scriptdir = "/opt/kohya"
+
+
+  def caption_images(caption_text, images_dir, overwrite, caption_ext):
+      if caption_text:
+          run_cmd = rf'"{PYTHON}" "{scriptdir}/tools/caption.py"'
+          run_cmd += f' --caption_text="{caption_text}"'
+
+          if overwrite:
+              run_cmd += f" --overwrite"
+          if caption_ext:
+              run_cmd += f' --caption_file_ext="{caption_ext}"'
+
+          run_cmd += f' "{images_dir}"'
+
+          env = os.environ.copy()
+          subprocess.run(run_cmd, env=env)
+  ```

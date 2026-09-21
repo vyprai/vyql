@@ -1,0 +1,40 @@
+# Rank 473 / CVE-2013-7370: Connect's methodOverride middleware could
+# place attacker-controlled req.method into the default 404 response body.
+
+test "rank473: Connect default 404 renders raw request method"
+  lang javascript
+  file proto.js
+  expect VYQL-INJ-004
+  code
+  ```
+  app.handle = function(req, res, out) {
+    function next(err) {
+      if (!out) {
+        res.statusCode = 404;
+        res.setHeader('Content-Type', 'text/plain');
+        if ('HEAD' == req.method) return res.end();
+        res.end('Cannot ' + req.method + ' ' + utils.escape(req.originalUrl));
+      }
+    }
+    next();
+  };
+  ```
+
+test "rank473: Connect escapes request method in default 404"
+  lang javascript
+  file proto.js
+  reject VYQL-INJ-004
+  code
+  ```
+  app.handle = function(req, res, out) {
+    function next(err) {
+      if (!out) {
+        res.statusCode = 404;
+        res.setHeader('Content-Type', 'text/plain');
+        if ('HEAD' == req.method) return res.end();
+        res.end('Cannot ' + utils.escape(req.method) + ' ' + utils.escape(req.originalUrl));
+      }
+    }
+    next();
+  };
+  ```

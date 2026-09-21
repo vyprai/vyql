@@ -1,0 +1,17 @@
+module bindings.dart.generated.mcf621b38;
+
+binding deserialization0 {
+  requires {
+    dependency("yet_another_json_isolate")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("yet_another_json_isolate")
+  }
+  query pattern callExpr where callee.method == "jsonDecode"
+  emit sink code.Deserialization at args[0]
+}

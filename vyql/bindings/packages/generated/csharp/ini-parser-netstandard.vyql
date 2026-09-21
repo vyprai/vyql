@@ -1,0 +1,9 @@
+module bindings.csharp.generated.mf0c702e8;
+
+binding deserialization0 {
+  requires {
+    dependency("ini-parser-netstandard")
+  }
+  query pattern callExpr where callee.method == "FileIniDataParser.ReadFile"
+  emit sink code.Deserialization at args[0]
+}

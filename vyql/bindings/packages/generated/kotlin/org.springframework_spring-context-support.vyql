@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.mf7eb377e;
+
+binding networkSend0 {
+  requires {
+    dependency("org.springframework:spring-context-support")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

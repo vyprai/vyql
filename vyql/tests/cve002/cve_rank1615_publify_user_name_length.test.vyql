@@ -1,0 +1,120 @@
+# Publify persists the user display name with no length bound: the
+# users.name column is a text type, so a profile edit can store
+# megabytes into the name rendered on every page, feed and session the
+# user touches (unbounded input to resource exhaustion and cookie
+# breakage, CWE-400/CWE-20). The User model in
+# publify_core/app/models/user.rb bounds some string attributes -- the
+# login to 3..40, and email and text_filter_name to 255 through the
+# StringLengthLimit concern's validates_default_string_length -- while
+# the name attribute appears in no validation at all; it is read back
+# by display_name. Pool commit 29a5837c29 is the real fix (the advisory
+# links this exact commit, "Validate length of user's name attribute"):
+# `validates :name, length: { maximum: 2048 }` -- generous for any real
+# name, bounded for the column semantics. No pool correction.
+#
+# Held ATTENTION, model-level length budgets, rechecked at the span
+# tip. Fresh scans of the real checkout at both revisions (3 x
+# --cache off each, timeout 180, --max-ram 6GB) report the identical
+# 75-finding set: the single finding in user.rb is VYQL-CRY-001 on the
+# SHA1 password digest, which shifts user.rb:81 -> :82 with the added
+# line, and nothing in the findings or match view touches the
+# validation surface -- no later-shipped rule fires and no existing
+# detection was missed. The discriminating fact spans three files: the
+# controller's mass-assignment list (admin/users_controller.rb
+# user_params permits :name among 25 symbols), the schema column
+# (db/schema.rb declares users.name as t.text, no limit), and the
+# model's validation set. Presence bindings are lexically confined, so
+# no binding sees the three together, and the Ruby frontend emits no
+# call-argument tokens at all (the context walk produces assign:,
+# selector:, expr:, field:, call_path:, call:, index:, literal:,
+# interpolation: and regex: tokens only, and a bare symbol argument
+# produces no token), so even the in-file pairing "which attributes
+# does this validates call bound" is unavailable. A class-level
+# negation ("the model carries no length validation") is satisfied by
+# neither revision -- the vulnerable model already bounds login, email
+# and text_filter_name, and the parent commit is itself a
+# length-hardening pass -- so it never fires here. An attribute-level
+# verdict is unshippably broad: the same permit list still writes
+# description, url, msn, aim, yahoo, jabber, twitter, firstname,
+# lastname and nickname into the unbounded serialized settings column
+# at the fixed revision, and unbounded text is the norm for legitimate
+# fields (an article body must not be capped at 2048), the same
+# measured family as a request-body byte cap and a model write with no
+# ownership key. The bound itself is arbitrary -- "generous for any
+# real name" -- so no vocabulary states what the budget should be;
+# only column semantics and feature intent know, and neither is in
+# code the scanner sees. Keying on :name or on Publify's own
+# validates_default_string_length DSL detects this application rather
+# than the weakness. No ENGINE-GAPS.md entry -- the engine mishandles
+# no construct here; the blocker is cross-file expressibility plus
+# verdict precision. No definition change shipped. Spec cve_rank1615
+# pins both revisions on the real file shape, both rejecting
+# VYQL-DOS-029: when attribute-budget vocabulary lands, the
+# unvalidated form must flip to expect.
+
+test "rank1615: the display name appears in no length validation"
+  lang ruby
+  file publify_core/app/models/user.rb
+  reject VYQL-DOS-029
+  code
+  ```
+  class User < ApplicationRecord
+    devise :database_authenticatable, :registerable,
+           :recoverable, :rememberable, :trackable, :validatable
+    include StringLengthLimit
+
+    before_validation :set_default_profile
+
+    validates :login, uniqueness: true
+    validates :email, :login, presence: true
+    validates :login, length: { in: 3..40 }
+    validates_default_string_length :email, :text_filter_name
+
+    belongs_to :resource, optional: true
+    has_many :articles
+
+    def display_name
+      if nickname.present?
+        nickname
+      elsif name.present?
+        name
+      else
+        login
+      end
+    end
+  end
+  ```
+
+test "rank1615: the fixed revision bounds the name length"
+  lang ruby
+  file publify_core/app/models/user.rb
+  reject VYQL-DOS-029
+  code
+  ```
+  class User < ApplicationRecord
+    devise :database_authenticatable, :registerable,
+           :recoverable, :rememberable, :trackable, :validatable
+    include StringLengthLimit
+
+    before_validation :set_default_profile
+
+    validates :login, uniqueness: true
+    validates :email, :login, presence: true
+    validates :login, length: { in: 3..40 }
+    validates_default_string_length :email, :text_filter_name
+    validates :name, length: { maximum: 2048 }
+
+    belongs_to :resource, optional: true
+    has_many :articles
+
+    def display_name
+      if nickname.present?
+        nickname
+      elsif name.present?
+        name
+      else
+        login
+      end
+    end
+  end
+  ```

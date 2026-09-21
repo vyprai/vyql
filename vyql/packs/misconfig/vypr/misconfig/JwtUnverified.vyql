@@ -1,0 +1,10 @@
+module vypr.misconfig;
+
+rule JwtUnverified {
+  meta {
+    cwe: [CWE_347]
+    id: "VYQL-CFG-005"
+    severity: high
+  }
+  issue code.JwtUnverified as c
+}

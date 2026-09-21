@@ -1,0 +1,8 @@
+module code;
+
+review code.ComposerGitBranchDiffCommandInjection {
+  category: command
+  expected: [core.ShellEscape]
+  kind: attention
+  text: "review Composer git diff command construction for argv-array execution instead of branch-name string formatting"
+}

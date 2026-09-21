@@ -1,0 +1,32 @@
+module bindings.javascript.tool_schema_security_override_advertised;
+
+// An agent tool's input schema is the contract the host advertises to the
+// model: whatever it accepts, the model can send in a tool_use payload. The
+// documented way a codebase keeps a field out of that contract while still
+// typing it internally is to derive the advertised schema from the full one
+// and omit the field by name — zod's `.omit({ field: true })`. A parameter
+// whose name declares it turns a security boundary off
+// (`dangerouslyDisableSandbox` and its siblings) is therefore model-settable
+// exactly when the declaration survives into the advertised schema, that is
+// when the module's omit list never names it. A module that narrows nothing
+// advertises the declaration verbatim, so the binding fires there too.
+//
+// The declaration has to look like schema input — a zod builder or a JSON
+// Schema entry — so an internal `{ dangerouslyDisableSandbox: true }` policy
+// constant elsewhere in the module is not read as a tool parameter. Each
+// sibling pairs its own declaration needles with its own negation, so omitting
+// one name never silences another.
+binding toolSchemaSecurityOverrideAdvertisedSandbox {
+  query pattern presenceNode where node.context.language == "javascript" and node.scope == "module" and containsAny(node.context.prop, ["dangerouslyDisableSandbox=semanticBoolean", "dangerouslyDisableSandbox=z.boolean", "dangerouslyDisableSandbox=z.optional", "dangerouslyDisableSandbox=boolean(", "dangerouslyDisableSandbox=optional(", "dangerouslyDisableSandbox={type:"]) and not containsAny(node.context.prop, ["dangerouslyDisableSandbox=true"])
+  emit issue code.ToolSchemaSecurityOverrideAdvertised at node
+}
+
+binding toolSchemaSecurityOverrideAdvertisedSkipPermissions {
+  query pattern presenceNode where node.context.language == "javascript" and node.scope == "module" and containsAny(node.context.prop, ["dangerouslySkipPermissions=semanticBoolean", "dangerouslySkipPermissions=z.boolean", "dangerouslySkipPermissions=z.optional", "dangerouslySkipPermissions=boolean(", "dangerouslySkipPermissions=optional(", "dangerouslySkipPermissions={type:"]) and not containsAny(node.context.prop, ["dangerouslySkipPermissions=true"])
+  emit issue code.ToolSchemaSecurityOverrideAdvertised at node
+}
+
+binding toolSchemaSecurityOverrideAdvertisedBypassPermissions {
+  query pattern presenceNode where node.context.language == "javascript" and node.scope == "module" and containsAny(node.context.prop, ["dangerouslyBypassPermissions=semanticBoolean", "dangerouslyBypassPermissions=z.boolean", "dangerouslyBypassPermissions=z.optional", "dangerouslyBypassPermissions=boolean(", "dangerouslyBypassPermissions=optional(", "dangerouslyBypassPermissions={type:"]) and not containsAny(node.context.prop, ["dangerouslyBypassPermissions=true"])
+  emit issue code.ToolSchemaSecurityOverrideAdvertised at node
+}

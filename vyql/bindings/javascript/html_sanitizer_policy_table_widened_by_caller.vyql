@@ -1,0 +1,60 @@
+module bindings.javascript.html_sanitizer_policy_table_widened_by_caller;
+
+// An HTML sanitizer earns its keep by deciding inside the library which elements
+// and attributes may be emitted, against a table its authors maintain from what
+// browsers actually execute. Application code that reaches into that table and
+// rewrites an entry before calling the sanitizer moves the decision back out to
+// the caller, who is reasoning about one attribute at a time rather than about
+// the parser the markup is eventually handed to -- and the rewrite outlives the
+// call, because the table is the library's own module state.
+//
+// google-caja's html-css-sanitizer publishes exactly two such tables, and its
+// documentation gives both a fixed vocabulary. `html4.ELEMENTS` maps a tag name
+// to a bitmask of `html4.eflags`, of which `UNSAFE` marks the elements the
+// sanitizer must never emit, so clearing that bit -- `html4.ELEMENTS.style &=
+// ~html4.eflags.UNSAFE` -- puts the element back into the output. `html4.ATTRIBS`
+// maps a `tag::attr` key to an `html4.atype`, where `URI` means "run this value
+// through the URI policy" and `NONE`, spelled `0`, means "emit it unexamined";
+// assigning `NONE` to a URL-bearing key such as `img::src` switches the
+// sanitizer's scheme filtering off for that attribute, so a `src` naming a
+// scheme the browser cannot load still reaches the document and the `onerror`
+// handler beside it runs. Adding keys to `html4.ATTRIBS` from inside a tag
+// policy is the same move made per document: the attribute names of the markup
+// being sanitized choose which entries appear, so the input extends the
+// allowlist that exists to constrain it.
+//
+// The fact recorded is the write itself, in either direction. A caller keeping
+// its own copy of the sanitizer's policy owes a reviewer the argument for why
+// the library's entry was wrong, and a relaxing write and the tightening write
+// in the sibling branch are what have to be read together; recording only the
+// relaxing half would report a policy that is toggled per call as if it were
+// fixed. Reading the tables -- consulting `html4.ELEMENTS[tag]` to decide
+// whether to log a removal -- is not a write and is not recorded.
+//
+// Function scope rather than module scope: the alias (`var ATTRIBS =
+// caja.html4.ATTRIBS`) and the write through it are statements of one function,
+// while a module-scope query over a bundled tree would be satisfied by any
+// vendored copy of the sanitizer that merely defines the tables.
+binding cajaSanitizerPolicyTableWidenedByCaller {
+  query pattern presenceNode where node.scope == "function"
+    and node.context.language == "javascript"
+    and containsAny(node.context.selector, ["html4.ATTRIBS", "html4.ELEMENTS"])
+    and containsAny(node.context.assign, ["ATTRIBS", "ELEMENTS"])
+  emit issue code.HtmlSanitizerLogicReview at node
+}
+
+// The same write reached through a local alias, which is how a tag policy that
+// touches many keys is usually written (`var ATTRIBS = caja.html4.ATTRIBS;
+// ATTRIBS[key] = 0`). The assignment's left side is then a subscript on a name
+// the binding cannot predict, so the write is recognised by its shape --
+// JavaScript's dynamic-property-write fact -- with the table still named by the
+// alias's own initialiser in the same function. The negation keeps a function
+// that already matched the dotted form above from being recorded twice.
+binding cajaSanitizerPolicyTableWidenedThroughAlias {
+  query pattern presenceNode where node.scope == "function"
+    and node.context.language == "javascript"
+    and containsAny(node.context.selector, ["html4.ATTRIBS", "html4.ELEMENTS"])
+    and node.context.dynamicPropertyWrite == "true"
+    and not (containsAny(node.context.assign, ["ATTRIBS", "ELEMENTS"]))
+  emit issue code.HtmlSanitizerLogicReview at node
+}

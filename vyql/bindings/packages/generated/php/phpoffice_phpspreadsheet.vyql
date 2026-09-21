@@ -1,0 +1,9 @@
+module bindings.php.generated.m8337ba07;
+
+binding filePathAccess0 {
+  requires {
+    dependency("phpoffice/phpspreadsheet")
+  }
+  query pattern callExpr where callee.method == "PhpOffice\\PhpSpreadsheet\\IOFactory::load"
+  emit sink code.FilePathAccess at args[0]
+}

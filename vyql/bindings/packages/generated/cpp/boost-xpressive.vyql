@@ -1,0 +1,81 @@
+module bindings.cpp.generated.ma9b99c52;
+
+binding deserialization0 {
+  requires {
+    dependency("boost-xpressive")
+  }
+  query pattern callExpr where callee.method == "parse_alternates"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("boost-xpressive")
+  }
+  query pattern callExpr where callee.method == "parse_group"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("boost-xpressive")
+  }
+  query pattern callExpr where callee.method == "parse_charset"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("boost-xpressive")
+  }
+  query pattern callExpr where callee.method == "parse_atom"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("boost-xpressive")
+  }
+  query pattern callExpr where callee.method == "parse_quant"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("boost-xpressive")
+  }
+  query pattern callExpr where callee.method == "parse_sequence"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization6 {
+  requires {
+    dependency("boost-xpressive")
+  }
+  query pattern callExpr where callee.method == "parse_literal"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization7 {
+  requires {
+    dependency("boost-xpressive")
+  }
+  query pattern callExpr where callee.method == "parse_quote_meta"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization8 {
+  requires {
+    dependency("boost-xpressive")
+  }
+  query pattern callExpr where callee.method == "parse_escape"
+  emit sink code.Deserialization at args[0]
+}
+
+binding filePathAccess9 {
+  requires {
+    dependency("boost-xpressive")
+  }
+  query pattern callExpr where callee.method == "load_file"
+  emit sink code.FilePathAccess at args[0]
+}

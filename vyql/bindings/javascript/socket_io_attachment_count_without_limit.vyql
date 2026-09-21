@@ -1,0 +1,52 @@
+module bindings.javascript.socketIoAttachmentCountWithoutLimit;
+
+// The socket.io wire protocol frames a packet carrying binary payloads as a
+// text header followed by that many separate frames: `<type><attachment
+// count>-<payload>`, with each payload replaced in the JSON by a
+// `{"_placeholder":true,"num":N}` marker. The count is therefore typed by the
+// peer, and a decoder's documented job on the receiving side is to hold every
+// arriving frame until it has that many of them -- socket.io-parser's
+// `Decoder#add` hands the packet to a reconstructor whose completion test is
+// `buffers.length === packet.attachments`. Nothing in the protocol bounds the
+// count, so a header of a few bytes ("5" + the count + "-") asks the server to
+// retain an arbitrary number of frames, each of arbitrary size, for as long as
+// the client cares to keep the connection half-finished (CWE-400/CWE-770).
+//
+// The decode idiom this keys on is shared by every implementation of the
+// protocol, whatever their module layout: the header's digit run is coerced to
+// a number and stored straight onto the packet, `attachments = Number(buf)`.
+// The coercion is the load-bearing part -- it is the point where text the peer
+// typed becomes the integer that sizes the retention, and any ceiling has to be
+// applied to it rather than around it. The remaining clauses pin the module to
+// the retention itself, so an ordinary attachment-handling module (a mail
+// composer listing files, an upload form) does not match: it names no
+// `attachments` field read back off state, and it does not wait on a length.
+//
+// Three things mean a ceiling exists, so none of them reports: an option or
+// property whose name spells one (`maxAttachments`, an attachment `limit`, a
+// frame `cap`) whether it is read off a receiver or compared in place; a
+// comparison that orders the decoded count rather than only testing it for
+// equality with a length, which is what a bound check reads as however it is
+// spelled; and a decode that does not store the coercion directly, because
+// `Math.min(Number(buf), N)` or a checked local that is assigned afterwards
+// both apply something to the count before it reaches the packet.
+//
+// The module is the unit. The header decode, the retention and the configured
+// ceiling live in three different scopes, so no single function sees all of
+// them. Every clause is node-derived, so none of them can be silenced by
+// prose, and a ceiling reaches the tokens by three routes no one of which
+// subsumes the others: as a member read (`opts.maxAttachments`, `selector:`),
+// as a local in the enclosing scope (`identifier:`, the only route when a
+// ceiling is never a property), and as an operand of the comparison that
+// applies it (`expr:`).
+binding jsSocketIoAttachmentCountWithoutLimit {
+  query pattern presenceNode where node.scope == "module"
+    and node.context.language == "javascript"
+    and containsAny(node.context.assign, ["attachments=Number(", "attachments=parseInt"])
+    and containsAny(node.context.selector, ["attachments"])
+    and containsAny(node.context.expr, [".length==="])
+    and not (containsAny(node.context.selector, ["max", "Max", "MAX", "limit", "Limit", "LIMIT", "cap", "Cap", "CAP", "ceiling", "Ceiling", "threshold", "Threshold"]))
+    and not (containsAny(node.context.identifier, ["max", "Max", "MAX", "limit", "Limit", "LIMIT", "cap", "Cap", "CAP", "ceiling", "Ceiling", "threshold", "Threshold"]))
+    and not (containsAny(node.context.expr, ["max", "Max", "MAX", "limit", "Limit", "LIMIT", "cap", "Cap", "CAP", "ceiling", "Ceiling", "threshold", "Threshold", "attachments>", "attachments<"]))
+  emit issue code.UnboundedAllocationReview at node
+}

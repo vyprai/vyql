@@ -1,0 +1,109 @@
+module bindings.swift.generated.m98e3ffbb;
+
+binding networkSend0 {
+  requires {
+    dependency("github.com/parse-community/Parse-Swift")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding nosqlQuery1 {
+  requires {
+    dependency("github.com/parse-community/Parse-Swift")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery2 {
+  requires {
+    dependency("github.com/parse-community/Parse-Swift")
+  }
+  query pattern callExpr where callee.method == "find"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery3 {
+  requires {
+    dependency("github.com/parse-community/Parse-Swift")
+  }
+  query pattern callExpr where callee.method == "first"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery4 {
+  requires {
+    dependency("github.com/parse-community/Parse-Swift")
+  }
+  query pattern callExpr where callee.method == "count"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery5 {
+  requires {
+    dependency("github.com/parse-community/Parse-Swift")
+  }
+  query pattern callExpr where callee.method == "save"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery6 {
+  requires {
+    dependency("github.com/parse-community/Parse-Swift")
+  }
+  query pattern callExpr where callee.method == "create"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery7 {
+  requires {
+    dependency("github.com/parse-community/Parse-Swift")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding secretValue8 {
+  requires {
+    dependency("github.com/parse-community/Parse-Swift")
+  }
+  query pattern callExpr where callee.method == "initialize"
+  emit source code.SecretValue at call.result
+}
+
+binding authorizationCheck9 {
+  requires {
+    dependency("github.com/parse-community/Parse-Swift")
+  }
+  query pattern callExpr where callee.method == "getReadAccess"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck10 {
+  requires {
+    dependency("github.com/parse-community/Parse-Swift")
+  }
+  query pattern callExpr where callee.method == "getWriteAccess"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck11 {
+  requires {
+    dependency("github.com/parse-community/Parse-Swift")
+  }
+  query pattern callExpr where callee.method == "updateAuthentication"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

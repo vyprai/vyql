@@ -1,0 +1,57 @@
+module bindings.objc.generated.m725dbc57;
+
+binding secretValue0 {
+  requires {
+    dependency("OneSignalXCFramework")
+  }
+  query pattern callExpr where callee.method == "login:withToken:"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("OneSignalXCFramework")
+  }
+  query pattern callExpr where callee.method == "initialize:withLaunchOptions:"
+  emit source code.SecretValue at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("OneSignalXCFramework")
+  }
+  query pattern callExpr where callee.method == "didReceiveNotificationExtensionRequest:withMutableNotificationContent:"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("OneSignalXCFramework")
+  }
+  query pattern callExpr where callee.method == "serviceExtensionTimeWillExpireRequest:withMutableNotificationContent:"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData4 {
+  requires {
+    dependency("OneSignalXCFramework")
+  }
+  query pattern callExpr where callee.method == "requestPermission:"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData5 {
+  requires {
+    dependency("OneSignalXCFramework")
+  }
+  query pattern callExpr where callee.method == "registerForProvisionalAuthorization:"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData6 {
+  requires {
+    dependency("OneSignalXCFramework")
+  }
+  query pattern callExpr where callee.method == "startLocationSharedWithFlag:"
+  emit source core.UserControlledData at call.result
+}

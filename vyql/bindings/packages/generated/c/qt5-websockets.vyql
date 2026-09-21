@@ -1,0 +1,33 @@
+module bindings.c.generated.m46370342;
+
+binding networkSend0 {
+  requires {
+    dependency("qt5-websockets")
+  }
+  query pattern callExpr where callee.method == "QWebSocket::sendTextMessage"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("qt5-websockets")
+  }
+  query pattern callExpr where callee.method == "QWebSocket::sendBinaryMessage"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkData2 {
+  requires {
+    dependency("qt5-websockets")
+  }
+  query pattern callExpr where callee.method == "QWebSocket::textMessageReceived"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData3 {
+  requires {
+    dependency("qt5-websockets")
+  }
+  query pattern callExpr where callee.method == "QWebSocket::binaryMessageReceived"
+  emit source code.NetworkData at call.result
+}

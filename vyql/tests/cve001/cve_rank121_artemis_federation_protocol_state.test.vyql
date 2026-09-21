@@ -1,0 +1,83 @@
+# Rank 121 / CVE-2026-27446 (KNIME CVE-2026-4649): the Core protocol channel
+# handler accepts a FEDERATION_DOWNSTREAM_CONNECT packet from the remote peer
+# and deploys the federation configuration it carries without consulting the
+# connection's authenticated subject, so an unauthenticated peer can make the
+# broker open a federation connection back to it. The fix gates the deploy on
+# the connection subject and a role check before acting on the packet.
+
+test "rank121: federation downstream packet deploys without a subject gate"
+  lang java
+  expect VYQL-AUTH-082
+  code
+  ```
+  package protocol;
+
+  public class CoreProtocolManager {
+     private final ActiveMQServer server;
+
+     private class LocalChannelHandler implements ChannelHandler {
+        private final CoreRemotingConnection rc;
+
+        @Override
+        public void handlePacket(final Packet packet) {
+           if (packet.getType() == PacketImpl.FEDERATION_DOWNSTREAM_CONNECT) {
+              // a remote broker requests an upstream federation connection back to it
+              final FederationDownstreamConnectMessage message = (FederationDownstreamConnectMessage) packet;
+              final FederationConfiguration config = new FederationConfiguration();
+              config.setName(message.getName() + FederationDownstreamConnectMessage.UPSTREAM_SUFFIX);
+              config.setCredentials(message.getCredentials());
+              rc.addCloseListener(() -> {
+                 server.getFederationManager().undeploy(config.getName());
+              });
+              try {
+                 server.getFederationManager().deploy(config);
+              } catch (Exception e) {
+              }
+           }
+        }
+     }
+  }
+  ```
+
+test "rank121: federation downstream packet checks the connection subject"
+  lang java
+  reject VYQL-AUTH-082
+  code
+  ```
+  package protocol;
+
+  public class CoreProtocolManager {
+     private final ActiveMQServer server;
+
+     private class FederationChannelHandler implements ChannelHandler {
+        private final CoreRemotingConnection rc;
+
+        @Override
+        public void handlePacket(final Packet packet) {
+           if (packet.getType() == PacketImpl.FEDERATION_DOWNSTREAM_CONNECT) {
+              if (server.getSecurityStore().isSecurityEnabled()) {
+                 if (rc.getSubject() == null) {
+                  rc.close();
+                  return;
+                 }
+                 if (!server.getFederationManager().authorizeDownstreamDeployment(rc.getSubject())) {
+                  rc.close();
+                  return;
+                 }
+              }
+              final FederationDownstreamConnectMessage message = (FederationDownstreamConnectMessage) packet;
+              final FederationConfiguration config = new FederationConfiguration();
+              config.setName(message.getName() + FederationDownstreamConnectMessage.UPSTREAM_SUFFIX);
+              config.setCredentials(message.getCredentials());
+              rc.addCloseListener(() -> {
+                 server.getFederationManager().undeploy(config.getName());
+              });
+              try {
+                 server.getFederationManager().deploy(config);
+              } catch (Exception e) {
+              }
+           }
+        }
+     }
+  }
+  ```

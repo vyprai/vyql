@@ -1,0 +1,9 @@
+module bindings.objc.generated.m7e05a943;
+
+binding codeEval0 {
+  requires {
+    dependency("AgoraRtcEngine_iOS")
+  }
+  query pattern callExpr where callee.method == "setAgoraSdkExternalSymbolLoader"
+  emit sink code.CodeEval at args[0]
+}

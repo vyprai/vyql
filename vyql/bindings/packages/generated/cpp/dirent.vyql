@@ -1,0 +1,25 @@
+module bindings.cpp.generated.m01ea10e7;
+
+binding filePathAccess0 {
+  requires {
+    dependency("dirent")
+  }
+  query pattern callExpr where callee.method == "opendir"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("dirent")
+  }
+  query pattern callExpr where callee.method == "readdir"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("dirent")
+  }
+  query pattern callExpr where callee.method == "scandir"
+  emit sink code.FilePathAccess at args[0]
+}

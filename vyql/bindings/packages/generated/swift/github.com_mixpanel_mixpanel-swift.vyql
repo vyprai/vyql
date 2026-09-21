@@ -1,0 +1,9 @@
+module bindings.swift.generated.mc45625d9;
+
+binding networkSend0 {
+  requires {
+    dependency("github.com/mixpanel/mixpanel-swift")
+  }
+  query pattern callExpr where callee.method == "trackCharge"
+  emit sink code.NetworkSend at args[0]
+}

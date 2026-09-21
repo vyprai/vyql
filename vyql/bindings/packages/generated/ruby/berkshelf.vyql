@@ -1,0 +1,17 @@
+module bindings.ruby.generated.me77b5eaa;
+
+binding networkSend0 {
+  requires {
+    dependency("berkshelf")
+  }
+  query pattern callExpr where callee.method == "upload"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding archiveEntryWrite1 {
+  requires {
+    dependency("berkshelf")
+  }
+  query pattern callExpr where callee.method == "package"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

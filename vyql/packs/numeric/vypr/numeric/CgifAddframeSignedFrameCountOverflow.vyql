@@ -1,0 +1,11 @@
+module vypr.numeric;
+
+rule CgifAddframeSignedFrameCountOverflow {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_190]
+    id: "VYQL-NUM-010"
+    severity: medium
+  }
+  issue code.CgifAddframeSignedFrameCountOverflow as overflow
+}

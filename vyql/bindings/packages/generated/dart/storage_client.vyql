@@ -1,0 +1,89 @@
+module bindings.dart.generated.medf6299a;
+
+binding secretValue0 {
+  requires {
+    dependency("storage_client")
+  }
+  query pattern callExpr where callee.method == "setAuth"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("storage_client")
+  }
+  query pattern callExpr where callee.method == "createSignedUploadUrl"
+  emit source code.SecretValue at call.result
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("storage_client")
+  }
+  query pattern callExpr where callee.method == "listBuckets"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("storage_client")
+  }
+  query pattern callExpr where callee.method == "getBucket"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("storage_client")
+  }
+  query pattern callExpr where callee.method == "emptyBucket"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess5 {
+  requires {
+    dependency("storage_client")
+  }
+  query pattern callExpr where callee.method == "deleteBucket"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess6 {
+  requires {
+    dependency("storage_client")
+  }
+  query pattern callExpr where callee.method == "info"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess7 {
+  requires {
+    dependency("storage_client")
+  }
+  query pattern callExpr where callee.method == "exists"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess8 {
+  requires {
+    dependency("storage_client")
+  }
+  query pattern callExpr where callee.method == "remove"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding urlFetch9 {
+  requires {
+    dependency("storage_client")
+  }
+  query pattern callExpr where callee.method == "head"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch10 {
+  requires {
+    dependency("storage_client")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.UrlFetch at args[0]
+}

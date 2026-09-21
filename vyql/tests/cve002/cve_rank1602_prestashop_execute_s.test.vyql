@@ -1,0 +1,106 @@
+# Rank 1602 / CVE-2023-30839: PrestaShop's database helper enforced
+# its SELECT-only contract only in development mode, so in production
+# any caller sliding a write statement through the read API had it
+# executed verbatim (SQL injection escalation through a dev-only
+# guard, CWE-89/CWE-964; GHSA-p379-cxqh-q822). executeS in
+# classes/db/Db.php detected non-select statements with
+# preg_match('#^\s*\(?\s*(select|show|explain|describe|desc|checksum)
+# \s#i', $sql) and did `if (defined('_PS_MODE_DEV_') && _PS_MODE_DEV_)
+# { throw new PrestaShopDatabaseException('Db->executeS() must be
+# used only with select, show, explain or describe queries'); }
+# return $this->execute($sql, $use_cache);` -- the production path
+# runs the statement. Pool commit d1d27dc371 is the real fix
+# (COMMIT_OK -- the GHSA merge, "Fix executeS method making sure it
+# does selection only"): the conditional and the fallthrough are
+# deleted; the method always throws on a non-selection statement. No
+# pool correction.
+#
+# ATTENTION, mode-conditional enforcement, held on recheck. The guard
+# exists and detects the violation -- its throw is wrapped in a
+# development-mode conditional, the same release-mode-guard family as
+# rank 1543 (orjson's debug_assert): no rule can ask "is this check
+# compiled out or bypassed in production configurations" --
+# mode-conditionality of guards is environment vocabulary. Measured
+# at the span tip on the real checkout (3 x --cache off per revision,
+# timeout 180, --max-ram 6GB): classes/db/Db.php alone and the whole
+# classes/db directory both report zero findings at both revisions;
+# the earlier pass's five php-heuristic findings no longer reproduce.
+# The label view is identical across the revisions: code.SqlExecution
+# on the five $this->query(...) calls (Db.php:545/567/614/664/744
+# vulnerable, :610 shifted in the fixed file), RegexCompileSink plus
+# core.PathAccessCheck on the preg_match guard, FileInclude at :281
+# -- and the deleted fallthrough $this->execute($sql, $use_cache)
+# carries no label at all: the PHP SQL sink family binds
+# query/exec/prepare, not execute. A caller-side route was measured
+# with a $_GET-fed statement through Db::getInstance()->executeS(...):
+# zero findings at both revisions and trace reports the source
+# reaches no sink, and resolution would not help -- the fixed revision
+# still passes the string to the labelled $this->query($sql), because
+# executing a tainted SELECT is the read API's contract; the taint
+# axis cannot separate a write statement from a select statement. No
+# guard-mode vocabulary exists in any language (code.DebugEnabled is
+# a python debug-flag-exposure binding, the opposite direction), and
+# a shape rule "a throw under a development-mode conditional" was
+# measured on this very repository: eight sites wrap a throw in
+# _PS_MODE_DEV_ at the vulnerable revision -- classes/Hook.php:548,
+# classes/Tools.php:1126, config/smartyadmin.config.inc.php:112/128,
+# config/smartyfront.config.inc.php:198/214 and Db.php:607 -- of
+# which every one but Db.php is intentional dev-only error verbosity,
+# so the rule fires eight times for one security enforcement and the
+# discriminator (what the throw protects) has no fact. A binding on
+# PrestaShop's own executeS would detect this platform rather than
+# the weakness. No ENGINE-GAPS.md entry: no taint path is
+# interrupted -- the missing piece is environment vocabulary, not a
+# localized construct. No definition change shipped. Spec cve_rank1602
+# records the dev-only throw with its execute fallthrough and the
+# unconditional form, both asserting reject VYQL-INJ-001: when
+# guard-mode vocabulary lands, the conditional form must flip to
+# expect.
+
+test "rank1602: the select-only check throws in dev mode alone"
+  lang php
+  file classes/db/Db.php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  class Db
+  {
+      public function executeS($sql, $array = true, $use_cache = true)
+      {
+          // This method must be used only with queries which display results
+          if (!preg_match('#^\s*\(?\s*(select|show|explain|describe|desc|checksum)\s#i', $sql)) {
+              if (defined('_PS_MODE_DEV_') && _PS_MODE_DEV_) {
+                  throw new PrestaShopDatabaseException('Db->executeS() must be used only with select, show, explain or describe queries');
+              }
+
+              return $this->execute($sql, $use_cache);
+          }
+
+          $this->result = $this->query($sql);
+      }
+  }
+  ```
+
+test "rank1602: the fixed revision always refuses non-selection statements"
+  lang php
+  file classes/db/Db.php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  class Db
+  {
+      public function executeS($sql, $array = true, $use_cache = true)
+      {
+          // This method must be used only with queries which display results
+          if (!preg_match('#^\s*\(?\s*(select|show|explain|describe|desc|checksum)\s#i', $sql)) {
+              throw new PrestaShopDatabaseException('Db->executeS() must be used only with select, show, explain or describe queries');
+          }
+
+          $this->result = $this->query($sql);
+      }
+  }
+  ```

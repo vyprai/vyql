@@ -1,0 +1,177 @@
+module bindings.csharp.generated.m20f5be65;
+
+binding userControlledData0 {
+  requires {
+    dependency("twilio.mvc")
+  }
+  query pattern callExpr where callee.method == "AccountSid"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("twilio.mvc")
+  }
+  query pattern callExpr where callee.method == "From"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("twilio.mvc")
+  }
+  query pattern callExpr where callee.method == "FromCity"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("twilio.mvc")
+  }
+  query pattern callExpr where callee.method == "FromState"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData4 {
+  requires {
+    dependency("twilio.mvc")
+  }
+  query pattern callExpr where callee.method == "FromZip"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData5 {
+  requires {
+    dependency("twilio.mvc")
+  }
+  query pattern callExpr where callee.method == "FromCountry"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData6 {
+  requires {
+    dependency("twilio.mvc")
+  }
+  query pattern callExpr where callee.method == "ToCity"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData7 {
+  requires {
+    dependency("twilio.mvc")
+  }
+  query pattern callExpr where callee.method == "ToState"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData8 {
+  requires {
+    dependency("twilio.mvc")
+  }
+  query pattern callExpr where callee.method == "ToZip"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData9 {
+  requires {
+    dependency("twilio.mvc")
+  }
+  query pattern callExpr where callee.method == "ToCountry"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData10 {
+  requires {
+    dependency("twilio.mvc")
+  }
+  query pattern callExpr where callee.method == "SmsSid"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData11 {
+  requires {
+    dependency("twilio.mvc")
+  }
+  query pattern callExpr where callee.method == "Body"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData12 {
+  requires {
+    dependency("twilio.mvc")
+  }
+  query pattern callExpr where callee.method == "MessageStatus"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData13 {
+  requires {
+    dependency("twilio.mvc")
+  }
+  query pattern callExpr where callee.method == "CallSid"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData14 {
+  requires {
+    dependency("twilio.mvc")
+  }
+  query pattern callExpr where callee.method == "CallStatus"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData15 {
+  requires {
+    dependency("twilio.mvc")
+  }
+  query pattern callExpr where callee.method == "ApiVersion"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData16 {
+  requires {
+    dependency("twilio.mvc")
+  }
+  query pattern callExpr where callee.method == "Direction"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData17 {
+  requires {
+    dependency("twilio.mvc")
+  }
+  query pattern callExpr where callee.method == "ForwardedFrom"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData18 {
+  requires {
+    dependency("twilio.mvc")
+  }
+  query pattern callExpr where callee.method == "CallerName"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData19 {
+  requires {
+    dependency("twilio.mvc")
+  }
+  query pattern callExpr where callee.method == "Digits"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData20 {
+  requires {
+    dependency("twilio.mvc")
+  }
+  query pattern callExpr where callee.method == "RecordingUrl"
+  emit source core.UserControlledData at call.result
+}
+
+binding htmlRender21 {
+  requires {
+    dependency("twilio.mvc")
+  }
+  query pattern callExpr where callee.method == "TwiML"
+  emit sink code.HtmlRender at args[0]
+}

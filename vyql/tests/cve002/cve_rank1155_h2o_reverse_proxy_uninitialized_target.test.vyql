@@ -1,0 +1,186 @@
+# Rank 1155 / CVE-2023-30847: h2o's reverse proxy builds the request target
+# for the outgoing connection into a stack-local h2o_url_t, target_buf, by
+# calling h2o_url_init(&target_buf, req->scheme, req->authority, ...) as a
+# bare statement and discarding its return. The header's own contract is
+# "@return 0 if successful", and the inline definition keeps it: the failure
+# return happens before any field of the output struct is written, so an
+# authority (Host header) the host/port parser cannot fully consume leaves
+# the caller's struct exactly as it was found on the stack. That value,
+# unread and unvalidated, is then passed as the connection target to
+# h2o_httpclient_connect -- an invalid read of uninitialized stack memory a
+# single malformed request triggers (CWE-824, a child of CWE-908).
+#
+# The fix (f010336b) wraps the same call in
+# `if (target == &target_buf && h2o_url_init(...) != 0)`, sending a 400 and
+# returning instead of connecting, and guards the sibling call in
+# build_request() the same way with h2o_fatal.
+#
+# C now reports the unchecked call through code.UninitializedBufferExposure
+# (VYQL-MEM-015), whose Rust and JavaScript members already ship. The binding
+# names h2o_url_init's documented contract and credits the two idioms that
+# consult the return: a comparison lowers to a binary: token carrying the
+# whole expression text, and a capture into a named variable to an assign:
+# token, so the fix's own spelling clears by the call's appearance inside a
+# binary expression. h2o_url_init_with_hostport and h2o_url_init_with_sun_path
+# write their fields unconditionally and only fail at an sprintf that cannot,
+# so the exact-token anchor leaves them out.
+#
+# Residuals, all false-negative: a return consumed by a form that lowers to
+# neither token -- a bare `return h2o_url_init(...)` wrapper, an explicit
+# `(void)` discard -- still reports, and a capture that is never read still
+# clears.
+#
+# Measured on the real revision pair (full-tree scans, three --cache off runs
+# each, timeout 180, --max-ram 6GB): the vulnerable revision reports exactly
+# two VYQL-MEM-015, on build_request and h2o__proxy_process_request in
+# lib/core/proxy.c -- the two sites the fix guards -- and the fixed revision
+# reports zero; 13307 -> 13305 findings with VYQL-MEM-015 the only rule
+# moving, stable across all six runs. No other tree under /tmp/cve-work
+# contains an h2o_url_init call site.
+#
+# verify_current_expected: fixed
+
+test "rank1155: h2o_url_init's return is discarded before target_buf is used"
+  lang c
+  file lib/core/proxy.c
+  expect VYQL-MEM-015
+  code
+  ```
+  #include <stddef.h>
+
+  typedef struct h2o_iovec_t { const char *base; size_t len; } h2o_iovec_t;
+  typedef struct h2o_url_scheme_t { const char *name; } h2o_url_scheme_t;
+  typedef struct h2o_url_t {
+      const h2o_url_scheme_t *scheme;
+      h2o_iovec_t authority;
+      h2o_iovec_t host;
+      h2o_iovec_t path;
+      unsigned short _port;
+  } h2o_url_t;
+  typedef struct h2o_req_overrides_t { void *connpool; int proxy_preserve_host; } h2o_req_overrides_t;
+  typedef struct h2o_req_t {
+      const h2o_url_scheme_t *scheme;
+      h2o_iovec_t authority;
+      h2o_req_overrides_t *overrides;
+  } h2o_req_t;
+
+  /**
+   * initializes URL object given scheme, authority, and path
+   * @return 0 if successful
+   */
+  int h2o_url_init(h2o_url_t *url, const h2o_url_scheme_t *scheme, h2o_iovec_t authority, h2o_iovec_t path);
+  void h2o_send_error_400(h2o_req_t *req, const char *reason, const char *body, int flags);
+  void h2o_httpclient_connect(void **clientp, void *pool, void *data, void *client_ctx, void *connpool, h2o_url_t *target, const char *upgrade_to, void *cb);
+
+  void h2o__proxy_process_request(h2o_req_t *req)
+  {
+      h2o_req_overrides_t *overrides = req->overrides;
+      h2o_url_t target_buf, *target = &target_buf;
+
+      void *connpool = NULL;
+      if (overrides != NULL && overrides->connpool != NULL) {
+          connpool = overrides->connpool;
+          if (!overrides->proxy_preserve_host)
+              target = NULL;
+      }
+      if (target == &target_buf)
+          h2o_url_init(&target_buf, req->scheme, req->authority, (h2o_iovec_t){"/", 1});
+
+      void *client = NULL;
+      h2o_httpclient_connect(&client, NULL, NULL, NULL, connpool, target, NULL, NULL);
+  }
+  ```
+
+test "rank1155: the fixed revision gates the connect on h2o_url_init's return"
+  lang c
+  file lib/core/proxy.c
+  reject VYQL-MEM-015
+  code
+  ```
+  #include <stddef.h>
+
+  typedef struct h2o_iovec_t { const char *base; size_t len; } h2o_iovec_t;
+  typedef struct h2o_url_scheme_t { const char *name; } h2o_url_scheme_t;
+  typedef struct h2o_url_t {
+      const h2o_url_scheme_t *scheme;
+      h2o_iovec_t authority;
+      h2o_iovec_t host;
+      h2o_iovec_t path;
+      unsigned short _port;
+  } h2o_url_t;
+  typedef struct h2o_req_overrides_t { void *connpool; int proxy_preserve_host; } h2o_req_overrides_t;
+  typedef struct h2o_req_t {
+      const h2o_url_scheme_t *scheme;
+      h2o_iovec_t authority;
+      h2o_req_overrides_t *overrides;
+  } h2o_req_t;
+
+  /**
+   * initializes URL object given scheme, authority, and path
+   * @return 0 if successful
+   */
+  int h2o_url_init(h2o_url_t *url, const h2o_url_scheme_t *scheme, h2o_iovec_t authority, h2o_iovec_t path);
+  void h2o_send_error_400(h2o_req_t *req, const char *reason, const char *body, int flags);
+  void h2o_httpclient_connect(void **clientp, void *pool, void *data, void *client_ctx, void *connpool, h2o_url_t *target, const char *upgrade_to, void *cb);
+
+  void h2o__proxy_process_request(h2o_req_t *req)
+  {
+      h2o_req_overrides_t *overrides = req->overrides;
+      h2o_url_t target_buf, *target = &target_buf;
+
+      void *connpool = NULL;
+      if (overrides != NULL && overrides->connpool != NULL) {
+          connpool = overrides->connpool;
+          if (!overrides->proxy_preserve_host)
+              target = NULL;
+      }
+      if (target == &target_buf && h2o_url_init(&target_buf, req->scheme, req->authority, (h2o_iovec_t){"/", 1}) != 0) {
+          h2o_send_error_400(req, "Invalid Request", "Invalid Request", 1);
+          return;
+      }
+
+      void *client = NULL;
+      h2o_httpclient_connect(&client, NULL, NULL, NULL, connpool, target, NULL, NULL);
+  }
+  ```
+
+test "rank1155: capturing the return into a variable also consults it"
+  lang c
+  file lib/core/proxy.c
+  reject VYQL-MEM-015
+  code
+  ```
+  #include <stddef.h>
+
+  typedef struct h2o_iovec_t { const char *base; size_t len; } h2o_iovec_t;
+  typedef struct h2o_url_scheme_t { const char *name; } h2o_url_scheme_t;
+  typedef struct h2o_url_t {
+      const h2o_url_scheme_t *scheme;
+      h2o_iovec_t authority;
+      h2o_iovec_t host;
+      h2o_iovec_t path;
+      unsigned short _port;
+  } h2o_url_t;
+  typedef struct h2o_req_t {
+      const h2o_url_scheme_t *scheme;
+      h2o_iovec_t authority;
+  } h2o_req_t;
+
+  /**
+   * initializes URL object given scheme, authority, and path
+   * @return 0 if successful
+   */
+  int h2o_url_init(h2o_url_t *url, const h2o_url_scheme_t *scheme, h2o_iovec_t authority, h2o_iovec_t path);
+  void h2o_send_error_400(h2o_req_t *req, const char *reason, const char *body, int flags);
+
+  void h2o__proxy_process_request(h2o_req_t *req)
+  {
+      h2o_url_t target_buf;
+
+      int ret = h2o_url_init(&target_buf, req->scheme, req->authority, (h2o_iovec_t){"/", 1});
+      if (ret != 0) {
+          h2o_send_error_400(req, "Invalid Request", "Invalid Request", 1);
+          return;
+      }
+  }
+  ```

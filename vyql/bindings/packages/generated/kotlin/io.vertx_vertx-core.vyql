@@ -1,0 +1,49 @@
+module bindings.kotlin.generated.mdac635b6;
+
+binding userControlledData0 {
+  requires {
+    dependency("io.vertx:vertx-core")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("io.vertx:vertx-core")
+  }
+  query pattern callExpr where callee.method == "addAll"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("io.vertx:vertx-core")
+  }
+  query pattern callExpr where callee.method == "setAll"
+  emit source core.UserControlledData at call.result
+}
+
+binding fileUse3 {
+  requires {
+    dependency("io.vertx:vertx-core")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding storedDataRead4 {
+  requires {
+    dependency("io.vertx:vertx-core")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.StoredDataRead at call.result
+}
+
+binding filePathAccess5 {
+  requires {
+    dependency("io.vertx:vertx-core")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}

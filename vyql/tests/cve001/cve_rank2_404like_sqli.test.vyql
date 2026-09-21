@@ -1,0 +1,12 @@
+# Rank 2 / CVE-2012-10009: 404Like request parameters reach SQL.
+# Fresh/current full-repo scans emit VYQL-INJ-001 on 404Like.php.
+
+test "rank2: 404Like request parameter reaches SQL execution"
+  expect VYQL-INJ-001
+  graph
+  ```
+  node src core.UserControlledData
+  node sink code.SqlExecution
+  edge FLOWS src -> sink
+  ```
+

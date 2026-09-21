@@ -1,0 +1,81 @@
+# Rank 1146 / CVE-2025-53106: Graylog's token-creation endpoint checks whether
+# the requesting user may create tokens for themselves, then uses that answer
+# to authorize creating a token for whichever other user the URL names
+# (CWE-285).
+#
+# The handler loads the token's future owner from the {userId} path parameter
+# but evaluates the instance-scoped permission against the current principal:
+# RestResource.isPermitted(permission, instanceId) answers "may the subject act
+# on instanceId's namespace", and the vulnerable form passes
+# currentUser.getName() there while the token is minted for futureOwner.
+# Pool commit 9215b8f1fd32 is the real fix (COMMIT_OK, its changelog entry
+# names the advisory GHSA-3m86-c9x3-vwm9): it deletes the currentUser lookup
+# entirely and checks isPermitted(USERS_TOKENCREATE, futureOwner.getName()).
+# No pool correction.
+#
+# ATTENTION, vocabulary gap, confirmed on recheck. Nearest IDOR concepts
+# describe a missing ownership constraint, not a permission check present but
+# evaluated against the wrong principal, and Java has no binding for them;
+# both snippets reject, and no rule or flag fires on the real handler at
+# either revision (full findings and flags views, 3 x --cache off each).
+#
+# The wrong subject is only readable through the two locals' spellings: the
+# vulnerable call's argument token is call_arg:isPermitted:currentUser.getName
+# and the fixed one is call_arg:isPermitted:futureOwner.getName, so every
+# discriminating route keys the application's own variable name. Relaxing to
+# the spelling-free facts over-fires: a function-scope "some call receives a
+# getCurrentUser-derived argument" probe reports 63 flags on the rest subtree
+# alone against 1 true finding, because passing the current user as the
+# owner/creator argument of a create call is correct code everywhere else in
+# this codebase; and the current-principal accessor itself is the application
+# helper getCurrentUser(), not library vocabulary.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1146: the permission check runs against the requester, not the token's future owner"
+  lang java
+  file UsersResource.java
+  reject_review code.IdorPolicyReview
+  code
+  ```
+  package org.graylog2.rest.resources.users;
+
+  public class UsersResource extends RestResource {
+      public Token generateNewToken(@PathParam("userId") String userId, @PathParam("name") String name, GenerateTokenTTL body) {
+          final User futureOwner = loadUserById(userId);
+          final User currentUser = getCurrentUser();
+
+          if (currentUser == null) {
+              throw new ForbiddenException("Not allowed to create tokens for unknown user.");
+          }
+          if (!isPermitted(USERS_TOKENCREATE, currentUser.getName())) {
+              throw new ForbiddenException(currentUser.getName() + " is not allowed to create token.");
+          }
+
+          final AccessToken accessToken = accessTokenService.create(futureOwner.getName(), name, body.getTTL(() -> defaultTTL()));
+          return Token.create(accessToken.getId(), accessToken.getName(), accessToken.getToken(), accessToken.getLastAccess());
+      }
+  }
+  ```
+
+test "rank1146: the permission check runs against the token's actual future owner"
+  lang java
+  file UsersResource.java
+  reject_review code.IdorPolicyReview
+  code
+  ```
+  package org.graylog2.rest.resources.users;
+
+  public class UsersResource extends RestResource {
+      public Token generateNewToken(@PathParam("userId") String userId, @PathParam("name") String name, GenerateTokenTTL body) {
+          final User futureOwner = loadUserById(userId);
+
+          if (!isPermitted(USERS_TOKENCREATE, futureOwner.getName())) {
+              throw new ForbiddenException("You are not allowed to create a token for user " + futureOwner.getName() + ".");
+          }
+
+          final AccessToken accessToken = accessTokenService.create(futureOwner.getName(), name, body.getTTL(() -> defaultTTL()));
+          return Token.create(accessToken.getId(), accessToken.getName(), accessToken.getToken(), accessToken.getLastAccess());
+      }
+  }
+  ```

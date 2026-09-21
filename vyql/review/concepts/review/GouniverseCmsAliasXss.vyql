@@ -1,0 +1,8 @@
+module code;
+
+review code.GouniverseCmsAliasXss {
+  category: xss
+  expected: [core.HtmlEscape]
+  kind: attention
+  text: "review Gouniverse CMS page-alias error responses for hb.Text or equivalent escaping before returning HTML"
+}

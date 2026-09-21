@@ -1,0 +1,41 @@
+module bindings.java.hapiXmlutilXXEProtectedFactory;
+
+// HAPI FHIR's org.hl7.fhir.utilities.xml.XMLUtil exposes a pair of factory
+// constructors whose contract is the name. newXXEProtectedDocumentBuilderFactory()
+// returns a DocumentBuilderFactory with disallow-doctype-decl set and XInclude
+// disabled; newXXEProtectedTransformerFactory() returns a TransformerFactory
+// with ACCESS_EXTERNAL_DTD and ACCESS_EXTERNAL_STYLESHEET set to the empty
+// string. A parser or transformer built from the returned object cannot resolve
+// an external entity, so the constructor call is the hardening in the same way
+// a setFeature call on a local is.
+//
+// The JDK's own spellings are already credited at covers sameReceiver --
+// setFeature with disallow-doctype-decl, setAttribute with ACCESS_EXTERNAL_DTD
+// -- which covers a tree that hardens its own local where it builds the parser.
+// HAPI centralises the features inside the constructor instead, so the call
+// site carries no feature call and no receiver to key on: the factory arrives
+// as the constructor's return value and the caller never re-hardens it. The
+// credit has to be carried by the constructor call, and covers endpoint is the
+// anchor that reaches a parser built in the same function from that value.
+//
+// The method segment is matched exactly and ungated. callee.method compares the
+// final segment only, so the qualified XMLUtil spelling and a static import both
+// match and nothing else does; both constructors are public static API on a
+// class every HAPI FHIR consumer reaches through org.hl7.fhir.utilities, the
+// TransformerFactory one the older of the pair and the DocumentBuilderFactory
+// one its twin.
+//
+// This is a check and only ever suppresses. The residual is a function that
+// takes one factory from the constructor and builds a second, raw one beside
+// it: endpoint coverage clears both. Every function in HAPI's own tree that
+// mixes the two hardens the raw factory inline, which the sameReceiver
+// spellings credit on their own.
+
+binding hapiXXEProtectedFactory {
+  query pattern callExpr where callee.method in ["newXXEProtectedDocumentBuilderFactory", "newXXEProtectedTransformerFactory"]
+  emit check core.XmlHardening at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

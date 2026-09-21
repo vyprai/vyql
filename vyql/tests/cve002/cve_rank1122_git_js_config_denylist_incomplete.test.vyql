@@ -1,0 +1,128 @@
+# Rank 1122 / CVE-2026-6951: simple-git's unsafe-operation guard blocked a
+# short denylist of git config keys and no CLI flags at all, so the
+# --config spelling of an option the guard did block as -c, and every flag
+# form of the same program-running settings (clone -u, push --exec,
+# --template, --upload-pack, --receive-pack), reached the git child process
+# unguarded wherever an application passed user-influenced arguments
+# through (CWE-94). The defect is which strings the library's own denylists
+# contain, so an application call site looks identical on both revisions
+# and the report that belongs to this CVE is the dependency finding: a pin
+# below 3.36.0, the release the advisory names as first fixed.
+
+test "rank1122: a simple-git pin below the first fixed release is a dependency finding"
+  lang javascript
+  file app.js
+  code
+  ```
+  const { simpleGit } = require('simple-git');
+
+  async function mirrorRepository(req, workDir) {
+    await simpleGit({ baseDir: workDir }).raw(
+      'clone', req.body.remote,
+      '--config', 'protocol.ext.allow=always'
+    );
+  }
+  ```
+  file package.json
+  code
+  ```
+  {
+    "name": "repo-mirror",
+    "dependencies": {
+      "simple-git": "3.35.2"
+    }
+  }
+  ```
+  expect VYQL-SCA-001
+  expect_evidence VYQL-SCA-001 CVE-2026-6951
+
+test "rank1122: a simple-git pin at the first fixed release is clean"
+  lang javascript
+  file app.js
+  code
+  ```
+  const { simpleGit } = require('simple-git');
+
+  async function mirrorRepository(req, workDir) {
+    await simpleGit({ baseDir: workDir }).raw(
+      'clone', req.body.remote,
+      '--config', 'protocol.ext.allow=always'
+    );
+  }
+  ```
+  file package.json
+  code
+  ```
+  {
+    "name": "repo-mirror",
+    "dependencies": {
+      "simple-git": "3.36.0"
+    }
+  }
+  ```
+  reject VYQL-SCA-001
+
+# The clone call itself stays unreported whatever the library version: the
+# application is making ordinary library use, and the vulnerable-library
+# report is carried by the dependency finding above, not by an injection
+# finding on the call.
+
+test "rank1122: the clone call is not an injection finding on a vulnerable pin"
+  lang javascript
+  file app.js
+  code
+  ```
+  const { simpleGit } = require('simple-git');
+
+  async function mirrorRepository(req, workDir) {
+    await simpleGit({ baseDir: workDir }).raw(
+      'clone', req.body.remote,
+      '--config', 'protocol.ext.allow=always'
+    );
+  }
+  ```
+  file package.json
+  code
+  ```
+  {
+    "name": "repo-mirror",
+    "dependencies": {
+      "simple-git": "3.35.2"
+    }
+  }
+  ```
+  reject VYQL-INJ-004
+
+# The library's own fix, kept so a later reader can see what the patched
+# guard does rather than inferring it from the advisory text: a parallel
+# denylist over CLI flags, beside the expanded config-key list.
+
+test "rank1122: the patched guard denies the flag forms itself"
+  lang javascript
+  file detect-vulnerable-flags.ts
+  code
+  ```
+  function preventFlagBuilder(
+     task: string | null,
+     flag: string | RegExp,
+     category: VulnerabilityCategory,
+     name = String(flag)
+  ) {
+     const regex = typeof flag === 'string' ? new RegExp(`\\s*${flag.toLowerCase()}`) : flag;
+
+     return function preventFlag(currentTask: string | null, flagName: string): Vulnerability | void {
+        if ((!task || currentTask === task) && regex.test(flagName)) {
+           return { category, message };
+        }
+     };
+  }
+
+  const preventUnsafeFlags = [
+     preventFlagBuilder(null, /--(upload|receive)-pack/, 'allowUnsafePack'),
+     preventFlagBuilder('clone', /^-\w*u/, 'allowUnsafePack'),
+     preventFlagBuilder('clone', '--u', 'allowUnsafePack'),
+     preventFlagBuilder('push', '--exec', 'allowUnsafePack'),
+     preventFlagBuilder(null, '--template', 'allowUnsafeTemplateDir'),
+  ];
+  ```
+  reject VYQL-INJ-004

@@ -1,0 +1,8 @@
+module code;
+
+review code.CookieAuthHandlerMissingPrepareOriginCheck {
+  category: csrf
+  expected: [core.CsrfProtection]
+  kind: target
+  text: "verify a cookie-authenticated Tornado handler validates the request Origin against Host before dispatch"
+}

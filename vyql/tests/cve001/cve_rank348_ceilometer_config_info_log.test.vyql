@@ -1,0 +1,31 @@
+test "rank348: Ceilometer logs parsed polling config at info level"
+  lang python
+  expect VYQL-SEC-007
+  expect_review code.SensitiveConfigInfoLog
+  code
+  ```
+  import yaml
+
+  class ConfigManagerBase(object):
+      def load_config(self, cfg_file):
+          with open(cfg_file) as fap:
+              conf = yaml.safe_load(fap)
+          LOG.info("Config file: %s", conf)
+          return conf
+  ```
+
+test "rank348: Ceilometer logs parsed polling config only at debug level"
+  lang python
+  reject VYQL-SEC-007
+  reject_review code.SensitiveConfigInfoLog
+  code
+  ```
+  import yaml
+
+  class ConfigManagerBase(object):
+      def load_config(self, cfg_file):
+          with open(cfg_file) as fap:
+              conf = yaml.safe_load(fap)
+          LOG.debug("Config file: %s", conf)
+          return conf
+  ```

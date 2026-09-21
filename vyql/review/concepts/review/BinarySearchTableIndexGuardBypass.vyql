@@ -1,0 +1,7 @@
+module code;
+
+review code.BinarySearchTableIndexGuardBypass {
+  category: memory
+  kind: attention
+  text: "review binary-search table lookups for min/max guards before indexing by the recomputed midpoint"
+}

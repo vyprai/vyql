@@ -1,0 +1,6 @@
+module injection;
+
+threat MassAssignment {
+  cwe: [CWE_915]
+  desc: "Untrusted request body bulk-bound to object attributes (mass assignment)"
+}

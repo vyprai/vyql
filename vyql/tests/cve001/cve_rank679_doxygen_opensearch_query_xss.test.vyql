@@ -1,0 +1,39 @@
+# Rank 679 / CVE-2016-10245: Doxygen's legacy PHP OpenSearch endpoint
+# reflected the query parameter into XML/JSON/plain output before allowlisting.
+
+test "rank679: Doxygen legacy PHP OpenSearch reflects raw query"
+  lang php
+  file search_opensearch.php
+  expect VYQL-INJ-004
+  code
+  ```
+  <script language="PHP">
+  $mode = array_key_exists('v', $_GET) ? $_GET['v'] : "";
+  $query = array_key_exists('query', $_GET) ? $_GET['query'] : "";
+  opensearch_json_results($query);
+
+  function opensearch_json_results($query)
+  {
+      print "[\"$query\", []]";
+  }
+  </script>
+  ```
+
+test "rank679: Doxygen legacy PHP OpenSearch allowlists query characters"
+  lang php
+  file search_opensearch.php
+  reject VYQL-INJ-004
+  code
+  ```
+  <script language="PHP">
+  $mode = array_key_exists('v', $_GET) ? $_GET['v'] : "";
+  $query = array_key_exists('query', $_GET) ? $_GET['query'] : "";
+  $query = preg_replace("/[^a-zA-Z0-9\-\_\.\x80-\xFF]/i", " ", $query);
+  opensearch_json_results($query);
+
+  function opensearch_json_results($query)
+  {
+      print "[\"$query\", []]";
+  }
+  </script>
+  ```

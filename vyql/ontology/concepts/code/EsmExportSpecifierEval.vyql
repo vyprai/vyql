@@ -1,0 +1,11 @@
+module code;
+
+concept EsmExportSpecifierEval : issue {
+  cwe: [CWE_94]
+  reviewAssumption: "an ESM export specifier's text can be more than a plain identifier"
+  reviewCategory: code_execution
+  reviewCondition: "a module compiler splits an export specifier and splices the raw name into generated script text without checking it is a valid identifier"
+  reviewConfidence: high
+  reviewEvidence: "module export compiler context {pattern} builds an exports assignment from a parsed specifier name and hands the result to eval without an identifier-format check"
+  vulnerableTo: [injection.CodeInjection]
+}

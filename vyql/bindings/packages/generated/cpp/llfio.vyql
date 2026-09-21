@@ -1,0 +1,25 @@
+module bindings.cpp.generated.m5ed5c10f;
+
+binding filePathAccess0 {
+  requires {
+    dependency("llfio")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding fileUse1 {
+  requires {
+    dependency("llfio")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding fileUse2 {
+  requires {
+    dependency("llfio")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.FileUseSink at args[0]
+}

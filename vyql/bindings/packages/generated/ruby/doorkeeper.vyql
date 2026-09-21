@@ -1,0 +1,13 @@
+module bindings.ruby.generated.m5ff5cbc2;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("doorkeeper")
+  }
+  query pattern callExpr where callee.method == "authenticate"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

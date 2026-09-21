@@ -1,0 +1,11 @@
+module vypr.crypto;
+
+rule CryptoVariableTimeDivision {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_203, CWE_208]
+    id: "VYQL-CRY-056"
+    severity: high
+  }
+  issue code.CryptoVariableTimeDivision as div
+}

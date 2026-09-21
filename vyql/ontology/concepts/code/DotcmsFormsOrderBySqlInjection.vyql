@@ -1,0 +1,11 @@
+module code;
+
+concept DotcmsFormsOrderBySqlInjection : issue {
+  cwe: [CWE_89]
+  reviewAssumption: "authenticated administrators can reach the Marketing > Forms screen and control the _EXT_FORM_HANDLER_orderBy request parameter"
+  reviewCategory: sql
+  reviewCondition: "dotCMS Forms admin action forwards request-controlled orderBy into structure lookup SQL without an order-by allowlist"
+  reviewConfidence: high
+  reviewEvidence: "ViewFormHandlerAction._loadStructures context {pattern} reads request parameters and calls StructureFactory.getStructuresByUser without SQLUtil.sanitizeSortBy"
+  vulnerableTo: [injection.SqlInjection]
+}

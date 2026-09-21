@@ -1,0 +1,11 @@
+module code;
+
+concept UnsanitizedEditorContentHtmlRender : issue {
+  cwe: [CWE_79]
+  reviewAssumption: "the content object can carry pasted or serialized markup that survives the editor's document model without a sanitizing round-trip"
+  reviewCategory: xss
+  reviewCondition: "a view assigns a content getter's markup to innerHTML with no sanitizer in scope"
+  reviewConfidence: medium
+  reviewEvidence: "HTML render context {pattern} renders getContent() output into innerHTML"
+  vulnerableTo: [injection.Xss]
+}

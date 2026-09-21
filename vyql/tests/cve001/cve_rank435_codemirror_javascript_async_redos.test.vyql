@@ -1,0 +1,36 @@
+# Rank 435 / CVE-2020-7760: CodeMirror JavaScript mode used a
+# potentially exponential async-lookahead regex around whitespace/comments.
+
+test "rank435: CodeMirror JavaScript async lookahead uses catastrophic comment regex"
+  lang javascript
+  file javascript.js
+  expect VYQL-DOS-003
+  expect_review code.CatastrophicRegex
+  code
+  ```
+  CodeMirror.defineMode("javascript", function(config, parserConfig) {
+    function tokenBase(stream, state) {
+      var word = stream.current()
+      if (word == "async" && stream.match(/^(\s|\/\*.*?\*\/)*[\[\(\w]/, false))
+        return ret("async", "keyword", word)
+      return ret("variable", "variable", word)
+    }
+  })
+  ```
+
+test "rank435: CodeMirror JavaScript async lookahead uses bounded comment body"
+  lang javascript
+  file javascript.js
+  reject VYQL-DOS-003
+  reject_review code.CatastrophicRegex
+  code
+  ```
+  CodeMirror.defineMode("javascript", function(config, parserConfig) {
+    function tokenBase(stream, state) {
+      var word = stream.current()
+      if (word == "async" && stream.match(/^(\s|\/\*([^*]|\*(?!\/))*?\*\/)*[\[\(\w]/, false))
+        return ret("async", "keyword", word)
+      return ret("variable", "variable", word)
+    }
+  })
+  ```

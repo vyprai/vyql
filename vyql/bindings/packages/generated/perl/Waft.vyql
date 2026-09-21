@@ -1,0 +1,59 @@
+module bindings.perl.generated.m4b50f0fb;
+
+binding userControlledData0 {
+  requires {
+    dependency("Waft")
+  }
+  query pattern callExpr where callee.method == "create_query_obj"
+  emit source core.UserControlledData at call.result
+}
+
+binding htmlEscape1 {
+  requires {
+    dependency("Waft")
+  }
+  query pattern callExpr where callee.method == "html_escape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation2 {
+  requires {
+    dependency("Waft")
+  }
+  query pattern callExpr where callee.method == "jsstr_escape"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding codeEval3 {
+  requires {
+    dependency("Waft")
+  }
+  query pattern callExpr where callee.method == "compile_template_file"
+  emit sink code.CodeEval at args[0]
+}
+
+binding codeEval4 {
+  requires {
+    dependency("Waft")
+  }
+  query pattern callExpr where callee.method == "compile_template"
+  emit sink code.CodeEval at args[0]
+}
+
+binding codeEval5 {
+  requires {
+    dependency("Waft")
+  }
+  query pattern callExpr where callee.method == "Waft"
+  emit sink code.CodeEval at args[0]
+}

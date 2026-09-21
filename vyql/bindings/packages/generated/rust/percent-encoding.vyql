@@ -1,0 +1,33 @@
+module bindings.rust.generated.m264fd2f1;
+
+binding deserialization0 {
+  requires {
+    dependency("percent-encoding")
+  }
+  query pattern callExpr where callee.method == "percent_decode_str"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("percent-encoding")
+  }
+  query pattern callExpr where callee.method == "percent_decode"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("percent-encoding")
+  }
+  query pattern callExpr where callee.method == "decode_utf8"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("percent-encoding")
+  }
+  query pattern callExpr where callee.method == "decode_utf8_lossy"
+  emit sink code.Deserialization at args[0]
+}

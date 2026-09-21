@@ -1,0 +1,9 @@
+module bindings.java.generated.m1914b57a;
+
+binding deserialization0 {
+  requires {
+    dependency("com.googlecode.efficient-java-matrix-library:ejml")
+  }
+  query pattern callExpr where callee.method == "parseMatrix"
+  emit sink code.Deserialization at args[0]
+}

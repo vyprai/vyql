@@ -1,0 +1,145 @@
+# Rank 1608 / CVE-2017-1000481: Plone's isURLInPortal decided whether a
+# URL belonged to the portal -- the membership check a login redirect
+# target passes through -- by rejecting five literal substrings
+# ('\\', '<script', '%3cscript', 'javascript:', 'javascript%3a') and
+# otherwise comparing hosts (Products/CMFPlone/URLTool.py). The scheme
+# component came back from parse.urlparse and was discarded unread
+# (`_`), so data: and mailto: and every scheme the list never named
+# passed as "in the portal", and nothing asked what the URL became
+# after one more html-unescape. The fixing commit 236b62b756
+# (PloneHotfix20171128) parses with the scheme kept, rejects any scheme
+# outside ALLOWED_SCHEMAS (http/https), and when html-unescaping
+# changes the URL re-validates the unescaped form recursively; the
+# literal list survives as a module-level BAD_URL_PARTS table the
+# function iterates.
+#
+# pyUrlSchemeDenylistWithoutDecoding
+# (vyql/bindings/python/url_scheme_denylist_without_decoding.vyql)
+# reads the three parts of the weak shape in one function: the
+# urlparse/urlsplit call, a script-scheme literal tested by
+# comparison in that function, and no decode or re-encode step
+# (unquote/unquote_plus, html.unescape, urllib.parse.quote). It emits
+# code.WeakRedirectUrlValidation, which VYQL-RF-039 reports. The
+# scheme-allowlist form rejects because the decode step is present and
+# the literal comparison has left the function; the third case holds
+# the scope -- a denylist compared in a sibling function credits
+# nothing to the function that parses.
+
+test "rank1608: portal membership blacklists script literals and drops the scheme"
+  lang python
+  file Products/CMFPlone/URLTool.py
+  expect VYQL-RF-039
+  code
+  ```
+  from six.moves.urllib import parse
+
+
+  class URLTool:
+
+      def isURLInPortal(self, url, context=None):
+          url = url.strip()
+          cmp_url = url.lower()
+          if ('\\\\' in cmp_url or
+                  '<script' in cmp_url or
+                  '%3cscript' in cmp_url or
+                  'javascript:' in cmp_url or
+                  'javascript%3a' in cmp_url):
+              return False
+
+          p_url = 'https://portal.example.com/plone'
+
+          _, u_host, u_path, _, _, _ = parse.urlparse(url)
+          if not u_host and not u_path.startswith('/'):
+              if context is None:
+                  return True  # old behavior
+              useurl = context.absolute_url()
+          else:
+              useurl = p_url
+          if not useurl.endswith('/'):
+              useurl += '/'
+
+          _, u_host, u_path, _, _, _ = parse.urlparse(parse.urljoin(useurl, url))
+          if not u_path:
+              u_path = '/'
+          _, host, path, _, _, _ = parse.urlparse(p_url)
+          if host == u_host and u_path.startswith(path):
+              return True
+          return False
+  ```
+
+test "rank1608: the fixed revision allows only http and revalidates the unescaped url"
+  lang python
+  file Products/CMFPlone/URLTool.py
+  reject VYQL-RF-039
+  code
+  ```
+  from six.moves.html_parser import HTMLParser
+  from six.moves.urllib import parse
+
+  hp = HTMLParser()
+
+  ALLOWED_SCHEMAS = [
+      'https',
+      'http',
+  ]
+
+  BAD_URL_PARTS = [
+      '\\\\',
+      '<script',
+      '%3cscript',
+      'javascript:',
+      'javascript%3a',
+  ]
+
+
+  class URLTool:
+
+      def isURLInPortal(self, url, context=None):
+          cmp_url = url.lower()
+          for bad in BAD_URL_PARTS:
+              if bad in cmp_url:
+                  return False
+
+          schema, u_host, u_path, _, _, _ = parse.urlparse(url)
+          if schema and schema not in ALLOWED_SCHEMES:
+              return False
+
+          # Someone may be doing tricks with escaped html code.
+          unescaped_url = hp.unescape(url)
+          if unescaped_url != url:
+              if not self.isURLInPortal(unescaped_url):
+                  return False
+
+          if not u_host:
+              return True
+
+          p_url = 'https://portal.example.com/plone'
+          _, host, path, _, _, _ = parse.urlparse(p_url)
+          return host == u_host and u_path.startswith(path)
+  ```
+
+test "rank1608: a denylist compared in a sibling function credits the parser with nothing"
+  lang python
+  file Products/CMFPlone/URLTool.py
+  reject VYQL-RF-039
+  code
+  ```
+  from six.moves.urllib import parse
+
+
+  def blacklist_hit(cmp_url):
+      if 'javascript:' in cmp_url or 'vbscript:' in cmp_url:
+          return True
+      return False
+
+
+  class URLTool:
+
+      def isURLInPortal(self, url, context=None):
+          if blacklist_hit(url.lower()):
+              return False
+          _, u_host, u_path, _, _, _ = parse.urlparse(url)
+          p_url = 'https://portal.example.com/plone'
+          _, host, path, _, _, _ = parse.urlparse(p_url)
+          return host == u_host and u_path.startswith(path)
+  ```

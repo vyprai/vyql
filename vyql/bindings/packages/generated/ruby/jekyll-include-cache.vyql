@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m11f7e405;
+
+binding filePathAccess0 {
+  requires {
+    dependency("jekyll-include-cache")
+  }
+  query pattern callExpr where callee.method == "path"
+  emit sink code.FilePathAccess at args[0]
+}

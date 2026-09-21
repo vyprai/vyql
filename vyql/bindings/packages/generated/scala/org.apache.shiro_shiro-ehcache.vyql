@@ -1,0 +1,17 @@
+module bindings.scala.generated.m1b0a0ca1;
+
+binding filePathAccess0 {
+  requires {
+    dependency("org.apache.shiro:shiro-ehcache")
+  }
+  query pattern callExpr where callee.method == "getCacheManagerConfigFileInputStream"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("org.apache.shiro:shiro-ehcache")
+  }
+  query pattern callExpr where callee.method == "getCacheManagerConfigFile"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,17 @@
+module bindings.dart.generated.m1346cefe;
+
+binding deserialization0 {
+  requires {
+    dependency("flutter_secure_storage_linux")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding weakHash1 {
+  requires {
+    dependency("flutter_secure_storage_linux")
+  }
+  query pattern presenceNode where node.path ~= "flutter_secure_storage_linux.hash"
+  emit issue code.WeakHash at node
+}

@@ -1,0 +1,11 @@
+module code;
+
+concept LockFileCreateMissingNoFollow : issue {
+  cwe: [CWE_59, CWE_367]
+  reviewAssumption: "the lock-file path may reside in a directory where an attacker can race or place symlinks"
+  reviewCategory: path
+  reviewCondition: "a lock file is created with exclusive open semantics without no-follow protection"
+  reviewConfidence: medium
+  reviewEvidence: "lock acquisition context {pattern} creates a lock file with os.open and exclusive create flags without an observed O_NOFOLLOW guard"
+  vulnerableTo: [path.LinkFollowing, concurrency.Toctou]
+}

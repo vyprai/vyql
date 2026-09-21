@@ -1,0 +1,11 @@
+module code;
+
+concept PersistentModelTitleStoredXss : issue {
+  cwe: [CWE_79]
+  reviewAssumption: "the stored title or option label can be attacker-controlled and later rendered through a raw/template-safe display path"
+  reviewCategory: xss
+  reviewCondition: "a persistent model/UI title is stored from an untrusted source without HTML stripping or encoding"
+  reviewConfidence: high
+  reviewEvidence: "save context {pattern} assigns a raw title/option value into persisted model or column metadata before saving the record"
+  vulnerableTo: [injection.Xss]
+}

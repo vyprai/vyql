@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m6cac2660;
+
+binding deserialization0 {
+  requires {
+    dependency("kramdown-parser-gfm")
+  }
+  query pattern callExpr where callee.method == "initialize"
+  emit sink code.Deserialization at args[0]
+}

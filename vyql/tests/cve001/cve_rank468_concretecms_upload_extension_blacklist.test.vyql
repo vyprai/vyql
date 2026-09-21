@@ -1,0 +1,31 @@
+# Rank 468 / CVE-2020-11476: Concrete5/Concrete CMS omitted executable
+# extensions such as .phar from its upload extension blacklist.
+
+test "rank468: Concrete CMS upload extension blacklist omits phar and related executable extensions"
+  lang php
+  file concrete/config/concrete.php
+  expect VYQL-INJ-099
+  expect_review code.ConcreteCmsIncompleteUploadExtensionBlacklist
+  code
+  ```
+  <?php
+  return [
+      'upload' => [
+          'extensions_blacklist' => '*.php;*.php2;*.php3;*.php4;*.php5;*.php7;*.phtml',
+      ],
+  ];
+  ```
+
+test "rank468: Concrete CMS upload extension blacklist includes phar and related executable extensions"
+  lang php
+  file concrete/config/concrete.php
+  reject VYQL-INJ-099
+  code
+  ```
+  <?php
+  return [
+      'upload' => [
+          'extensions_blacklist' => '*.php;*.php2;*.php3;*.php4;*.php5;*.php7;*.php8;*.phtml;*.phar;*.htaccess;*.pl;*.phpsh;*.pht;*.shtml;*.cgi',
+      ],
+  ];
+  ```

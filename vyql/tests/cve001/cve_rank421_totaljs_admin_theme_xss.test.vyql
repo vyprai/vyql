@@ -1,0 +1,99 @@
+# Rank 421 / CVE-2019-10260: Total.js CMS admin theme XSS in grid
+# column.format rendering and notification item.message rendering.
+
+test "rank421: Total.js grid renders formatted column values without encoding"
+  lang javascript
+  file ui.js
+  expect VYQL-INJ-078
+  expect_review code.TotalJsAdminThemeXss
+  code
+  ```
+  COMPONENT('grid', function(self) {
+    self.redraw = function() {
+      var items = options.items;
+      var columns = options.columns;
+      var builder = [];
+      var m = {};
+
+      for (var i = 0, length = items.length; i < length; i++) {
+        builder.push('<tr class="ui-grid-row" data-index="' + i + '">');
+        for (var j = 0, jl = columns.length; j < jl; j++) {
+          var column = columns[j];
+          var val = items[i][column.name];
+          m.value = column.template ? column.template(items[i], column) : column.render ? column.render(val, column, items[i]) : val == null ? '' : (column.format ? val.format(column.format) : val);
+          builder.push(self.template(m, column));
+        }
+      }
+    };
+  });
+  ```
+
+test "rank421: Total.js grid encodes formatted column values"
+  lang javascript
+  file ui.js
+  reject VYQL-INJ-078
+  reject_review code.TotalJsAdminThemeXss
+  code
+  ```
+  COMPONENT('grid', function(self) {
+    self.redraw = function() {
+      var items = options.items;
+      var columns = options.columns;
+      var builder = [];
+      var m = {};
+
+      for (var i = 0, length = items.length; i < length; i++) {
+        builder.push('<tr class="ui-grid-row" data-index="' + i + '">');
+        for (var j = 0, jl = columns.length; j < jl; j++) {
+          var column = columns[j];
+          var val = items[i][column.name];
+          m.value = column.template ? column.template(items[i], column) : column.render ? column.render(val, column, items[i]) : val == null ? '' : Thelpers.encode((column.format ? val.format(column.format) : val));
+          builder.push(self.template(m, column));
+        }
+      }
+    };
+  });
+  ```
+
+test "rank421: Total.js notification messages are formatted without encoding"
+  lang config
+  file index.html
+  expect VYQL-INJ-078
+  expect_review code.TotalJsAdminThemeXss
+  code
+  ```
+  <script>
+  function refresh_notifications() {
+    var item = common.notifications.messages.shift();
+    var msg = '';
+    var t = common.notifications.template;
+    switch (item.type) {
+      case 'navigation.save':
+        msg = t.format('@(Navigation has been saved)', item.message);
+        break;
+    }
+  }
+  </script>
+  ```
+
+test "rank421: Total.js notification messages are encoded before formatting"
+  lang config
+  file index.html
+  reject VYQL-INJ-078
+  code
+  ```
+  <script>
+  function refresh_notifications() {
+    var item = common.notifications.messages.shift();
+    var msg = '';
+    var t = common.notifications.template;
+    if (item.message)
+      item.message = Thelpers.encode(item.message);
+    switch (item.type) {
+      case 'navigation.save':
+        msg = t.format('@(Navigation has been saved)', item.message);
+        break;
+    }
+  }
+  </script>
+  ```

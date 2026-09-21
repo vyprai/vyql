@@ -1,0 +1,46 @@
+module bindings.groovy.generated.m21df8bcd;
+
+binding sqlExecution0 {
+  requires {
+    dependency("com.zaxxer:HikariCP")
+  }
+  query pattern callExpr where callee.method == "setJdbcUrl"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution1 {
+  requires {
+    dependency("com.zaxxer:HikariCP")
+  }
+  query pattern callExpr where callee.method == "setConnectionInitSql"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution2 {
+  requires {
+    dependency("com.zaxxer:HikariCP")
+  }
+  query pattern callExpr where callee.method == "setConnectionTestQuery"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding secretValue3 {
+  requires {
+    dependency("com.zaxxer:HikariCP")
+  }
+  query pattern callExpr where callee.method == "setPassword"
+  emit source code.SecretValue at call.result
+}
+
+binding inputValidation4 {
+  requires {
+    dependency("com.zaxxer:HikariCP")
+  }
+  query pattern callExpr where callee.method == "validate"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

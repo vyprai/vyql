@@ -1,0 +1,81 @@
+module bindings.ruby.generated.me31aab7c;
+
+binding userControlledData0 {
+  requires {
+    dependency("signet")
+  }
+  query pattern callExpr where callee.method == "parse_auth_param_list"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("signet")
+  }
+  query pattern callExpr where callee.method == "parse_authorization_header"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("signet")
+  }
+  query pattern callExpr where callee.method == "parse_form_encoded_credentials"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("signet")
+  }
+  query pattern callExpr where callee.method == "parse_www_authenticate_header"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData4 {
+  requires {
+    dependency("signet")
+  }
+  query pattern callExpr where callee.method == "parse_basic_credentials"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData5 {
+  requires {
+    dependency("signet")
+  }
+  query pattern callExpr where callee.method == "parse_bearer_credentials"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData6 {
+  requires {
+    dependency("signet")
+  }
+  query pattern callExpr where callee.method == "parse_oauth_challenge"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData7 {
+  requires {
+    dependency("signet")
+  }
+  query pattern callExpr where callee.method == "parse_credentials"
+  emit source core.UserControlledData at call.result
+}
+
+binding secretValue8 {
+  requires {
+    dependency("signet")
+  }
+  query pattern callExpr where callee.method == "extract_credential_key_option"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue9 {
+  requires {
+    dependency("signet")
+  }
+  query pattern callExpr where callee.method == "extract_credential_secret_option"
+  emit source code.SecretValue at call.result
+}

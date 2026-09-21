@@ -1,0 +1,7 @@
+module code;
+
+review code.MissingFormatTruncationCheck {
+  category: memory
+  kind: attention
+  text: "review whether the formatted output fit the destination; compare the formatted-output return value with the bound before reusing it as a length or offset"
+}

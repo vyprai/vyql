@@ -1,0 +1,88 @@
+test "rank316: Capsule tenant service accounts bypass admission classification"
+  lang go
+  expect VYQL-AUTH-009
+  expect_review code.TenantServiceAccountAdmissionBypass
+  code
+  ```
+  package utils
+
+  import "sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+  type UserGroupList struct{}
+
+  func NewUserGroupList(groups []string) UserGroupList { return UserGroupList{} }
+  func (g UserGroupList) Find(group string) bool { return false }
+
+  func IsCapsuleUser(req admission.Request, userGroups []string) bool {
+      groupList := NewUserGroupList(req.UserInfo.Groups)
+
+      if groupList.Find("system:serviceaccounts:kube-system") {
+          return false
+      }
+
+      for _, group := range userGroups {
+          if groupList.Find(group) {
+              return true
+          }
+      }
+
+      return false
+  }
+  ```
+
+test "rank316: Capsule tenant service accounts are resolved through tenant namespace status"
+  lang go
+  reject VYQL-AUTH-009
+  reject_review code.TenantServiceAccountAdmissionBypass
+  code
+  ```
+  package utils
+
+  import (
+      "context"
+      "strings"
+
+      "k8s.io/apimachinery/pkg/fields"
+      "k8s.io/apimachinery/pkg/util/sets"
+      "sigs.k8s.io/controller-runtime/pkg/client"
+      "sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+  )
+
+  type UserGroupList struct{}
+  type TenantList struct{ Items []string }
+
+  func NewUserGroupList(groups []string) UserGroupList { return UserGroupList{} }
+  func (g UserGroupList) Find(group string) bool { return false }
+
+  func IsCapsuleUser(ctx context.Context, req admission.Request, clt client.Client, userGroups []string) bool {
+      groupList := NewUserGroupList(req.UserInfo.Groups)
+
+      if groupList.Find("system:serviceaccounts:kube-system") {
+          return false
+      }
+
+      if sets.NewString(req.UserInfo.Groups...).Has("system:serviceaccounts") {
+          parts := strings.Split(req.UserInfo.Username, ":")
+          targetNamespace := parts[2]
+
+          if len(targetNamespace) > 0 {
+              tl := &TenantList{}
+              if err := clt.List(ctx, tl, client.MatchingFieldsSelector{Selector: fields.OneTermEqualSelector(".status.namespaces", targetNamespace)}); err != nil {
+                  return false
+              }
+
+              if len(tl.Items) == 1 {
+                  return true
+              }
+          }
+      }
+
+      for _, group := range userGroups {
+          if groupList.Find(group) {
+              return true
+          }
+      }
+
+      return false
+  }
+  ```

@@ -1,0 +1,202 @@
+# Sequelize's query generator splices an attributes-array string straight into
+# the SELECT when that string carries parentheses, because quoteIdentifier is
+# skipped for exactly those strings (SQL injection, CWE-89; GHSA-f598-mfpv-gmfx,
+# CVSS 10.0, fixed in 6.29.0). escapeAttributes in
+# src/dialects/abstract/query-generator.js runs, at the vulnerable revision,
+#
+#   } else if (!attr[0].includes('(') && !attr[0].includes(')')) {
+#     attr[0] = this.quoteIdentifier(attr[0]);
+#   } else {
+#     deprecations.noRawAttributes();
+#   }
+#
+# so the else branch emits the attribute verbatim and only deprecates it, and
+# the join two statements below splices attr[0] into the query text. The fixing
+# commit d3f5b5a65e (the pool row's nocommit flag reflects advisory-side
+# absence -- the commit resolves, reads in full, and names the CVE in its
+# message and its error text) quotes the attribute when attributeBehavior is
+# 'escape' and otherwise throws, unless the application opts into
+# 'unsafe-legacy', which keeps the raw splice with the deprecation removed.
+#
+# ATTENTION, rechecked: ORM-boundary SQL assembly, the identifier-position
+# member of the settled family of ranks 1545, 1551, 1555, 1564, 1568, 1571,
+# 1579 and 1602. The defect sits inside the library's own query assembly, and
+# every file the fix touches is library source or a test
+# (query-generator.js, sequelize.js, sequelize.d.ts, utils/deprecations.ts and
+# six test files), so no application-level file differs between the two
+# revisions: an application calling User.findAll({ attributes: [[col, 'value']] })
+# is byte-identical before and after the upgrade, and a binding on that call
+# site can never separate the revisions however it is written.
+#
+# Re-measured over three --cache off runs per revision on the real src/ tree
+# (144 files, `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB`):
+# 213/213/213 findings at 53bd9b7 (the fix's parent) and 213/213/213 at
+# d3f5b5a65e, with identical per-rule tables on both sides (89 VYQL-INJ-001,
+# 53 VYQL-INJ-013, 32 VYQL-INJ-134, 7 VYQL-CRY-006, 6 VYQL-INJ-011,
+# 5 VYQL-INJ-008, 5 VYQL-DOS-001, 5 VYQL-CFG-014, 4 VYQL-INJ-009,
+# 4 VYQL-AUTH-079, 2 VYQL-INJ-012, 1 VYQL-INJ-106) and the only textual
+# differences eleven line-number shifts from the inserted throw block. The
+# `-flags only` view agrees: 47 flags on each side with identical key sets,
+# and the single query-generator flag is a code.SecretComparisonReview at
+# dialects/oracle/query-generator.js:37, unrelated to the splice. Nothing
+# reports anywhere in escapeAttributes (lines 1508-1545 at the parent,
+# 1508-1558 at the fix); the nearest findings sit at 1342 and 1613.
+#
+# Diagnosis re-run on the request-driven shape: `match` labels req.query.col as
+# code.HttpInput and puts no sink at all on the findAll call -- the only
+# code.SqlExecution in the file is args[0] of router.get, a constant route
+# string picked up by the method-name-wide sqlExecution673. `trace` from
+# code.HttpInput dead-ends at res.json, and `resolve` leaves router.get,
+# res.json and module.exports unresolved. So the miss is a missing sink
+# binding, not a broken path: nothing labels a model query call as a query
+# sink. The inversion the first pass recorded also survives -- the documented
+# raw-SQL opt-in sequelize.literal(col) reports VYQL-INJ-001 today through
+# sqlExecution137, while the request-driven attributes shape reports nothing,
+# and the parameterized-where form stays clean.
+#
+# Later-shipped vocabulary checked and ruled out. The tree's only sequelize
+# sink is sqlExecution18/sqlExecution138 on `sequelize.query` at args[0];
+# findAll, findOne and findAndCountAll appear in no JavaScript binding at all
+# (the nearest are the NoSQL sinks nosqlQuery464-466 on `Model.find`,
+# `Model.findOne` and `Model.where`). The generic identifier-interpolation
+# concept that did land, code.UnvalidatedSqlIdentifierInterpolation
+# (VYQL-INJ-152), is emitted only from Go and Python bindings keyed on
+# application-side shapes, and its documented neutraliser set -- allowlist
+# membership or a driver identifier quoter -- cannot separate these revisions
+# either, because this.quoteIdentifier is present in both. Two JavaScript
+# SqlParameterization credits now exist (sqlstring.escape,
+# pg-promise.parameterized), but both are explicit escape calls at the call
+# site; neither credits an ORM's implicit parameterization of a where clause,
+# which is what a sink on the model query would need to stay suppressible.
+#
+# The library-side discriminator that does separate the revisions fails the
+# genericity test. In the IR the quoting call this.quoteIdentifier sits in the
+# paren-free branch and the unquoted else branch holds exactly one call,
+# deprecations.noRawAttributes(); the join that emits the attribute is
+# byte-identical in both revisions. The only fact that distinguishes them is
+# what the else branch does -- deprecate versus throw -- which is the fixing
+# commit's own layout, and a binding keyed on it reports the same weakness
+# written with any other non-throwing action. The two attr[].includes tests
+# additionally carry vyql.internal.NeutralizerAssumption, so any clause keyed
+# on the character test reads as validation rather than as the bypass.
+#
+# Closing this needs ORM query-position vocabulary -- which option positions of
+# a model query are interpolated into SQL text rather than bound, with a
+# JavaScript credit for the implicit parameterization of the rest -- and that
+# is a weakness-class addition, not a localized construct. No ENGINE-GAPS.md
+# entry and no definition change.
+#
+# Spec cve_rank1723 records the raw splice, the quoting-or-throwing form, the
+# request-driven shape and the parameterized-where form, all asserting reject
+# VYQL-INJ-001: when ORM query-position vocabulary lands, the raw-splice and
+# request-driven forms must flip to expect while the parameterized-where form
+# must keep rejecting.
+#
+# verify_current_expected: attention-vocabulary-gap, all four forms rejected.
+
+test "rank1723: a parenthesis-carrying attribute is spliced raw into the SELECT"
+  lang javascript
+  file src/dialects/abstract/query-generator.js
+  reject VYQL-INJ-001
+  code
+  ```
+  escapeAttributes(attributes, options, mainTableAs) {
+    return attributes && attributes.map(attr => {
+      if (attr instanceof Utils.SequelizeMethod) {
+        return this.handleSequelizeMethod(attr);
+      }
+      if (Array.isArray(attr)) {
+        attr = attr.slice();
+
+        if (attr[0] instanceof Utils.SequelizeMethod) {
+          attr[0] = this.handleSequelizeMethod(attr[0]);
+        } else if (!attr[0].includes('(') && !attr[0].includes(')')) {
+          attr[0] = this.quoteIdentifier(attr[0]);
+        } else {
+          deprecations.noRawAttributes();
+        }
+
+        let alias = attr[1];
+
+        if (this.options.minifyAliases) {
+          alias = this._getMinifiedAlias(alias, mainTableAs, options);
+        }
+
+        attr = [attr[0], this.quoteIdentifier(alias)].join(' AS ');
+      }
+
+      return attr;
+    });
+  }
+  ```
+
+test "rank1723: the fixed revision quotes or throws instead of emitting the attribute verbatim"
+  lang javascript
+  file src/dialects/abstract/query-generator.js
+  reject VYQL-INJ-001
+  code
+  ```
+  escapeAttributes(attributes, options, mainTableAs) {
+    return attributes && attributes.map(attr => {
+      if (attr instanceof Utils.SequelizeMethod) {
+        return this.handleSequelizeMethod(attr);
+      }
+      if (Array.isArray(attr)) {
+        attr = attr.slice();
+
+        if (attr[0] instanceof Utils.SequelizeMethod) {
+          attr[0] = this.handleSequelizeMethod(attr[0]);
+        } else if (this.options.attributeBehavior === 'escape' || !attr[0].includes('(') && !attr[0].includes(')')) {
+          attr[0] = this.quoteIdentifier(attr[0]);
+        } else if (this.options.attributeBehavior !== 'unsafe-legacy') {
+          throw new Error('Attributes cannot include parentheses: wrap the attribute in a literal() call, or set the attributeBehavior option.');
+        }
+
+        let alias = attr[1];
+
+        if (this.options.minifyAliases) {
+          alias = this._getMinifiedAlias(alias, mainTableAs, options);
+        }
+
+        attr = [attr[0], this.quoteIdentifier(alias)].join(' AS ');
+      }
+
+      return attr;
+    });
+  }
+  ```
+
+test "rank1723: a request-supplied column reaches the attributes array of a model query"
+  lang javascript
+  file routes/users.js
+  reject VYQL-INJ-001
+  code
+  ```
+  const express = require('express');
+  const router = express.Router();
+
+  router.get('/rows', async (req, res) => {
+    const col = req.query.col;
+    const rows = await User.findAll({ attributes: [[col, 'value']] });
+    res.json(rows);
+  });
+
+  module.exports = router;
+  ```
+
+test "rank1723: constant attributes and a parameterized where stay clean"
+  lang javascript
+  file routes/users.js
+  reject VYQL-INJ-001
+  code
+  ```
+  const express = require('express');
+  const router = express.Router();
+
+  router.get('/rows', async (req, res) => {
+    const rows = await User.findAll({ attributes: [['id', 'value']], where: { id: req.query.id } });
+    res.json(rows);
+  });
+
+  module.exports = router;
+  ```

@@ -1,0 +1,243 @@
+# Rank 1017 / CVE-2026-45300: async-http-client forwards the Cookie header
+# across a redirect security boundary. Redirect30xInterceptor computes the
+# boundary -- cross-origin target or HTTPS-to-HTTP downgrade -- and its
+# propagatedHeaders helper then strips AUTHORIZATION and PROXY_AUTHORIZATION
+# from the copied header set but leaves COOKIE in place, so the session cookie
+# reaches whatever host the 3xx names (CWE-200, CWE-522). The 3xx is written by
+# the server the first request reached, so that server chooses the next host
+# and the copy hands its operator the caller's session. No injection is
+# involved: the URL the client fetches is exactly the one it was told to fetch.
+#
+# The fixed revision (3b0e3e9e, GHSA-fmxf-pm6p-7xgm) splits the strip
+# condition and adds .remove(COOKIE) on the stripAuthorization branch, keeping
+# the NTLM/SCRAM case in an else-if; the URI-scoped CookieStore re-adds the
+# cookies that legitimately match the new target after the helper returns.
+#
+# Vocabulary. This is the Java twin of a family that already ships:
+# code.CredentialHeadersForwardedAcrossRedirect (VYQL-SEC-052) with
+# bindings.javascript.redirectFollowCredentialHeaders and
+# bindings.python.redirectFollowCredentialHeaders for the followers that keep
+# the whole credential set. The JavaScript and Python twins read three facts
+# from the follower's own body -- a Location read, the header-store copy, a
+# redirect budget -- because in those clients the follower is one function. A
+# Java client hands the previous request's headers to a helper that builds the
+# propagated set, and the helper is where the strip and the fix live; its own
+# body carries the same facts in a helper's spelling: a hop rewrite
+# (remove(HOST)/remove(CONTENT_LENGTH)/remove(CONTENT_TYPE), what a re-sent
+# request must drop because target and body change), a credential strip
+# (remove(AUTHORIZATION)/remove(PROXY_AUTHORIZATION), what makes the function a
+# credential-boundary handler), and no Cookie removal -- the missing member of
+# the documented set. The java binding emits the existing concept; no concept,
+# rule or id is minted.
+#
+# The 1st pass pinned an extractor gap: no method-and-argument pairing for
+# Java, so a negation over the flat argument bag was silenced by the class's
+# own cookie-store vocabulary (Cookie, CookieStore, addCookieIfUnset in the
+# sibling redirect method). The pairing exists today without an engine change:
+# a call_arg predicate routes through flagScopeCallArgHit
+# (internal/bindings/bindings_match.go), which computes
+# call_arg:<callee>:<argument> pairs at match time from the call's argument
+# flow -- Java included -- and scopes the hit to the anchor's own function. So
+# `not containsAny(node.context.callArg, ["remove:COOKIE"])` is satisfied only
+# by an actual Cookie removal in that function, and the sibling's
+# addCookieIfUnset(cookie) cannot silence it.
+#
+# Discrimination, three --cache off scans of the whole checkout at each
+# revision, identical every run: 103 findings with exactly 1 VYQL-SEC-052 at
+# Redirect30xInterceptor.java:203 on 3b0e3e9e^, 102 findings and 0 VYQL-SEC-052
+# on 3b0e3e9e. The pre-binding baseline on the vulnerable tree is 102, so the
+# binding adds the target and nothing else.
+#
+# Hostile variants, all measured:
+#   - the vulnerable shape with a comment claiming the cookie store handles it -> 1
+#     (call-argument tokens are AST-derived; prose cannot silence the flag)
+#   - the vulnerable shape beside a sibling method calling remove(COOKIE)      -> 1
+#     (the paired negation is function-confined; siblings cannot satisfy it)
+#   - quoted spellings, remove("Host")/remove("Authorization"), vulnerable     -> 1
+#   - the same quoted spelling with remove("Cookie") added                     -> 0
+#   - a credential strip with no hop rewrite (a bare
+#     model.remove("authorizationRequest"), tomcat's userProperties cleanup)   -> 0
+#     (the hop clause is what keeps this on propagated header sets)
+#   - Python and JavaScript spellings of the same strip                         -> 0
+#     (the call-argument route needs the argument flow those frontends do not
+#     wire; the family's own twins read those languages)
+#
+# Known recall hole, stated in the binding as well: a strip spelled through a
+# different removal method -- Apache HttpClient's removeHeader, okhttp's
+# removeAll -- pairs the name with its own callee and is not read.
+#
+# Collateral, over the clones under /tmp/cve-work: grep enumerates 15 files in
+# 10 trees carrying a remove call with an Authorization or Cookie argument
+# (armeria, tomcat, uaa, vertx-web, android, v6, uv, vaultwarden, windmill,
+# tolgee-platform, this repository). A first draft without the hop clause
+# reported 3 findings on 2 of them -- uaa's model.remove("authorizationRequest")
+# and a test's headers.remove("Authorization"), plus tomcat's
+# userProperties.remove(PROXY_AUTHORIZATION_HEADER_NAME), all substring hits on
+# the bare credential needle. The hop clause takes every one of them to 0, and
+# the full shape reports 0 on all 10 trees (vertx-web scanned on its
+# vertx-web-client subtree after the whole tree exceeded a 170s bound). The
+# needle shapes are absent from BenchmarkJava and BenchmarkPython.
+test "rank1017: a redirect header propagation strips Authorization but keeps Cookie"
+  lang java
+  file client/src/main/java/org/asynchttpclient/netty/handler/intercept/Redirect30xInterceptor.java
+  expect VYQL-SEC-052
+  expect_review code.CredentialHeadersForwardedAcrossRedirect
+  code
+  ```
+  package org.asynchttpclient.netty.handler.intercept;
+
+  import static io.netty.handler.codec.http.HttpHeaderNames.AUTHORIZATION;
+  import static io.netty.handler.codec.http.HttpHeaderNames.CONTENT_LENGTH;
+  import static io.netty.handler.codec.http.HttpHeaderNames.CONTENT_TYPE;
+  import static io.netty.handler.codec.http.HttpHeaderNames.HOST;
+  import static io.netty.handler.codec.http.HttpHeaderNames.PROXY_AUTHORIZATION;
+
+  public class Redirect30xInterceptor {
+      private static HttpHeaders propagatedHeaders(Request request, Realm realm, boolean keepBody,
+                                                   boolean stripAuthorization) {
+          HttpHeaders headers = request.getHeaders()
+                  .remove(HOST)
+                  .remove(CONTENT_LENGTH);
+
+          if (!keepBody) {
+              headers.remove(CONTENT_TYPE);
+          }
+
+          if (stripAuthorization || (realm != null && (realm.getScheme() == AuthScheme.NTLM
+                  || realm.getScheme() == AuthScheme.SCRAM_SHA_256))) {
+              headers.remove(AUTHORIZATION)
+                      .remove(PROXY_AUTHORIZATION);
+          }
+          return headers;
+      }
+  }
+  ```
+
+test "rank1017: the fix also removes Cookie on the security boundary"
+  lang java
+  file client/src/main/java/org/asynchttpclient/netty/handler/intercept/Redirect30xInterceptor.java
+  reject VYQL-SEC-052
+  reject_review code.CredentialHeadersForwardedAcrossRedirect
+  code
+  ```
+  package org.asynchttpclient.netty.handler.intercept;
+
+  import static io.netty.handler.codec.http.HttpHeaderNames.AUTHORIZATION;
+  import static io.netty.handler.codec.http.HttpHeaderNames.CONTENT_LENGTH;
+  import static io.netty.handler.codec.http.HttpHeaderNames.CONTENT_TYPE;
+  import static io.netty.handler.codec.http.HttpHeaderNames.COOKIE;
+  import static io.netty.handler.codec.http.HttpHeaderNames.HOST;
+  import static io.netty.handler.codec.http.HttpHeaderNames.PROXY_AUTHORIZATION;
+
+  public class Redirect30xInterceptor {
+      private static HttpHeaders propagatedHeaders(Request request, Realm realm, boolean keepBody,
+                                                   boolean stripAuthorization) {
+          HttpHeaders headers = request.getHeaders()
+                  .remove(HOST)
+                  .remove(CONTENT_LENGTH);
+
+          if (!keepBody) {
+              headers.remove(CONTENT_TYPE);
+          }
+
+          if (stripAuthorization) {
+              headers.remove(AUTHORIZATION)
+                      .remove(PROXY_AUTHORIZATION)
+                      .remove(COOKIE);
+          } else if (realm != null && (realm.getScheme() == AuthScheme.NTLM
+                  || realm.getScheme() == AuthScheme.SCRAM_SHA_256)) {
+              headers.remove(AUTHORIZATION)
+                      .remove(PROXY_AUTHORIZATION);
+          }
+          return headers;
+      }
+  }
+  ```
+
+test "rank1017: a sibling method re-adding cookies from the store does not handle the boundary"
+  lang java
+  file client/src/main/java/org/asynchttpclient/netty/handler/intercept/Redirect30xInterceptor.java
+  expect VYQL-SEC-052
+  expect_review code.CredentialHeadersForwardedAcrossRedirect
+  code
+  ```
+  package org.asynchttpclient.netty.handler.intercept;
+
+  import io.netty.handler.codec.http.cookie.Cookie;
+  import org.asynchttpclient.cookie.CookieStore;
+
+  import static io.netty.handler.codec.http.HttpHeaderNames.AUTHORIZATION;
+  import static io.netty.handler.codec.http.HttpHeaderNames.CONTENT_LENGTH;
+  import static io.netty.handler.codec.http.HttpHeaderNames.HOST;
+  import static io.netty.handler.codec.http.HttpHeaderNames.PROXY_AUTHORIZATION;
+
+  public class Redirect30xInterceptor {
+      private void nextRequest(RequestBuilder requestBuilder, CookieStore cookieStore, Uri newUri) {
+          CookieStore store = cookieStore;
+          if (store != null) {
+              for (Cookie cookie : store.get(newUri)) {
+                  requestBuilder.addCookieIfUnset(cookie);
+              }
+          }
+      }
+
+      private static HttpHeaders propagatedHeaders(Request request, boolean stripAuthorization) {
+          HttpHeaders headers = request.getHeaders()
+                  .remove(HOST)
+                  .remove(CONTENT_LENGTH);
+
+          if (stripAuthorization) {
+              headers.remove(AUTHORIZATION)
+                      .remove(PROXY_AUTHORIZATION);
+          }
+          return headers;
+      }
+  }
+  ```
+
+test "rank1017: an independently spelled propagation drops the whole credential set"
+  lang java
+  file client/src/main/java/example/hop/RedirectHeaders.java
+  reject VYQL-SEC-052
+  reject_review code.CredentialHeadersForwardedAcrossRedirect
+  code
+  ```
+  package example.hop;
+
+  import java.net.URI;
+  import java.util.Map;
+
+  public class RedirectHeaders {
+      static Map<String, String> forNextHop(Map<String, String> previous, URI from, URI to) {
+          Map<String, String> headers = new java.util.HashMap<>(previous);
+          headers.remove("Host");
+          headers.remove("Content-Length");
+
+          if (!from.getHost().equals(to.getHost()) || from.getScheme().equals("https") && !to.getScheme().equals("https")) {
+              headers.remove("Authorization");
+              headers.remove("Proxy-Authorization");
+              headers.remove("Cookie");
+          }
+          return headers;
+      }
+  }
+  ```
+
+test "rank1017: a credential strip outside a propagated header set is not this leak"
+  lang java
+  file client/src/main/java/example/log/Scrubber.java
+  reject VYQL-SEC-052
+  reject_review code.CredentialHeadersForwardedAcrossRedirect
+  code
+  ```
+  package example.log;
+
+  import java.util.Map;
+
+  public class Scrubber {
+      static Map<String, Object> beforeLogging(Map<String, Object> model) {
+          model.remove("authorizationRequest");
+          return model;
+      }
+  }
+  ```

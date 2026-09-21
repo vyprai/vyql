@@ -1,0 +1,73 @@
+# Rank 803 / CVE-2016-7398: pecl_http crashed while merging nested query
+# parameters because the loop proved only the incoming zval was an array before
+# treating the existing destination zval as an array.
+
+test "rank803: PHP zval merge descends through destination without array type guard"
+  lang c
+  expect VYQL-MEM-040
+  expect_review code.PhpZvalArrayMergeMissingDestTypeCheck
+  code
+  ```
+  static void merge_param(HashTable *params, zval *zdata, zval ***current_param)
+  {
+      zval **ptr, **zdata_ptr, **test_ptr;
+      php_http_array_hashkey_t hkey = php_http_array_hashkey_init(0);
+
+      zend_hash_find(params, hkey.str, hkey.len, (void *) &ptr);
+      zdata_ptr = &zdata;
+
+      if (Z_TYPE_PP(ptr) == IS_ARRAY
+      &&  SUCCESS == zend_hash_find(Z_ARRVAL_PP(ptr), "value", sizeof("value"), (void *) &ptr)
+      &&  SUCCESS == zend_hash_get_current_data(Z_ARRVAL_PP(zdata_ptr), (void *) &zdata_ptr)
+      ) {
+          while (Z_TYPE_PP(zdata_ptr) == IS_ARRAY
+          &&     SUCCESS == zend_hash_get_current_data(Z_ARRVAL_PP(zdata_ptr), (void *) &test_ptr)
+          ) {
+              if (Z_TYPE_PP(test_ptr) == IS_ARRAY) {
+                  if (SUCCESS == zend_hash_find(Z_ARRVAL_PP(ptr), hkey.str, hkey.len, (void *) &ptr)) {
+                      zdata_ptr = test_ptr;
+                  } else if (SUCCESS == zend_hash_index_find(Z_ARRVAL_PP(ptr), hkey.num, (void *) &ptr)) {
+                      zdata_ptr = test_ptr;
+                  }
+              }
+          }
+      }
+
+      *current_param = ptr;
+  }
+  ```
+
+test "rank803: PHP zval merge checks destination before descending"
+  lang c
+  reject VYQL-MEM-040
+  reject_review code.PhpZvalArrayMergeMissingDestTypeCheck
+  code
+  ```
+  static void merge_param(HashTable *params, zval *zdata, zval ***current_param)
+  {
+      zval **ptr, **zdata_ptr, **test_ptr;
+      php_http_array_hashkey_t hkey = php_http_array_hashkey_init(0);
+
+      zend_hash_find(params, hkey.str, hkey.len, (void *) &ptr);
+      zdata_ptr = &zdata;
+
+      if (Z_TYPE_PP(ptr) == IS_ARRAY
+      &&  SUCCESS == zend_hash_find(Z_ARRVAL_PP(ptr), "value", sizeof("value"), (void *) &ptr)
+      &&  SUCCESS == zend_hash_get_current_data(Z_ARRVAL_PP(zdata_ptr), (void *) &zdata_ptr)
+      ) {
+          while (Z_TYPE_PP(zdata_ptr) == IS_ARRAY
+          &&     SUCCESS == zend_hash_get_current_data(Z_ARRVAL_PP(zdata_ptr), (void *) &test_ptr)
+          ) {
+              if (Z_TYPE_PP(test_ptr) == IS_ARRAY && Z_TYPE_PP(ptr) == IS_ARRAY) {
+                  if (SUCCESS == zend_hash_find(Z_ARRVAL_PP(ptr), hkey.str, hkey.len, (void *) &ptr)) {
+                      zdata_ptr = test_ptr;
+                  } else if (SUCCESS == zend_hash_index_find(Z_ARRVAL_PP(ptr), hkey.num, (void *) &ptr)) {
+                      zdata_ptr = test_ptr;
+                  }
+              }
+          }
+      }
+
+      *current_param = ptr;
+  }
+  ```

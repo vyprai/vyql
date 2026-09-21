@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m4f373e83;
+
+binding commandExecution0 {
+  requires {
+    dependency("org.elasticsearch:elasticsearch")
+  }
+  query pattern callExpr where callee.method == "spawnNativeController"
+  emit sink code.CommandExecution at args[0]
+}

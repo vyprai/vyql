@@ -1,0 +1,50 @@
+module bindings.java.bean_introspection_property_binding;
+
+// `java.beans.Introspector.getBeanInfo(Class)` and the `BeanInfo` it returns
+// are documented as handing back *all* of a class's properties -- declared and
+// inherited, accessor-derived included. For `java.lang.Class` that set contains
+// `classLoader` and `protectionDomain`, and from JDK 9 on it also contains
+// `module`, whose own `classLoader` property belongs to a different bean class
+// altogether. So the descriptor array an introspecting function receives has no
+// security shape of its own: whether a name is safe to resolve is a property of
+// the *type* that name reaches, and `PropertyDescriptor.getPropertyType()`
+// paired with `Class.isAssignableFrom` is the API for asking it. `isAssignableFrom`
+// rather than `==` because a container's loader is a subclass of
+// `java.lang.ClassLoader`, never the class itself.
+//
+// The shape labelled here is the admission step. A function that takes the
+// descriptor array and indexes every descriptor into a map under the
+// descriptor's own name has just built a name-resolution surface: whatever it
+// admits is reachable by that name from whoever consults the map. When the map
+// backs a binder -- a `BeanWrapper`, a properties/XML/JSON mapper, a template or
+// scripting bridge, an MBean surface -- the names arrive from outside the
+// process, and an unbounded map hands each of them a reflective accessor. The
+// classic instance is a binder that excluded the two `Class` properties by
+// literal name and only for the one bean class `java.lang.Class`, so any path
+// that reached a loader through another bean class -- `module`, or any property
+// whose own type is a loader subclass -- resolved without a check.
+//
+// `getBeanInfo` is the load-bearing clause and it is keyed on the final segment
+// so that both the static `Introspector.getBeanInfo(...)` and a receiverless
+// helper that wraps it count. Without it the label lands on framework code whose
+// `getPropertyDescriptors()` returns an unrelated class that merely shares the
+// name: nifi's `org.apache.nifi.components.PropertyDescriptor` produced six
+// function hits across three files in the measured candidate set before this
+// clause was added, none of them within reach of `java.beans`. On the same
+// candidate set the clause set below reports five functions in four trees, three
+// of which are the same unbounded index built by other projects.
+//
+// Each of `call in [...]` is exact-token, and that is not stylistic:
+// `containsAny` substring-matches the value after the prefix, so `["put"]` would
+// also credit `putAll` and `["getName"]` would also credit `getNamedItem`, both
+// of which occur in the measured candidate set.
+
+binding unboundedBeanPropertyBinding {
+  query pattern presenceNode where node.scope == "function"
+    and node.context.call in ["getBeanInfo"]
+    and node.context.call in ["getPropertyDescriptors"]
+    and node.context.call in ["put"]
+    and node.context.call in ["getName"]
+    and not (containsAny(node.context.call, ["isAssignableFrom"]))
+  emit issue code.UnboundedBeanPropertyBinding at node
+}

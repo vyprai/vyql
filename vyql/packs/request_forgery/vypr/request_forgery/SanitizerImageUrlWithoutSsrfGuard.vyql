@@ -1,0 +1,11 @@
+module vypr.request_forgery;
+
+rule SanitizerImageUrlWithoutSsrfGuard {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_918]
+    id: "VYQL-RF-051"
+    severity: high
+  }
+  issue code.SanitizerImageUrlWithoutSsrfGuard as sanitizer
+}

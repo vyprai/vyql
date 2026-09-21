@@ -1,0 +1,63 @@
+test "rank335: Cassandra JMX server uses custom RMI exporter registry path"
+  lang java
+  expect VYQL-AUTH-013
+  expect_review code.JmxRmiRegistryExposure
+  code
+  ```
+  import java.lang.management.ManagementFactory;
+  import java.util.HashMap;
+  import java.util.Map;
+  import javax.management.remote.JMXConnectorServer;
+  import javax.management.remote.JMXConnectorServerFactory;
+  import javax.management.remote.JMXServiceURL;
+  import com.sun.jmx.remote.internal.RMIExporter;
+
+  class JMXServerUtils {
+      public static JMXConnectorServer createJMXServer(int port, boolean local) throws Exception {
+          Map<String, Object> env = new HashMap<>();
+          env.put(RMIExporter.EXPORTER_ATTRIBUTE, new Exporter());
+          int rmiPort = Integer.getInteger("com.sun.management.jmxremote.rmi.port", 0);
+          JMXConnectorServer jmxServer =
+              JMXConnectorServerFactory.newJMXConnectorServer(new JMXServiceURL("rmi", null, rmiPort),
+                                                              env,
+                                                              ManagementFactory.getPlatformMBeanServer());
+          jmxServer.start();
+          configureRMIRegistry(port, env);
+          return jmxServer;
+      }
+
+      private static void configureRMIRegistry(int port, Map<String, Object> env) {}
+      private static class Exporter {}
+  }
+  ```
+
+test "rank335: Cassandra JMX server binds registry with configured socket factories"
+  lang java
+  reject VYQL-AUTH-013
+  reject_review code.JmxRmiRegistryExposure
+  code
+  ```
+  import java.lang.management.ManagementFactory;
+  import java.rmi.registry.LocateRegistry;
+  import java.rmi.registry.Registry;
+  import java.util.HashMap;
+  import java.util.Map;
+  import javax.management.remote.JMXConnectorServer;
+  import javax.management.remote.JMXServiceURL;
+  import javax.management.remote.rmi.RMIConnectorServer;
+  import javax.management.remote.rmi.RMIJRMPServerImpl;
+
+  class JMXServerUtils {
+      public static JMXConnectorServer createJMXServer(int port, boolean local) throws Exception {
+          Map<String, Object> env = new HashMap<>();
+          Registry registry = LocateRegistry.createRegistry(port, null, null);
+          int rmiPort = Integer.getInteger("com.sun.management.jmxremote.rmi.port", 0);
+          RMIJRMPServerImpl server = new RMIJRMPServerImpl(rmiPort, null, null, env);
+          JMXServiceURL serviceURL = new JMXServiceURL("rmi", null, rmiPort);
+          RMIConnectorServer jmxServer = new RMIConnectorServer(serviceURL, env, server, ManagementFactory.getPlatformMBeanServer());
+          jmxServer.start();
+          registry.rebind("jmxrmi", server);
+          return jmxServer;
+      }
+  }
+  ```

@@ -1,0 +1,247 @@
+module bindings.cryptoreview.generated.m4f475b34;
+
+pattern bindingMetadata {
+  binding: {
+    name: "cryptoreview"
+    meta: {
+      auto_apply: "graph"
+      cross_language: "true"
+      fidelity: "syntactic"
+    }
+  }
+}
+
+binding cryptoOperation0 {
+  query pattern presenceNode where node.path ~= "crypto.createCipheriv"
+  emit issue code.CryptoOperation at node
+}
+
+binding cryptoOperation1 {
+  query pattern presenceNode where node.path ~= "crypto.createDecipheriv"
+  emit issue code.CryptoOperation at node
+}
+
+binding cryptoOperation2 {
+  query pattern presenceNode where node.path ~= "crypto.createCipher"
+  emit issue code.CryptoOperation at node
+}
+
+binding cryptoOperation3 {
+  query pattern presenceNode where node.path ~= "crypto.createSign"
+  emit issue code.CryptoOperation at node
+}
+
+binding cryptoOperation4 {
+  query pattern presenceNode where node.path ~= "crypto.createVerify"
+  emit issue code.CryptoOperation at node
+}
+
+binding cryptoOperation5 {
+  query pattern presenceNode where node.path ~= "crypto.publicEncrypt"
+  emit issue code.CryptoOperation at node
+}
+
+binding cryptoOperation6 {
+  query pattern presenceNode where node.path ~= "crypto.privateDecrypt"
+  emit issue code.CryptoOperation at node
+}
+
+binding cryptoOperation7 {
+  query pattern presenceNode where node.path ~= "crypto.pbkdf2"
+  emit issue code.CryptoOperation at node
+}
+
+binding cryptoOperation8 {
+  query pattern presenceNode where node.path ~= "crypto.scrypt"
+  emit issue code.CryptoOperation at node
+}
+
+binding cryptoOperation9 {
+  query pattern presenceNode where node.path ~= "crypto.generateKeyPair"
+  emit issue code.CryptoOperation at node
+}
+
+binding cryptoOperation10 {
+  query pattern presenceNode where node.path ~= "Cipher.getInstance"
+  emit issue code.CryptoOperation at node
+}
+
+binding cryptoOperation11 {
+  query pattern presenceNode where node.path ~= "Signature.getInstance"
+  emit issue code.CryptoOperation at node
+}
+
+binding cryptoOperation12 {
+  query pattern presenceNode where node.path ~= "Mac.getInstance"
+  emit issue code.CryptoOperation at node
+}
+
+binding cryptoOperation13 {
+  query pattern presenceNode where node.path ~= "KeyGenerator.getInstance"
+  emit issue code.CryptoOperation at node
+}
+
+binding cryptoOperation14 {
+  query pattern presenceNode where node.path ~= "KeyPairGenerator.getInstance"
+  emit issue code.CryptoOperation at node
+}
+
+binding cryptoOperation15 {
+  query pattern callExpr where callee.method == "doFinal"
+  emit issue code.CryptoOperation at call
+}
+
+binding cryptoOperation16 {
+  query pattern callExpr where callee.method == "EncryptValue"
+  emit issue code.CryptoOperation at call
+}
+
+binding cryptoOperation17 {
+  query pattern callExpr where callee.method == "DecryptValue"
+  emit issue code.CryptoOperation at call
+}
+
+binding cryptoOperation18 {
+  query pattern presenceNode where node.path ~= "aes.NewCipher"
+  emit issue code.CryptoOperation at node
+}
+
+binding cryptoOperation19 {
+  query pattern presenceNode where node.path ~= "cipher.NewGCM"
+  emit issue code.CryptoOperation at node
+}
+
+binding cryptoOperation20 {
+  query pattern presenceNode where node.path ~= "rsa.SignPKCS1v15"
+  emit issue code.CryptoOperation at node
+}
+
+binding cryptoOperation21 {
+  query pattern presenceNode where node.path ~= "rsa.VerifyPKCS1v15"
+  emit issue code.CryptoOperation at node
+}
+
+binding cryptoOperation22 {
+  query pattern presenceNode where node.path ~= "ecdsa.Sign"
+  emit issue code.CryptoOperation at node
+}
+
+binding cryptoOperation23 {
+  query pattern presenceNode where node.path ~= "ecdsa.Verify"
+  emit issue code.CryptoOperation at node
+}
+
+binding cryptoOperation24 {
+  query pattern presenceNode where node.path ~= "hmac.New"
+  emit issue code.CryptoOperation at node
+}
+
+binding cryptoOperation25 {
+  query pattern presenceNode where node.path ~= "Aes.Create"
+  emit issue code.CryptoOperation at node
+}
+
+binding cryptoOperation26 {
+  query pattern presenceNode where node.path ~= "SymmetricAlgorithm.Create"
+  emit issue code.CryptoOperation at node
+}
+
+binding cryptoOperation27 {
+  query pattern presenceNode where node.path ~= "HashAlgorithm.Create"
+  emit issue code.CryptoOperation at node
+}
+
+binding cryptoOperation28 {
+  query pattern callExpr where callee.method == "CreateEncryptor"
+  emit issue code.CryptoOperation at call
+}
+
+binding cryptoOperation29 {
+  query pattern callExpr where callee.method == "CreateDecryptor"
+  emit issue code.CryptoOperation at call
+}
+
+binding cryptoOperation30 {
+  query pattern callExpr where callee.method == "TransformFinalBlock"
+  emit issue code.CryptoOperation at call
+}
+
+binding cryptoOperation31 {
+  query pattern callExpr where callee.method == "GenerateKey"
+  emit issue code.CryptoOperation at call
+}
+
+binding cryptoOperation32 {
+  query pattern callExpr where callee.method == "GenerateIV"
+  emit issue code.CryptoOperation at call
+}
+
+binding cryptoOperation33 {
+  query pattern presenceNode where node.path ~= "CryptoStream"
+  emit issue code.CryptoOperation at node
+}
+
+binding cryptoOperation34 {
+  query pattern presenceNode where node.path ~= "RSACryptoServiceProvider"
+  emit issue code.CryptoOperation at node
+}
+
+binding cryptoOperation35 {
+  query pattern presenceNode where node.path ~= "AesManaged"
+  emit issue code.CryptoOperation at node
+}
+
+binding cryptoOperation36 {
+  query pattern presenceNode where node.path ~= "TripleDESCryptoServiceProvider"
+  emit issue code.CryptoOperation at node
+}
+
+binding cryptoOperation37 {
+  query pattern presenceNode where node.path ~= "RijndaelManaged"
+  emit issue code.CryptoOperation at node
+}
+
+binding cryptoOperation38 {
+  query pattern presenceNode where node.path ~= "ProtectedData.Protect"
+  emit issue code.CryptoOperation at node
+}
+
+binding cryptoOperation39 {
+  query pattern presenceNode where node.path ~= "ProtectedData.Unprotect"
+  emit issue code.CryptoOperation at node
+}
+
+binding cryptoOperation40 {
+  query pattern presenceNode where node.path ~= "Rfc2898DeriveBytes"
+  emit issue code.CryptoOperation at node
+}
+
+binding cryptoOperation41 {
+  query pattern presenceNode where node.path ~= "EVP_EncryptInit_ex"
+  emit issue code.CryptoOperation at node
+}
+
+binding cryptoOperation42 {
+  query pattern presenceNode where node.path ~= "EVP_DecryptInit_ex"
+  emit issue code.CryptoOperation at node
+}
+
+binding cryptoOperation43 {
+  query pattern presenceNode where node.path ~= "EVP_DigestSignInit"
+  emit issue code.CryptoOperation at node
+}
+
+binding cryptoOperation44 {
+  query pattern presenceNode where node.path ~= "EVP_DigestVerifyInit"
+  emit issue code.CryptoOperation at node
+}
+
+binding cryptoOperation45 {
+  query pattern presenceNode where node.path ~= "RSA_sign"
+  emit issue code.CryptoOperation at node
+}
+
+binding cryptoOperation46 {
+  query pattern presenceNode where node.path ~= "RSA_verify"
+  emit issue code.CryptoOperation at node
+}

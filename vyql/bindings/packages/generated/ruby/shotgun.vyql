@@ -1,0 +1,25 @@
+module bindings.ruby.generated.m948c362a;
+
+binding deserialization0 {
+  requires {
+    dependency("shotgun")
+  }
+  query pattern callExpr where callee.method == "Loader.call!"
+  emit sink code.Deserialization at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("shotgun")
+  }
+  query pattern callExpr where callee.method == "Loader.call!"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding codeEval2 {
+  requires {
+    dependency("shotgun")
+  }
+  query pattern callExpr where callee.method == "Loader.call!"
+  emit sink code.CodeEval at args[0]
+}

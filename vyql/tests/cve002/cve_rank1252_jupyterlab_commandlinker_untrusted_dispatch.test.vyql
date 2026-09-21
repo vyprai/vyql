@@ -1,0 +1,138 @@
+# Rank 1252 / CVE-2026-42557 (GHSA-mqcg-5x36-vfcg): JupyterLab's HTML
+# sanitizer allowlisted `data-commandlinker-command` / `data-commandlinker-args`
+# on `<button>` elements, and CommandLinker registered a single delegated
+# click listener on document.body that walked up from event.target, read
+# those two attributes off whatever element was clicked, and executed the
+# named command with no check that the element came from trusted JupyterLab
+# UI rather than sanitized (but attacker-authored) notebook output. A saved
+# notebook with an HTML cell output containing such a button triggered an
+# arbitrary JupyterLab command -- including kernel code execution -- on a
+# single click (CWE-79). Fix commit 5d9cb8c634e0 (the advisory's own
+# c5f522db11d0 is the identical fix rebased onto the 4.5.x release branch)
+# makes `_evtClick` async and gates execution behind `_isTrusted(target)` --
+# an in-memory WeakMap populated only via the new `markTrusted()` API --
+# plus a confirmation dialog (`_requestTrust`/
+# `showCommandLinkerTrustDialog`), and adds a sanitizer toggle
+# `setAllowCommandLinker(false)`; the data flow itself (attribute read ->
+# `.execute(command, args)`) survives the fix by design, because trusted
+# buttons still dispatch through the same call.
+#
+# ATTENTION, no discrimination. The attribute read is labelled now:
+# domInput2650 (bindings/javascript/mfb63017a.vyql) emits code.DomInput at
+# every `getAttribute()` result, and `.execute` matches sqlExecution131 as
+# code.SqlExecution off the method name alone, so VYQL-INJ-001 fires high on
+# the vulnerable flow -- in this spec pair and in the real checkout
+# (packages/apputils, 3x --cache off runs per revision, timeout 180,
+# --max-ram 6GB, no ceiling abort): the vulnerable revision reports
+# VYQL-INJ-001 at src/commandlinker.ts:176 -> :185 (4 findings total: also
+# 2 VYQL-CRY-003 in windowresolver.ts, 1 VYQL-INJ-009 in toolbar/factory.ts)
+# and the fixed revision reports VYQL-INJ-001 twice -- the same flow plus
+# one through the fix's own `_findTrustCommand` return into
+# `.execute(trustCommand)` (5 findings total). The patched revision scores
+# higher than the vulnerable one, so promotion is measured out: no rule
+# separates the pair, and the -flags only view reports zero review-concept
+# flags on either revision. The only separating signal available is the
+# fix's own trust API (`markTrusted`/`_isTrusted`/`_requestTrust`) -- the
+# fixing commit's own layout as a discriminator -- while generalising the
+# source to any DOM-attribute read inside a delegated handler would flag
+# ordinary, safe event delegation (Bootstrap `data-toggle`, htmx `hx-*`)
+# broadly. code.HtmlSanitizerLogicReview and code.UnsafeEmbeddableAllowlist
+# stay silent because the sanitizer does exactly what its allowlist says;
+# the danger is unrelated application code trusting one permitted attribute
+# as a command.
+#
+# verify_current_expected: attention-no-discrimination; both tests pin the
+# identical VYQL-INJ-001 firing (the trust gate is invisible to the taint
+# path) plus the silence of the nearest-theme rules
+
+test "rank1252: _evtClick dispatches a data-commandlinker-command attribute with no trust check"
+  lang javascript
+  file commandlinker.ts
+  expect VYQL-INJ-001
+  reject VYQL-INJ-009
+  reject_review code.HtmlSanitizerLogicReview
+  code
+  ```
+  class CommandLinker {
+    private _evtClick(event: MouseEvent): void {
+      let target = event.target as HTMLElement;
+      while (target && target.parentElement) {
+        if (target.hasAttribute('data-commandlinker-command')) {
+          event.preventDefault();
+          const command = target.getAttribute('data-commandlinker-command');
+          if (!command) {
+            return;
+          }
+          const argsValue = target.getAttribute('data-commandlinker-args');
+          let args = {};
+          if (argsValue) {
+            args = JSON.parse(argsValue);
+          }
+          void this._commands.execute(command, args);
+          return;
+        }
+        target = target.parentElement;
+      }
+    }
+
+    private _commands: any;
+  }
+  ```
+
+test "rank1252: _evtClick asks for trust before dispatching an unmarked node"
+  lang javascript
+  file commandlinker.ts
+  expect VYQL-INJ-001
+  reject VYQL-INJ-009
+  reject_review code.HtmlSanitizerLogicReview
+  code
+  ```
+  class CommandLinker {
+    private async _evtClick(event: MouseEvent): Promise<void> {
+      let target = event.target as HTMLElement;
+      while (target && target.parentElement) {
+        if (target.hasAttribute('data-commandlinker-command')) {
+          event.preventDefault();
+          const command = target.getAttribute('data-commandlinker-command');
+          if (!command) {
+            return;
+          }
+          const argsValue = target.getAttribute('data-commandlinker-args');
+          let args = {};
+          if (argsValue) {
+            args = JSON.parse(argsValue);
+          }
+
+          if (!this._isTrusted(target)) {
+            const trustAction = await this._requestTrust(command, args);
+            if (trustAction === 'cancel') {
+              return;
+            }
+          }
+
+          void this._commands.execute(command, args);
+          return;
+        }
+        target = target.parentElement;
+      }
+    }
+
+    private _isTrusted(target: HTMLElement): boolean {
+      let node: HTMLElement | null = target;
+      while (node) {
+        if (this._trustedBoundaries.has(node)) {
+          return true;
+        }
+        node = node.parentElement;
+      }
+      return false;
+    }
+
+    private async _requestTrust(command: string, args: any): Promise<string> {
+      return 'cancel';
+    }
+
+    private _commands: any;
+    private _trustedBoundaries = new WeakMap<HTMLElement, true>();
+  }
+  ```

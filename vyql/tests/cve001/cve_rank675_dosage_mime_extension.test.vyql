@@ -1,0 +1,37 @@
+# Rank 675 / CVE-2025-64184: Dosage derived the output file extension from
+# the raw MIME subtype before switching to mimetypes.guess_extension.
+
+test "rank675: MIME subtype is used directly as output file extension"
+  lang python
+  expect VYQL-PATH-032
+  code
+  ```
+  class ComicImage:
+      def connect(self):
+          content_type = unquote(self.urlobj.headers.get('content-type', 'application/octet-stream'))
+          content_type = content_type.split(';', 1)[0]
+          if '/' in content_type:
+              maintype, subtype = content_type.split('/', 1)
+          else:
+              maintype = content_type
+              subtype = None
+          if maintype == 'image':
+              self.ext = '.' + subtype.replace('jpeg', 'jpg')
+  ```
+
+test "rank675: MIME extension is selected through mimetypes registry"
+  lang python
+  reject VYQL-PATH-032
+  code
+  ```
+  import mimetypes
+
+  class ComicImage:
+      def connect(self):
+          content_type = unquote(self.urlobj.headers.get('content-type', 'application/octet-stream'))
+          content_type = content_type.split(';', 1)[0]
+          maintype = content_type.split('/', 1)[0]
+          guessed_ext = mimetypes.guess_extension(content_type)
+          if guessed_ext and guessed_ext != '.bin':
+              self.ext = guessed_ext
+  ```

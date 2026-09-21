@@ -1,0 +1,81 @@
+module bindings.dart.generated.m605bf67e;
+
+binding deserialization0 {
+  requires {
+    dependency("country_picker")
+  }
+  query pattern callExpr where callee.method == "Country.parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("country_picker")
+  }
+  query pattern callExpr where callee.method == "Country.tryParse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("country_picker")
+  }
+  query pattern callExpr where callee.method == "CountryParser.parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("country_picker")
+  }
+  query pattern callExpr where callee.method == "CountryParser.tryParse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("country_picker")
+  }
+  query pattern callExpr where callee.method == "CountryParser.parseCountryCode"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("country_picker")
+  }
+  query pattern callExpr where callee.method == "CountryParser.parsePhoneCode"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization6 {
+  requires {
+    dependency("country_picker")
+  }
+  query pattern callExpr where callee.method == "CountryParser.tryParseCountryCode"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization7 {
+  requires {
+    dependency("country_picker")
+  }
+  query pattern callExpr where callee.method == "CountryParser.tryParsePhoneCode"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization8 {
+  requires {
+    dependency("country_picker")
+  }
+  query pattern callExpr where callee.method == "CountryParser.parseCountryName"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization9 {
+  requires {
+    dependency("country_picker")
+  }
+  query pattern callExpr where callee.method == "CountryParser.tryParseCountryName"
+  emit sink code.Deserialization at args[0]
+}

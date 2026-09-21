@@ -1,0 +1,11 @@
+module code;
+
+concept UntrustedSupportUrlNotification : issue {
+  cwe: [CWE_20]
+  reviewAssumption: "mail clients or recipient workflows may auto-link the supplied URL, causing the notification to imply trust in an attacker-selected site"
+  reviewCategory: validation
+  reviewCondition: "an endpoint forwards a request-supplied site or base URL into an outbound notification as trusted context"
+  reviewConfidence: high
+  reviewEvidence: "notification context {pattern} takes the site or base URL from request input and schedules or sends the notification without server-side base-URL derivation or URL defanging"
+  vulnerableTo: [validation.ImproperInputValidation]
+}

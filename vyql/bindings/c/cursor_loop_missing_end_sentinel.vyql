@@ -1,0 +1,47 @@
+module bindings.c.cursor_loop_missing_end_sentinel;
+
+// A walk that takes a half-open range states its own contract: one pointer to
+// read from and one past the last byte it may touch, both in the function's
+// signature, and the comparisons that keep the cursor inside it restate the
+// same pairing -- `first >= afterLast` names that parameter as this walk's
+// end. A loop that dereferences and advances the cursor while relating it to
+// nothing anywhere in its own subtree has no bound of its own, so its only
+// ways out are the values of the bytes it reads, and a buffer that ends
+// mid-walk leaves it reading past the range.
+//
+// The fact is emitted by the C frontend (ccCursorLoopMissingEndSentinelObservations,
+// internal/extract/frontend/treesitter/c.go) from the syntax tree, so neither
+// half can be satisfied by prose or by an unrelated identifier. The end
+// sentinel is a parameter standing alone as one side of a relational
+// comparison whose other side is the bare cursor, which keeps the fact off
+// the two idioms that only look like it: an allocation base plus an offset
+// (`p < zl + zlbytes` bounds by the base and a length, not by the parameter)
+// and a count checked through an out-parameter (`*argidx >= argc` compares a
+// dereference, not the cursor). A cursor never compared bare against a
+// parameter is not a range walk at all -- the NUL-terminated walk is the
+// ordinary safe C idiom exactly when the contract is a terminator rather
+// than a range, and it stays unreported.
+//
+// The loop side is generous in what counts as a bound: any relational
+// operator in the loop's own subtree naming the cursor in either operand
+// clears the fact, so `in + 1 >= maxbuf` bounds the walk as well as
+// `in >= maxbuf` does, and a loop bounded against a local derived from the
+// parameter is left alone. An enclosing loop that carries the check
+// suppresses the fact for itself, while a nested walk inside it is judged on
+// its own subtree.
+//
+// The issue joins the existing pointer-offset bounds binding rather than a
+// new concept, so it carries the same rule: the two provenances ask one
+// question -- is the walk's stated end consulted before the cursor is
+// advanced past it? -- and differ only in where the code states that end, an
+// encoded length inside the stream or a range parameter in the signature.
+//
+// Residuals, all false-negative: the pairing is intra-function, so a range
+// maintained across calls in a helper is invisible; a cursor spelled
+// differently at the comparison and the loop does not pair; and a loop whose
+// bound is an equality test against a terminator value rather than a
+// relational comparison of the cursor is not this fact's subject.
+binding cursorLoopMissingEndSentinel {
+  query pattern presenceNode where node.kind == "any" and node.analysis == "cursor_loop.missing_end_sentinel"
+  emit issue code.PointerOffsetBoundsCheck at node
+}

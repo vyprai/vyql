@@ -1,0 +1,17 @@
+module bindings.python.generated.m36dfbff2;
+
+binding deserialization0 {
+  requires {
+    dependency("cairocffi")
+  }
+  query pattern callExpr where callee.method == "decode_to_pixbuf"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("cairocffi")
+  }
+  query pattern callExpr where callee.method == "decode_to_image_surface"
+  emit sink code.Deserialization at args[0]
+}

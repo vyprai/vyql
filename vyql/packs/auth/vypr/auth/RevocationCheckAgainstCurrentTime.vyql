@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule RevocationCheckAgainstCurrentTime {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_287, CWE_613]
+    id: "VYQL-AUTH-121"
+    severity: high
+  }
+  issue code.RevocationCheckAgainstCurrentTime as validator
+}

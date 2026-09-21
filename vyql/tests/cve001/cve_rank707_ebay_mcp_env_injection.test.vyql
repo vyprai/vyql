@@ -1,0 +1,47 @@
+test "rank707: dotenv updater interpolates unescaped token values"
+  lang javascript
+  expect VYQL-INJ-156
+  expect_review code.EnvFileVariableInjection
+  code
+  ```
+  import { existsSync, readFileSync, writeFileSync } from 'fs';
+  import { join } from 'path';
+
+  function updateEnvFile(updates) {
+    const envPath = join(process.cwd(), '.env');
+    let envContent = existsSync(envPath) ? readFileSync(envPath, 'utf-8') : '';
+
+    for (const [key, value] of Object.entries(updates)) {
+      const regex = new RegExp(`^(#\\s*)?${key}=.*$`, 'gm');
+      const newLine = `${key}="${value}"`;
+
+      if (regex.test(envContent)) {
+        envContent = envContent.replace(regex, newLine);
+      } else {
+        envContent += `\n${newLine}`;
+      }
+    }
+
+    writeFileSync(envPath, envContent, 'utf-8');
+  }
+  ```
+
+test "rank707: dotenv updater stringifies parsed environment object"
+  lang javascript
+  reject VYQL-INJ-156
+  reject_review code.EnvFileVariableInjection
+  code
+  ```
+  import dotenv from 'dotenv';
+  import stringify from 'dotenv-stringify';
+  import { existsSync, readFileSync, writeFileSync } from 'fs';
+  import { join } from 'path';
+
+  function updateEnvFile(updates) {
+    const envPath = join(process.cwd(), '.env');
+    const existingEnv = existsSync(envPath) ? dotenv.parse(readFileSync(envPath, 'utf-8')) : {};
+    const mergedEnv = { ...existingEnv, ...updates };
+    const safeEnvContent = stringify(mergedEnv);
+    writeFileSync(envPath, safeEnvContent, 'utf-8');
+  }
+  ```

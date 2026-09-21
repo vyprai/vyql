@@ -1,0 +1,151 @@
+# Rank 1279 / CVE-2022-46154: kodexplorer's remote-download feature
+# (explorer.class.php serverDownload, plus fileGet/filePath call sites in
+# editor.class.php, share.class.php and PluginBase.class.php) takes a
+# caller-supplied URL and, after a scheme/host check in
+# app/function/web.function.php's request_url_safe(), fetches it with
+# fopen()/curl (CWE-22, kalcaddle/kodexplorer). request_url_safe() checked
+# only that the URL started with an allowed scheme and that a local file of
+# that exact name does not exist; it never rejected a literal "../"
+# sequence, so a URL crafted with directory-traversal segments in its path
+# component reaches the fetch untouched. The fixed revision adds
+# exactly one line to
+# request_url_safe(): `if(strstr($url,'../')) return false;`.
+#
+# code.HttpInput -> code.FilePathAccess (fopen) reports this shape
+# through the existing VYQL-PATH-001 rule with no new vocabulary: nothing
+# needed minting. Two new PHP bindings (pathAccessCheck475-478) teach the
+# engine what the fixed revision itself is -- strstr/strpos/stripos/str_contains
+# rejecting a value that contains "../" is the textbook blacklist mitigation
+# for path traversal, the same kind of gate the existing in_array/isBelow
+# bindings recognize, and PHP's own documentation shows the pattern
+# with no reference to this codebase. The first pair below proves that
+# binding: an identical "../" denylist check sitting in the same function as
+# the fopen() call now suppresses the finding.
+#
+# ATTENTION on the second pair, engine gap. kodexplorer's actual fix does not
+# take that inline shape -- the check lives inside request_url_safe(), a
+# separate method that every call site invokes as a boolean gate
+# (`if(!request_url_safe($url)) { ...; }`) before going on to fetch $url
+# itself. `vyql scan` on both a hand-built repro matching this exact
+# real-code structure and the real kodexplorer checkout at the fixed revision still
+# reports VYQL-PATH-001: the engine's endpoint-guard dominance
+# (`internal/engine/engine.go`'s `endpointGuarded`, backed by
+# `solvers.Dominates` in `internal/solvers/cfg.go`) is intraprocedural by
+# construction -- "each function has a distinct region root" -- and never
+# follows a call edge into a callee, so a check emitted inside
+# request_url_safe() can never dominate the fopen() call in serverDownload().
+# Making it interprocedural (summarizing a callee's own checks and applying
+# that summary at every call site that gates on the callee's return value) is
+# a new capability across the whole solver, not a change confined to one
+# function, so it does not clear the mechanical bar. The third and fourth
+# tests below isolate the exact construct with no CVE-specific naming: the
+# same denylist check, once written directly in the caller and once behind a
+# one-level boolean-returning helper.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1279: server download fetches a URL past a same-scheme check with no traversal check"
+  lang php
+  file app/controller/explorer.class.php
+  expect VYQL-PATH-001
+  code
+  ```
+  <?php
+  class Explorer {
+      function request_url_safe($url){
+          $allow = array('http','https','ftp');
+          $info  = parse_url($url);
+          $hasAllow = false;
+          foreach($allow as $scheme){
+              $schemeNow = substr($url,0,strlen($scheme) + 3);
+              if($schemeNow === $scheme."://"){$hasAllow = true;}
+          }
+          if(!$hasAllow) return false;
+          if(!$info['scheme'] || !$info['host'] || !in_array($info['scheme'],$allow)) return false;
+          if(@file_exists($url)) return false;
+          return true;
+      }
+
+      public function serverDownload() {
+          $url = rawurldecode($_GET['url']);
+          if(!$this->request_url_safe($url)){
+              show_json('url error!',false);
+          }
+          $fp = fopen($url, "rb");
+      }
+  }
+  ```
+
+test "rank1279: the shipped fix adds the traversal check inside request_url_safe, one call away from the fetch"
+  lang php
+  file app/controller/explorer.class.php
+  expect VYQL-PATH-001
+  code
+  ```
+  <?php
+  class Explorer {
+      function request_url_safe($url){
+          $allow = array('http','https','ftp');
+          $info  = parse_url($url);
+          $hasAllow = false;
+          foreach($allow as $scheme){
+              $schemeNow = substr($url,0,strlen($scheme) + 3);
+              if($schemeNow === $scheme."://"){$hasAllow = true;}
+          }
+          if(!$hasAllow) return false;
+          if(strstr($url,'../')) return false;
+          if(!$info['scheme'] || !$info['host'] || !in_array($info['scheme'],$allow)) return false;
+          if(@file_exists($url)) return false;
+          return true;
+      }
+
+      public function serverDownload() {
+          $url = rawurldecode($_GET['url']);
+          if(!$this->request_url_safe($url)){
+              show_json('url error!',false);
+          }
+          $fp = fopen($url, "rb");
+      }
+  }
+  ```
+
+test "rank1279: a traversal denylist check in the same function as the fetch is recognized"
+  lang php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+  class Fetcher {
+      public function download() {
+          $url = $_GET['url'];
+          if (strpos($url, '../') !== false) {
+              return;
+          }
+          $fp = fopen($url, "rb");
+      }
+  }
+  ```
+
+test "rank1279: the identical check behind a one-level boolean helper is not"
+  lang php
+  expect VYQL-PATH-001
+  code
+  ```
+  <?php
+  class Fetcher {
+      private function isSafe($url) {
+          if (strpos($url, '../') !== false) {
+              return false;
+          }
+          return true;
+      }
+
+      public function download() {
+          $url = $_GET['url'];
+          if (!$this->isSafe($url)) {
+              return;
+          }
+          $fp = fopen($url, "rb");
+      }
+  }
+  ```

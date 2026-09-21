@@ -1,0 +1,9 @@
+module bindings.php.generated.m18808a43;
+
+binding fileUse0 {
+  requires {
+    dependency("yiisoft/yii2-faker")
+  }
+  query pattern callExpr where callee.method == "file_put_contents"
+  emit sink code.FileUseSink at args[0]
+}

@@ -1,0 +1,72 @@
+# OWASP-replica coverage for Go — true positives plus precision patterns
+# (opaque-predicate pruning, switch pruning) unlocked by the parity port.
+
+# --- SQL injection (INJ-001) ---
+test "go: request param -> db.Query is SQLi"
+  lang go
+  expect VYQL-INJ-001
+  code
+  ```
+  package main
+  import ("database/sql"; "net/http")
+  func g(db *sql.DB, r *http.Request) {
+    p := r.URL.Query().Get("id")
+    db.Query("SELECT * FROM u WHERE id='" + p + "'")
+  }
+  ```
+
+test "go: opaque if/else assigns constant on the live branch — clean SQLi"
+  lang go
+  reject VYQL-INJ-001
+  code
+  ```
+  package main
+  import ("database/sql"; "net/http")
+  func h(db *sql.DB, r *http.Request) {
+    p := r.URL.Query().Get("id")
+    num := 88
+    var bar string
+    if (7*42)-num > 200 { bar = "safe" } else { bar = "alsosafe" }
+    _ = p
+    db.Query("SELECT * FROM u WHERE id='" + bar + "'")
+  }
+  ```
+
+# --- command injection (INJ-002) ---
+test "go: request param -> exec.Command is command injection"
+  lang go
+  expect VYQL-INJ-002
+  code
+  ```
+  package main
+  import ("os/exec"; "net/http")
+  func g(r *http.Request) {
+    p := r.URL.Query().Get("cmd")
+    exec.Command("sh", "-c", p).Run()
+  }
+  ```
+
+# --- path traversal (PATH-001) ---
+test "go: request param -> os.Open is path traversal"
+  lang go
+  expect VYQL-PATH-001
+  code
+  ```
+  package main
+  import ("os"; "net/http")
+  func g(r *http.Request) {
+    p := r.URL.Query().Get("f")
+    os.Open("/tmp/" + p)
+  }
+  ```
+
+# --- weak hash (CRY-001) ---
+test "go: md5.New is weak hash"
+  lang go
+  expect VYQL-CRY-001
+  code
+  ```
+  package main
+  import "crypto/md5"
+  func h() { _ = md5.New() }
+  ```

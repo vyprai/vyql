@@ -1,0 +1,81 @@
+# Rank 1156 / CVE-2026-3960: H2O's default JDBC connection-parameter
+# denylist names the mysql and h2 class-loading parameters but omits the
+# postgresql socketFactory/sslfactory family and mysql
+# statementInterceptors, so a caller-supplied JDBC URL can name a parameter
+# that a supported driver uses to load and instantiate an arbitrary class
+# (CWE-94).
+#
+# A class scope whose identifier list includes
+# DEFAULT_JDBC_DISALLOWED_PARAMETERS with the autoDeserialize and
+# allowLoadLocalInfile entries but none of socketFactory, sslfactory or
+# statementInterceptors emits code.H2oJdbcDisallowedParameterDenylistGap;
+# VYQL-INJ-205 reports it. A denylist carrying any of the omitted
+# parameters emits nothing. The vulnerable snippet expects the finding;
+# the fixed snippet rejects it.
+#
+# verify_current_expected: current-behavior
+
+test "rank1156: H2O JDBC disallowed parameter denylist omits postgresql socketFactory and mysql statementInterceptors"
+  lang java
+  file h2o-core/src/main/java/water/jdbc/SQLManager.java
+  expect VYQL-INJ-205
+  expect_review code.H2oJdbcDisallowedParameterDenylistGap
+  code
+  ```
+  package water.jdbc;
+
+  import java.util.List;
+  import java.util.stream.Collectors;
+  import java.util.stream.Stream;
+
+  public class SQLManager {
+
+    private static final List<String> DEFAULT_JDBC_DISALLOWED_PARAMETERS = Stream.of(
+            "autoDeserialize", "queryInterceptors", "allowLoadLocalInfile", "allowMultiQueries",
+            "allowLoadLocalInfileInPath", "allowUrlInLocalInfile", "allowPublicKeyRetrieval",
+            "init", "script", "shutdown"
+    ).map(String::toLowerCase).collect(Collectors.toList());
+
+    public static void validateJdbcUrl(String jdbcUrl) {
+        for (String key : parseParameterNames(jdbcUrl)) {
+            if (DEFAULT_JDBC_DISALLOWED_PARAMETERS.contains(key.toLowerCase())) {
+                throw new IllegalArgumentException("Potentially dangerous JDBC parameter found: " + key);
+            }
+        }
+    }
+  }
+  ```
+
+test "rank1156: H2O JDBC disallowed parameter denylist covers postgresql and mysql class-loading parameters"
+  lang java
+  file h2o-core/src/main/java/water/jdbc/SQLManager.java
+  reject VYQL-INJ-205
+  reject_review code.H2oJdbcDisallowedParameterDenylistGap
+  code
+  ```
+  package water.jdbc;
+
+  import java.util.List;
+  import java.util.stream.Collectors;
+  import java.util.stream.Stream;
+
+  public class SQLManager {
+
+    private static final List<String> DEFAULT_JDBC_DISALLOWED_PARAMETERS = Stream.of(
+            "autoDeserialize", "queryInterceptors", "allowLoadLocalInfile", "allowMultiQueries",
+            "allowLoadLocalInfileInPath", "allowUrlInLocalInfile", "allowPublicKeyRetrieval",
+            "statementInterceptors",
+            "socketFactory", "socketFactoryArg", "sslfactory", "sslfactoryarg",
+            "loggerLevel", "loggerFile",
+            "init", "script", "shutdown"
+    ).map(String::toLowerCase).collect(Collectors.toList());
+
+    public static void validateJdbcUrl(String jdbcUrl) {
+        for (String key : parseParameterNames(jdbcUrl)) {
+            if (DEFAULT_JDBC_DISALLOWED_PARAMETERS.contains(key.toLowerCase())) {
+                throw new IllegalArgumentException("Potentially dangerous JDBC parameter found: " + key);
+            }
+        }
+    }
+  }
+  ```

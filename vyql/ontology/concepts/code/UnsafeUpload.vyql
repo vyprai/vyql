@@ -1,0 +1,7 @@
+module code;
+
+concept UnsafeUpload : sink {
+  cwe: [CWE_434]
+  enabledBy: [taint.UntrustedData]
+  vulnerableTo: [injection.UnrestrictedUpload]
+}

@@ -1,0 +1,9 @@
+module bindings.perl.generated.mb514734f;
+
+binding deserialization0 {
+  requires {
+    dependency("FBP")
+  }
+  query pattern callExpr where callee.method == "parse_file"
+  emit sink code.Deserialization at args[0]
+}

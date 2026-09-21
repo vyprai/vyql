@@ -1,0 +1,124 @@
+# Rank 150 / CVE-2025-47275: Auth0-PHP accepted AES-GCM session-cookie
+# authentication tags without enforcing the expected 16-byte tag length before
+# decrypting, so a truncated or attacker-chosen tag reached openssl_decrypt.
+
+test "rank150: php authenticated decrypt without a tag length check reports the tag review rule"
+  lang php
+  expect VYQL-CRY-028
+  expect_review code.AuthenticatedDecryptionTagReview
+  code
+  ```
+  <?php
+  declare(strict_types=1);
+
+  final class CookieStore
+  {
+      public const VAL_CRYPTO_ALGO = 'aes-128-gcm';
+
+      public function decrypt(string $data): ?array
+      {
+          $secret = $this->configuration->getCookieSecret();
+
+          $decoded = rawurldecode((string) $data);
+          $stripped = stripslashes($decoded);
+          $data = json_decode($stripped, true, 512);
+
+          if (! isset($data['iv']) || ! isset($data['tag']) || ! is_string($data['iv']) || ! is_string($data['tag'])) {
+              return null;
+          }
+
+          $iv = base64_decode($data['iv'], true);
+          $tag = base64_decode($data['tag'], true);
+
+          if (! is_string($iv) || ! is_string($tag)) {
+              return null;
+          }
+
+          $data = openssl_decrypt($data['data'], self::VAL_CRYPTO_ALGO, $secret, 0, $iv, $tag);
+
+          return is_string($data) ? json_decode($data, true) : null;
+      }
+  }
+  ?>
+  ```
+
+test "rank150: php authenticated decrypt with a constant-bounded tag length is clean"
+  lang php
+  reject VYQL-CRY-028
+  reject_review code.AuthenticatedDecryptionTagReview
+  code
+  ```
+  <?php
+  declare(strict_types=1);
+
+  final class CookieStore
+  {
+      public const VAL_CRYPTO_ALGO = 'aes-128-gcm';
+      public const VAL_CRYPTO_TAG_LENGTH_BYTES = 16;
+
+      public function decrypt(string $data): ?array
+      {
+          $secret = $this->configuration->getCookieSecret();
+
+          $decoded = rawurldecode((string) $data);
+          $stripped = stripslashes($decoded);
+          $data = json_decode($stripped, true, 512);
+
+          if (! isset($data['iv']) || ! isset($data['tag']) || ! is_string($data['iv']) || ! is_string($data['tag'])) {
+              return null;
+          }
+
+          $iv = base64_decode($data['iv'], true);
+          $tag = base64_decode($data['tag'], true);
+
+          if (! is_string($iv) || ! is_string($tag) || self::VAL_CRYPTO_TAG_LENGTH_BYTES !== strlen($tag)) {
+              return null;
+          }
+
+          $data = openssl_decrypt($data['data'], self::VAL_CRYPTO_ALGO, $secret, 0, $iv, $tag);
+
+          return is_string($data) ? json_decode($data, true) : null;
+      }
+  }
+  ?>
+  ```
+
+test "rank150: php authenticated decrypt with a literal tag length is clean"
+  lang php
+  reject VYQL-CRY-028
+  reject_review code.AuthenticatedDecryptionTagReview
+  code
+  ```
+  <?php
+  declare(strict_types=1);
+
+  final class CookieStore
+  {
+      public const VAL_CRYPTO_ALGO = 'aes-128-gcm';
+
+      public function decrypt(string $data): ?array
+      {
+          $secret = $this->configuration->getCookieSecret();
+
+          $decoded = rawurldecode((string) $data);
+          $stripped = stripslashes($decoded);
+          $data = json_decode($stripped, true, 512);
+
+          if (! isset($data['iv']) || ! isset($data['tag']) || ! is_string($data['iv']) || ! is_string($data['tag'])) {
+              return null;
+          }
+
+          $iv = base64_decode($data['iv'], true);
+          $tag = base64_decode($data['tag'], true);
+
+          if (! is_string($iv) || ! is_string($tag) || 16 !== strlen($tag)) {
+              return null;
+          }
+
+          $data = openssl_decrypt($data['data'], self::VAL_CRYPTO_ALGO, $secret, 0, $iv, $tag);
+
+          return is_string($data) ? json_decode($data, true) : null;
+      }
+  }
+  ?>
+  ```

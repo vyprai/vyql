@@ -1,0 +1,18 @@
+module bindings.ruby.generated.m10f99b48;
+
+binding redirectTarget0 {
+  requires {
+    dependency("rack-ssl")
+  }
+  query pattern callExpr where callee.method == "redirect_to_https"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}
+
+binding responseHeaderWrite1 {
+  requires {
+    dependency("rack-ssl")
+  }
+  query pattern callExpr where callee.method == "flag_cookies_as_secure!"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

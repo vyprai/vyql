@@ -1,0 +1,33 @@
+module bindings.objc.generated.m506289a3;
+
+binding httpInput0 {
+  requires {
+    dependency("GTMAppAuth")
+  }
+  query pattern callExpr where callee.method == "authorizeRequest"
+  emit source code.HttpInput at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("GTMAppAuth")
+  }
+  query pattern callExpr where callee.method == "save"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue2 {
+  requires {
+    dependency("GTMAppAuth")
+  }
+  query pattern callExpr where callee.method == "removeAuthSession"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue3 {
+  requires {
+    dependency("GTMAppAuth")
+  }
+  query pattern callExpr where callee.method == "retrieveAuthSession"
+  emit source code.SecretValue at call.result
+}

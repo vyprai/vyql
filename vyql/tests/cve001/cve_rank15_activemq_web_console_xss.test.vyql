@@ -1,0 +1,12 @@
+# Rank 15 / CVE-2010-0684: ActiveMQ web console JSP/tag values such as
+# destination names and descriptions reached HTML output without escaping.
+
+test "rank15: web console value reaches html rendering"
+  expect VYQL-INJ-004
+  graph
+  ```
+  node src core.UserControlledData
+  node sink code.HtmlRender
+  edge FLOWS src -> sink
+  ```
+

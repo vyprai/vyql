@@ -1,0 +1,25 @@
+module bindings.cpp.generated.m658442c0;
+
+binding deserialization0 {
+  requires {
+    dependency("libjuice")
+  }
+  query pattern callExpr where callee.method == "ice_parse_sdp"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("libjuice")
+  }
+  query pattern callExpr where callee.method == "ice_parse_candidate_sdp"
+  emit sink code.Deserialization at args[0]
+}
+
+binding logOutput2 {
+  requires {
+    dependency("libjuice")
+  }
+  query pattern callExpr where callee.method == "juice_log_write"
+  emit sink code.LogOutput at args[0]
+}

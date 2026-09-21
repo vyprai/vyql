@@ -1,0 +1,40 @@
+# Rank 60 / CVE-2024-32888: Amazon Redshift JDBC SQL literal cast injection.
+# Ledger verification: VYQL-INJ-030 catches unsafe cast stringification.
+
+test "rank60: Redshift JDBC returns SQL literal cast without shared quoting"
+  lang java
+  expect VYQL-INJ-030
+  code
+  ```
+  class SimpleParameterList {
+    Object[] paramValues;
+
+    public String toString(int index) {
+      String uuid = paramValues[index].toString();
+      return "'" + uuid + "'::uuid";
+    }
+  }
+  ```
+
+test "rank60: Redshift JDBC quotes SQL literal cast through helper"
+  lang java
+  reject VYQL-INJ-030
+  code
+  ```
+  class SimpleParameterList {
+    Object[] paramValues;
+
+    private static String quoteAndCast(String text, String type) {
+      StringBuilder sb = new StringBuilder();
+      Utils.escapeLiteral(sb, text, true);
+      sb.append("::");
+      sb.append(type);
+      return sb.toString();
+    }
+
+    public String toString(int index) {
+      String uuid = paramValues[index].toString();
+      return quoteAndCast(uuid, "uuid");
+    }
+  }
+  ```

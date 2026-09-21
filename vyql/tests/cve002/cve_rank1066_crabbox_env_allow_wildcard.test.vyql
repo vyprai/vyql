@@ -1,0 +1,104 @@
+# Rank 1066 / CVE-2026-8634: crabbox let a bare * in the env allow-list
+# forward every local environment variable into the sandboxed command. The
+# wildcard branch trimmed the star inline inside the prefix match, so the
+# trimmed value was never named or checked, and the empty prefix a bare star
+# produces satisfies strings.HasPrefix for every name. The fix binds the
+# trimmed prefix and skips the entry when it is empty.
+
+test "rank1066: bare-star allow-list entry trims to an empty prefix inside the match"
+  lang go
+  file internal/cli/repo.go
+  expect VYQL-CFG-026
+  code
+  ```
+  package cli
+
+  import (
+  	"os"
+  	"strings"
+  )
+
+  func envAllowed(name string, allow []string) bool {
+  	for _, pattern := range allow {
+  		pattern = strings.TrimSpace(pattern)
+  		if pattern == "" {
+  			continue
+  		}
+  		if strings.HasSuffix(pattern, "*") {
+  			if strings.HasPrefix(name, strings.TrimSuffix(pattern, "*")) {
+  				return true
+  			}
+  			continue
+  		}
+  		if name == pattern {
+  			return true
+  		}
+  	}
+  	return false
+  }
+
+  func allowedEnv(allow []string) map[string]string {
+  	out := map[string]string{}
+  	for _, env := range os.Environ() {
+  		k, v, ok := strings.Cut(env, "=")
+  		if !ok {
+  			continue
+  		}
+  		if envAllowed(k, allow) {
+  			out[k] = v
+  		}
+  	}
+  	return out
+  }
+  ```
+
+test "rank1066: the trimmed prefix is bound and skipped when empty"
+  lang go
+  file internal/cli/repo.go
+  reject VYQL-CFG-026
+  code
+  ```
+  package cli
+
+  import (
+  	"os"
+  	"strings"
+  )
+
+  func envAllowed(name string, allow []string) bool {
+  	for _, pattern := range allow {
+  		pattern = strings.TrimSpace(pattern)
+  		if pattern == "" {
+  			continue
+  		}
+  		if strings.HasSuffix(pattern, "*") {
+  			prefix := strings.TrimSuffix(pattern, "*")
+  			if prefix == "" {
+  				continue
+  			}
+  			if strings.HasPrefix(name, prefix) {
+  				return true
+  			}
+  			continue
+  		}
+  		if name == pattern {
+  			return true
+  		}
+  	}
+  	return false
+  }
+
+  func allowedEnv(allow []string) map[string]string {
+  	out := map[string]string{}
+  	for _, env := range os.Environ() {
+  		k, v, ok := strings.Cut(env, "=")
+  		if !ok {
+  			continue
+  		}
+  		if envAllowed(k, allow) {
+  			out[k] = v
+  		}
+  	}
+  	return out
+  }
+  ```

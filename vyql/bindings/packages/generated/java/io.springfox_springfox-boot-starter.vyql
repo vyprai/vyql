@@ -1,0 +1,34 @@
+module bindings.java.generated.mf27d1696;
+
+binding filePathAccess0 {
+  requires {
+    dependency("io.springfox:springfox-boot-starter")
+  }
+  query pattern callExpr where callee.method == "addResourceHandlers"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("io.springfox:springfox-boot-starter")
+  }
+  query pattern callExpr where callee.method == "addViewControllers"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("io.springfox:springfox-boot-starter")
+  }
+  query pattern callExpr where callee.method == "filter"
+  emit source core.UserControlledData at call.result
+}
+
+binding redirectTarget3 {
+  requires {
+    dependency("io.springfox:springfox-boot-starter")
+  }
+  query pattern callExpr where callee.method == "setBaseUrl"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

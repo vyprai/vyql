@@ -1,0 +1,340 @@
+# Starlette through 0.4x (CVE-2026-54283, CWE-400/CWE-770): a urlencoded
+# form body arrives as ASGI chunks, and FormParser hands each whole chunk
+# to python-multipart's QuerystringParser through a callbacks dict. The
+# library's contract is that the consumer receives the parse piecemeal --
+# on_field_name and on_field_data are called with a (data, start, end)
+# window per fragment, on_field_end once per completed field -- and the
+# parser itself takes no limit by default (its own max_size documents
+# "Defaults to infinity - i.e. unbounded"), so a consumer that wants
+# max_part_size or max_fields enforced has to enforce them at the point
+# the fragments arrive. FormParser accumulated instead:
+#
+#   def on_field_name(self, data, start, end) -> None:      # formparsers.py
+#       message = (FormMessage.FIELD_NAME, data[start:end])
+#       self.messages.append(message)
+#
+#   async for chunk in self.stream:
+#       if chunk:
+#           parser.write(chunk)        # every callback for the whole
+#       else:                          # chunk runs and returns here
+#           parser.finalize()
+#       messages = list(self.messages)
+#       self.messages.clear()
+#       for message_type, message_bytes in messages:
+#           elif message_type == FormMessage.FIELD_NAME:
+#               if len(field_name) + len(field_value) + len(message_bytes) > self.max_part_size:
+#                   raise MultiPartException("Field exceeded maximum size ...")
+#
+# Both caps are correct and both are reached -- but only after
+# parser.write has returned, by which time self.messages holds every
+# fragment of the chunk. A single chunk of `f0=&f1=&f2=...` with 100,000
+# fields materialises ~200,000 tuples before the first field_count
+# comparison runs, and a chunk with one 50 MB field materialises the field
+# before the first size comparison runs. The advisory's regression test
+# drives exactly this, a single-yield stream. 25b8e179 ("Enforce
+# `FormParser` limits in parser callbacks (#3331)") moves the caps into
+# the callbacks -- _current_field_size and _current_fields counters
+# incremented in on_field_name/on_field_data and on_field_end with the
+# comparison and the raise ahead of the append, and on_field_start
+# resetting the size counter -- and deletes the three comparisons from
+# the drain loop. The sibling class in the same file had the correct
+# shape all along: MultiPartParser.on_part_data compares
+# len(self._current_part.data) + len(message_bytes) against max_part_size
+# inside the callback, which is why the multipart path is never affected.
+#
+# What fired before, union over three `timeout 180 ./bin/vyql scan
+# --cache off --max-ram 6GB` runs per revision: 190 findings (147 at or
+# above high) on both the fix parent and the fix, byte-identical, and
+# zero in starlette/formparsers.py every time; `vyql match` on the file
+# labelled only generic code.Param / code.ExternalEntryInput parameters
+# plus an unrelated core.ResourceRelease. The drain loop cannot anchor
+# the discrimination, because the patched parse() is a strict subset of
+# the vulnerable one -- three comparisons deleted, nothing added -- so a
+# binding reading parse() fires on both revisions and fires harder on
+# the remediation. After the binding below: 193 on the fix parent, with
+# VYQL-DOS-042 at formparsers.py:77 (on_field_name) and :81
+# (on_field_data), and the fixed tree still at 190 with neither -- the
+# in-callback comparison suppresses both. The one extra row the binding
+# adds at both revisions is an unbounded on_part_data accumulator in
+# tests/test_responses.py, a test harness, present and unchanged at each.
+# The anchor is the window contract, not any one library's callback
+# names and not the counters this fix minted: renaming
+# _current_field_size/_current_fields across the patched form leaves it
+# rejecting, and the enumeration below holds for any consumer of any
+# parser that reports through (data, start, end) windows.
+#
+# Reach, enumerated rather than sampled over every Python file cloned
+# for the corpus (41,565 files): an on_* handler carrying the
+# data[start:end] window slice that appends or extends into state with no
+# ordering comparison in its own body appears in starlette's
+# formparsers.py (the two callbacks above) and in python-multipart's own
+# create_form_parser convenience wrapper, whose nested on_field_name /
+# on_header_field / on_header_value handlers accumulate the same way and
+# are unremediated at both of that library's revisions -- true positives
+# of the same shape, not collateral. The wider form without the window
+# slice (any on_* method appending to state with no comparison) matches
+# 170 methods across 22 unrelated projects of ordinary event-handler and
+# collector code, which is why the slice is a conjunct and not a
+# decoration. Residuals, both recall-direction and stated in the binding:
+# an accumulation grown with += on a byte accumulator rather than an
+# append or extend stays unflagged (MultiPartParser's
+# on_header_field/on_header_value pair), and a consumer that bounds by
+# passing the parser its own documented max_size argument leaves its
+# callbacks comparison-free and stays flagged.
+
+test "rank1791: the urlencoded callbacks accumulate the whole chunk and the caps run only after the write returns"
+  lang python
+  file starlette/formparsers.py
+  expect VYQL-DOS-042
+  expect_review code.UnboundedResourceOperation
+  code
+  ```
+  class FormParser:
+      def __init__(
+          self,
+          headers: Headers,
+          stream: AsyncGenerator[bytes, None],
+          *,
+          max_fields: int | float = 1000,
+          max_part_size: int = 1024 * 1024,  # 1MB
+      ) -> None:
+          self.headers = headers
+          self.stream = stream
+          self.max_fields = max_fields
+          self.max_part_size = max_part_size
+          self.messages: list[tuple[FormMessage, bytes]] = []
+
+      def on_field_start(self) -> None:
+          message = (FormMessage.FIELD_START, b"")
+          self.messages.append(message)
+
+      def on_field_name(self, data: bytes, start: int, end: int) -> None:
+          message = (FormMessage.FIELD_NAME, data[start:end])
+          self.messages.append(message)
+
+      def on_field_data(self, data: bytes, start: int, end: int) -> None:
+          message = (FormMessage.FIELD_DATA, data[start:end])
+          self.messages.append(message)
+
+      def on_field_end(self) -> None:
+          message = (FormMessage.FIELD_END, b"")
+          self.messages.append(message)
+
+      def on_end(self) -> None:
+          message = (FormMessage.END, b"")
+          self.messages.append(message)
+
+      async def parse(self) -> FormData:
+          callbacks: QuerystringCallbacks = {
+              "on_field_start": self.on_field_start,
+              "on_field_name": self.on_field_name,
+              "on_field_data": self.on_field_data,
+              "on_field_end": self.on_field_end,
+              "on_end": self.on_end,
+          }
+
+          parser = multipart.QuerystringParser(callbacks)
+          field_name = bytearray()
+          field_value = bytearray()
+
+          items: list[tuple[str, str | UploadFile]] = []
+          field_count = 0
+
+          async for chunk in self.stream:
+              if chunk:
+                  parser.write(chunk)
+              else:
+                  parser.finalize()
+              messages = list(self.messages)
+              self.messages.clear()
+              for message_type, message_bytes in messages:
+                  if message_type == FormMessage.FIELD_START:
+                      field_name = bytearray()
+                      field_value = bytearray()
+                  elif message_type == FormMessage.FIELD_NAME:
+                      if len(field_name) + len(field_value) + len(message_bytes) > self.max_part_size:
+                          raise MultiPartException(f"Field exceeded maximum size of {int(self.max_part_size / 1024)}KB.")
+                      field_name.extend(message_bytes)
+                  elif message_type == FormMessage.FIELD_DATA:
+                      if len(field_name) + len(field_value) + len(message_bytes) > self.max_part_size:
+                          raise MultiPartException(f"Field exceeded maximum size of {int(self.max_part_size / 1024)}KB.")
+                      field_value.extend(message_bytes)
+                  elif message_type == FormMessage.FIELD_END:
+                      field_count += 1
+                      if field_count > self.max_fields:
+                          raise MultiPartException(f"Too many fields. Maximum number of fields is {self.max_fields}.")
+                      name = unquote_plus(field_name.decode("latin-1"))
+                      value = unquote_plus(field_value.decode("latin-1"))
+                      items.append((name, value))
+
+          return FormData(items)
+  ```
+
+test "rank1791: the caps move into the callbacks ahead of the append"
+  lang python
+  file starlette/formparsers.py
+  reject VYQL-DOS-042
+  reject_review code.UnboundedResourceOperation
+  code
+  ```
+  class FormParser:
+      def __init__(
+          self,
+          headers: Headers,
+          stream: AsyncGenerator[bytes, None],
+          *,
+          max_fields: int | float = 1000,
+          max_part_size: int = 1024 * 1024,  # 1MB
+      ) -> None:
+          self.headers = headers
+          self.stream = stream
+          self.max_fields = max_fields
+          self.max_part_size = max_part_size
+          self.messages: list[tuple[FormMessage, bytes]] = []
+          self._current_field_size = 0
+          self._current_fields = 0
+
+      def on_field_start(self) -> None:
+          self._current_field_size = 0
+          message = (FormMessage.FIELD_START, b"")
+          self.messages.append(message)
+
+      def on_field_name(self, data: bytes, start: int, end: int) -> None:
+          self._current_field_size += end - start
+          if self._current_field_size > self.max_part_size:
+              raise MultiPartException(f"Field exceeded maximum size of {int(self.max_part_size / 1024)}KB.")
+          message = (FormMessage.FIELD_NAME, data[start:end])
+          self.messages.append(message)
+
+      def on_field_data(self, data: bytes, start: int, end: int) -> None:
+          self._current_field_size += end - start
+          if self._current_field_size > self.max_part_size:
+              raise MultiPartException(f"Field exceeded maximum size of {int(self.max_part_size / 1024)}KB.")
+          message = (FormMessage.FIELD_DATA, data[start:end])
+          self.messages.append(message)
+
+      def on_field_end(self) -> None:
+          self._current_fields += 1
+          if self._current_fields > self.max_fields:
+              raise MultiPartException(f"Too many fields. Maximum number of fields is {self.max_fields}.")
+          message = (FormMessage.FIELD_END, b"")
+          self.messages.append(message)
+
+      def on_end(self) -> None:
+          message = (FormMessage.END, b"")
+          self.messages.append(message)
+
+      async def parse(self) -> FormData:
+          callbacks: QuerystringCallbacks = {
+              "on_field_start": self.on_field_start,
+              "on_field_name": self.on_field_name,
+              "on_field_data": self.on_field_data,
+              "on_field_end": self.on_field_end,
+              "on_end": self.on_end,
+          }
+
+          parser = multipart.QuerystringParser(callbacks)
+          field_name = bytearray()
+          field_value = bytearray()
+
+          items: list[tuple[str, str | UploadFile]] = []
+
+          async for chunk in self.stream:
+              if chunk:
+                  parser.write(chunk)
+              else:
+                  parser.finalize()
+              messages = list(self.messages)
+              self.messages.clear()
+              for message_type, message_bytes in messages:
+                  if message_type == FormMessage.FIELD_START:
+                      field_name = bytearray()
+                      field_value = bytearray()
+                  elif message_type == FormMessage.FIELD_NAME:
+                      field_name.extend(message_bytes)
+                  elif message_type == FormMessage.FIELD_DATA:
+                      field_value.extend(message_bytes)
+                  elif message_type == FormMessage.FIELD_END:
+                      name = unquote_plus(field_name.decode("latin-1"))
+                      value = unquote_plus(field_value.decode("latin-1"))
+                      items.append((name, value))
+
+          return FormData(items)
+  ```
+
+test "rank1791: the in-callback cap with the fix's own counter vocabulary renamed"
+  lang python
+  file starlette/formparsers.py
+  reject VYQL-DOS-042
+  reject_review code.UnboundedResourceOperation
+  code
+  ```
+  class FormParser:
+      def __init__(
+          self,
+          headers: Headers,
+          stream: AsyncGenerator[bytes, None],
+          *,
+          max_fields: int | float = 1000,
+          max_part_size: int = 1024 * 1024,  # 1MB
+      ) -> None:
+          self.headers = headers
+          self.stream = stream
+          self.max_fields = max_fields
+          self.max_part_size = max_part_size
+          self.messages: list[tuple[FormMessage, bytes]] = []
+          self.running_field_bytes = 0
+          self.fields_seen = 0
+
+      def on_field_start(self) -> None:
+          self.running_field_bytes = 0
+          message = (FormMessage.FIELD_START, b"")
+          self.messages.append(message)
+
+      def on_field_name(self, data: bytes, start: int, end: int) -> None:
+          self.running_field_bytes += end - start
+          if self.running_field_bytes > self.max_part_size:
+              raise MultiPartException(f"Field exceeded maximum size of {int(self.max_part_size / 1024)}KB.")
+          message = (FormMessage.FIELD_NAME, data[start:end])
+          self.messages.append(message)
+
+      def on_field_data(self, data: bytes, start: int, end: int) -> None:
+          self.running_field_bytes += end - start
+          if self.running_field_bytes > self.max_part_size:
+              raise MultiPartException(f"Field exceeded maximum size of {int(self.max_part_size / 1024)}KB.")
+          message = (FormMessage.FIELD_DATA, data[start:end])
+          self.messages.append(message)
+
+      def on_field_end(self) -> None:
+          self.fields_seen += 1
+          if self.fields_seen > self.max_fields:
+              raise MultiPartException(f"Too many fields. Maximum number of fields is {self.max_fields}.")
+          message = (FormMessage.FIELD_END, b"")
+          self.messages.append(message)
+  ```
+
+test "rank1791: the multipart sibling caps inside its own callback"
+  lang python
+  file starlette/formparsers.py
+  reject VYQL-DOS-042
+  reject_review code.UnboundedResourceOperation
+  code
+  ```
+  class MultiPartParser:
+      max_part_size = 1024 * 1024  # 1MB
+
+      def __init__(self, headers: Headers, stream: AsyncGenerator[bytes, None]) -> None:
+          self.headers = headers
+          self.stream = stream
+          self.max_part_size = 1024 * 1024
+          self._current_part = MultipartPart()
+
+      def on_part_data(self, data: bytes, start: int, end: int) -> None:
+          message_bytes = data[start:end]
+          if self._current_part.file is None:
+              if len(self._current_part.data) + len(message_bytes) > self.max_part_size:
+                  raise MultiPartException(f"Part exceeded maximum size of {int(self.max_part_size / 1024)}KB.")
+              self._current_part.data.extend(message_bytes)
+          else:
+              self._file_parts_to_write.append((self._current_part, message_bytes))
+  ```

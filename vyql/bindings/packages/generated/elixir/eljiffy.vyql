@@ -1,0 +1,33 @@
+module bindings.elixir.generated.m8fe0b81c;
+
+binding deserialization0 {
+  requires {
+    dependency("eljiffy")
+  }
+  query pattern callExpr where callee.method == "decode_proplist"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("eljiffy")
+  }
+  query pattern callExpr where callee.method == "decode_maps"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("eljiffy")
+  }
+  query pattern callExpr where callee.method == "decode!"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("eljiffy")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

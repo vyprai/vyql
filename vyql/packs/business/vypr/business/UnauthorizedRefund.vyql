@@ -1,0 +1,10 @@
+module vypr.business;
+
+rule UnauthorizedRefund {
+  meta {
+    id: "VYQL-BIZ-001"
+    severity: high
+  }
+  fact business.Refund as a
+  unless a.endpoint coveredBy core.AuthorizationCheck
+}

@@ -1,0 +1,65 @@
+module bindings.kotlin.generated.m19ec740d;
+
+binding networkData0 {
+  requires {
+    dependency("io.netty:netty-buffer")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend1 {
+  requires {
+    dependency("io.netty:netty-buffer")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkData2 {
+  requires {
+    dependency("io.netty:netty-buffer")
+  }
+  query pattern callExpr where callee.method == "readByte"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData3 {
+  requires {
+    dependency("io.netty:netty-buffer")
+  }
+  query pattern callExpr where callee.method == "readShort"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData4 {
+  requires {
+    dependency("io.netty:netty-buffer")
+  }
+  query pattern callExpr where callee.method == "readInt"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData5 {
+  requires {
+    dependency("io.netty:netty-buffer")
+  }
+  query pattern callExpr where callee.method == "readLong"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData6 {
+  requires {
+    dependency("io.netty:netty-buffer")
+  }
+  query pattern callExpr where callee.method == "getBytes"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend7 {
+  requires {
+    dependency("io.netty:netty-buffer")
+  }
+  query pattern callExpr where callee.method == "setBytes"
+  emit sink code.NetworkSend at args[0]
+}

@@ -1,0 +1,184 @@
+# Rank 1255 / CVE-2023-28118: kaml's YamlNodeReader expands YAML anchors and
+# aliases unconditionally. readNodeAndAnchor records every anchor a document
+# declares into a mutable map -- `aliases.put(it, ...)` under
+# `event.anchor.ifPresent { ... }` -- and readAlias resolves every AliasEvent
+# against that map with `aliases.getOrElse(anchor) { ... }`, so a document
+# that declares an anchor once and aliases it a thousand times (or nests
+# self-referencing merge keys) is expanded into a structure whose size is a
+# property of the input, not of any ceiling the reader enforces: the classic
+# "billion laughs" expansion, exhausting heap or CPU during decode
+# (CWE-400/CWE-776). Fix 5f82a2d7e00bfc307afca05d1dc4d7c50593531a ("Default
+# to not parsing anchors and aliases to prevent 'billion laughs'-style
+# attacks", verified in the clone) adds a YamlConfiguration.allowAnchorsAndAliases
+# flag defaulting to false, threads it into the reader's constructor, and
+# throws ForbiddenAnchorOrAliasException from both the anchor-record and the
+# alias-resolve site unless the configuration opted in -- parsing anchors and
+# aliases becomes opt-in rather than always-on. Note the remediation is a
+# policy default, not a bound: neither revision carries an alias-count,
+# nesting-depth or structure-size ceiling anywhere.
+#
+# ATTENTION, held on recheck -- the Kotlin instance of the measured
+# cross-iteration budget family (ranks 1320/1391/1697 self-recursion depth,
+# 1954 nested-group recursion, 1959 the closest sibling: unbounded recursive
+# expansion in a Java parser, also held). Three --cache off scans per revision
+# of the whole checkout (timeout 180, --max-ram 6GB; kotlin:46 config:8
+# textpattern:56) report 0 findings and 0 review flags at the vulnerable
+# revision and the same 0/0 at the fixed one -- deterministic, no noise floor
+# to read a miss out of, and the counts match the first pass's run on a
+# knowledge base that has since grown by hundreds of rules, so the zero is
+# real, not a vacuous one. `vyql match` on YamlNodeReader.kt labels nothing
+# (no source, sink or control); `vyql graph` shows the engine does lower every
+# relevant call node -- event.anchor.ifPresent (kt:45), aliases.put inside the
+# trailing lambda (kt:46), readAlias (kt:59), event.anchor.get (kt:189) and
+# aliases.getOrElse (kt:191) -- so the miss is vocabulary, not lowering. The
+# exhaustive reachable set is one file: YamlNodeReader.kt is the only
+# non-test source touching Anchor/AliasEvent/aliases (YamlConfiguration.kt
+# and YamlException.kt only declare the knob and the exception type).
+#
+# Why no binding is justifiable today, at either revision: the only
+# library-API surface in the vulnerable shape is snakeyaml-engine's
+# (NodeEvent.anchor, AliasEvent); the anchor map and both resolution sites
+# are kaml's own private names, so a binding keyed on aliases.put/readAlias
+# is a repro-shaped patch that transfers nowhere. The Ruby DOS-049 idiom --
+# positive conjuncts on the convention's own parsing surface, negated on the
+# convention's generic ceiling spellings (depth_limit, max_depth,
+# recursion_limit, ...) -- cannot discriminate here because kaml's convention
+# has no ceiling to name: both revisions still record every anchor and
+# resolve every alias, and the only token-level difference is the fixing
+# commit's own vocabulary (allowAnchorsAndAliases,
+# ForbiddenAnchorOrAliasException), which is the rejected
+# fix-layout-as-discriminator class. And the positive conjuncts themselves
+# are inexpressible: Kotlin emits no function- or module-scope context tokens
+# at all (no call:, literal: or assign: -- the ENGINE-GAPS "no function- or
+# class-member context node" entry, which names this rank), so a co-occurrence
+# query has nothing to match against, and VYQL-DOS-042's concept
+# code.UnboundedResourceOperation has emitters in rust, python, javascript,
+# swift, c and ruby but none in Kotlin or Java. Both halves -- the Kotlin
+# context-token walk and a budget/ceiling judgement vocabulary the whole
+# recursion family shares -- are design work on file, not mechanical fixes;
+# no ENGINE-GAPS entry is filed anew. Both tests hold the two revisions of
+# the real reader and assert reject VYQL-DOS-042; when Kotlin context tokens
+# and budget vocabulary land, the unguarded form must flip to expect.
+
+test "rank1255: the reader records every anchor and resolves every alias with no ceiling"
+  lang kotlin
+  file src/jvmMain/kotlin/com/charleskorn/kaml/YamlNodeReader.kt
+  reject VYQL-DOS-042
+  code
+  ```
+  package com.charleskorn.kaml
+
+  import org.snakeyaml.engine.v2.common.Anchor
+  import org.snakeyaml.engine.v2.events.AliasEvent
+  import org.snakeyaml.engine.v2.events.Event
+  import org.snakeyaml.engine.v2.events.MappingStartEvent
+  import org.snakeyaml.engine.v2.events.NodeEvent
+  import org.snakeyaml.engine.v2.events.ScalarEvent
+  import org.snakeyaml.engine.v2.events.SequenceStartEvent
+
+  internal actual class YamlNodeReader(
+      private val parser: YamlParser,
+      private val extensionDefinitionPrefix: String? = null,
+  ) {
+      private val aliases = mutableMapOf<Anchor, YamlNode>()
+
+      private fun readNodeAndAnchor(path: YamlPath): Pair<YamlNode, Anchor?> {
+          val event = parser.consumeEvent(path)
+          val node = readFromEvent(event, path)
+
+          if (event is NodeEvent) {
+              event.anchor.ifPresent {
+                  aliases.put(it, node.withPath(YamlPath.forAliasDefinition(it.value, event.location)))
+              }
+
+              return node to event.anchor.orElse(null)
+          }
+
+          return node to null
+      }
+
+      private fun readFromEvent(event: Event, path: YamlPath): YamlNode = when (event) {
+          is ScalarEvent -> readScalarOrNull(event, path)
+          is SequenceStartEvent -> readSequence(path)
+          is MappingStartEvent -> readMapping(path)
+          is AliasEvent -> readAlias(event, path)
+          else -> throw MalformedYamlException("Unexpected ${event.eventId}", path)
+      }
+
+      private fun readAlias(event: AliasEvent, path: YamlPath): YamlNode {
+          val anchor = event.anchor.get()
+
+          val resolvedNode = aliases.getOrElse(anchor) {
+              throw UnknownAnchorException(anchor.value, path.withError(event.location))
+          }
+
+          return resolvedNode.withPath(path.withAliasReference(anchor.value, event.location))
+      }
+  }
+  ```
+
+test "rank1255: the fixed reader refuses anchors and aliases unless the configuration opts in"
+  lang kotlin
+  file src/jvmMain/kotlin/com/charleskorn/kaml/YamlNodeReader.kt
+  reject VYQL-DOS-042
+  code
+  ```
+  package com.charleskorn.kaml
+
+  import org.snakeyaml.engine.v2.common.Anchor
+  import org.snakeyaml.engine.v2.events.AliasEvent
+  import org.snakeyaml.engine.v2.events.Event
+  import org.snakeyaml.engine.v2.events.MappingStartEvent
+  import org.snakeyaml.engine.v2.events.NodeEvent
+  import org.snakeyaml.engine.v2.events.ScalarEvent
+  import org.snakeyaml.engine.v2.events.SequenceStartEvent
+
+  internal actual class YamlNodeReader(
+      private val parser: YamlParser,
+      private val extensionDefinitionPrefix: String? = null,
+      private val allowAnchorsAndAliases: Boolean = false,
+  ) {
+      private val aliases = mutableMapOf<Anchor, YamlNode>()
+
+      private fun readNodeAndAnchor(path: YamlPath): Pair<YamlNode, Anchor?> {
+          val event = parser.consumeEvent(path)
+          val node = readFromEvent(event, path)
+
+          if (event is NodeEvent) {
+              event.anchor.ifPresent {
+                  if (!allowAnchorsAndAliases) {
+                      throw ForbiddenAnchorOrAliasException("Parsing anchors and aliases is disabled.", path)
+                  }
+
+                  aliases.put(it, node.withPath(YamlPath.forAliasDefinition(it.value, event.location)))
+              }
+
+              return node to event.anchor.orElse(null)
+          }
+
+          return node to null
+      }
+
+      private fun readFromEvent(event: Event, path: YamlPath): YamlNode = when (event) {
+          is ScalarEvent -> readScalarOrNull(event, path)
+          is SequenceStartEvent -> readSequence(path)
+          is MappingStartEvent -> readMapping(path)
+          is AliasEvent -> readAlias(event, path)
+          else -> throw MalformedYamlException("Unexpected ${event.eventId}", path)
+      }
+
+      private fun readAlias(event: AliasEvent, path: YamlPath): YamlNode {
+          if (!allowAnchorsAndAliases) {
+              throw ForbiddenAnchorOrAliasException("Parsing anchors and aliases is disabled.", path)
+          }
+
+          val anchor = event.anchor.get()
+
+          val resolvedNode = aliases.getOrElse(anchor) {
+              throw UnknownAnchorException(anchor.value, path.withError(event.location))
+          }
+
+          return resolvedNode.withPath(path.withAliasReference(anchor.value, event.location))
+      }
+  }
+  ```

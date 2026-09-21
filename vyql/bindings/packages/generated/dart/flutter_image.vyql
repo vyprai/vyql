@@ -1,0 +1,9 @@
+module bindings.dart.generated.mda12bddb;
+
+binding urlFetch0 {
+  requires {
+    dependency("flutter_image")
+  }
+  query pattern callExpr where callee.method == "NetworkImageWithRetry"
+  emit sink code.UrlFetch at args[0]
+}

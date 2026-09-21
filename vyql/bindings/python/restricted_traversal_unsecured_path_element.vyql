@@ -1,0 +1,27 @@
+module bindings.python.restricted_traversal_unsecured_path_element;
+
+// `zope.traversing.adapters.traversePathElement` resolves one path segment
+// onto an object and, by that library's contract, applies no security policy:
+// validating the access is the caller's job. Zope's restricted traversal
+// (`restrictedTraverse`) carries both halves of that contract itself — it
+// screens names, rejecting segments starting with an underscore, and consults
+// the security manager. A traversal loop that screens names the same way but
+// resolves plain objects through `traversePathElement` enforces only the
+// naming half, so a path expression can walk from an object the policy
+// authorized onto attributes it never did.
+//
+// The restricted loop is recognised by the segment screening it performs
+// (`startswith` on the popped name, the same idiom `restrictedTraverse`
+// implements) together with the unsecured primitive; the trusted traversal
+// loops, which resolve through `unrestrictedTraverse` and screen nothing,
+// match neither half. Consulting the policy is recognised by either spelling
+// AccessControl documents: obtaining the manager through `getSecurityManager`,
+// or calling the validator it returns.
+binding restrictedTraversalUnsecuredPathElement {
+  query pattern presenceNode where node.scope == "function"
+    and node.token contains "lang=python"
+    and containsAny(node.context.callPath, ["traversePathElement"])
+    and containsAny(node.context.callPath, ["startswith"])
+    and not containsAny(node.context.callPath, ["getSecurityManager", "validate"])
+  emit issue code.AccessPolicyReview at node
+}

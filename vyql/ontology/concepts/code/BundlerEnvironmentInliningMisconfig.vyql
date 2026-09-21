@@ -1,0 +1,11 @@
+module code;
+
+concept BundlerEnvironmentInliningMisconfig : issue {
+  cwe: [CWE_1188, CWE_693]
+  reviewAssumption: "the bundled entry point relies on a runtime process.env check to gate production-only or security-sensitive behaviour"
+  reviewCategory: misconfig
+  reviewCondition: "a bundler build config targets a Node/CommonJS output without an explicit Node platform, leaving the bundler's browser-default environment-variable inlining in place for code that expects the real runtime value"
+  reviewConfidence: possibility
+  reviewEvidence: "bundler build configuration {pattern} selects a Node-targeted output format without setting the platform to node"
+  vulnerableTo: [access_control.IncorrectAuthorization]
+}

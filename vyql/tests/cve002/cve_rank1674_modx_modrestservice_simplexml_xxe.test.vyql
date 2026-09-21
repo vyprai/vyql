@@ -1,0 +1,119 @@
+# Rank 1674 / CVE-2020-25911: MODX Revolution parsed the raw REST request
+# body as XML with SimpleXML while libxml's external entity loader is left
+# enabled (CWE-611). _collectRequestParameters in
+# core/model/modx/rest/modrestservice.class.php opens php://input, reads the
+# body with stream_get_contents under the application/xml and text/xml content
+# types, and hands it straight to simplexml_load_string, so a crafted entity
+# declaration resolves external entities on libxml builds older than 2.9. The
+# fix c532dae6cf defaults a new xmlDisableEntityLoader service option to true
+# and, on LIBXML_VERSION < 20900, wraps the parse with a saved
+# libxml_disable_entity_loader(true) toggle that is restored after the parse.
+#
+# The vulnerable shape is a function whose body calls simplexml_load_string
+# with no libxml_disable_entity_loader anywhere in it, which is exactly what
+# the phpSimplexmlEntityLoaderXxe presence binding labels; the patched shape
+# both toggles and restores, so neither the plain nor the unscoped-toggle
+# variant applies.
+
+test "rank1674: REST request body parsed by SimpleXML with the entity loader left enabled"
+  lang php
+  file modrestservice.class.php
+  expect VYQL-DESER-015
+  expect_review code.PhpSimplexmlEntityLoaderXxe
+  code
+  ```
+  <?php
+
+  class modRestServiceRequest {
+      protected $service;
+
+      protected function _collectRequestParameters() {
+          $filehandle = fopen('php://input', "r");
+          $params = array();
+          $contentType = isset($_SERVER['CONTENT_TYPE']) ? $_SERVER['CONTENT_TYPE'] : '';
+          $spPos = strpos($contentType, ';');
+          if ($spPos !== false) {
+              $contentType = substr($contentType, 0, $spPos);
+          }
+          switch ($contentType) {
+              case 'application/xml':
+              case 'text/xml':
+                  $data = stream_get_contents($filehandle);
+                  fclose($filehandle);
+                  $xml = simplexml_load_string($data);
+                  $params = $this->_xml2array($xml);
+                  break;
+              case 'application/json':
+              case 'text/json':
+                  $data = stream_get_contents($filehandle);
+                  fclose($filehandle);
+                  $params = $this->service->modx->fromJSON($data);
+                  $params = (!is_array($params)) ? array() : $params;
+                  break;
+              case 'application/x-www-form-urlencoded':
+              default:
+                  $data = stream_get_contents($filehandle);
+                  fclose($filehandle);
+                  parse_str($data, $params);
+                  break;
+          }
+          return $params;
+      }
+  }
+  ```
+
+test "rank1674: entity loader disabled around the SimpleXML parse and restored after"
+  lang php
+  file modrestservice.class.php
+  reject VYQL-DESER-015
+  reject VYQL-DESER-020
+  reject_review code.PhpSimplexmlEntityLoaderXxe
+  reject_review code.PhpSimplexmlUnscopedEntityLoaderXxe
+  code
+  ```
+  <?php
+
+  class modRestServiceRequest {
+      protected $service;
+
+      protected function _collectRequestParameters() {
+          $filehandle = fopen('php://input', "r");
+          $params = array();
+          $contentType = isset($_SERVER['CONTENT_TYPE']) ? $_SERVER['CONTENT_TYPE'] : '';
+          $spPos = strpos($contentType, ';');
+          if ($spPos !== false) {
+              $contentType = substr($contentType, 0, $spPos);
+          }
+          switch ($contentType) {
+              case 'application/xml':
+              case 'text/xml':
+                  $data = stream_get_contents($filehandle);
+                  fclose($filehandle);
+                  if (LIBXML_VERSION < 20900 && $this->service->getOption('xmlDisableEntityLoader')) {
+                      $disableEntities = libxml_disable_entity_loader(true);
+                      $xml = simplexml_load_string($data);
+                      libxml_disable_entity_loader($disableEntities);
+                  }
+                  else {
+                      $xml = simplexml_load_string($data);
+                  }
+                  $params = $this->_xml2array($xml);
+                  break;
+              case 'application/json':
+              case 'text/json':
+                  $data = stream_get_contents($filehandle);
+                  fclose($filehandle);
+                  $params = $this->service->modx->fromJSON($data);
+                  $params = (!is_array($params)) ? array() : $params;
+                  break;
+              case 'application/x-www-form-urlencoded':
+              default:
+                  $data = stream_get_contents($filehandle);
+                  fclose($filehandle);
+                  parse_str($data, $params);
+                  break;
+          }
+          return $params;
+      }
+  }
+  ```

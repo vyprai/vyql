@@ -1,0 +1,133 @@
+# A Soft Serve SSH server committed the authenticated user into the
+# connection context from inside the public-key *offer* callback.
+# pkg/ssh/ssh.go's PublicKeyHandler(ctx ssh.Context, pk ssh.PublicKey) ran
+#   user, _ := s.be.UserByPublicKey(ctx, pk)
+#   if user != nil { ctx.SetValue(proto.ContextKeyUser, user) }
+# and charmbracelet/ssh calls that callback from gossh's PublicKeyCallback,
+# which fires for every key a client offers with the signature verified only
+# afterwards by the transport -- returning true does not authenticate the
+# connection. A client that offers the admin's public key, cannot sign with
+# it, and then authenticates with its own key leaves the admin's user object
+# sitting in the context the session handler reads (CWE-287). The fixed revision deletes
+# the lookup from the callback and re-derives the user after authentication,
+# from Session.PublicKey() -- "the PublicKey authenticate" -- inside
+# AuthenticationMiddleware, and adds the AllowKeyless denial for sessions
+# that carried no key at all.
+#
+# FIXED by two bindings and one rule over two new concepts. The source labels
+# an ssh.PublicKey-typed parameter as code.UnverifiedCredential: the callback
+# receives a claim, not a credential, and the offered key reaches helpers by
+# ordinary argument passing. The sink labels the value argument of a
+# Context.SetValue as code.ConnectionStateWrite, because the library hands
+# the same context to the auth callbacks and to the session handler.
+# VYQL-AUTH-152 asks the taint engine whether a derivation from the claim
+# reached the connection store. That is the right question rather than a
+# name key on the lookup: the same library documents storing the key's
+# fingerprint in Context.Permissions().Extensions as the sanctioned pattern,
+# which is also a derivation from the offered key committed to the same
+# context, and the taint path for it does not exist because a map-subscript
+# assignment does not taint the map's owner.
+#
+# Measured on the real tree (three --cache off runs per side, stable): the
+# vulnerable revision reports VYQL-AUTH-152 once at pkg/ssh/ssh.go:175 along
+# the path PublicKeyHandler#param#pk -> UserByPublicKey -> SetValue, 54
+# findings total against a 53-finding baseline whose rule histogram is
+# unchanged; the fixed revision reports none and its histogram is identical
+# to the pre-change baseline. Across every other clone under
+# /tmp/cve-work/rank*/, only waypoint also depends on a Context-carrying SSH
+# server library and it contains no SetValue call at all, so the shape has no
+# second instance to misfire on.
+
+test "rank1770: offered public key identity committed into the ssh connection context"
+  lang go
+  file pkg/ssh/ssh.go
+  expect VYQL-AUTH-152
+  code
+  ```
+  package ssh
+
+  import (
+      "github.com/charmbracelet/soft-serve/pkg/proto"
+      "github.com/charmbracelet/ssh"
+      gossh "golang.org/x/crypto/ssh"
+  )
+
+  type SSHServer struct {
+      be Backend
+  }
+
+  type Backend interface {
+      UserByPublicKey(ctx ssh.Context, pk ssh.PublicKey) (proto.User, error)
+  }
+
+  // PublicKeyHandler handles public key authentication.
+  func (s *SSHServer) PublicKeyHandler(ctx ssh.Context, pk ssh.PublicKey) (allowed bool) {
+      allowed = true
+
+      user, _ := s.be.UserByPublicKey(ctx, pk)
+      if user != nil {
+          ctx.SetValue(proto.ContextKeyUser, user)
+      }
+
+      initializePermissions(ctx)
+      perms := ctx.Permissions()
+      perms.Extensions["pubkey-fp"] = gossh.FingerprintSHA256(pk)
+      ctx.SetValue(ssh.ContextKeyPermissions, perms)
+
+      return
+  }
+  ```
+
+test "rank1770: user re-derived from the authenticated key in the session middleware"
+  lang go
+  file pkg/ssh/middleware.go
+  reject VYQL-AUTH-152
+  code
+  ```
+  package ssh
+
+  import (
+      "github.com/charmbracelet/soft-serve/pkg/proto"
+      "github.com/charmbracelet/ssh"
+      gossh "golang.org/x/crypto/ssh"
+  )
+
+  type Backend interface {
+      UserByPublicKey(ctx ssh.Context, pk ssh.PublicKey) (proto.User, error)
+      AllowKeyless(ctx ssh.Context) bool
+  }
+
+  // PublicKeyHandler handles public key authentication.
+  func (s *SSHServer) PublicKeyHandler(ctx ssh.Context, pk ssh.PublicKey) (allowed bool) {
+      allowed = true
+
+      initializePermissions(ctx)
+      perms := ctx.Permissions()
+      perms.Extensions["pubkey-fp"] = gossh.FingerprintSHA256(pk)
+      ctx.SetValue(ssh.ContextKeyPermissions, perms)
+
+      return
+  }
+
+  // AuthenticationMiddleware handles authentication.
+  func AuthenticationMiddleware(sh ssh.Handler) ssh.Handler {
+      return func(s ssh.Session) {
+          ctx := s.Context()
+          pk := s.PublicKey()
+          if pk != nil {
+              fp := s.Permissions().Permissions.Extensions["pubkey-fp"]
+              if fp != "" && fp != gossh.FingerprintSHA256(pk) {
+                  return
+              }
+          }
+
+          var user proto.User
+          if pk != nil {
+              user, _ = s.be.UserByPublicKey(ctx, pk)
+          }
+          ctx.SetValue(proto.ContextKeyUser, user)
+
+          sh(s)
+      }
+  }
+  ```

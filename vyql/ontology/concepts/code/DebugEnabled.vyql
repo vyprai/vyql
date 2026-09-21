@@ -1,0 +1,11 @@
+module code;
+
+concept DebugEnabled : issue {
+  cwe: [CWE_489]
+  reviewAssumption: "the default is what production runs with"
+  reviewCategory: misconfig
+  reviewCondition: "a debug flag defaults to a truthy value"
+  reviewConfidence: medium
+  reviewEvidence: "debug configuration {pattern} defaults to enabled"
+  vulnerableTo: [access_control.IncorrectAuthorization]
+}

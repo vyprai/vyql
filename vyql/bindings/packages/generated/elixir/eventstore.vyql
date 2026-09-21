@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mc6b3f988;
+
+binding urlFetch0 {
+  requires {
+    dependency("eventstore")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.UrlFetch at args[0]
+}

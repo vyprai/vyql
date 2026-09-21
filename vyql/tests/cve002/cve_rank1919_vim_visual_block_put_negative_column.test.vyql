@@ -1,0 +1,213 @@
+# Rank 1919 / CVE-2022-3520: vim's do_put() (src/register.c), in Visual-block
+# mode, computes the ']' mark's column from the inserted text and, when the
+# register is empty or every trailing space is reclaimed, the arithmetic
+# underflows:
+#
+#     totlen = count * (yanklen + spaces) + bd.startspaces + bd.endspaces;
+#     ...
+#     else
+#         totlen -= spaces;  // didn't use these spaces
+#     ...
+#     // adjust '] mark
+#     curbuf->b_op_end.lnum = curwin->w_cursor.lnum - 1;
+#     curbuf->b_op_end.col = bd.textcol + totlen - 1;
+#     curbuf->b_op_end.coladd = 0;
+#
+# With bd.textcol 0 (cursor at column 0) and totlen 0 (empty register block,
+# `norm v)P` in the regression test), bd.textcol + totlen - 1 is -1. The mark
+# keeps the negative column and the next operator that reads ']' (the test's
+# second `v)P`) walks the line text before its start: out-of-bounds read,
+# CWE-125 by way of a CWE-191 underflow. Fix 36343ae0 adds exactly
+#
+#     if (curbuf->b_op_end.col < 0)
+#         curbuf->b_op_end.col = 0;
+#
+# after the store and changes nothing else.
+#
+# Measured miss. register.c scanned at the vulnerable revision and at the fixed revision, three
+# --cache off runs each: 57 findings on both revisions, the same rules on the
+# same lines (offset by the two added lines), nothing at or near the store.
+# The nearest rows are code.FieldDerivedIndexAccess @ :1870 (oldp[bd.textcol],
+# a bounded read in the same function) and code.ZeroCountLastElementAccess @
+# :1318/:445 (other functions) -- findings in the function are not coverage.
+# `vyql match` on a trimmed repro labels the store line only
+# code.IntegerSizeArithmeticSink / code.IntegerSizeArithmetic on the __binop
+# nodes; no issue concept is attached to the store. A consumer-side reading
+# (line[buf->b_op_end.col]) does draw code.FieldDerivedIndexAccess, but the
+# clamp is not in that text, so it fires identically on both revisions.
+#
+# Why nothing is labelled: the "last-element value without a nonzero guard"
+# analysis, ccIndexAccessObservations ->
+# analysis.zero_count.missing_nonzero_last_index ->
+# code.ZeroCountLastElementAccess / VYQL-MEM-041
+# (internal/extract/frontend/treesitter/c.go:1601), only visits
+# subscript_expression nodes. Here the minus-one expression lands in a member
+# store, and the index it becomes lives in another function. Minimal pair,
+# measured on this checkout: `return oldp[bd.textcol + totlen - 1];` reports
+# VYQL-MEM-041 at HIGH, while the identical expression stored into
+# `curbuf->b_op_end.col` reports nothing -- this is the 1295/1310 gate again,
+# on the store-site axis rather than the count-origin axis (1424's cause 1
+# names the subscript-only walk for pointer offsets; this is the same cause
+# for member stores).
+#
+# Two guard-form holes block the obvious extension. The remediation here is a
+# clamp on the stored member (`if (m < 0) m = 0;`), a form ccHasNonZeroGuard
+# (c.go:4614) has no counterpart for at all -- it tests only the count
+# expression's text. And the accepting polarity `count > 1` is not in its
+# token list either, measured: `if (bd.textcol + totlen > 1)` before the
+# subscript leaves VYQL-MEM-041 firing while `if (bd.textcol + totlen < 1)
+# return 0;` suppresses it -- so a store-site observation keyed on the
+# existing guard vocabulary would also flag vim's own guarded siblings at
+# register.c:2241 (`if (col > 1) { curbuf->b_op_end.col = col - 1; ... }`).
+#
+# The data-layer route is not expressible. A function-scoped binding on the
+# `assign:` token needs a negation that recognises the clamp, but correlating
+# the clamp's member with the stored member is identity unification VyQL
+# cannot express (1391, restated at 1424), and the uncorrelated forms are
+# silenced by do_put's own text at BOTH revisions: `if (spaces < 0)` at :1896
+# satisfies any "no <0 comparison" negation and `curbuf->b_op_end.coladd = 0;`
+# at :1963/:1965 satisfies any "no member = 0 store" negation. Zero
+# discrimination either way.
+#
+# Precision constraint for the sweep: 102 member stores of a `- 1` arithmetic
+# right-hand side in 34 files under vim's src/ alone (182 in 51 files for the
+# looser single-token form); 12 more across the three other C clones under
+# /tmp/cve-work/rank*/ that carry the shape. Most are last-element or
+# last-line positions whose non-negativity holds by construction, so the fact
+# must correlate the stored member with a runtime clamp or count guard, not
+# merely observe the store.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1919: do_put stores an underflowing block-put column into the ']' mark"
+  lang c
+  file register.c
+  reject VYQL-MEM-041
+  reject_review code.ZeroCountLastElementAccess
+  code
+  ```
+  typedef int colnr_T;
+  typedef struct { long lnum; colnr_T col; colnr_T coladd; } pos_T;
+  struct buffer_struct { pos_T b_op_end; };
+  extern struct buffer_struct *curbuf;
+  extern struct window_struct { pos_T w_cursor; } *curwin;
+
+  typedef struct {
+      int startspaces;
+      int endspaces;
+      int textcol;
+  } blockdef_T;
+
+  void do_put(blockdef_T bd, int count, int yanklen, int spaces, int shortline)
+  {
+      int i, j;
+      int totlen = 0;		// init for gcc
+
+      for (i = 0; i < count; ++i)
+      {
+	  // calculate number of spaces required to fill right side of block
+	  // ... yanklen and spaces both 0 for an empty register block
+
+	  totlen = count * (yanklen + spaces) + bd.startspaces + bd.endspaces;
+
+	  // insert block's trailing spaces only if there's text behind
+	  if (!((0 < count - 1 || !shortline) && spaces))
+	      totlen -= spaces;  // didn't use these spaces
+      }
+
+      // adjust '] mark
+      curbuf->b_op_end.lnum = curwin->w_cursor.lnum - 1;
+      curbuf->b_op_end.col = bd.textcol + totlen - 1;
+      curbuf->b_op_end.coladd = 0;
+  }
+  ```
+
+test "rank1919: fixed do_put clamps the stored column to zero"
+  lang c
+  file register.c
+  reject VYQL-MEM-041
+  reject_review code.ZeroCountLastElementAccess
+  code
+  ```
+  typedef int colnr_T;
+  typedef struct { long lnum; colnr_T col; colnr_T coladd; } pos_T;
+  struct buffer_struct { pos_T b_op_end; };
+  extern struct buffer_struct *curbuf;
+  extern struct window_struct { pos_T w_cursor; } *curwin;
+
+  typedef struct {
+      int startspaces;
+      int endspaces;
+      int textcol;
+  } blockdef_T;
+
+  void do_put(blockdef_T bd, int count, int yanklen, int spaces, int shortline)
+  {
+      int i, j;
+      int totlen = 0;		// init for gcc
+
+      for (i = 0; i < count; ++i)
+      {
+	  totlen = count * (yanklen + spaces) + bd.startspaces + bd.endspaces;
+
+	  if (!((0 < count - 1 || !shortline) && spaces))
+	      totlen -= spaces;  // didn't use these spaces
+      }
+
+      // adjust '] mark
+      curbuf->b_op_end.lnum = curwin->w_cursor.lnum - 1;
+      curbuf->b_op_end.col = bd.textcol + totlen - 1;
+      if (curbuf->b_op_end.col < 0)
+	  curbuf->b_op_end.col = 0;
+      curbuf->b_op_end.coladd = 0;
+  }
+  ```
+
+test "rank1919: guarded sibling stores col - 1 behind col > 1, the accepting polarity the guard vocabulary lacks"
+  lang c
+  file register.c
+  reject VYQL-MEM-041
+  reject_review code.ZeroCountLastElementAccess
+  code
+  ```
+  typedef int colnr_T;
+  typedef struct { long lnum; colnr_T col; colnr_T coladd; } pos_T;
+  struct buffer_struct { pos_T b_op_end; };
+  extern struct buffer_struct *curbuf;
+
+  void block_put_end_mark(colnr_T col, colnr_T len, colnr_T lendiff)
+  {
+      if (col > 1)
+      {
+	  curbuf->b_op_end.col = col - 1;
+	  if (len > 0)
+	      curbuf->b_op_end.col -= 1;
+      }
+  }
+  ```
+
+test "rank1919: minimal pair — the same expression indexed reports, the member store does not"
+  lang c
+  file register.c
+  expect VYQL-MEM-041
+  expect_review code.ZeroCountLastElementAccess
+  code
+  ```
+  typedef struct {
+      int startspaces;
+      int endspaces;
+      int textcol;
+  } blockdef_T;
+
+  extern char *oldp;
+
+  int do_put(blockdef_T bd, int count, int yanklen, int spaces)
+  {
+      int totlen = 0;
+
+      totlen = count * (yanklen + spaces) + bd.startspaces + bd.endspaces;
+      totlen -= spaces;
+
+      return oldp[bd.textcol + totlen - 1];
+  }
+  ```

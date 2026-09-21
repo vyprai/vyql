@@ -1,0 +1,6 @@
+module bindings.javascript.generated.m6a2f91d4;
+
+binding passwordChangeWithoutSessionInvalidation947 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and containsAny(node.context.callPath, ["req.isAuthenticated", "request.isAuthenticated"]) and containsAny(node.context.selector, ["bcrypt.hash", "bcryptjs.hash", "argon2.hash", "crypto.scrypt", "crypto.pbkdf2"]) and not (containsAny(node.context.prop, ["tokenVersion", "token_version", "sessionVersion", "session_version", "jwtVersion", "jwt_version", "refreshTokenVersion", "passwordChangedAt", "password_changed_at", "credentialsUpdatedAt", "tokensValidFrom"])) and not (containsAny(node.context.selector, ["tokenVersion", "token_version", "sessionVersion", "session_version", "jwtVersion", "jwt_version", "refreshTokenVersion", "passwordChangedAt", "password_changed_at", "credentialsUpdatedAt", "tokensValidFrom"])) and not (containsAny(node.context.callPath, ["req.logout", "req.logOut", "req.session.destroy", "req.session.regenerate", "session.destroy", "session.regenerate", "sessionStore.destroy", "revokeRefreshTokens", "revokeAllSessions", "revokeAllTokens", "invalidateSessions", "invalidateAllSessions", "destroyAllSessions", "deleteAllSessions", "signOutAll", "logoutAllDevices"]))
+  emit issue code.PasswordChangeWithoutSessionInvalidation at node
+}

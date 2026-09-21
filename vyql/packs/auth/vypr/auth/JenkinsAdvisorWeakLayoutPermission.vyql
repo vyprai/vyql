@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule JenkinsAdvisorWeakLayoutPermission {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_862]
+    id: "VYQL-AUTH-021"
+    severity: medium
+  }
+  issue code.JenkinsAdvisorWeakLayoutPermission as page
+}

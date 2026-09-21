@@ -1,0 +1,41 @@
+module bindings.elixir.generated.m55dfca5a;
+
+binding commandExecution0 {
+  requires {
+    dependency("core")
+  }
+  query pattern callExpr where callee.method == "spawn"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution1 {
+  requires {
+    dependency("core")
+  }
+  query pattern callExpr where callee.method == "spawn_link"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("core")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("core")
+  }
+  query pattern callExpr where callee.method == "call"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData4 {
+  requires {
+    dependency("core")
+  }
+  query pattern callExpr where callee.method == "cast"
+  emit source core.UserControlledData at call.result
+}

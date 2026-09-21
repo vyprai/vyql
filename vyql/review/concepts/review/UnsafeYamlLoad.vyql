@@ -1,0 +1,8 @@
+module code;
+
+review code.UnsafeYamlLoad {
+  category: deserialization
+  expected: [core.SafeDeserialization]
+  kind: attention
+  text: "review PyYAML unsafe load calls; prefer safe_load or an explicit SafeLoader/CSafeLoader/BaseLoader"
+}

@@ -1,0 +1,90 @@
+# verify_current_expected: skip-fresh-target
+# Rank 523 / CVE-2026-32627: the selected pool commit is the v0.37.2
+# release tag, and its parent is already past the actual TLS hardening. This
+# spec covers the real cpp-httplib mechanic fixed by 125272f: proxied HTTPS
+# redirects must preserve certificate and hostname verification settings.
+
+test "rank523: proxied HTTPS redirect disables cert verification"
+  lang cpp
+  file httplib.h
+  expect VYQL-CFG-023
+  expect_review code.ProxyRedirectCertVerificationBypass
+  code
+  ```
+  class SSLClient {
+  public:
+    SSLClient(const char *host, int port);
+    void set_proxy(const char *host, int port);
+    void enable_server_certificate_verification(bool enabled);
+    void enable_server_hostname_verification(bool enabled);
+  };
+
+  namespace detail {
+  bool redirect(SSLClient &client, int &req, int &res, const char *path,
+                const char *location, int &error);
+  }
+
+  class ClientImpl {
+  public:
+    bool create_redirect_client(const char *scheme, const char *host, int port,
+                                int &req, int &res, const char *path,
+                                const char *location, int &error) {
+      SSLClient redirect_client(host, port);
+      redirect_client.set_proxy(proxy_host_, proxy_port_);
+      if (proxy_host_[0] != '\0' && proxy_port_ != -1) {
+        redirect_client.enable_server_certificate_verification(false);
+        redirect_client.enable_server_hostname_verification(false);
+      } else {
+        redirect_client.enable_server_certificate_verification(server_certificate_verification_);
+        redirect_client.enable_server_hostname_verification(server_hostname_verification_);
+      }
+      return detail::redirect(redirect_client, req, res, path, location, error);
+    }
+
+  private:
+    const char *proxy_host_;
+    int proxy_port_;
+    bool server_certificate_verification_;
+    bool server_hostname_verification_;
+  };
+  ```
+
+test "rank523: proxied HTTPS redirect preserves cert verification"
+  lang cpp
+  file httplib.h
+  reject VYQL-CFG-023
+  reject_review code.ProxyRedirectCertVerificationBypass
+  code
+  ```
+  class SSLClient {
+  public:
+    SSLClient(const char *host, int port);
+    void set_proxy(const char *host, int port);
+    void enable_server_certificate_verification(bool enabled);
+    void enable_server_hostname_verification(bool enabled);
+  };
+
+  namespace detail {
+  bool redirect(SSLClient &client, int &req, int &res, const char *path,
+                const char *location, int &error);
+  }
+
+  class ClientImpl {
+  public:
+    bool create_redirect_client(const char *scheme, const char *host, int port,
+                                int &req, int &res, const char *path,
+                                const char *location, int &error) {
+      SSLClient redirect_client(host, port);
+      redirect_client.set_proxy(proxy_host_, proxy_port_);
+      redirect_client.enable_server_certificate_verification(server_certificate_verification_);
+      redirect_client.enable_server_hostname_verification(server_hostname_verification_);
+      return detail::redirect(redirect_client, req, res, path, location, error);
+    }
+
+  private:
+    const char *proxy_host_;
+    int proxy_port_;
+    bool server_certificate_verification_;
+    bool server_hostname_verification_;
+  };
+  ```

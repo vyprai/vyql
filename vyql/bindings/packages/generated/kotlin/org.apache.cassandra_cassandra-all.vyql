@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m2c577b56;
+
+binding deserialization0 {
+  requires {
+    dependency("org.apache.cassandra:cassandra-all")
+  }
+  query pattern callExpr where callee.method == "deserialize"
+  emit sink code.Deserialization at args[0]
+}

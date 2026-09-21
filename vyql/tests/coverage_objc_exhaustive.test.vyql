@@ -1,0 +1,259 @@
+# Objective-C language-gap narrowing: exhaustive coverage for adapter-claimed idioms.
+
+test "objc exhaustive: request and environment input reach SQL and command sinks"
+  lang objc
+  expect VYQL-INJ-001
+  expect VYQL-INJ-002
+  code
+  ```
+  @implementation C
+  - (void)handler:(Request *)request db:(sqlite3 *)db {
+    char *cmd = getenv("CMD");
+    NSString *q = [request param:@"q"];
+    sqlite3_exec(db, [q UTF8String], NULL, NULL, NULL);
+    sqlite3_prepare_v2(db, [q UTF8String], -1, NULL, NULL);
+    system(cmd);
+    popen(cmd, "r");
+  }
+  @end
+  ```
+
+test "objc exhaustive: escaped command and constant SQL are clean"
+  lang objc
+  reject VYQL-INJ-001
+  reject VYQL-INJ-002
+  code
+  ```
+  @implementation C
+  - (void)handler:(sqlite3 *)db {
+    sqlite3_exec(db, "select 1", NULL, NULL, NULL);
+    system(escape_shell(getenv("CMD")));
+  }
+  @end
+  ```
+
+test "objc exhaustive: file APIs access tainted paths"
+  lang objc
+  expect VYQL-PATH-001
+  code
+  ```
+  @implementation C
+  - (void)handler:(Request *)request {
+    NSString *p = [request param:@"path"];
+    fopen([p UTF8String], "r");
+    [NSString stringWithContentsOfFile:p encoding:NSUTF8StringEncoding error:nil];
+    [NSData dataWithContentsOfFile:p];
+  }
+  @end
+  ```
+
+test "objc exhaustive: realpath suppresses file traversal"
+  lang objc
+  reject VYQL-PATH-001
+  code
+  ```
+  void handler(char *p) {
+    char resolved[4096];
+    fopen(realpath(p, resolved), "r");
+  }
+  ```
+
+test "objc exhaustive: WebView loads and native bridge are reported"
+  lang objc
+  expect VYQL-MOB-001
+  expect VYQL-MOB-002
+  code
+  ```
+  @implementation C
+  - (void)handler:(WKWebView *)webView controller:(WKUserContentController *)controller {
+    NSString *s = UIPasteboard.generalPasteboard.string;
+    [webView evaluateJavaScript:s completionHandler:nil];
+    [webView loadHTMLString:s baseURL:nil];
+    [controller addScriptMessageHandler:self name:@"bridge"];
+  }
+  @end
+  ```
+
+test "objc exhaustive: constant WebView loads and bridge removal are clean"
+  lang objc
+  reject VYQL-MOB-001
+  reject VYQL-MOB-002
+  code
+  ```
+  @implementation C
+  - (void)handler:(WKWebView *)webView controller:(WKUserContentController *)controller {
+    [webView evaluateJavaScript:@"init()" completionHandler:nil];
+    [controller removeScriptMessageHandlerForName:@"bridge"];
+  }
+  @end
+  ```
+
+test "objc exhaustive: NSURL APIs fetch tainted URLs"
+  lang objc
+  expect VYQL-RF-001
+  code
+  ```
+  @implementation C
+  - (void)handler:(Request *)request session:(NSURLSession *)session {
+    NSString *u = [request param:@"url"];
+    NSURL *url = [NSURL URLWithString:u];
+    [NSData dataWithContentsOfURL:url];
+    [session dataTaskWithURL:url];
+  }
+  @end
+  ```
+
+test "objc exhaustive: constant NSURL APIs are clean for SSRF"
+  lang objc
+  reject VYQL-RF-001
+  code
+  ```
+  @implementation C
+  - (void)handler:(NSURLSession *)session {
+    NSURL *url = [NSURL URLWithString:@"https://example.com"];
+    [session dataTaskWithURL:url];
+  }
+  @end
+  ```
+
+test "objc exhaustive: cleartext NSURL and cert disable are reported"
+  lang objc
+  expect VYQL-CFG-004
+  expect VYQL-CFG-006
+  code
+  ```
+  @implementation C
+  - (void)handler:(AFHTTPSessionManager *)manager {
+    [NSURL URLWithString:@"http://example.com"];
+    [manager setAllowsAnyHTTPSCertificate:YES];
+  }
+  @end
+  ```
+
+test "objc exhaustive: HTTPS localhost and cert strict mode are clean"
+  lang objc
+  reject VYQL-CFG-004
+  reject VYQL-CFG-006
+  code
+  ```
+  @implementation C
+  - (void)handler:(AFHTTPSessionManager *)manager {
+    [NSURL URLWithString:@"https://example.com"];
+    [NSURL URLWithString:@"http://127.0.0.1:8080"];
+    [manager setAllowsAnyHTTPSCertificate:NO];
+  }
+  @end
+  ```
+
+test "objc exhaustive: regex XPath LDAP XSS and format sinks receive taint"
+  lang objc
+  expect VYQL-DOS-001
+  expect VYQL-INJ-004
+  expect VYQL-INJ-005
+  expect VYQL-INJ-006
+  expect VYQL-INJ-011
+  code
+  ```
+  @implementation C
+  - (void)handler:(Request *)request xml:(NSXMLDocument *)xml {
+    NSString *v = [request param:@"v"];
+    [NSRegularExpression regularExpressionWithPattern:v options:0 error:nil];
+    [xml nodesForXPath:v error:nil];
+    ldap_search_s(ld, "dc=x", LDAP_SCOPE_SUBTREE, [v UTF8String], NULL, 0, &res);
+    fputs([v UTF8String], stdout);
+    NSLog(v);
+  }
+  @end
+  ```
+
+test "objc exhaustive: regex XPath LDAP XSS and format controls suppress findings"
+  lang objc
+  reject VYQL-DOS-001
+  reject VYQL-INJ-004
+  reject VYQL-INJ-005
+  reject VYQL-INJ-006
+  reject VYQL-INJ-011
+  code
+  ```
+  @implementation C
+  - (void)handler:(Request *)request xml:(NSXMLDocument *)xml {
+    NSString *v = [request param:@"v"];
+    [NSRegularExpression regularExpressionWithPattern:@"^[a-z]+$" options:0 error:nil];
+    [xml nodesForXPath:escape_xpath(v) error:nil];
+    ldap_search_s(ld, "dc=x", LDAP_SCOPE_SUBTREE, encode_for_ldap(v), NULL, 0, &res);
+    fputs(escape_html([v UTF8String]), stdout);
+    NSLog(@"%@", v);
+  }
+  @end
+  ```
+
+test "objc exhaustive: memory numeric lifecycle and race review points are reported"
+  lang objc
+  expect VYQL-MEM-001
+  expect VYQL-MEM-002
+  expect VYQL-MEM-003
+  expect VYQL-MEM-004
+  expect VYQL-MEM-005
+  expect VYQL-MEM-006
+  expect VYQL-MEM-007
+  expect VYQL-MEM-008
+  expect VYQL-NUM-001
+  expect VYQL-NUM-002
+  expect VYQL-NUM-003
+  expect VYQL-RACE-001
+  expect VYQL-LIFE-001
+  code
+  ```
+  int atoi(const char *);
+  void handler(int argc, char **argv, char *src, char *p) {
+    int n = atoi(argv[1]);
+    char dst[8];
+    strcpy(dst, argv[1]);
+    memcpy(dst, src, n);
+    sprintf(dst, "%s", src);
+    alloca(n);
+    dst[n] = 'x';
+    int y = 10 / n;
+    int z = n * 1024;
+    void *heap = malloc(n * 32);
+    char *maybe = NULL;
+    *maybe = 'x';
+    free(p);
+    *p = 'x';
+    free(p);
+    if (access(argv[2], F_OK) == 0) { fopen(argv[2], "r"); }
+    pthread_mutex_lock(&m);
+  }
+  ```
+
+test "objc exhaustive: weak crypto static IV and weak randomness are reported"
+  lang objc
+  expect VYQL-CRY-001
+  expect VYQL-CRY-002
+  expect VYQL-CRY-003
+  expect VYQL-CRY-004
+  code
+  ```
+  void handler() {
+    CC_MD5(data, len, out);
+    CCCrypt(kCCEncrypt, "DES", 0, key, 8, "0000000000000000", in, len, out, outLen, &moved);
+    CCCryptorCreate(kCCEncrypt, "DES", 0, key, 8, "0000000000000000", &cryptor);
+    arc4random();
+    rand();
+  }
+  ```
+
+test "objc exhaustive: stronger crypto and secure randomness are clean"
+  lang objc
+  reject VYQL-CRY-001
+  reject VYQL-CRY-002
+  reject VYQL-CRY-003
+  reject VYQL-CRY-004
+  code
+  ```
+  void handler() {
+    CC_SHA256(data, len, out);
+    CCCrypt(kCCEncrypt, kCCAlgorithmAES, 0, key, 16, iv, in, len, out, outLen, &moved);
+    SecRandomCopyBytes(kSecRandomDefault, 16, out);
+  }
+  ```

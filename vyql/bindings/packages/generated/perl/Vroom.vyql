@@ -1,0 +1,9 @@
+module bindings.perl.generated.mfac04980;
+
+binding commandExecution0 {
+  requires {
+    dependency("Vroom")
+  }
+  query pattern callExpr where callee.method == "runSlide"
+  emit sink code.CommandExecution at args[0]
+}

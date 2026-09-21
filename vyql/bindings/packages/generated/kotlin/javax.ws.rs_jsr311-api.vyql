@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m7966bede;
+
+binding httpInput0 {
+  requires {
+    dependency("javax.ws.rs:jsr311-api")
+  }
+  query pattern callExpr where callee.path ~= "javax.ws.rs.jsr311.api.cookie"
+  emit source code.HttpInput at call.result
+}

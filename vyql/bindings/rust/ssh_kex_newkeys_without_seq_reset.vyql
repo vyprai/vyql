@@ -1,0 +1,37 @@
+module bindings.rust.ssh_kex_newkeys_without_seq_reset;
+
+// An SSH transport protects each packet with the running sequence number of
+// its direction, and both endpoints count from the start of the connection
+// (RFC 4253, section 6). Because that counter is anchored nowhere, an active
+// attacker can delete packets from the front of the handshake while the
+// channel is still plaintext: both sides' counters shift by the same amount,
+// every later MAC still verifies, and the exchange hash both sides sign
+// covers only a suffix of what was sent. Strict key exchange
+// (kex-strict-{s,c}-v00@openssh.com) closes this by accepting only KEXINIT,
+// the DH request/reply and NEWKEYS, in that order, during the initial
+// exchange -- injected IGNORE, DEBUG or DISCONNECT aborts it -- and by
+// resetting the sequence number to zero when the first NEWKEYS installs the
+// keys, so a deleted prefix no longer leaves the counters aligned.
+//
+// A function that drives the exchange through KEXINIT and NEWKEYS and never
+// touches the sequence counter has no anchor for that integrity check, which
+// is the vulnerability. The message names are the wire protocol's, so the
+// shape is recognisable in any implementation of it, and the counter is the
+// protocol's own "sequence number": every implementation spells it
+// seq/seqn/seqnr/sequence_number, and a few name the same quantity a packet
+// counter -- any of those appearing in the same function is the control being
+// present, so it suppresses the finding. The reading is deliberately about
+// the counter being anchored at all rather than about which construct anchors
+// it; an implementation that only enforces the message order but leaves the
+// counter running still fires, because order enforcement alone does not
+// detect a deleted prefix.
+//
+// The spelling match is over the function body, which carries comments, so a
+// comment naming the counter can silence it -- the false-negative direction
+// only. Keys installed on rekey share the same reset in a strict-kex
+// implementation, and the rekey readers that move through NEWKEYS under the
+// same control land in the same shape.
+binding sshKexNewkeysWithoutSequenceReset {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and containsAny(node.token, ["NEWKEYS", "NewKeys", "newKeys", "new_keys", "MSG_NEWKEYS"]) and containsAny(node.token, ["KEXINIT", "KexInit", "kexInit", "kex_init", "MSG_KEXINIT"]) and not (containsAny(node.token, ["seq", "counter"]))
+  emit issue code.ProtocolStateReview at node
+}

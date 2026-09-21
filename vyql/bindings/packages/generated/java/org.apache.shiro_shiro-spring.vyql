@@ -1,0 +1,28 @@
+module bindings.java.generated.m758d4a69;
+
+binding redirectTarget0 {
+  requires {
+    dependency("org.apache.shiro:shiro-spring")
+  }
+  query pattern callExpr where callee.method == "setLoginUrl"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}
+
+binding redirectTarget1 {
+  requires {
+    dependency("org.apache.shiro:shiro-spring")
+  }
+  query pattern callExpr where callee.method == "setSuccessUrl"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}
+
+binding redirectTarget2 {
+  requires {
+    dependency("org.apache.shiro:shiro-spring")
+  }
+  query pattern callExpr where callee.method == "setUnauthorizedUrl"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

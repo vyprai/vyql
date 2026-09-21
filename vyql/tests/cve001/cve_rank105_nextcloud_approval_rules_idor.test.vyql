@@ -1,0 +1,56 @@
+# Rank 105 / CVE-2026-45277: getUserRules accepted a fileId and returned
+# the approval rules for it without checking the user can access that file.
+# The fix adds a userHasAccessTo guard that throws when access is missing.
+
+test "rank105: getUserRules returns file rules without a file access check"
+  lang php
+  expect VYQL-AUTH-081
+  code
+  ```
+  <?php
+  class ApprovalService {
+      public function getUserRules(string $userId, string $role = 'requesters', ?int $fileId = null): array {
+          $userRules = [];
+          $rules = $this->ruleService->getRules();
+          foreach ($rules as $rule) {
+              if ($this->userIsAuthorizedByRule($userId, $rule, $role)) {
+                  if ($role === 'requesters' && $fileId !== null
+                      && ($this->tagObjectMapper->haveTag((string)$fileId, 'files', $rule['tagPending'])
+                          || $this->tagObjectMapper->haveTag((string)$fileId, 'files', $rule['tagApproved']))) {
+                      continue;
+                  }
+                  $userRules[] = $rule;
+              }
+          }
+          return $userRules;
+      }
+  }
+  ```
+
+test "rank105: getUserRules guards fileId with a file access check"
+  lang php
+  reject VYQL-AUTH-081
+  code
+  ```
+  <?php
+  class ApprovalService {
+      public function getUserRules(string $userId, string $role = 'requesters', ?int $fileId = null): array {
+          if ($fileId !== null && !$this->utilsService->userHasAccessTo($fileId, $userId)) {
+              throw new \InvalidArgumentException('File not found');
+          }
+          $userRules = [];
+          $rules = $this->ruleService->getRules();
+          foreach ($rules as $rule) {
+              if ($this->userIsAuthorizedByRule($userId, $rule, $role)) {
+                  if ($role === 'requesters' && $fileId !== null
+                      && ($this->tagObjectMapper->haveTag((string)$fileId, 'files', $rule['tagPending'])
+                          || $this->tagObjectMapper->haveTag((string)$fileId, 'files', $rule['tagApproved']))) {
+                      continue;
+                  }
+                  $userRules[] = $rule;
+              }
+          }
+          return $userRules;
+      }
+  }
+  ```

@@ -1,0 +1,11 @@
+module code;
+
+concept JoinedPathCopyWithoutContainment : issue {
+  cwe: [CWE_22, CWE_73]
+  reviewAssumption: "the joined path components can carry parent-directory segments that the join itself resolves, so the resolved path can leave its intended base directory"
+  reviewCategory: path
+  reviewCondition: "a function copies files to paths assembled by joining components under a base directory without a containment check on the resolved path"
+  reviewConfidence: high
+  reviewEvidence: "joined-path copy context {pattern} joins path components and hands the result to a copy with no isBasePath, canonicalize, basename or realpath containment"
+  vulnerableTo: [path.PathTraversal]
+}

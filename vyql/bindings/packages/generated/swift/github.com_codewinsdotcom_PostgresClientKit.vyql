@@ -1,0 +1,9 @@
+module bindings.swift.generated.m34e53283;
+
+binding sqlExecution0 {
+  requires {
+    dependency("github.com/codewinsdotcom/PostgresClientKit")
+  }
+  query pattern callExpr where callee.method == "prepareStatement"
+  emit sink code.SqlExecution at args[0]
+}

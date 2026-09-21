@@ -1,0 +1,57 @@
+module bindings.c.generated.m9fcabd2b;
+
+binding deserialization0 {
+  requires {
+    dependency("hiredis")
+  }
+  query pattern callExpr where callee.method == "redisReaderFeed"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("hiredis")
+  }
+  query pattern callExpr where callee.method == "redisReaderGetReply"
+  emit sink code.Deserialization at args[0]
+}
+
+binding networkData2 {
+  requires {
+    dependency("hiredis")
+  }
+  query pattern callExpr where callee.method == "redisNetWrite"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData3 {
+  requires {
+    dependency("hiredis")
+  }
+  query pattern callExpr where callee.method == "redisNetRead"
+  emit source code.NetworkData at call.result
+}
+
+binding networkConnect4 {
+  requires {
+    dependency("hiredis")
+  }
+  query pattern callExpr where callee.method == "redisContextConnectTcp"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect5 {
+  requires {
+    dependency("hiredis")
+  }
+  query pattern callExpr where callee.method == "redisContextConnectBindTcp"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect6 {
+  requires {
+    dependency("hiredis")
+  }
+  query pattern callExpr where callee.method == "redisContextConnectUnix"
+  emit sink code.NetworkConnectSink at args[0]
+}

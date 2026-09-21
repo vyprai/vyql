@@ -1,0 +1,81 @@
+module bindings.kotlin.generated.m1cbc8173;
+
+binding sqlExecution0 {
+  requires {
+    dependency("org.springframework.session:spring-session-jdbc")
+  }
+  query pattern callExpr where callee.method == "setCreateSessionQuery"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution1 {
+  requires {
+    dependency("org.springframework.session:spring-session-jdbc")
+  }
+  query pattern callExpr where callee.method == "setCreateSessionAttributeQuery"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution2 {
+  requires {
+    dependency("org.springframework.session:spring-session-jdbc")
+  }
+  query pattern callExpr where callee.method == "setGetSessionQuery"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution3 {
+  requires {
+    dependency("org.springframework.session:spring-session-jdbc")
+  }
+  query pattern callExpr where callee.method == "setUpdateSessionQuery"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution4 {
+  requires {
+    dependency("org.springframework.session:spring-session-jdbc")
+  }
+  query pattern callExpr where callee.method == "setUpdateSessionAttributeQuery"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution5 {
+  requires {
+    dependency("org.springframework.session:spring-session-jdbc")
+  }
+  query pattern callExpr where callee.method == "setDeleteSessionAttributeQuery"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution6 {
+  requires {
+    dependency("org.springframework.session:spring-session-jdbc")
+  }
+  query pattern callExpr where callee.method == "setDeleteSessionQuery"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution7 {
+  requires {
+    dependency("org.springframework.session:spring-session-jdbc")
+  }
+  query pattern callExpr where callee.method == "setListSessionsByPrincipalNameQuery"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution8 {
+  requires {
+    dependency("org.springframework.session:spring-session-jdbc")
+  }
+  query pattern callExpr where callee.method == "setDeleteSessionsByExpiryTimeQuery"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding deserialization9 {
+  requires {
+    dependency("org.springframework.session:spring-session-jdbc")
+  }
+  query pattern callExpr where callee.method == "deserialize"
+  emit sink code.Deserialization at args[0]
+}

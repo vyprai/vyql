@@ -1,0 +1,8 @@
+module code;
+
+review code.ZipEntryCompressedSizeTokenRead {
+  category: resource
+  expected: [core.InputValidation]
+  kind: target
+  text: "review ZIP entry parsing for an inflate/output limit before reading entry content sized from compressed ZIP metadata"
+}

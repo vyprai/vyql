@@ -1,0 +1,12 @@
+module vypr.injection;
+
+rule Code {
+  meta {
+    benchmark: codeinj
+    cwe: [CWE_94]
+    id: "VYQL-INJ-003"
+    severity: critical
+  }
+  taint core.UserControlledData -> code.CodeEval
+  unless endpoint coveredBy core.CodeExecutionValidation
+}

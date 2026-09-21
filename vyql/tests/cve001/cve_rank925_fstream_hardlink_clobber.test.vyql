@@ -1,0 +1,80 @@
+# Rank 925 / CVE-2019-13173: fstream reused an existing hard-linked File
+# target instead of clobbering it before writing archive/package contents.
+
+test "rank925: file writer does not clobber existing hard-linked file"
+  lang javascript
+  file writer.js
+  expect VYQL-PATH-051
+  expect_review code.HardlinkedFileOverwriteWithoutClobber
+  code
+  ```
+  var fs = require('graceful-fs')
+  var rimraf = require('rimraf')
+  var getType = require('./get-type.js')
+
+  Writer.prototype._stat = function (current) {
+    var self = this
+    var props = self.props
+    var stat = props.follow ? 'stat' : 'lstat'
+    if (current) statCb(null, current)
+    else fs[stat](self._path, statCb)
+
+    function statCb (er, current) {
+      if (er || !current) {
+        return create(self)
+      }
+
+      self._old = current
+      var currentType = getType(current)
+
+      if (currentType !== self.type) {
+        return rimraf(self._path, function (er) {
+          if (er) return self.error(er)
+          self._old = null
+          create(self)
+        })
+      }
+
+      create(self)
+    }
+  }
+  ```
+
+test "rank925: file writer clobbers hard-linked file targets"
+  lang javascript
+  file writer.js
+  reject VYQL-PATH-051
+  reject_review code.HardlinkedFileOverwriteWithoutClobber
+  code
+  ```
+  var fs = require('graceful-fs')
+  var rimraf = require('rimraf')
+  var getType = require('./get-type.js')
+
+  Writer.prototype._stat = function (current) {
+    var self = this
+    var props = self.props
+    var stat = props.follow ? 'stat' : 'lstat'
+    if (current) statCb(null, current)
+    else fs[stat](self._path, statCb)
+
+    function statCb (er, current) {
+      if (er || !current) {
+        return create(self)
+      }
+
+      self._old = current
+      var currentType = getType(current)
+
+      if (currentType !== self.type || self.type === 'File' && current.nlink > 1) {
+        return rimraf(self._path, function (er) {
+          if (er) return self.error(er)
+          self._old = null
+          create(self)
+        })
+      }
+
+      create(self)
+    }
+  }
+  ```

@@ -1,0 +1,52 @@
+module bindings.ruby.imap_raw_command_data;
+
+// Net::IMAP encodes ordinary String arguments as an IMAP `astring` -- an atom, a
+// quoted string or a literal, whichever the bytes require -- so CR and LF inside
+// them cannot end the command line. `Net::IMAP::RawData` is the documented
+// bypass: its `send_data` hands the string straight to `put_string`, which
+// writes it onto the socket with no encoding and no escaping. IMAP is
+// line-oriented, so a CRLF inside such a string terminates the command and the
+// server reads whatever follows as a command of its own (CWE-93).
+//
+// The argument of a RawData constructor is therefore a protocol-command write,
+// wherever it is built.
+
+binding imapRawDataProtocolWrite {
+  query pattern callExpr where callee.path ~= "RawData.new"
+  emit sink code.LineProtocolCommandWrite at args[0]
+}
+
+// The same positions as seen by a caller of the library. Net::IMAP's own
+// documentation marks these arguments as sent "with minimal validation and no
+// encoding or formatting": search/sort/thread criteria and fetch/store
+// attributes are IMAP grammar rather than payload, and a SETQUOTA limit is
+// interpolated into the resource list. `search`, `sort`, `thread`, `fetch` and
+// `store` are names shared with collections, ORMs and mailers, so those are
+// bound only through the receiver spelling Net::IMAP's own documentation uses
+// (`imap = Net::IMAP.new(...)`; `imap.search(...)`); the `uid_` variants and
+// `setquota` are unambiguous and are bound by method name.
+
+binding imapSearchCriteria {
+  query pattern callExpr where callee.path ~= "imap.search" or callee.method == "uid_search"
+  emit sink code.LineProtocolCommandWrite at args[0]
+}
+
+binding imapSortThreadCriteria {
+  query pattern callExpr where callee.path ~= "imap.sort" or callee.path ~= "imap.thread" or callee.method in ["uid_sort", "uid_thread"]
+  emit sink code.LineProtocolCommandWrite at args[1]
+}
+
+binding imapFetchAttribute {
+  query pattern callExpr where callee.path ~= "imap.fetch" or callee.method == "uid_fetch"
+  emit sink code.LineProtocolCommandWrite at args[1]
+}
+
+binding imapStoreAttribute {
+  query pattern callExpr where callee.path ~= "imap.store" or callee.method == "uid_store"
+  emit sink code.LineProtocolCommandWrite at args[1]
+}
+
+binding imapSetQuotaLimit {
+  query pattern callExpr where callee.method == "setquota"
+  emit sink code.LineProtocolCommandWrite at args[1]
+}

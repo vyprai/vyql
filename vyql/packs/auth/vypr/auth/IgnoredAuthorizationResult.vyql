@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule IgnoredAuthorizationResult {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_252, CWE_285, CWE_863]
+    id: "VYQL-AUTH-171"
+    severity: high
+  }
+  issue code.IgnoredAuthorizationResult as authz
+}

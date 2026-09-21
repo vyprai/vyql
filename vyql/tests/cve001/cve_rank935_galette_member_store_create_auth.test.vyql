@@ -1,0 +1,69 @@
+# Rank 935 / CVE-2025-58052: Galette's member storage path could create
+# members without a local canCreate guard when reached through an alternate
+# route/capability combination.
+
+test "rank935: member store creates new non-self member without canCreate guard"
+  lang php
+  file MembersController.php
+  expect VYQL-AUTH-069
+  expect_review code.MemberStoreMissingCreateAuthorization
+  code
+  ```
+  <?php
+  class MembersController {
+      public function store(Request $request, Response $response): Response
+      {
+          $post = $request->getParsedBody();
+          $member = new Adherent($this->zdb);
+          if ($this->isSelfMembership() && !isset($post[Adherent::PK])) {
+              $member->setSelfMembership();
+          }
+          if (isset($post['id_adh'])) {
+              $member->load((int)$post['id_adh']);
+              if (!$member->canEdit($this->login)) {
+                  throw new \RuntimeException('No right to store member');
+              }
+          } elseif ($member->id != '') {
+              $member->load($this->login->id);
+          }
+          if ($member->store() === true) {
+              return $response;
+          }
+      }
+  }
+  ?>
+  ```
+
+test "rank935: member store rejects new non-self member without canCreate"
+  lang php
+  file MembersController.php
+  reject VYQL-AUTH-069
+  reject_review code.MemberStoreMissingCreateAuthorization
+  code
+  ```
+  <?php
+  class MembersController {
+      public function store(Request $request, Response $response): Response
+      {
+          $post = $request->getParsedBody();
+          $member = new Adherent($this->zdb);
+          if ($this->isSelfMembership() && !isset($post[Adherent::PK])) {
+              $member->setSelfMembership();
+          }
+          if (isset($post['id_adh'])) {
+              $member->load((int)$post['id_adh']);
+              if (!$member->canEdit($this->login)) {
+                  throw new \RuntimeException('No right to store member');
+              }
+          } elseif ($member->id != '') {
+              $member->load($this->login->id);
+          } elseif (!$this->isSelfMembership() && !$member->canCreate($this->login)) {
+              throw new \RuntimeException('No right to store new member!');
+          }
+          if ($member->store() === true) {
+              return $response;
+          }
+      }
+  }
+  ?>
+  ```

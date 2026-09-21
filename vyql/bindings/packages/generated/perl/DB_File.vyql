@@ -1,0 +1,33 @@
+module bindings.perl.generated.m49d8eae4;
+
+binding filePathAccess0 {
+  requires {
+    dependency("DB_File")
+  }
+  query pattern callExpr where callee.method == "tie_hash_or_array"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding databaseRead1 {
+  requires {
+    dependency("DB_File")
+  }
+  query pattern callExpr where callee.method == "FETCH"
+  emit sink code.DatabaseReadSink at args[0]
+}
+
+binding nosqlQuery2 {
+  requires {
+    dependency("DB_File")
+  }
+  query pattern callExpr where callee.method == "STORE"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery3 {
+  requires {
+    dependency("DB_File")
+  }
+  query pattern callExpr where callee.method == "DELETE"
+  emit sink code.NosqlQuery at args[0]
+}

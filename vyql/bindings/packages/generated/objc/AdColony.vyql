@@ -1,0 +1,9 @@
+module bindings.objc.generated.m6ac3d17f;
+
+binding networkSend0 {
+  requires {
+    dependency("AdColony")
+  }
+  query pattern callExpr where callee.method == "sendCustomMessageOfType:withContent:reply:"
+  emit sink code.NetworkSend at args[0]
+}

@@ -1,0 +1,45 @@
+test "rank582: JSON tree labels must escape stored names"
+  lang php
+  expect VYQL-INJ-125
+  code
+  ```
+  <?php
+  class ConfigController
+  {
+      private function buildItem($configuration): array
+      {
+          $type = $configuration->getType() ?: 'graphql';
+          $name = $configuration->getName();
+
+          return [
+              'id' => $name,
+              'text' => $name,
+              'type' => 'config',
+              'iconCls' => 'plugin_icon_' . $type,
+          ];
+      }
+  }
+  ```
+
+test "rank582: JSON tree labels escape stored names"
+  lang php
+  reject VYQL-INJ-125
+  code
+  ```
+  <?php
+  class ConfigController
+  {
+      private function buildItem($configuration): array
+      {
+          $type = $configuration->getType() ?: 'graphql';
+          $name = $configuration->getName();
+
+          return [
+              'id' => $name,
+              'text' => htmlspecialchars($name),
+              'type' => 'config',
+              'iconCls' => 'plugin_icon_' . $type,
+          ];
+      }
+  }
+  ```

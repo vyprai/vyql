@@ -1,0 +1,8 @@
+module code;
+
+review code.ArgvTrustedOnEmptyGet {
+  category: validation
+  expected: [core.InputValidation]
+  kind: attention
+  text: "gate argv-backed console input on the raw query string ($_SERVER['QUERY_STRING']) or the SAPI, not on $_GET emptiness, which a query string without name=value pairs leaves empty while argv still carries its tokens"
+}

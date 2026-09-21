@@ -1,0 +1,41 @@
+module bindings.java.generated.m69835ec8;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("com.firebaseui:firebase-ui-auth")
+  }
+  query pattern callExpr where callee.method == "AuthUI.clearCredentialState"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck1 {
+  requires {
+    dependency("com.firebaseui:firebase-ui-auth")
+  }
+  query pattern callExpr where callee.method == "AuthUI.setCredentialManagerEnabled"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding secretValue2 {
+  requires {
+    dependency("com.firebaseui:firebase-ui-auth")
+  }
+  query pattern callExpr where callee.method == "AuthUI.IdpResponse.getIdpToken"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue3 {
+  requires {
+    dependency("com.firebaseui:firebase-ui-auth")
+  }
+  query pattern callExpr where callee.method == "AuthUI.IdpResponse.getAccessToken"
+  emit source code.SecretValue at call.result
+}

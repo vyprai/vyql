@@ -1,0 +1,151 @@
+# Rank 1990 / CVE-2024-2083 (CWE-29): the ZenML server served artifact
+# visualizations and step logs by opening the URI stored in the artifact's
+# metadata:
+#
+#	artifact_store.open(visualization.uri, mode)
+#
+# The URI is client-chosen at save time and read back at view time, so the
+# server-side artifact store is the only boundary. Its `_sanitize_paths`
+# decorator installed `_sanitize_potential_path` on every filesystem method
+# (`open`, `exists`, `makedirs`, `remove`, ...), and that sanitizer's whole
+# transformation is a separator rewrite -- `path.replace(ntpath.sep,
+# posixpath.sep)` on remote paths, which turns a Windows `..\` traversal into
+# the POSIX `../` form remote stores act on. No check kept the path inside the
+# store's root, so a stored URI naming any path the server could reach is
+# read, and via the materializer reroute written.
+#
+# The fixed revision (00e934f3, "Improve Artifact Store isolation") turns the sanitizer
+# into a class carrying the store's root and validates every path before the
+# call-through: `_validate_path` raises unless `path.startswith(root)`, and the
+# local branch canonicalizes with `Path(path).absolute().resolve()` first. The
+# same commit reroutes the materializer, logging and artifact paths that had
+# bypassed the facade entirely (`fileio.open` -> `artifact_store.open`).
+#
+# `vyql match` at the parent labelled nothing on the flow: the visualization
+# URI crosses the database between the save endpoint and the read endpoint, so
+# no single-function taint path exists, and `artifact_store.open` carries no
+# sink label. Detection therefore keys on the boundary itself: a path
+# sanitizer -- a function whose declared job, read from its name, is
+# sanitizing paths, and which observably rewrites its input -- that performs no
+# containment check in its own body. The patched method clears the flag
+# through `Path(path).absolute().resolve()`, the documented canonicalization
+# left inside the function the fixed revision guards; nothing keys on the fixed revision's own
+# helper name or layout, so a containment check written with any of
+# startswith, relative_to, is_relative_to, commonpath, commonprefix, resolve,
+# abspath, realpath, normpath or basename clears it the same way.
+#
+# The name conjunct is what keeps the ordinary cross-platform idiom out: the
+# materializers in the same repository normalize URIs they have just built
+# themselves (`describe_uri.replace("\\", "/")`), and the third case below
+# models that shape -- a rewrite in a function that is not a sanitizer. The
+# containment vocabulary is matched as substrings of dotted call paths, so a
+# receiver whose name merely contains one of them reads as containment, and a
+# hand-rolled `..`-segment walk that uses none of the documented path APIs
+# leaves the flag standing. Both residuals are the cheaper direction:
+# silence on safe code is the one that would hide a traversal.
+#
+# Measured on the real revisions (three --cache off runs each): the vulnerable
+# file reports VYQL-PATH-087 once, at `_sanitize_potential_path`
+# (base_artifact_store.py:47); the patched file reports nothing, the only
+# surviving finding on both being the unrelated VYQL-AUTH-105 throttle flag on
+# `__init__`. Reachable set across ten Python trees (~12k files: zenml,
+# yt-dlp, wagtail, twisted, weblate, transformers, vllm, web2py, vyper,
+# wger): the sanitizer-named-and-rewriting shape occurs only in zenml's
+# artifact store; yt-dlp's `sanitize_path` normalizes Windows paths but reads
+# `startswith` first and does not fire.
+#
+# verify_current_expected: fixed
+
+test "rank1990: an artifact-store path sanitizer that only rewrites separators is reported"
+  lang python
+  file src/zenml/artifact_stores/base_artifact_store.py
+  expect VYQL-PATH-087
+  code
+  ```
+  from typing import Any
+
+  from zenml.io import fileio
+  from zenml.utils import io_utils
+
+
+  def _sanitize_potential_path(potential_path: Any) -> Any:
+      if isinstance(potential_path, bytes):
+          path = fileio.convert_to_str(potential_path)
+      elif isinstance(potential_path, str):
+          path = potential_path
+      else:
+          # Neither string nor bytes, this is not a path
+          return potential_path
+
+      if io_utils.is_remote(path):
+          # If we have a remote path, replace windows path separators with
+          # slashes
+          import ntpath
+          import posixpath
+
+          path = path.replace(ntpath.sep, posixpath.sep)
+
+      return path
+  ```
+
+test "rank1990: the sanitizer carrying the store root and validating every path is not reported"
+  lang python
+  file src/zenml/artifact_stores/base_artifact_store.py
+  reject VYQL-PATH-087
+  code
+  ```
+  from pathlib import Path
+  from typing import Any
+
+  from zenml.io import fileio
+  from zenml.utils import io_utils
+
+
+  class _sanitize_paths:
+      def __init__(self, func, fixed_root_path: str) -> None:
+          self.func = func
+          self.fixed_root_path = fixed_root_path
+
+      def _validate_path(self, path: str) -> None:
+          if not path.startswith(self.fixed_root_path):
+              raise FileNotFoundError(
+                  f"File `{path}` is outside of "
+                  f"artifact store bounds `{self.fixed_root_path}`"
+              )
+
+      def _sanitize_potential_path(self, potential_path: Any) -> Any:
+          if isinstance(potential_path, bytes):
+              path = fileio.convert_to_str(potential_path)
+          elif isinstance(potential_path, str):
+              path = potential_path
+          else:
+              return potential_path
+
+          if io_utils.is_remote(path):
+              import ntpath
+              import posixpath
+
+              path = path.replace(ntpath.sep, posixpath.sep)
+              self._validate_path(path)
+          else:
+              self._validate_path(str(Path(path).absolute().resolve()))
+
+          return path
+  ```
+
+test "rank1990: a materializer normalizing a URI it built itself is not reported"
+  lang python
+  file src/zenml/materializers/pandas_materializer.py
+  reject VYQL-PATH-087
+  code
+  ```
+  import os
+
+
+  def save_visualizations(self, df) -> dict:
+      describe_uri = os.path.join(self.uri, "describe.html")
+      describe_uri = describe_uri.replace("\\", "/")
+      with open(describe_uri, "w") as f:
+          f.write(df.describe().to_html())
+      return {describe_uri: "html"}
+  ```

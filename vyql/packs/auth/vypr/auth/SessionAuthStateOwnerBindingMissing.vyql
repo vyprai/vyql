@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule SessionAuthStateOwnerBindingMissing {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_287, CWE_863]
+    id: "VYQL-AUTH-167"
+    severity: critical
+  }
+  issue code.SessionAuthStateOwnerBindingMissing as guard
+}

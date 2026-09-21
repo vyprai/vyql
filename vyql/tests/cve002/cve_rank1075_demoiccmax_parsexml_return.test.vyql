@@ -1,0 +1,77 @@
+# Rank 1075 / CVE-2024-38427: DemoIccMAX's ProfileSequenceId tag parser returns
+# false from every path, so a well-formed tag is reported as a parse failure
+# (CWE-252). The fix is the single character at the end of the function:
+# return false -> return true. The only caller that matters
+# (IccProfileXml.cpp, ParseTag) fails closed on the false return: it appends a
+# parse error and returns false up the profile load, so no partially built tag
+# is ever used.
+#
+# ATTENTION: precision cost, measured. A bool function whose every return is
+# the literal false is fail-closed, which is the safe direction; the dangerous
+# mirror is a verifier stuck at true (code.EmptyVerifierAcceptance /
+# VYQL-AUTH-006), and both snippets reject that rule. Counting the shape over
+# real C++ trees: 34 always-false bool functions in demoiccmax itself (this
+# function is one of them), 367 in xbmc, 216 in ChakraCore, 15 in assimp —
+# 632 rows for one finding. The engine sees the construct (the returns extract
+# as analysis.function.return nodes), so this is a judgement gap, not an
+# engine gap.
+#
+# verify_current_expected: attention-precision-cost
+
+test "rank1075: the tag parser cannot report success"
+  lang cpp
+  file IccXML/IccLibXML/IccTagXml.cpp
+  reject VYQL-AUTH-006
+  code
+  ```
+  bool CIccTagXmlProfileSequenceId::ParseXml(xmlNode *pNode, std::string &parseStr)
+  {
+      pNode = icXmlFindNode(pNode, "ProfileSequenceId");
+      if (!pNode)
+          return false;
+
+      m_list->clear();
+
+      for (pNode = icXmlFindNode(pNode->children, "ProfileIdDesc"); pNode;
+           pNode = icXmlFindNode(pNode->next, "ProfileIdDesc")) {
+          CIccProfileIdDesc desc;
+          const icChar *szDesc = icXmlAttrValue(pNode, "id");
+
+          if (szDesc && *szDesc)
+              icXmlGetHexData(&desc.m_profileID, szDesc, sizeof(desc.m_profileID));
+
+          m_list->push_back(desc);
+      }
+
+      return false;
+  }
+  ```
+
+test "rank1075: the same parser returning success"
+  lang cpp
+  file IccXML/IccLibXML/IccTagXml.cpp
+  reject VYQL-AUTH-006
+  code
+  ```
+  bool CIccTagXmlProfileSequenceId::ParseXml(xmlNode *pNode, std::string &parseStr)
+  {
+      pNode = icXmlFindNode(pNode, "ProfileSequenceId");
+      if (!pNode)
+          return false;
+
+      m_list->clear();
+
+      for (pNode = icXmlFindNode(pNode->children, "ProfileIdDesc"); pNode;
+           pNode = icXmlFindNode(pNode->next, "ProfileIdDesc")) {
+          CIccProfileIdDesc desc;
+          const icChar *szDesc = icXmlAttrValue(pNode, "id");
+
+          if (szDesc && *szDesc)
+              icXmlGetHexData(&desc.m_profileID, szDesc, sizeof(desc.m_profileID));
+
+          m_list->push_back(desc);
+      }
+
+      return true;
+  }
+  ```

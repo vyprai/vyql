@@ -1,0 +1,60 @@
+# Rank 904 / CVE-2019-8903: Total.js blocked literal './' traversal in
+# static-file paths but missed percent-encoded dot segments such as %2e.
+
+test "rank904: Total.js static path filter misses encoded dot segments"
+  lang javascript
+  file index.js
+  expect VYQL-PATH-050
+  expect_review code.EncodedDotSegmentStaticPathBypass
+  code
+  ```
+  F.$requestcontinue = function(req, res, headers) {
+    if (!req || !res || res.headersSent || res.success)
+      return;
+
+    if (req.isStaticFile) {
+      if (req.uri.pathname.indexOf('./') !== -1) {
+        req.$total_status(404);
+        return;
+      }
+
+      F.stats.request.file++;
+      if (F._length_files)
+        req.$total_file();
+      else
+        res.continue();
+      return;
+    }
+  };
+  ```
+
+test "rank904: Total.js static path filter rejects encoded dot segments"
+  lang javascript
+  file index.js
+  reject VYQL-PATH-050
+  reject_review code.EncodedDotSegmentStaticPathBypass
+  code
+  ```
+  F.$requestcontinue = function(req, res, headers) {
+    if (!req || !res || res.headersSent || res.success)
+      return;
+
+    if (req.isStaticFile) {
+      for (var i = 0; i < req.uri.pathname.length; i++) {
+        var c = req.uri.pathname[i];
+        var n = req.uri.pathname[i + 1];
+        if ((c === '.' && n === '/') || (c === '%' && n === '2' && req.uri.pathname[i + 2] === 'e')) {
+          req.$total_status(404);
+          return;
+        }
+      }
+
+      F.stats.request.file++;
+      if (F._length_files)
+        req.$total_file();
+      else
+        res.continue();
+      return;
+    }
+  };
+  ```

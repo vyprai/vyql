@@ -1,0 +1,14 @@
+module bindings.go.wildcardPrefixEmptyMatch;
+
+// An allow-list prefix match that trims the entry's trailing star inline in
+// the comparison can never name the trimmed value, so it cannot reject the
+// bare star: strings.TrimSuffix("*", "*") is the empty string and
+// strings.HasPrefix accepts the empty prefix against every name. A trim
+// hoisted ahead of the match leaves no such nesting; whether that hoisted
+// value is then checked for emptiness is not expressible from these tokens,
+// because an assignment whose right-hand side is a call emits no assign
+// token, so only the inline-nested form is stated.
+binding wildcardPrefixEmptyMatch {
+  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "strings.HasPrefix" and node.context.callPath contains "strings.TrimSuffix" and node.context.callArg contains "strings.TrimSuffix:\"*\"" and node.context.callOrder contains "strings.HasPrefix>strings.TrimSuffix"
+  emit issue code.WildcardPrefixEmptyMatch at node
+}

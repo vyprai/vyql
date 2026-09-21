@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule AuthFailureResponseReview {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_287]
+    id: "VYQL-AUTH-084"
+    severity: high
+  }
+  issue code.AuthFailureResponseReview as sink
+}

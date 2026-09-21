@@ -1,0 +1,26 @@
+module bindings.javascript.unvalidated_placeholder_attachment_index;
+
+// Binary-capable socket.io protocol parsers mark every binary value in an
+// encoded packet with a placeholder object the protocol specification spells
+// `{ _placeholder: true, num: n }`, send the binaries as an attachment list
+// after the packet, and reconstruct the packet by replacing each placeholder
+// with `attachments[num]`. Both the marker and its index arrive inside the
+// decoded JSON payload, so `num` is whatever the peer wrote: the string
+// "splice" resolves `Array.prototype.splice` out of the attachment array's
+// prototype chain, and a negative or out-of-range index resolves undefined —
+// either way a value of a type the application never expects is substituted
+// into the decoded packet's data. The remediation, in every released fix of
+// the parser family, is to accept the index only when it is a number within
+// the attachment list's bounds.
+//
+// The whole shape lives in the reconstructing function: it reads the
+// placeholder marker, subscripts the attachment list with the marker's index
+// field, and — when unguarded — compares that field with nothing. A guard is
+// any comparison of the field itself (`typeof num === "number"`,
+// `num < attachments.length`) or an integer predicate on it
+// (`Number.isInteger(num)`); the walk's own loop counters are compared as
+// `i < data.length` and never as `.num`, so they cannot silence the finding.
+binding unvalidatedPlaceholderAttachmentIndex {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.selector contains "_placeholder" and node.context.indexKey endsWith ".num" and not (containsAny(node.context.expr, [".num==", ".num!=", ".num<", ".num>", "\"number\"==typeof", "\"number\"!=typeof", "'number'==typeof", "'number'!=typeof"])) and not (containsAny(node.context.callPath, ["isInteger", "isNaN"]))
+  emit issue code.UnvalidatedAttachmentPlaceholderIndex at node
+}

@@ -1,0 +1,17 @@
+module bindings.php.db_wrapper_consulta_sql_execution;
+
+// An application database wrapper whose query method is named Consulta --
+// Portuguese for "query", the spelling i-Educar's clsBancoSQL_/clsBanco
+// wrapper family documents as "@param string $consulta Consulta SQL" -- runs
+// the string it is given as SQL against the connection. The wrapper is the
+// application's single database entry point (every controller reaches the
+// database through it), so a call carrying request-derived text in its query
+// argument is the raw-string construction the SQL injection rules judge:
+// parameter binding is expressed through the wrapper's second parameter, not
+// by interpolating into the first. Keying on the method name matches the
+// documented contract of the API rather than any one caller, so every call
+// site in the application is covered, not the one that motivated the binding.
+binding sqlExecutionConsulta {
+  query pattern callExpr where callee.method == "Consulta"
+  emit sink code.SqlExecution at args[0]
+}

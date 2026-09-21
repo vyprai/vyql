@@ -1,0 +1,7 @@
+module code;
+
+review code.HostHeaderUserinfoConfusion {
+  category: request
+  kind: attention
+  text: "review host/authority header parsing that treats the raw header text as the host without accounting for an embedded userinfo component"
+}

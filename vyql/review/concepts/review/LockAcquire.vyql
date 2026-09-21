@@ -1,0 +1,8 @@
+module code;
+
+review code.LockAcquire {
+  category: concurrency
+  expected: [core.LockRelease]
+  kind: target
+  text: "verify the lock is released on every path"
+}

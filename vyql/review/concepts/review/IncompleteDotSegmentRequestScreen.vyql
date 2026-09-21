@@ -1,0 +1,8 @@
+module code;
+
+review code.IncompleteDotSegmentRequestScreen {
+  category: path
+  expected: [core.InputValidation, core.PathAccessCheck]
+  kind: attention
+  text: "review request path screens that reject other dangerous sequences but allow dot-segment traversal through"
+}

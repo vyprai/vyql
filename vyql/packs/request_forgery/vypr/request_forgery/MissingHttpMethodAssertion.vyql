@@ -1,0 +1,11 @@
+module vypr.request_forgery;
+
+rule MissingHttpMethodAssertion {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_352, CWE_749]
+    id: "VYQL-RF-007"
+    severity: medium
+  }
+  issue code.MissingHttpMethodAssertion as action
+}

@@ -1,0 +1,17 @@
+module bindings.groovy.generated.ma9a5f0ba;
+
+binding sqlExecution0 {
+  requires {
+    dependency("org.springframework.data:spring-data-jpa")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution1 {
+  requires {
+    dependency("org.springframework.data:spring-data-jpa")
+  }
+  query pattern callExpr where callee.method == "rewrite"
+  emit sink code.SqlExecution at args[0]
+}

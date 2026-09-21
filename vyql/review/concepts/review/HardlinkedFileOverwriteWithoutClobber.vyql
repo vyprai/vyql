@@ -1,0 +1,8 @@
+module code;
+
+review code.HardlinkedFileOverwriteWithoutClobber {
+  category: path
+  expected: [core.PathAccessCheck]
+  kind: target
+  text: "review filesystem writers for hard-link clobbering before writing file entries over existing paths"
+}

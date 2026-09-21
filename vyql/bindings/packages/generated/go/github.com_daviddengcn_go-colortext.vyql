@@ -1,0 +1,57 @@
+module bindings.go.generated.mea5a6714;
+
+binding logOutput0 {
+  requires {
+    dependency("github.com/daviddengcn/go-colortext")
+  }
+  query pattern callExpr where callee.method == "ChangeColor"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput1 {
+  requires {
+    dependency("github.com/daviddengcn/go-colortext")
+  }
+  query pattern callExpr where callee.method == "Foreground"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput2 {
+  requires {
+    dependency("github.com/daviddengcn/go-colortext")
+  }
+  query pattern callExpr where callee.method == "Background"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput3 {
+  requires {
+    dependency("github.com/daviddengcn/go-colortext")
+  }
+  query pattern callExpr where callee.method == "Print"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput4 {
+  requires {
+    dependency("github.com/daviddengcn/go-colortext")
+  }
+  query pattern callExpr where callee.method == "Println"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput5 {
+  requires {
+    dependency("github.com/daviddengcn/go-colortext")
+  }
+  query pattern callExpr where callee.method == "Printf"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput6 {
+  requires {
+    dependency("github.com/daviddengcn/go-colortext")
+  }
+  query pattern callExpr where callee.method == "Printfln"
+  emit sink code.LogOutput at args[0]
+}

@@ -1,0 +1,137 @@
+# Rank 1100 / CVE-2026-44668: FACTION's Struts2 AccessControlInterceptor reads
+# the session user and always calls invocation.invoke(), so a request with no
+# session still reaches the action (CWE-306).
+#
+# A session-consulting intercept(ActionInvocation) that reaches invoke with no
+# deny result name anywhere in it emits code.AuthenticationRequiredOp, which the
+# MissingAuthentication review consumes. A deny result name -- a login/error/
+# input/none literal or the matching constant -- both keeps the observation
+# absent and emits core.AuthenticationCheck covering the endpoint, so the
+# guarded forms are clean (reject) while the unguarded one reports (expect).
+# Interceptors that never consult the session stay unlabelled.
+#
+# verify_current_expected: expect fires on the unguarded interceptor; reject on
+# the guarded one, on the same guard written with a result constant, and on an
+# interceptor that never consults the session.
+
+test "rank1100: the interceptor consults the session and invokes regardless"
+  lang java
+  file src/com/fuse/utils/AccessControlInterceptor.java
+  expect_review code.AuthenticationRequiredOp
+  code
+  ```
+  package com.fuse.utils;
+
+  import org.apache.struts2.ServletActionContext;
+
+  import com.fuse.dao.User;
+  import com.opensymphony.xwork2.ActionContext;
+  import com.opensymphony.xwork2.ActionInvocation;
+  import com.opensymphony.xwork2.interceptor.AbstractInterceptor;
+
+  public class AccessControlInterceptor extends AbstractInterceptor {
+
+      @Override
+      public String intercept(ActionInvocation invocation) throws Exception {
+
+          User user = (User) ServletActionContext.getRequest().getSession(true).getAttribute("user");
+
+          if (user != null) {
+              ActionContext.getContext().put("user", user);
+              ActionContext.getContext().put("isAdmin", user.getPermissions().isAdmin());
+              ActionContext.getContext().put("isManager", user.getPermissions().isManager());
+          }
+          return invocation.invoke();
+      }
+  }
+  ```
+
+test "rank1100: the guarded interceptor returns a result name before invoking"
+  lang java
+  file src/com/fuse/utils/AccessControlInterceptor.java
+  reject_review code.AuthenticationRequiredOp
+  code
+  ```
+  package com.fuse.utils;
+
+  import org.apache.struts2.ServletActionContext;
+
+  import com.fuse.dao.User;
+  import com.opensymphony.xwork2.ActionContext;
+  import com.opensymphony.xwork2.ActionInvocation;
+  import com.opensymphony.xwork2.interceptor.AbstractInterceptor;
+
+  public class AccessControlInterceptor extends AbstractInterceptor {
+
+      @Override
+      public String intercept(ActionInvocation invocation) throws Exception {
+
+          User user = (User) ServletActionContext.getRequest().getSession(true).getAttribute("user");
+
+          if (user != null) {
+              ActionContext.getContext().put("user", user);
+              ActionContext.getContext().put("isAdmin", user.getPermissions().isAdmin());
+              ActionContext.getContext().put("isManager", user.getPermissions().isManager());
+          } else {
+              String namespace = invocation.getProxy().getNamespace();
+              if (!"/".equals(namespace)) {
+                  return "login";
+              }
+          }
+          return invocation.invoke();
+      }
+  }
+  ```
+
+test "rank1100: the same guard written with the Action result constant"
+  lang java
+  file src/com/fuse/utils/AccessControlInterceptor.java
+  reject_review code.AuthenticationRequiredOp
+  code
+  ```
+  package com.fuse.utils;
+
+  import org.apache.struts2.ServletActionContext;
+
+  import com.fuse.dao.User;
+  import com.opensymphony.xwork2.Action;
+  import com.opensymphony.xwork2.ActionInvocation;
+  import com.opensymphony.xwork2.interceptor.AbstractInterceptor;
+
+  public class AccessControlInterceptor extends AbstractInterceptor {
+
+      @Override
+      public String intercept(ActionInvocation invocation) throws Exception {
+
+          User user = (User) ServletActionContext.getRequest().getSession(true).getAttribute("user");
+
+          if (user == null) {
+              return Action.LOGIN;
+          }
+          return invocation.invoke();
+      }
+  }
+  ```
+
+test "rank1100: an interceptor that never consults the session is not this"
+  lang java
+  file src/com/fuse/utils/TimerInterceptor.java
+  reject_review code.AuthenticationRequiredOp
+  code
+  ```
+  package com.fuse.utils;
+
+  import com.opensymphony.xwork2.ActionInvocation;
+  import com.opensymphony.xwork2.interceptor.AbstractInterceptor;
+
+  public class TimerInterceptor extends AbstractInterceptor {
+
+      @Override
+      public String intercept(ActionInvocation invocation) throws Exception {
+          long start = System.currentTimeMillis();
+          String result = invocation.invoke();
+          System.out.println("elapsed " + (System.currentTimeMillis() - start));
+          return result;
+      }
+  }
+  ```

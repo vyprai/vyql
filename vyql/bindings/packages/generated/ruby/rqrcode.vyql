@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m5593e838;
+
+binding filePathAccess0 {
+  requires {
+    dependency("rqrcode")
+  }
+  query pattern callExpr where callee.method == "as_png"
+  emit sink code.FilePathAccess at args[0]
+}

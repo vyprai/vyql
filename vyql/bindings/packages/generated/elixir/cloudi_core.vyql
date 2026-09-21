@@ -1,0 +1,17 @@
+module bindings.elixir.generated.m82481b8b;
+
+binding commandExecution0 {
+  requires {
+    dependency("cloudi_core")
+  }
+  query pattern callExpr where callee.method == "shell_output"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution1 {
+  requires {
+    dependency("cloudi_core")
+  }
+  query pattern callExpr where callee.method == "os_spawn_kill_pids"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,0 +1,181 @@
+# Rank 1087 / CVE-2017-16228: Dulwich's subprocess SSH vendor passes the
+# URL-derived hostname into the ssh argument vector without refusing a
+# leading dash, so a hostname beginning with '-' reaches ssh as an option
+# (CWE-88). The URL path reaches the same vector embedded in the command
+# string SubprocessSSHVendor.run_command appends after it
+# (SSHGitClient._connect builds "git-<cmd> '<path>'"), and that is the arm
+# the finding rides.
+#
+# FIXED: binding leadingDashArgumentRejection
+# (vyql/bindings/python/leading_dash_argument_rejection.vyql) labels the
+# leading-dash comparison the fix adds (`host.startswith('-')`) as
+# core.CommandArgumentValidation, the control VYQL-INJ-002's
+# `unless endpoint coveredBy core.CommandArgumentValidation` clause already
+# consumes; the guard sits in the same function as the sink it covers.
+# Measured on the real checkout: the vulnerable revision (7116a0cbbda^)
+# reports VYQL-INJ-002 at dulwich/client.py:1094, the Popen line inside
+# SubprocessSSHVendor.run_command, and the fixed revision reports none
+# there — the guard is the only finding delta between the revisions.
+#
+# The last four tests are the minimal pairs for the two Python taint
+# propagation gaps recorded against this rank in ENGINE-GAPS.md (a list
+# literal carries taint only at element 0, and list concatenation loses
+# taint on both operands); they still pin those misses, which no longer
+# block this rank because the reporting arm rides the argv string the
+# `+ [command]` right operand carries.
+#
+# verify_current_expected: fixed, 1 -> 0.
+
+test "rank1087: a URL-derived path reaches the ssh argv"
+  lang python
+  file dulwich/client.py
+  expect VYQL-INJ-002
+  code
+  ```
+  import subprocess
+
+
+  class SubprocessSSHVendor(object):
+      def run_command(self, host, command, username=None, port=None):
+          args = ['ssh', '-x']
+          if port is not None:
+              args.extend(['-p', str(port)])
+          if username is not None:
+              host = '%s@%s' % (username, host)
+          args.append(host)
+          proc = subprocess.Popen(args + [command], bufsize=0,
+                                  stdin=subprocess.PIPE,
+                                  stdout=subprocess.PIPE)
+          return proc
+
+
+  class SSHGitClient(object):
+      def _connect(self, cmd, path):
+          argv = ('git-' + cmd + " '" + path + "'")
+          vendor = SubprocessSSHVendor()
+          con = vendor.run_command('example.com', argv)
+          return con
+
+
+  def fetch(request):
+      path = request.GET.get('path')
+      client = SSHGitClient()
+      return client._connect('git-upload-pack', path)
+  ```
+
+test "rank1087: the fixed revision refuses a hostname beginning with a dash"
+  lang python
+  file dulwich/client.py
+  reject VYQL-INJ-002
+  code
+  ```
+  import subprocess
+
+
+  class StrangeHostname(Exception):
+      def __init__(self, hostname):
+          super(StrangeHostname, self).__init__(hostname)
+
+
+  class SubprocessSSHVendor(object):
+      def run_command(self, host, command, username=None, port=None):
+          args = ['ssh', '-x']
+          if port is not None:
+              args.extend(['-p', str(port)])
+          if username is not None:
+              host = '%s@%s' % (username, host)
+          if host.startswith('-'):
+              raise StrangeHostname(hostname=host)
+          args.append(host)
+          proc = subprocess.Popen(args + [command], bufsize=0,
+                                  stdin=subprocess.PIPE,
+                                  stdout=subprocess.PIPE)
+          return proc
+
+
+  class SSHGitClient(object):
+      def _connect(self, cmd, path):
+          argv = ('git-' + cmd + " '" + path + "'")
+          vendor = SubprocessSSHVendor()
+          con = vendor.run_command('example.com', argv)
+          return con
+
+
+  def fetch(request):
+      path = request.GET.get('path')
+      client = SSHGitClient()
+      return client._connect('git-upload-pack', path)
+  ```
+
+# The isolated pairs for the two engine gaps this rank recorded; same source,
+# same sink, same subprocess.Popen call, only the collection shape differs.
+
+test "rank1087: a tainted value at index 0 of a list literal reaches the sink"
+  lang python
+  file index0.py
+  expect VYQL-INJ-002
+  code
+  ```
+  import subprocess
+
+
+  def handler(request):
+      host = request.GET.get('host')
+      args = [host]
+      proc = subprocess.Popen(args, bufsize=0,
+                               stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+      return proc
+  ```
+
+test "rank1087: the same value at a later index in the same literal does not"
+  lang python
+  file index1.py
+  reject VYQL-INJ-002
+  code
+  ```
+  import subprocess
+
+
+  def handler(request):
+      host = request.GET.get('host')
+      args = ['ssh', host]
+      proc = subprocess.Popen(args, bufsize=0,
+                               stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+      return proc
+  ```
+
+test "rank1087: a value appended to a list reaches the sink through that list"
+  lang python
+  file append.py
+  expect VYQL-INJ-002
+  code
+  ```
+  import subprocess
+
+
+  def handler(request):
+      host = request.GET.get('host')
+      args = ['ssh', '-x']
+      args.append(host)
+      proc = subprocess.Popen(args, bufsize=0,
+                               stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+      return proc
+  ```
+
+test "rank1087: the same appended value does not survive a list concatenation"
+  lang python
+  file append_concat.py
+  reject VYQL-INJ-002
+  code
+  ```
+  import subprocess
+
+
+  def handler(request):
+      host = request.GET.get('host')
+      args = ['ssh', '-x']
+      args.append(host)
+      proc = subprocess.Popen(args + ['git-upload-pack'], bufsize=0,
+                               stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+      return proc
+  ```

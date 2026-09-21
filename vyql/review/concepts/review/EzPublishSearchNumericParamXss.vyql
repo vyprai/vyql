@@ -1,0 +1,8 @@
+module code;
+
+review code.EzPublishSearchNumericParamXss {
+  category: xss
+  expected: [core.InputValidation, core.HtmlEscape]
+  kind: attention
+  text: "review eZ Publish search module request numeric parameters for integer casts or is_numeric checks before template/search-state reuse"
+}

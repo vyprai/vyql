@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule AutoActiveSignupAccount {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_306, CWE_862]
+    id: "VYQL-AUTH-005"
+    severity: high
+  }
+  issue code.AutoActiveSignupAccount as signup
+}

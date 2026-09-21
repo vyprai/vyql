@@ -1,0 +1,187 @@
+# Rank 1585 / CVE-2023-22731: Shopware's SEO URL and script Twig
+# environments served template source that arrived from outside the
+# codebase -- merchant-authored SEO URL templates, app scripts -- with no
+# sandbox, so Twig's stock array filters `filter`, `map`, `reduce` and
+# `sort` each passed their arrow value to PHP as a callable and a template
+# expression naming a PHP function executed it (code execution through
+# unvalidated callables, CWE-94/CWE-96; NEXT-24667). ScriptRule and
+# ScriptExecutor build `new TwigEnvironment(new ScriptTwigLoader($script),
+# $script->getTwigOptions())` -- an environment on a loader of the
+# application's own -- and render through it; SeoUrlGenerator loads the
+# stored SEO URL template into an ArrayLoader at render time. Pool commit
+# 89d1ea1546 is the real fix (COMMIT_OK -- "NEXT-24667 - Add twig
+# improvements", adding
+# src/Core/Framework/Adapter/Twig/SecurityExtension.php): every filter
+# first checks `if (\is_string($function) && !\in_array($function,
+# $this->allowedPHPFunctions, true)) { throw new \RuntimeException(...) }`,
+# and SeoUrlTwigFactory, ScriptRule and ScriptExecutor register
+# `new SecurityExtension([])` -- an empty allowlist by default -- where
+# each environment is built.
+#
+# ATTENTION, subclass construction spelling, held on recheck. The
+# unsandboxed-template-validation family (VYQL-INJ-024 /
+# code.IncompleteTemplateValidation) grew to cover exactly this shape --
+# an environment on a loader of the application's own, rendering, with no
+# sandbox and no callback-filter override -- and the second and third
+# blocks below pin how narrow the remaining gap is: the same module with
+# the construction spelled as Twig's own `new \Twig\Environment(...)` is
+# reported, and Shopware's `new TwigEnvironment(...)`, a subclass of that
+# same class with the same loader and the same render, is not. Measured on
+# the real code (3 x --cache off per revision, timeout 180, --max-ram
+# 6GB): the four directories that carry every environment
+# (Framework/Adapter/Twig, Content/Seo, Framework/Rule, Framework/Script)
+# report 22 findings at the vulnerable revision and 22 at the fixed one,
+# the same five rules at the same counts, with no template-validation
+# finding either side -- the full-tree scan dies at the memory ceiling
+# (5.7 GiB resident against the 6GB cap) and the src/Core subtree times
+# out at 180s, so the four directories are the measured scope. Widening
+# the construction clause to the bare `Environment(` token reaches the
+# shape -- VYQL-INJ-024 on ScriptExecutor.php and ScriptRule.php at the
+# vulnerable revision -- and fires identically at the fixed one (2 -> 2):
+# the remediation's only trace in the file that builds the environment is
+# the project's own `SecurityExtension` name, and keying on it detects the
+# platform rather than the weakness. No generic clear-clause exists for
+# this fix: Twig's documented remediation vocabulary is the sandbox and
+# the filter re-registration, and Shopware's re-registration lives in
+# another module. What would close it is the same cross-file coverage
+# relation the family already needs elsewhere -- a control registered
+# where the environment is built, defined in a sibling file -- not a
+# needle change. Spec cve_rank1585 keeps the vulnerable script rule and
+# the allowlist-registered form, both asserting reject VYQL-INJ-024: when
+# that coverage relation lands, the first block must flip to expect.
+
+test "rank1585: the script rule renders on an environment of the application's own loader"
+  lang php
+  file src/Core/Framework/Rule/ScriptRule.php
+  reject VYQL-INJ-024
+  code
+  ```
+  <?php declare(strict_types=1);
+
+  namespace Shopware\Core\Framework\Rule;
+
+  use Shopware\Core\Framework\Adapter\Twig\Extension\ComparisonExtension;
+  use Shopware\Core\Framework\Adapter\Twig\Extension\PhpSyntaxExtension;
+  use Shopware\Core\Framework\Adapter\Twig\TwigEnvironment;
+  use Shopware\Core\Framework\Script\Execution\Script;
+  use Shopware\Core\Framework\Script\Execution\ScriptTwigLoader;
+
+  class ScriptRule extends Rule
+  {
+      protected string $script = '';
+
+      protected bool $debug = false;
+
+      public function matchRule(SalesChannelContext $context, Entity $entity): bool
+      {
+          $script = new Script(
+              'scriptRule',
+              $this->script,
+              new \DateTime(),
+              null,
+              []
+          );
+
+          $twig = new TwigEnvironment(
+              new ScriptTwigLoader($script),
+              $script->getTwigOptions()
+          );
+
+          $twig->addExtension(new PhpSyntaxExtension());
+          $twig->addExtension(new ComparisonExtension());
+
+          return filter_var(trim($twig->render('scriptRule', $context->getContext())), \FILTER_VALIDATE_BOOLEAN);
+      }
+  }
+  ```
+
+test "rank1585: the fixed revision registers the allowlist extension where the environment is built"
+  lang php
+  file src/Core/Framework/Rule/ScriptRule.php
+  reject VYQL-INJ-024
+  code
+  ```
+  <?php declare(strict_types=1);
+
+  namespace Shopware\Core\Framework\Rule;
+
+  use Shopware\Core\Framework\Adapter\Twig\Extension\ComparisonExtension;
+  use Shopware\Core\Framework\Adapter\Twig\Extension\PhpSyntaxExtension;
+  use Shopware\Core\Framework\Adapter\Twig\SecurityExtension;
+  use Shopware\Core\Framework\Adapter\Twig\TwigEnvironment;
+  use Shopware\Core\Framework\Script\Execution\Script;
+  use Shopware\Core\Framework\Script\Execution\ScriptTwigLoader;
+
+  class ScriptRule extends Rule
+  {
+      protected string $script = '';
+
+      protected bool $debug = false;
+
+      public function matchRule(SalesChannelContext $context, Entity $entity): bool
+      {
+          $script = new Script(
+              'scriptRule',
+              $this->script,
+              new \DateTime(),
+              null,
+              []
+          );
+
+          $twig = new TwigEnvironment(
+              new ScriptTwigLoader($script),
+              $script->getTwigOptions()
+          );
+
+          $twig->addExtension(new PhpSyntaxExtension());
+          $twig->addExtension(new ComparisonExtension());
+          $twig->addExtension(new SecurityExtension([]));
+
+          return filter_var(trim($twig->render('scriptRule', $context->getContext())), \FILTER_VALIDATE_BOOLEAN);
+      }
+  }
+  ```
+
+test "rank1585: the engine's own construction spelling is reported"
+  lang php
+  file src/Core/Framework/Rule/ScriptRuleEngineSpelled.php
+  expect VYQL-INJ-024
+  code
+  ```
+  <?php declare(strict_types=1);
+
+  namespace Shopware\Core\Framework\Rule;
+
+  use Shopware\Core\Framework\Adapter\Twig\Extension\ComparisonExtension;
+  use Shopware\Core\Framework\Adapter\Twig\Extension\PhpSyntaxExtension;
+  use Shopware\Core\Framework\Script\Execution\Script;
+  use Shopware\Core\Framework\Script\Execution\ScriptTwigLoader;
+
+  class ScriptRuleEngineSpelled extends Rule
+  {
+      protected string $script = '';
+
+      protected bool $debug = false;
+
+      public function matchRule(SalesChannelContext $context, Entity $entity): bool
+      {
+          $script = new Script(
+              'scriptRule',
+              $this->script,
+              new \DateTime(),
+              null,
+              []
+          );
+
+          $twig = new \Twig\Environment(
+              new ScriptTwigLoader($script),
+              $script->getTwigOptions()
+          );
+
+          $twig->addExtension(new PhpSyntaxExtension());
+          $twig->addExtension(new ComparisonExtension());
+
+          return filter_var(trim($twig->render('scriptRule', $context->getContext())), \FILTER_VALIDATE_BOOLEAN);
+      }
+  }
+  ```

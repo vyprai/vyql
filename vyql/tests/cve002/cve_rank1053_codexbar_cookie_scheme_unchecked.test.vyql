@@ -1,0 +1,117 @@
+# Rank 1053 / CVE-2026-43625: CodexBar reattaches imported browser cookies to a
+# redirect target after checking the host and never the scheme, so a redirect
+# to `http://ampcode.com` sends them in cleartext (CWE-319).
+# AmpUsageFetcher.shouldAttachCookie in
+# Sources/CodexBarCore/Providers/Amp/AmpUsageFetcher.swift holds
+#
+#   static func shouldAttachCookie(to url: URL?) -> Bool {
+#       guard let host = url?.host?.lowercased() else { return false }
+#       if host == "ampcode.com" || host == "www.ampcode.com" { return true }
+#       return host.hasSuffix(".ampcode.com")
+#   }
+#
+# and the redirect delegate returns a request carrying the Cookie header for
+# whatever host passed that test. The fixed revision splits the host test into
+# isAmpHost and requires `url?.scheme?.lowercased() == "https"` before
+# attaching, keeping the bare host test for deciding whether a URL is a login
+# redirect. OllamaUsageFetcher carries the same pair of shapes one file over,
+# and the same repository holds the guarded form already: Alibaba's
+# redirectedRequest declines to attach unless
+# `request.url?.scheme?.lowercased() == "https"`, and OpenCodeGo's
+# allowsRedirect requires the same read, so the scheme accessor is the
+# discriminator every independent implementation of the check spells.
+#
+# Detected by bindings.swift.redirectCookieSchemeUnchecked, the Swift member
+# of the redirect-credential family: a file that implements Apple's redirect
+# delegate, sets a credential header on the new request, and never reads a URL
+# scheme. Measured on the repository: 2 findings at the vulnerable revision
+# (AmpUsageFetcher.swift:1, OllamaUsageFetcher.swift:1), 0 at the fixed
+# revision, with Alibaba and OpenCodeGo silent at both because they read the
+# scheme; 0 findings across eight other Swift trees.
+
+test "rank1053: cookies are attached after a host check with no scheme check"
+  lang swift
+  file Sources/CodexBarCore/Providers/Amp/AmpUsageFetcher.swift
+  expect VYQL-CFG-006
+  code
+  ```
+  import Foundation
+
+  public struct AmpUsageFetcher: Sendable {
+      static func shouldAttachCookie(to url: URL?) -> Bool {
+          guard let host = url?.host?.lowercased() else { return false }
+          if host == "ampcode.com" || host == "www.ampcode.com" { return true }
+          return host.hasSuffix(".ampcode.com")
+      }
+  }
+
+  final class RedirectDiagnostics: NSObject, URLSessionTaskDelegate {
+      private let cookieHeader: String
+
+      init(cookieHeader: String) {
+          self.cookieHeader = cookieHeader
+      }
+
+      func urlSession(
+          _: URLSession,
+          task: URLSessionTask,
+          willPerformHTTPRedirection response: HTTPURLResponse,
+          newRequest request: URLRequest,
+          completionHandler: @escaping (URLRequest?) -> Void)
+      {
+          var updated = request
+          if AmpUsageFetcher.shouldAttachCookie(to: request.url), !self.cookieHeader.isEmpty {
+              updated.setValue(self.cookieHeader, forHTTPHeaderField: "Cookie")
+          } else {
+              updated.setValue(nil, forHTTPHeaderField: "Cookie")
+          }
+          completionHandler(updated)
+      }
+  }
+  ```
+
+test "rank1053: fix requires https before attaching"
+  lang swift
+  file Sources/CodexBarCore/Providers/Amp/AmpUsageFetcher.swift
+  reject VYQL-CFG-006
+  code
+  ```
+  import Foundation
+
+  public struct AmpUsageFetcher: Sendable {
+      static func shouldAttachCookie(to url: URL?) -> Bool {
+          guard url?.scheme?.lowercased() == "https" else { return false }
+          return self.isAmpHost(url)
+      }
+
+      private static func isAmpHost(_ url: URL?) -> Bool {
+          guard let host = url?.host?.lowercased() else { return false }
+          if host == "ampcode.com" || host == "www.ampcode.com" { return true }
+          return host.hasSuffix(".ampcode.com")
+      }
+  }
+
+  final class RedirectDiagnostics: NSObject, URLSessionTaskDelegate {
+      private let cookieHeader: String
+
+      init(cookieHeader: String) {
+          self.cookieHeader = cookieHeader
+      }
+
+      func urlSession(
+          _: URLSession,
+          task: URLSessionTask,
+          willPerformHTTPRedirection response: HTTPURLResponse,
+          newRequest request: URLRequest,
+          completionHandler: @escaping (URLRequest?) -> Void)
+      {
+          var updated = request
+          if AmpUsageFetcher.shouldAttachCookie(to: request.url), !self.cookieHeader.isEmpty {
+              updated.setValue(self.cookieHeader, forHTTPHeaderField: "Cookie")
+          } else {
+              updated.setValue(nil, forHTTPHeaderField: "Cookie")
+          }
+          completionHandler(updated)
+      }
+  }
+  ```

@@ -1,0 +1,32 @@
+module bindings.javascript.uploadDeclaredResponseContentType;
+
+// The Web `Response` constructor -- and Next.js's `NextResponse`, which its own
+// documentation describes as extending the Web Response API -- is the documented
+// way for a handler to serve a raw payload: the body is the first argument and
+// `init.headers` carries the response headers, so whatever the handler sets as
+// the Content-Type is what the browser is told the bytes are. A handler that
+// fills it from a runtime value is letting whoever supplied that value pick how
+// the response is parsed.
+//
+// For a download endpoint the runtime value is the content type recorded when
+// the file was stored, which for an upload API is the type the uploader
+// declared. Three content types are active: text/html, application/xhtml+xml
+// and image/svg+xml are parsed as markup and run script in the serving origin,
+// so a media stored under one of them and served inline is stored XSS
+// (CWE-79/CWE-434), not a download.
+//
+// This is that shape: a function that constructs a bare `new Response(...)` /
+// `new NextResponse(...)` (the constructor itself, not a member call like
+// `NextResponse.json`), names a Content-Type header, and nowhere in its own
+// body says anything about active content. Naming the header with a literal
+// pair inside the constructor's init object (`{ headers: { "Content-Type":
+// "text/csv" } }`) is the hardcoded spelling and is declined by the prop
+// clause; any of the documented ways of neutralising the remaining form
+// neutralises the flag -- forcing an inert type (application/octet-stream,
+// text/plain, application/json), sending the bytes as an attachment via
+// Content-Disposition, marking the response nosniff, or naming the renderable
+// content types at all in order to branch on them.
+binding jsUploadDeclaredResponseContentType {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.call in ["Response", "NextResponse"] and node.context.literal in ["Content-Type"] and not (node.context.prop contains "Content-Type=") and not containsAny(node.context.literal, ["application/octet-stream", "text/plain", "application/json", "attachment", "nosniff", "image/svg+xml", "text/html", "application/xhtml+xml"])
+  emit issue code.UploadDeclaredResponseContentType at node
+}

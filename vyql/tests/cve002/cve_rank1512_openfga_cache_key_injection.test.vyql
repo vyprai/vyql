@@ -1,0 +1,264 @@
+# Rank 1512 / CVE-2026-33729: an OpenFGA Check request's context values are
+# serialized raw into the authorization cache key, so a crafted context
+# collides with another request's cache entry and poisons its authorization
+# decision (CWE-74). `writeStruct` in pkg/storage/cache.go walks the sorted
+# field names of the request's `structpb.Struct` and writes
+# `fmt.Sprintf("'%s:'", key)` followed by the value, comma-separated, into an
+# `io.StringWriter`; `writeValue` writes `val.StringValue` verbatim. A string
+# value like `x,'b:'y` therefore injects a synthetic field/value pair into the
+# serialized key, and control characters reshape it arbitrarily. The caller is
+# `generateCacheKeyFromCheck` in pkg/server/commands/batch_check_command.go,
+# which feeds `check.GetContext()` into `WriteCheckCacheKey` over an xxhash
+# digest. The fixing commit 049b50ccd ("Merge commit from fork", strip unicode
+# control characters, encode context key length in cache key) rewrites
+# `writeValue` rune by rune, replacing every `unicode.IsControl` rune with
+# `?`, and prefixes `strconv.Itoa(len(keys))` in `writeStruct` so the field
+# count cannot be spoofed by injected delimiters.
+#
+# ## What fires, both revisions
+#
+# Three --cache off runs per revision over `pkg/storage` (56 analysed files)
+# report **105 findings each, deterministically, identically on the vulnerable
+# parent db79b31 and the fixed 049b50ccd** -- 55 VYQL-CRY-001, 49 VYQL-DOS-041,
+# 1 VYQL-RES-001 -- with **zero findings on cache.go** in any run; the only
+# per-line difference between the two finding sets is the fingerprint hash.
+# Over `pkg/server/commands` (three runs) the split is 3 VYQL-CRY-001 + 5
+# VYQL-DOS-041 on both revisions; two of the CRY-001 rows are the presence
+# rule firing on `code.WeakHash` at batch_check_command.go:296 and :302 -- the
+# xxhash digest the cache key is built over -- identically before and after
+# the fix, since the fix changes the serialization, not the hash. The
+# `-flags only` view carries nothing on cache.go either. `vyql match` on
+# cache.go labels no source and no sink on the serialization (the file's only
+# labels are `code.Arg`/`code.UrlFetch` at line 150 and a `ResourceRelease`);
+# on batch_check_command.go only the two `code.WeakHash` marks.
+#
+# ## Why nothing ships
+#
+# The weakness is delimiter injection into a serialized interchange key -- the
+# cache-poisoning sibling of log forging and SQL injection -- and the corpus
+# has no position for it.
+#
+# * `code.LogOutput`, the CWE-117 forging sink (VYQL-INJ-009), is bound in Go
+#   only to `log.Print`/`log.Printf`/`log.Println` (logOutput152-154). The
+#   serialization writes through `io.StringWriter`, not the log package.
+# * The only shipped `WriteString` sink is `htmlRender127`,
+#   `callee.path ~= "Writer.WriteString"`, which matches only when the call's
+#   own receiver is literally spelled `Writer`. Case five below fires it by
+#   renaming the receiver; the real code's parameter receiver `w` can never
+#   match, and HtmlRender is the wrong semantic for a cache key regardless.
+# * The source side has no binding either: `check.GetContext()` on the
+#   openfgav1 request proto is unlabelled, and a binding on it would detect
+#   this repository rather than the weakness.
+#
+# A scratch probe supplying both missing halves (source on the request-context
+# getter, `code.LogOutput` on `WriteString` at args.any) was measured and
+# reverted: taint crosses the whole chain -- `check.GetContext()` in the
+# caller, through `WriteCheckCacheKey`, `writeStruct` and `writeValue`, to the
+# `WriteString` sinks -- so the engine is not the blocker. But the probe
+# reports **6 findings on the vulnerable revision and 7 on the fixed one**:
+# the fix's per-rune rewrite adds `WriteString` call sites, and
+# `unicode.IsControl` rune stripping is not a declared neutralizer, so the
+# patched tree scores higher. Discriminating would require deciding which
+# serializers count as interchange keys and what counts as delimiter-safe
+# encoding for them -- ontology design of the same family as the
+# credential-vs-identifier question at ranks 1501/1504/1505/1508, and the
+# naive sink is precision-negative by construction. Recorded as a vocabulary
+# gap; no ENGINE-GAPS.md entry, no definition change shipped.
+#
+# ## Recheck measurements (knowledge base tip 62994e854)
+#
+# Narrow spec 5/5 passing; the three-run A/B above; the forging pair in cases
+# three and four and the name-keyed sink in case five verified by isolated
+# scans. Rank stays ATTENTION.
+
+test "rank1512: the vulnerable serialization writes context values raw into the key"
+  lang go
+  file pkg/storage/cache.go
+  reject VYQL-INJ-009
+  code
+  ```
+  package storage
+
+  import (
+      "fmt"
+      "io"
+      "sort"
+      "strconv"
+
+      "google.golang.org/protobuf/types/known/structpb"
+  )
+
+  func writeValue(w io.StringWriter, v *structpb.Value) (err error) {
+      switch val := v.GetKind().(type) {
+      case *structpb.Value_StringValue:
+          _, err = w.WriteString(val.StringValue)
+      case *structpb.Value_NumberValue:
+          _, err = w.WriteString(strconv.FormatFloat(val.NumberValue, 'f', -1, 64))
+      case *structpb.Value_StructValue:
+          err = writeStruct(w, val.StructValue)
+      }
+      return
+  }
+
+  func writeStruct(w io.StringWriter, s *structpb.Struct) (err error) {
+      if s == nil {
+          return
+      }
+      fields := s.GetFields()
+      keys := make([]string, 0, len(fields))
+      for k := range fields {
+          keys = append(keys, k)
+      }
+      sort.Strings(keys)
+      for _, key := range keys {
+          if _, err = w.WriteString(fmt.Sprintf("'%s:'", key)); err != nil {
+              return
+          }
+          if err = writeValue(w, fields[key]); err != nil {
+              return
+          }
+          if _, err = w.WriteString(","); err != nil {
+              return
+          }
+      }
+      return
+  }
+  ```
+
+test "rank1512: the fixed revision strips control runes and encodes the field count"
+  lang go
+  file pkg/storage/cache.go
+  reject VYQL-INJ-009
+  code
+  ```
+  package storage
+
+  import (
+      "fmt"
+      "io"
+      "sort"
+      "strconv"
+      "unicode"
+
+      "google.golang.org/protobuf/types/known/structpb"
+  )
+
+  func writeValue(w io.StringWriter, v *structpb.Value) (err error) {
+      switch val := v.GetKind().(type) {
+      case *structpb.Value_StringValue:
+          for _, c := range val.StringValue {
+              // Strip out any control characters so strings can't be manipulated
+              if unicode.IsControl(c) {
+                  _, err = w.WriteString("?")
+                  if err != nil {
+                      return
+                  }
+                  continue
+              }
+              if _, err = w.WriteString(string(c)); err != nil {
+                  return
+              }
+          }
+      case *structpb.Value_NumberValue:
+          _, err = w.WriteString(strconv.FormatFloat(val.NumberValue, 'f', -1, 64))
+      case *structpb.Value_StructValue:
+          err = writeStruct(w, val.StructValue)
+      }
+      return
+  }
+
+  func writeStruct(w io.StringWriter, s *structpb.Struct) (err error) {
+      if s == nil {
+          return
+      }
+      fields := s.GetFields()
+      keys := make([]string, 0, len(fields))
+      for k := range fields {
+          keys = append(keys, k)
+      }
+      sort.Strings(keys)
+      // encode the length of the keys to ensure the correct number of keys are reflected
+      if _, err = w.WriteString(strconv.Itoa(len(keys))); err != nil {
+          return
+      }
+      for _, key := range keys {
+          if _, err = w.WriteString(fmt.Sprintf("'%s:'", key)); err != nil {
+              return
+          }
+          if err = writeValue(w, fields[key]); err != nil {
+              return
+          }
+          if _, err = w.WriteString(","); err != nil {
+              return
+          }
+      }
+      return
+  }
+  ```
+
+test "rank1512: log forging -- the same request value into the log package fires"
+  lang go
+  file pkg/server/commands/batch_check_command.go
+  expect VYQL-INJ-009
+  code
+  ```
+  package commands
+
+  import (
+      "log"
+      "net/http"
+  )
+
+  func logCheckContext(r *http.Request) {
+      value := r.FormValue("ctx")
+      log.Printf("check context: %s", value)
+  }
+  ```
+
+test "rank1512: forging pair -- the same request value serialized into the cache key has no sink"
+  lang go
+  file pkg/storage/cache.go
+  reject VYQL-INJ-009
+  code
+  ```
+  package storage
+
+  import (
+      "io"
+      "net/http"
+      "strings"
+  )
+
+  func writeValue(w io.StringWriter, val string) error {
+      _, err := w.WriteString(val)
+      return err
+  }
+
+  func checkCacheKeyFromRequest(r *http.Request) string {
+      value := r.FormValue("ctx")
+      w := &strings.Builder{}
+      writeValue(w, value)
+      return w.String()
+  }
+  ```
+
+test "rank1512: the only shipped WriteString sink keys on a receiver spelled Writer"
+  lang go
+  file pkg/storage/cache.go
+  expect VYQL-INJ-004
+  code
+  ```
+  package storage
+
+  import (
+      "net/http"
+      "strings"
+  )
+
+  func checkCacheKeyFromRequest(r *http.Request) string {
+      value := r.FormValue("ctx")
+      Writer := &strings.Builder{}
+      Writer.WriteString(value)
+      return Writer.String()
+  }
+  ```

@@ -1,0 +1,102 @@
+# parking_lot's mapped lock guards implemented Send for whatever data
+# they wrap, with no Send or Sync bound on the data parameter at all:
+# `unsafe impl<'a, R: RawRwLock + 'a, T: ?Sized + 'a> Send for
+# MappedRwLockReadGuard<'a, R, T> where R::GuardMarker: Send` (and the
+# same shape for MappedRwLockWriteGuard in rwlock.rs and
+# MappedMutexGuard in mutex.rs). Moving the guard to another thread
+# moves its reference to T with it, whatever T is, so a guard over
+# non-Send data could cross threads and race on its target
+# (thread-safety soundness hole, CWE-662/CWE-362; "Fix bounds on Send
+# and Sync impls for lock guards"). The GuardMarker bound is on an
+# associated type of the raw lock parameter, not on T, so it constrains
+# a projection and leaves the data parameter unbounded. The fix bounds
+# the data parameter -- Sync for the read guard, Send for the write and
+# mutex guards, either spelling being sound for the guard's exposure of
+# T -- and adds a concrete `unsafe impl Sync for GuardNoSend` opt-out
+# marker (lib.rs) that asserts thread safety for a fully known type.
+#
+# The unsafe auto-trait binding fires on the unbounded guard impls and
+# stays silent once the data parameter carries a bound of its own, and
+# on the concrete marker impl. Measured on the real revisions: the
+# vulnerable tree reports VYQL-RACE-003 at rwlock.rs:1517,
+# rwlock.rs:1655 and mutex.rs:604; the fixed tree reports none of the
+# three and also drops the marker impl row the bound-text check used to
+# raise on it.
+
+test "rank1550: a mapped guard sends whatever it wraps"
+  lang rust
+  file lock_api/src/rwlock.rs
+  expect VYQL-RACE-003
+  expect_review code.UnsafeAutoTraitImpl
+  code
+  ```
+  use crate::raw_rwlock::RawRwLock;
+  use core::marker::PhantomData;
+
+  pub struct MappedRwLockReadGuard<'a, R: RawRwLock, T: ?Sized> {
+      raw: &'a R,
+      data: *const T,
+      marker: PhantomData<&'a T>,
+  }
+
+  pub struct MappedRwLockWriteGuard<'a, R: RawRwLock, T: ?Sized> {
+      raw: &'a R,
+      data: *mut T,
+      marker: PhantomData<&'a mut T>,
+  }
+
+  unsafe impl<'a, R: RawRwLock + 'a, T: ?Sized + 'a> Send
+      for MappedRwLockReadGuard<'a, R, T>
+  where
+      R::GuardMarker: Send,
+  {
+  }
+
+  unsafe impl<'a, R: RawRwLock + 'a, T: ?Sized + 'a> Send
+      for MappedRwLockWriteGuard<'a, R, T>
+  where
+      R::GuardMarker: Send,
+  {
+  }
+  ```
+
+test "rank1550: bounded guards and the concrete marker do not fire"
+  lang rust
+  file lock_api/src/rwlock.rs
+  reject VYQL-RACE-003
+  reject_review code.UnsafeAutoTraitImpl
+  code
+  ```
+  use crate::raw_rwlock::RawRwLock;
+  use core::marker::PhantomData;
+
+  pub struct MappedRwLockReadGuard<'a, R: RawRwLock, T: ?Sized> {
+      raw: &'a R,
+      data: *const T,
+      marker: PhantomData<&'a T>,
+  }
+
+  pub struct MappedRwLockWriteGuard<'a, R: RawRwLock, T: ?Sized> {
+      raw: &'a R,
+      data: *mut T,
+      marker: PhantomData<&'a mut T>,
+  }
+
+  pub struct GuardNoSend(*mut ());
+
+  unsafe impl<'a, R: RawRwLock + 'a, T: ?Sized + Sync + 'a> Send
+      for MappedRwLockReadGuard<'a, R, T>
+  where
+      R::GuardMarker: Send,
+  {
+  }
+
+  unsafe impl<'a, R: RawRwLock + 'a, T: ?Sized + Send + 'a> Send
+      for MappedRwLockWriteGuard<'a, R, T>
+  where
+      R::GuardMarker: Send,
+  {
+  }
+
+  unsafe impl Sync for GuardNoSend {}
+  ```

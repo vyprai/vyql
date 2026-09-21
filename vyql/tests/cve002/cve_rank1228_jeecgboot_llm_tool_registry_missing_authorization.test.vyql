@@ -1,0 +1,323 @@
+# Rank 1228 / CVE-2026-5616 (GHSA-52xr-h9vp-pxcj) jeecgboot/JeecgBoot: the AI
+# chat module hands the language model a LangChain4j tool registry that includes
+# account administration. JeecgBizToolsProvider.getDefaultTools() built four
+# ToolSpecification/ToolExecutor pairs -- query_user_by_name, add_user,
+# query_all_roles and grant_user_roles -- and returned all four unconditionally,
+# and AiragChatServiceImpl.sendWithDefault() attached that map to every
+# conversation running the default app. Which tool runs is decided by the model
+# from the prompt the caller wrote, so any caller of the chat endpoint could ask
+# the assistant to create an account and grant it roles (CWE-862, CWE-306).
+#
+# The fixing merge combines two commits,
+# b7c9aeba7aefda9e008ea8fe4fc3daf08d0c5b39 and
+# 2c1cc88b8d983868df8c520a343d6ff4369d9e59. The merge's combined diff is exactly
+# those two and nothing else, and its first parent 05b9b5e4 is the vulnerable
+# state, so it works as a fix commit. The durable row is the branch head
+# 2c1cc88b, which carries the JeecgBizToolsProvider.java change the advisory
+# names as the affected component. b7c9aeba is the other half: it makes
+# AiragChatServiceImpl.sendWithDefault() attach the default tools only when the
+# request carries a verifiable token.
+#
+# Repository names: rank 1227 scans jeecgboot/jeecg-boot and this rank scans
+# jeecgboot/JeecgBoot. Both clones share the root commit
+# e7fa2b23413a7320fd51ae0c33d16c43637320d0 and the same history, so these are one
+# repository under an old and a current name, not two projects.
+#
+# The snippets below model the registry half, the one the advisory names.
+# 2c1cc88b wraps each tools.put in SecurityUtils.getSubject().isPermitted(...),
+# so a caller only ever receives the tools whose permission it holds.
+# The project's main branch carries a reworked form of the same idea, and the
+# third test models it: currentUserPermissions() resolves the request's token
+# into a permission set through sysUserService.getUserPermissionsSet, returns an
+# empty registry when that set is empty, and tests membership per tool. Both
+# forms have to be rejected, because the second one is what the project actually
+# ships.
+#
+# FIXED. Nothing labelled the registry: a bounded scan of both real revisions of
+# JeecgBizToolsProvider.java reports no finding on either side without the
+# binding below.
+# Added code.LlmToolRegistrationMissingAuthorization (VYQL-AUTH-112) and a Java
+# binding at class scope: the class names both LangChain4j registry types
+# (ToolSpecification and ToolExecutor), calls an account, role or permission
+# administration operation, and contains no authorization check. Two kinds of
+# check suppress it, because applications use both: a framework call that asks
+# the current subject directly (isPermitted, checkPermission, hasAuthority,
+# hasRole, isAuthenticated, getAuthentication and the rest) or a method
+# annotation that declares the requirement (RequiresPermissions, PreAuthorize,
+# Secured, RolesAllowed and the rest), and a permission-named lookup that loads
+# the caller's permission set once so each tool can test membership against it.
+#
+# All three conjuncts are needed. A registry alone is not a finding: the fourth
+# test below is a LangChain4j provider whose only tool reads the weather, the
+# shape LangChain4j's own documentation and examples use, and it is rejected
+# because no administration operation appears. An administration call alone is
+# not a finding either: the fifth test is an ordinary user-management service
+# that creates accounts and grants roles, and it is rejected because nothing in
+# it names the registry types.
+#
+# Measured on the real checkout, bounded (timeout 180, --max-ram 4GB,
+# --cache off). Scanning jeecg-boot/jeecg-module-system at the vulnerable parent
+# 05b9b5e4 (383 java files) reports 276 findings, one of them VYQL-AUTH-112 at
+# JeecgBizToolsProvider.java:35; scanning the same module at the merge commit
+# reports 275, the same set minus that finding. The whole repository exceeds the
+# 180s bound, so the module holding the changed file is the real-checkout
+# evidence. False positives: the same binding over two unrelated Java corpora
+# cloned for this corpus, james-project/server (3231 java files) and
+# jackson-databind/src (721 java files), reports VYQL-AUTH-112 zero times.
+
+test "rank1228: LangChain4j tool registry exposes account administration with no permission check"
+  lang java
+  file JeecgBizToolsProvider.java
+  expect VYQL-AUTH-112
+  expect_review code.LlmToolRegistrationMissingAuthorization
+  code
+  ```
+  package org.jeecg.modules.airag;
+
+  import dev.langchain4j.agent.tool.ToolSpecification;
+  import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
+  import dev.langchain4j.service.tool.ToolExecutor;
+
+  public class JeecgBizToolsProvider implements JeecgToolsProvider {
+
+      @Autowired
+      private ISysUserService sysUserService;
+
+      public Map<ToolSpecification, ToolExecutor> getDefaultTools() {
+          Map<ToolSpecification, ToolExecutor> tools = new HashMap<>();
+          JeecgLlmTools addUser = addUserTool();
+          tools.put(addUser.getToolSpecification(), addUser.getToolExecutor());
+          return tools;
+      }
+
+      private JeecgLlmTools addUserTool() {
+          ToolSpecification toolSpecification = ToolSpecification.builder()
+                  .name("add_user")
+                  .description("add a user and return the result")
+                  .parameters(
+                          JsonObjectSchema.builder()
+                                  .addStringProperty("username", "user name")
+                                  .addStringProperty("password", "password")
+                                  .required("username", "password")
+                                  .build()
+                  )
+                  .build();
+          ToolExecutor toolExecutor = (toolExecutionRequest, memoryId) -> {
+              JSONObject arguments = JSONObject.parseObject(toolExecutionRequest.arguments());
+              SysUser user = JSON.parseObject(arguments.toJSONString(), SysUser.class);
+              String salt = oConvertUtils.randomGen(8);
+              user.setSalt(salt);
+              user.setPassword(PasswordUtil.encrypt(user.getUsername(), user.getPassword(), salt));
+              sysUserService.saveUser(user, null, null, null, false);
+              return "user added";
+          };
+          return new JeecgLlmTools(toolSpecification, toolExecutor);
+      }
+  }
+  ```
+
+test "rank1228: each tool is registered only when the caller holds its permission"
+  lang java
+  file JeecgBizToolsProvider.java
+  reject VYQL-AUTH-112
+  reject_review code.LlmToolRegistrationMissingAuthorization
+  code
+  ```
+  package org.jeecg.modules.airag;
+
+  import dev.langchain4j.agent.tool.ToolSpecification;
+  import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
+  import dev.langchain4j.service.tool.ToolExecutor;
+  import org.apache.shiro.SecurityUtils;
+
+  public class JeecgBizToolsProvider implements JeecgToolsProvider {
+
+      @Autowired
+      private ISysUserService sysUserService;
+
+      public Map<ToolSpecification, ToolExecutor> getDefaultTools() {
+          Map<ToolSpecification, ToolExecutor> tools = new HashMap<>();
+
+          if (SecurityUtils.getSubject().isPermitted("system:user:add")) {
+              JeecgLlmTools addUser = addUserTool();
+              tools.put(addUser.getToolSpecification(), addUser.getToolExecutor());
+          }
+
+          return tools;
+      }
+
+      private JeecgLlmTools addUserTool() {
+          ToolSpecification toolSpecification = ToolSpecification.builder()
+                  .name("add_user")
+                  .description("add a user and return the result")
+                  .parameters(
+                          JsonObjectSchema.builder()
+                                  .addStringProperty("username", "user name")
+                                  .addStringProperty("password", "password")
+                                  .required("username", "password")
+                                  .build()
+                  )
+                  .build();
+          ToolExecutor toolExecutor = (toolExecutionRequest, memoryId) -> {
+              JSONObject arguments = JSONObject.parseObject(toolExecutionRequest.arguments());
+              SysUser user = JSON.parseObject(arguments.toJSONString(), SysUser.class);
+              String salt = oConvertUtils.randomGen(8);
+              user.setSalt(salt);
+              user.setPassword(PasswordUtil.encrypt(user.getUsername(), user.getPassword(), salt));
+              sysUserService.saveUser(user, null, null, null, false);
+              return "user added";
+          };
+          return new JeecgLlmTools(toolSpecification, toolExecutor);
+      }
+  }
+  ```
+
+test "rank1228: the registry loads the caller's permission set and tests membership per tool"
+  lang java
+  file JeecgBizToolsProvider.java
+  reject VYQL-AUTH-112
+  reject_review code.LlmToolRegistrationMissingAuthorization
+  code
+  ```
+  package org.jeecg.modules.airag;
+
+  import dev.langchain4j.agent.tool.ToolSpecification;
+  import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
+  import dev.langchain4j.service.tool.ToolExecutor;
+  import org.jeecg.common.system.util.JwtUtil;
+  import org.jeecg.common.util.SpringContextUtils;
+
+  public class JeecgBizToolsProvider implements JeecgToolsProvider {
+
+      @Autowired
+      private ISysUserService sysUserService;
+
+      public Map<ToolSpecification, ToolExecutor> getDefaultTools() {
+          Map<ToolSpecification, ToolExecutor> tools = new HashMap<>();
+
+          Set<String> perms = currentUserPermissions();
+          if (perms.isEmpty()) {
+              return tools;
+          }
+
+          if (perms.contains("system:user:add")) {
+              JeecgLlmTools addUser = addUserTool(perms);
+              tools.put(addUser.getToolSpecification(), addUser.getToolExecutor());
+          }
+
+          return tools;
+      }
+
+      private Set<String> currentUserPermissions() {
+          HttpServletRequest req = SpringContextUtils.getHttpServletRequest();
+          if (null == req) {
+              return Collections.emptySet();
+          }
+          String token = req.getHeader("X-Access-Token");
+          String username = JwtUtil.getUsername(token);
+          if (StringUtils.isBlank(username)) {
+              return Collections.emptySet();
+          }
+          SysUser user = sysUserService.getUserByName(username);
+          if (null == user) {
+              return Collections.emptySet();
+          }
+          return sysUserService.getUserPermissionsSet(user.getId());
+      }
+
+      private JeecgLlmTools addUserTool(Set<String> perms) {
+          ToolSpecification toolSpecification = ToolSpecification.builder()
+                  .name("add_user")
+                  .description("add a user and return the result")
+                  .parameters(
+                          JsonObjectSchema.builder()
+                                  .addStringProperty("username", "user name")
+                                  .addStringProperty("password", "password")
+                                  .required("username", "password")
+                                  .build()
+                  )
+                  .build();
+          ToolExecutor toolExecutor = (toolExecutionRequest, memoryId) -> {
+              JSONObject arguments = JSONObject.parseObject(toolExecutionRequest.arguments());
+              SysUser user = JSON.parseObject(arguments.toJSONString(), SysUser.class);
+              String salt = oConvertUtils.randomGen(8);
+              user.setSalt(salt);
+              user.setPassword(PasswordUtil.encrypt(user.getUsername(), user.getPassword(), salt));
+              sysUserService.saveUser(user, null, null, null, false);
+              return "user added";
+          };
+          return new JeecgLlmTools(toolSpecification, toolExecutor);
+      }
+  }
+  ```
+
+test "rank1228: a tool registry that administers nothing is not a finding"
+  lang java
+  file WeatherToolsProvider.java
+  reject VYQL-AUTH-112
+  reject_review code.LlmToolRegistrationMissingAuthorization
+  code
+  ```
+  package com.example.assistant;
+
+  import dev.langchain4j.agent.tool.ToolSpecification;
+  import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
+  import dev.langchain4j.service.tool.ToolExecutor;
+
+  public class WeatherToolsProvider {
+
+      @Autowired
+      private WeatherService weatherService;
+
+      public Map<ToolSpecification, ToolExecutor> getDefaultTools() {
+          Map<ToolSpecification, ToolExecutor> tools = new HashMap<>();
+          ToolSpecification toolSpecification = ToolSpecification.builder()
+                  .name("current_weather")
+                  .description("return the current weather for a city")
+                  .parameters(
+                          JsonObjectSchema.builder()
+                                  .addStringProperty("city", "city name")
+                                  .required("city")
+                                  .build()
+                  )
+                  .build();
+          ToolExecutor toolExecutor = (toolExecutionRequest, memoryId) -> {
+              JSONObject arguments = JSONObject.parseObject(toolExecutionRequest.arguments());
+              return weatherService.forecastFor(arguments.getString("city"));
+          };
+          tools.put(toolSpecification, toolExecutor);
+          return tools;
+      }
+  }
+  ```
+
+test "rank1228: account administration outside a tool registry is not a finding"
+  lang java
+  file SysUserServiceImpl.java
+  reject VYQL-AUTH-112
+  reject_review code.LlmToolRegistrationMissingAuthorization
+  code
+  ```
+  package org.jeecg.modules.system.service.impl;
+
+  public class SysUserServiceImpl implements ISysUserService {
+
+      @Autowired
+      private SysUserMapper userMapper;
+
+      @Autowired
+      private ISysUserRoleService sysUserRoleService;
+
+      public void saveUser(SysUser user, String selectedRoles, String selectedDeparts, String relTenantIds, boolean sync) {
+          String salt = oConvertUtils.randomGen(8);
+          user.setSalt(salt);
+          user.setPassword(PasswordUtil.encrypt(user.getUsername(), user.getPassword(), salt));
+          userMapper.insert(user);
+          if (StringUtils.isNotBlank(selectedRoles)) {
+              for (String roleId : selectedRoles.split(",")) {
+                  sysUserRoleService.save(new SysUserRole(user.getId(), roleId));
+              }
+          }
+      }
+  }
+  ```

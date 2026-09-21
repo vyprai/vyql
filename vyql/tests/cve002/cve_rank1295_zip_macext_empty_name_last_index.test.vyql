@@ -1,0 +1,204 @@
+# libarchive's ZIP reader, with the mac-ext option enabled, derives a
+# resource-fork name from the entry's filename. To strip a trailing '/' before
+# generating the sibling "._name" resource entry it reads:
+#
+#   size_t tmp_length = filename_length;
+#   if (name[tmp_length - 1] == '/') {
+#
+# filename_length comes straight off the central directory record
+# (archive_le16dec(p + 28)), so a crafted archive with an empty filename makes
+# tmp_length 0. tmp_length - 1 on a size_t wraps to SIZE_MAX, so
+# name[tmp_length - 1] reads far outside the buffer (CWE-125). The fixed revision
+# b6a979481b adds a tmp_length > 0 guard before the subtraction.
+#
+# Pinned miss, engine gap: the "last-element access without a nonzero-count
+# guard" analysis (ccLastElementCountExpr in
+# internal/extract/frontend/treesitter/c.go, feeding
+# code.ZeroCountLastElementAccess / VYQL-MEM-041) only recognizes a subscript
+# of the exact form `X[count-1]` when `count` is struct/field-derived —
+# ccStructuredIndex(count) requires "->" or "." in the count text. Here the
+# count is `tmp_length`, a plain local (`size_t tmp_length = filename_length`)
+# copied from a parameter, so the same weakness on a locally-copied length is
+# never examined. The first and fourth tests isolate exactly this: a
+# struct-field count (`z->len - 1`) is reported, the same value through a
+# plain local is not.
+#
+# Widening the count gate to bare identifiers stays unshipped on precision
+# grounds, measured across five C trees (libarchive, asterisk, lyx, mojo,
+# vim): even behind the maximal textual guard ladder — accepting >0/0</>=1/1<=
+# polarity, generalized `count >= N` lower bounds, truthiness conjunctions
+# (`count &&`), any step (`count++`, `count--`, `count+=`, `-=`), and
+# excluding all-caps macro constants — the widening adds 19/65/60/60/73
+# firing sites against 18/160/125/125/72 today, and the survivors are
+# dominated by guarded code the textual analysis cannot see. The fifth and
+# sixth tests pin two of those idioms, both real libarchive code: guarding
+# the object's first byte instead of the count (archive_write_set_format_zip.c
+# path_length: `path[0] == '\0' || path[len - 1] != '/'`), and a count whose
+# own definition adds one (bsdunzip.c makepath: `prelen = strlen(prefix) + 1`
+# then `str[prelen - 1]`). A count/pointer correlation with real dataflow is
+# what those need; more textual patterns are not it.
+#
+# The guard half of the analysis has a separately measured defect: its token
+# list recognizes the rejecting spellings (`count == 0`, `count < 1`, `!count`,
+# `count <= 0`) but not the equivalent accepting spellings `count > 0`,
+# `0 < count`, `count >= 1`, `1 <= count`, so an access guarded the way this
+# CVE's own fix guards still fires (33 of 72 current VYQL-MEM-041 sites on vim
+# are guarded `> 0` upstream, 2 of 160 on asterisk). Any future widening must
+# land that polarity entry first, or the fixed revision of this CVE would
+# still report.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1295: mac-ext resource name strips a trailing slash by indexing count-1 on a local length copy"
+  lang c
+  file archive_read_support_format_zip.c
+  reject VYQL-MEM-041
+  reject_review code.ZeroCountLastElementAccess
+  code
+  ```
+  #include <stddef.h>
+
+  static const char *rsrc_basename(const char *name, size_t length) {
+      const char *s = name;
+      return s;
+  }
+
+  static void archive_strncat(void *as, const char *p, size_t n) {}
+  static void archive_strcpy(void *as, const char *p) {}
+  static void archive_strcat(void *as, const char *p) {}
+
+  void mac_ext_resource_name(void *rsrcname, const char *p, size_t filename_length) {
+      const char *name = p;
+      const char *r = rsrc_basename(name, filename_length);
+
+      /* If this is an entry ending with slash, make the resource name
+       * slash-less as the actual resource fork doesn't end with '/'. */
+      size_t tmp_length = filename_length;
+      if (name[tmp_length - 1] == '/') {
+          tmp_length--;
+          r = rsrc_basename(name, tmp_length);
+      }
+
+      archive_strcpy(rsrcname, "__MACOSX/");
+      archive_strncat(rsrcname, name, r - name);
+      archive_strcat(rsrcname, "._");
+      archive_strncat(rsrcname, name + (r - name), tmp_length - (r - name));
+  }
+  ```
+
+test "rank1295: fix guards the subtraction with tmp_length > 0 before indexing"
+  lang c
+  file archive_read_support_format_zip.c
+  reject VYQL-MEM-041
+  reject_review code.ZeroCountLastElementAccess
+  code
+  ```
+  #include <stddef.h>
+
+  static const char *rsrc_basename(const char *name, size_t length) {
+      const char *s = name;
+      return s;
+  }
+
+  static void archive_strncat(void *as, const char *p, size_t n) {}
+  static void archive_strcpy(void *as, const char *p) {}
+  static void archive_strcat(void *as, const char *p) {}
+
+  void mac_ext_resource_name(void *rsrcname, const char *p, size_t filename_length) {
+      const char *name = p;
+      const char *r = rsrc_basename(name, filename_length);
+
+      /* If this is an entry ending with slash, make the resource name
+       * slash-less as the actual resource fork doesn't end with '/'. */
+      size_t tmp_length = filename_length;
+      if (tmp_length > 0 && name[tmp_length - 1] == '/') {
+          tmp_length--;
+          r = rsrc_basename(name, tmp_length);
+      }
+
+      archive_strcpy(rsrcname, "__MACOSX/");
+      archive_strncat(rsrcname, name, r - name);
+      archive_strcat(rsrcname, "._");
+      archive_strncat(rsrcname, name + (r - name), tmp_length - (r - name));
+  }
+  ```
+
+test "rank1295: minimal pair — struct-field count-1 is caught, a plain local copy of the same count is not"
+  lang c
+  expect VYQL-MEM-041
+  expect_review code.ZeroCountLastElementAccess
+  code
+  ```
+  struct zip_name { unsigned len; const char *name; };
+
+  void field_derived(struct zip_name *z) {
+      if (z->name[z->len - 1] == '/') {
+          z->len--;
+      }
+  }
+  ```
+
+test "rank1295: minimal pair — same count-1 shape through a local copy is invisible to the analysis"
+  lang c
+  reject VYQL-MEM-041
+  reject_review code.ZeroCountLastElementAccess
+  code
+  ```
+  void local_copy(const char *name, unsigned filename_length) {
+      unsigned tmp_length = filename_length;
+      if (name[tmp_length - 1] == '/') {
+          tmp_length--;
+      }
+  }
+  ```
+
+test "rank1295: a first-byte emptiness check stands in for a count guard"
+  lang c
+  file archive_write_set_format_zip.c
+  reject VYQL-MEM-041
+  reject_review code.ZeroCountLastElementAccess
+  code
+  ```
+  #include <stddef.h>
+
+  size_t zip_path_length(const char *path, unsigned type) {
+      size_t len;
+
+      if (path == NULL)
+          return (0);
+      len = strlen(path);
+      if (type == 0x4000 && (path[0] == '\0' || path[len - 1] != '/'))
+          ++len; /* Space for the trailing / */
+      return len;
+  }
+  ```
+
+test "rank1295: a count defined as strlen plus one is nonzero by construction"
+  lang c
+  file bsdunzip.c
+  reject VYQL-MEM-041
+  reject_review code.ZeroCountLastElementAccess
+  code
+  ```
+  #include <stddef.h>
+  #include <stdlib.h>
+  #include <string.h>
+
+  char *unzip_makepath(const char *prefix, const char *path) {
+      char *str;
+      size_t prelen, len;
+
+      prelen = prefix ? strlen(prefix) + 1 : 0;
+      len = strlen(path) + 1;
+      if ((str = malloc(prelen + len)) == NULL) {
+          return (NULL);
+      }
+      if (prefix) {
+          memcpy(str, prefix, prelen);  /* includes zero */
+          str[prelen - 1] = '/';        /* splat zero */
+      }
+      memcpy(str + prelen, path, len);  /* includes zero */
+
+      return (str);
+  }
+  ```

@@ -1,0 +1,9 @@
+module bindings.perl.generated.mb80fc4d4;
+
+binding commandExecution0 {
+  requires {
+    dependency("System-Wrapper")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.CommandExecution at args[0]
+}

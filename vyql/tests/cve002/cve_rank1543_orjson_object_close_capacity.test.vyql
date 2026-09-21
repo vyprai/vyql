@@ -1,0 +1,141 @@
+# orjson closed serialized objects with a write whose capacity guard
+# existed only in debug builds, so a release-mode serialization that
+# ended exactly at the buffer boundary wrote its closing brace past the
+# allocation and crashed sporadically (out-of-bounds write,
+# CWE-787/CWE-131). The object close in
+# src/serialize/writer/formatter.rs ran
+# `debug_assert_has_capacity!(writer); unsafe { writer.put_u8(b'}'); }`
+# -- the macro expands to `debug_assert!($writer.remaining_mut() > 4)`,
+# which compiles to nothing without debug assertions, while the
+# BufMut-family write it guards is unsafe precisely because it does not
+# reserve. The fixing commit 62bb185b70 ("Fix sporadic crash on
+# serializing object close") swaps that one site to
+# `reserve_minimum!(writer);` -- the macro that expands to
+# `$writer.reserve(128);`, an unconditional reservation in every build
+# -- plus test_recursion.py exercising the boundary. No pool
+# correction.
+#
+# ATTENTION, debug-only capacity guards. The defect is a bounds check
+# that evaporates in release builds: debug_assert! is development
+# tooling, not a guard, and no current observation distinguishes an
+# enforced reservation from a debug assertion. A binding on orjson's
+# own macros would detect this crate rather than the weakness.
+#
+# Re-probed at the recheck span tip, which carries every definition
+# and engine change shipped since the first pass (loaded:
+# concepts=1008 rules=880 bindings=32984 reviews=679; binary built in
+# the worktree, data directory resolving to the worktree's own
+# vyql/). Measured 3x --cache off / timeout 180 / --max-ram 6GB per
+# revision on the real checkout, vulnerable parent d860078a97
+# (62bb185b70^) against fix 62bb185b70:
+#
+#   769/769/769 findings at the vulnerable revision and 769/769/769 at
+#   the fixed one (66 at or above high at both) -- deterministic. Not
+#   one finding lands in src/serialize/writer/formatter.rs at either
+#   revision, and vyql match reports no label of any kind on that file
+#   at either. The constructs are extracted -- the graph carries Call
+#   nodes path=debug_assert_has_capacity, path=reserve_minimum and
+#   path=writer.put_u8 -- so the miss is vocabulary, not extraction.
+#
+# Path 1 does not convert: nothing shipped since names debug-only
+# guards or release-mode enforcement; the new capacity rules
+# (DestCapacityUncheckedCopy, MissingOutParamStatusCheck,
+# AssumedLineTerminatorWidthScan) key on copies, out-params and
+# terminator widths, none on the build mode of a guard. Path 2 was a
+# hard zero in both views, not a misread one. Path 3 was measured on
+# both available routes and neither is shippable:
+#
+#   - The std-exact route (`node.context.call in ["debug_assert",
+#     ...]`) matches macro Call nodes segment-exactly (probe: "assert"
+#     matches nothing, "debug_assert" matches only the direct
+#     spelling) and reports zero on the vulnerable formatter.rs,
+#     because all five guard sites in the file go through the crate's
+#     own macro. The direct-spelling sites it does catch in this crate
+#     (serialize_unit_struct's debug_assert!, write_buf's, and the
+#     debug_assert! inside BytesWriter::put_u8 itself, where it
+#     documents the caller's obligation) are not the defect.
+#   - The name-substring text route (containsAny(node.token,
+#     ["debug_assert"]) beside a put-family write) does catch the
+#     vulnerable line but is keyed on the crate's macro naming
+#     convention rather than documented vocabulary, and measures 5
+#     findings on the vulnerable formatter.rs against 4 on the fixed
+#     one: the fix is deliberately partial, leaving end_array,
+#     begin_array_value, begin_object_key and begin_object_value on
+#     the debug-only guard behind a preceding-write invariant no
+#     observation can see, and the same probe fires on
+#     serialize_unit_struct at both revisions despite its
+#     reserve_minimum!, because raw text cannot tell which call
+#     enforces. No other .rs file across the campaign clones carries
+#     the put-family-plus-debug_assert co-occurrence, so the cost is
+#     concentrated exactly on the patched tree.
+#
+# The semantic discriminator -- whether the guard macro expands to
+# something enforced in release -- is macro-body resolution: a Rust
+# macro invocation lowers to a bare name Call node with no expansion,
+# the same gap family as the C #define non-expansion, and adding it is
+# a new capability rather than a localized correction. No
+# ENGINE-GAPS.md entry and no definition change shipped. Spec
+# cve_rank1543 records the debug-asserted close and the reserved form,
+# both asserting reject VYQL-MEM-071, the rule whose vocabulary this
+# weakness lives in (a destination whose capacity is consulted only by
+# a debug-compiled assertion): when release-enforcement vocabulary
+# lands, the debug-asserted form must flip to expect and the reserved
+# form must stay reject.
+
+test "rank1543: the closing brace is guarded only in debug"
+  lang rust
+  file src/serialize/writer/formatter.rs
+  reject VYQL-MEM-071
+  code
+  ```
+  use crate::serialize::writer::WriteExt;
+  use std::io;
+
+  macro_rules! debug_assert_has_capacity {
+      ($writer:expr) => {
+          debug_assert!($writer.remaining_mut() > 4)
+      };
+  }
+
+  pub(crate) trait Formatter {
+      unsafe fn end_object<W>(&mut self, writer: &mut W)
+      where
+          W: ?Sized + WriteExt + bytes::BufMut,
+      {
+          debug_assert_has_capacity!(writer);
+          unsafe {
+              writer.put_u8(b'}');
+          }
+          Ok(())
+      }
+  }
+  ```
+
+test "rank1543: the fixed revision reserves before every close"
+  lang rust
+  file src/serialize/writer/formatter.rs
+  reject VYQL-MEM-071
+  code
+  ```
+  use crate::serialize::writer::WriteExt;
+  use std::io;
+
+  macro_rules! reserve_minimum {
+      ($writer:expr) => {
+          $writer.reserve(128);
+      };
+  }
+
+  pub(crate) trait Formatter {
+      unsafe fn end_object<W>(&mut self, writer: &mut W)
+      where
+          W: ?Sized + WriteExt + bytes::BufMut,
+      {
+          reserve_minimum!(writer);
+          unsafe {
+              writer.put_u8(b'}');
+          }
+          Ok(())
+      }
+  }
+  ```

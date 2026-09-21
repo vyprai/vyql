@@ -1,0 +1,57 @@
+module bindings.go.generated.mdbc03d38;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/vektah/gqlparser")
+  }
+  query pattern callExpr where callee.method == "LoadSchema"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/vektah/gqlparser")
+  }
+  query pattern callExpr where callee.method == "MustLoadSchema"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("github.com/vektah/gqlparser")
+  }
+  query pattern callExpr where callee.method == "LoadQuery"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("github.com/vektah/gqlparser")
+  }
+  query pattern callExpr where callee.method == "MustLoadQuery"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("github.com/vektah/gqlparser")
+  }
+  query pattern callExpr where callee.method == "ParseQuery"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("github.com/vektah/gqlparser")
+  }
+  query pattern callExpr where callee.method == "ParseSchema"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization6 {
+  requires {
+    dependency("github.com/vektah/gqlparser")
+  }
+  query pattern callExpr where callee.method == "ParseSchemas"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,56 @@
+test "rank600: forOwn recursive defaults merge skips no proto key"
+  lang javascript
+  expect VYQL-INJ-130
+  expect_review code.ForOwnRecursiveDefaultsPrototypePollution
+  code
+  ```
+  var lazy = require('lazy-cache')(require);
+  lazy('is-extendable', 'isObject');
+  lazy('for-own', 'forOwn');
+
+  function defaultsDeep(target, objects) {
+    target = target || {};
+
+    function copy(target, current) {
+      lazy.forOwn(current, function (value, key) {
+        var val = target[key];
+        if (val == null) {
+          target[key] = value;
+        } else if (lazy.isObject(val) && lazy.isObject(value)) {
+          defaultsDeep(val, value);
+        }
+      });
+    }
+    return target;
+  }
+  ```
+
+test "rank600: forOwn recursive defaults merge skips proto key"
+  lang javascript
+  reject VYQL-INJ-130
+  reject_review code.ForOwnRecursiveDefaultsPrototypePollution
+  code
+  ```
+  var lazy = require('lazy-cache')(require);
+  lazy('is-extendable', 'isObject');
+  lazy('for-own', 'forOwn');
+
+  function defaultsDeep(target, objects) {
+    target = target || {};
+
+    function copy(target, current) {
+      lazy.forOwn(current, function (value, key) {
+        if (key === '__proto__') {
+          return;
+        }
+        var val = target[key];
+        if (val == null) {
+          target[key] = value;
+        } else if (lazy.isObject(val) && lazy.isObject(value)) {
+          defaultsDeep(val, value);
+        }
+      });
+    }
+    return target;
+  }
+  ```

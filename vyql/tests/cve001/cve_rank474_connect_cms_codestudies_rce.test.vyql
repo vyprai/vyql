@@ -1,0 +1,67 @@
+# Rank 474 / CVE-2026-32276: Connect-CMS Code Study plugin saved
+# authenticated user code and executed it on the server.
+
+test "rank474: Connect-CMS Code Study plugin executes submitted code"
+  lang php
+  file CodestudiesPlugin.php
+  expect VYQL-INJ-100
+  code
+  ```
+  <?php
+  class CodestudiesPlugin extends UserPluginBase
+  {
+      public function getPublicFunctions()
+      {
+          $functions = array();
+          $functions['post'] = ['savecode', 'run', 'deletecode'];
+          return $functions;
+      }
+
+      public function declareRole()
+      {
+          $role_ckeck_table = array();
+          $role_ckeck_table["run"] = array('role_reporter');
+          return $role_ckeck_table;
+      }
+
+      private function saveImpl($request, $page_id, $frame_id, $codestudy_id)
+      {
+          $codestudies = new Codestudies();
+          $codestudies->code_text = $request->code_text;
+          $codestudies->save();
+          return $codestudies->id;
+      }
+
+      public function run($request, $page_id, $frame_id, $codestudy_id)
+      {
+          $codestudy_id = $this->saveImpl($request, $page_id, $frame_id, $codestudy_id);
+          $codestudy = Codestudies::where('id', $codestudy_id)->first();
+          Storage::put('codestudy/' . $codestudy->created_id . '/' . $codestudy_id . '/' . $codestudy_id . '.php', $codestudy->code_text);
+          $cmd = 'php ' . storage_path('app/codestudy/' . $codestudy->created_id . '/' . $codestudy_id . '/' . $codestudy_id . '.php');
+          exec("$cmd 2>&1", $result);
+      }
+  }
+  ```
+
+test "rank474: removed Code Study plugin has no executable-code path"
+  lang php
+  file CodestudiesPlugin.php
+  reject VYQL-INJ-100
+  code
+  ```
+  <?php
+  class OtherPlugin extends UserPluginBase
+  {
+      public function getPublicFunctions()
+      {
+          $functions = array();
+          $functions['post'] = ['save'];
+          return $functions;
+      }
+
+      public function save($request)
+      {
+          return response()->json(['ok' => true]);
+      }
+  }
+  ```

@@ -1,0 +1,54 @@
+module bindings.javascript.irc_client_protocol_command;
+
+// node-irc and its forks (`irc`, `irc-upd`, `matrix-org-irc`) build every
+// outbound line by joining the arguments of `send` with a space and appending
+// CRLF, and `join`/`part` split their channel argument on spaces into separate
+// parameters before sending it. irc-framework's `raw` writes its arguments the
+// same way. The channel, nick and target arguments of the documented command
+// helpers are therefore protocol syntax rather than payload: a space inside one
+// smuggles further parameters (a channel key, a second channel) and a CR or LF
+// ends the line so that what follows is a command of its own.
+//
+// The message body of say/notice/action is deliberately not labelled: the
+// library splits text into one PRIVMSG per line, and relaying user text is what
+// a bridge or a bot exists to do.
+//
+// The receiver spelling follows each library's own README -- `client.join(...)`,
+// `client.say(...)`, `client.raw(...)`. A bare method name cannot be used
+// because `join`, `part`, `send` and `raw` collide with unrelated APIs.
+
+binding ircClientCommandIdentifier {
+  requires {
+    any(dependency("irc"), dependency("irc-upd"), dependency("matrix-org-irc"), dependency("irc-framework"))
+  }
+  query pattern callExpr where callee.path ~= "client.join" or callee.path ~= "client.part" or callee.path ~= "client.say" or callee.path ~= "client.notice" or callee.path ~= "client.action" or callee.path ~= "client.whois" or callee.path ~= "client.mode" or callee.path ~= "ircClient.join" or callee.path ~= "ircClient.part" or callee.path ~= "ircClient.say" or callee.path ~= "ircClient.notice" or callee.path ~= "ircClient.action" or callee.path ~= "ircClient.whois" or callee.path ~= "ircClient.mode"
+  emit sink code.LineProtocolCommandWrite at args[0]
+}
+
+binding ircClientCtcpTarget {
+  requires {
+    any(dependency("irc"), dependency("irc-upd"), dependency("matrix-org-irc"))
+  }
+  query pattern callExpr where callee.path ~= "client.ctcp" or callee.path ~= "ircClient.ctcp"
+  emit sink code.LineProtocolCommandWrite at args[0]
+}
+
+// The first parameter of a raw command: `send("JOIN", channel)`,
+// `send("NICK", nick)`, `send("TOPIC", channel, topic)`. The command word
+// itself (args[0]) is not labelled -- issuing a chosen raw command is what
+// these calls are for.
+binding ircClientRawCommandParameter {
+  requires {
+    any(dependency("irc"), dependency("irc-upd"), dependency("matrix-org-irc"))
+  }
+  query pattern callExpr where callee.path ~= "client.send" or callee.path ~= "ircClient.send"
+  emit sink code.LineProtocolCommandWrite at args[1]
+}
+
+binding ircFrameworkRawCommandParameter {
+  requires {
+    dependency("irc-framework")
+  }
+  query pattern callExpr where callee.path ~= "client.raw" or callee.path ~= "ircClient.raw"
+  emit sink code.LineProtocolCommandWrite at args[1]
+}

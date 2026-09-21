@@ -1,0 +1,11 @@
+module vypr.dos;
+
+rule NestedParamExpansionWithoutDepthLimit {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_674, CWE_400]
+    id: "VYQL-DOS-049"
+    severity: high
+  }
+  issue code.NestedParamExpansionWithoutDepthLimit as params
+}

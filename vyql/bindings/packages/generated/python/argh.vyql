@@ -1,0 +1,33 @@
+module bindings.python.generated.mfcb84eea;
+
+binding userControlledData0 {
+  requires {
+    dependency("argh")
+  }
+  query pattern callExpr where callee.method == "dispatch"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("argh")
+  }
+  query pattern callExpr where callee.method == "dispatch_command"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("argh")
+  }
+  query pattern callExpr where callee.method == "dispatch_commands"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("argh")
+  }
+  query pattern callExpr where callee.method == "parse_args"
+  emit source core.UserControlledData at call.result
+}

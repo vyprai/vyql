@@ -1,0 +1,6 @@
+module code;
+
+concept NetworkBind : sink {
+  cwe: [CWE_200]
+  vulnerableTo: [iac.PublicNetworkExposure]
+}

@@ -1,0 +1,31 @@
+module bindings.php.route_acl_public_entry;
+
+// YesWiki controller routes are gated by one function,
+// ApiService::isAuthorized(), which loads the route annotation's ACL list
+// and authorizes the request when the list holds the entry "public":
+//
+//     $publicMode = in_array('public', $acl);
+//     $acl = array_diff($acl, ['public']);
+//     $hasAcl = !empty(implode(' ', $acl)) && $this->aclService->check(implode("\n", $acl));
+//     return $publicMode || $hasAcl || (...bearer keys...);
+//
+// The list is disjunctive, so an annotation reading
+// options={"acl":{"public","@admins"}} publishes the route to everyone and
+// the audience entry is dead text -- the developer docs described this
+// spelling as group-only access, which is why it reads as intentional.
+// Lists that hold "public" alone are the documented way to publish a route
+// without a bearer, and lists without "public" reach the ACL service.
+//
+// The clause matches the annotation over the whitespace-stripped class body,
+// which both spellings in the tree reduce to the same fragment
+// ("acl":{"public","@admins"} and {"public", "@admins"}); the anchored
+// "acl":{ prefix keeps an ordinary list of strings containing "public" from
+// reading as a route ACL. Residual: an entry list with "public" in a later
+// position is not recognised -- every list in the tree puts it first, and
+// anchoring the later positions would drop the acl prefix and match
+// unrelated arrays.
+binding routeAclPublicEntryDefeatsAudience {
+  query pattern presenceNode where node.scope == "class" and node.context.language == "php"
+    and node.token contains "acl\":{\"public\","
+  emit issue code.AccessPolicyReview at node
+}

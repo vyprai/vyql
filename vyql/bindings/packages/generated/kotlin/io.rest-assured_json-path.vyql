@@ -1,0 +1,153 @@
+module bindings.kotlin.generated.mb32d0a46;
+
+binding deserialization0 {
+  requires {
+    dependency("io.rest-assured:json-path")
+  }
+  query pattern callExpr where callee.method == "parseText"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("io.rest-assured:json-path")
+  }
+  query pattern callExpr where callee.method == "parseURL"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("io.rest-assured:json-path")
+  }
+  query pattern callExpr where callee.method == "parseInputStream"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("io.rest-assured:json-path")
+  }
+  query pattern callExpr where callee.method == "parseFile"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("io.rest-assured:json-path")
+  }
+  query pattern callExpr where callee.method == "parseReader"
+  emit sink code.Deserialization at args[0]
+}
+
+binding userControlledData5 {
+  requires {
+    dependency("io.rest-assured:json-path")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData6 {
+  requires {
+    dependency("io.rest-assured:json-path")
+  }
+  query pattern callExpr where callee.method == "getObject"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData7 {
+  requires {
+    dependency("io.rest-assured:json-path")
+  }
+  query pattern callExpr where callee.method == "getList"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData8 {
+  requires {
+    dependency("io.rest-assured:json-path")
+  }
+  query pattern callExpr where callee.method == "getMap"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData9 {
+  requires {
+    dependency("io.rest-assured:json-path")
+  }
+  query pattern callExpr where callee.method == "getString"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData10 {
+  requires {
+    dependency("io.rest-assured:json-path")
+  }
+  query pattern callExpr where callee.method == "getBoolean"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData11 {
+  requires {
+    dependency("io.rest-assured:json-path")
+  }
+  query pattern callExpr where callee.method == "getChar"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData12 {
+  requires {
+    dependency("io.rest-assured:json-path")
+  }
+  query pattern callExpr where callee.method == "getInt"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData13 {
+  requires {
+    dependency("io.rest-assured:json-path")
+  }
+  query pattern callExpr where callee.method == "getByte"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData14 {
+  requires {
+    dependency("io.rest-assured:json-path")
+  }
+  query pattern callExpr where callee.method == "getShort"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData15 {
+  requires {
+    dependency("io.rest-assured:json-path")
+  }
+  query pattern callExpr where callee.method == "getFloat"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData16 {
+  requires {
+    dependency("io.rest-assured:json-path")
+  }
+  query pattern callExpr where callee.method == "getDouble"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData17 {
+  requires {
+    dependency("io.rest-assured:json-path")
+  }
+  query pattern callExpr where callee.method == "getLong"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData18 {
+  requires {
+    dependency("io.rest-assured:json-path")
+  }
+  query pattern callExpr where callee.method == "getUUID"
+  emit source core.UserControlledData at call.result
+}

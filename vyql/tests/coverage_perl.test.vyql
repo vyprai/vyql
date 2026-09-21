@@ -1,0 +1,53 @@
+# Perl coverage breadth: SSRF, weak crypto, deserialization, XXE, sanitizers.
+
+test "perl: cgi param -> getstore is SSRF"
+  lang perl
+  expect VYQL-RF-001
+  code
+  ```
+  my $u = $cgi->param('u');
+  getstore($u, '/tmp/out');
+  ```
+
+test "perl: a constant URL is clean (SSRF)"
+  lang perl
+  reject VYQL-RF-001
+  code
+  ```
+  getstore('https://api.example.com/v1', '/tmp/out');
+  ```
+
+test "perl: Digest::MD5 md5_hex is weak crypto"
+  lang perl
+  expect VYQL-CRY-001
+  code
+  ```
+  my $h = Digest::MD5::md5_hex($data);
+  ```
+
+test "perl: cgi param -> Storable::thaw is unsafe deserialization"
+  lang perl
+  expect VYQL-DESER-001
+  code
+  ```
+  my $u = $cgi->param('blob');
+  my $obj = Storable::thaw($u);
+  ```
+
+test "perl: cgi param -> parse_string is XXE"
+  lang perl
+  expect VYQL-DESER-002
+  code
+  ```
+  my $u = $cgi->param('xml');
+  my $doc = $parser->parse_string($u);
+  ```
+
+test "perl: quotemeta neutralizes command injection"
+  lang perl
+  reject VYQL-INJ-002
+  code
+  ```
+  my $u = $cgi->param('host');
+  system("ping " . quotemeta($u));
+  ```

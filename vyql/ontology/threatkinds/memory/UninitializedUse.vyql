@@ -1,0 +1,6 @@
+module memory;
+
+threat UninitializedUse {
+  cwe: [CWE_908]
+  desc: "Use of uninitialized resource"
+}

@@ -1,0 +1,8 @@
+module code;
+
+review code.ExternalUrlOpenWithoutSchemeAllowlist {
+  category: command
+  expected: [core.InputValidation]
+  kind: attention
+  text: "review external URL launches for an explicit scheme allowlist before handing the URL to the platform handler"
+}

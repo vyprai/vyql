@@ -1,0 +1,41 @@
+module bindings.swift.generated.me2adc301;
+
+binding filePathAccess0 {
+  requires {
+    dependency("github.com/soto-project/soto-s3-file-transfer")
+  }
+  query pattern callExpr where callee.method == "copy"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("github.com/soto-project/soto-s3-file-transfer")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("github.com/soto-project/soto-s3-file-transfer")
+  }
+  query pattern callExpr where callee.method == "listFiles"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("github.com/soto-project/soto-s3-file-transfer")
+  }
+  query pattern callExpr where callee.method == "sync"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("github.com/soto-project/soto-s3-file-transfer")
+  }
+  query pattern callExpr where callee.method == "resume"
+  emit sink code.FilePathAccess at args[0]
+}

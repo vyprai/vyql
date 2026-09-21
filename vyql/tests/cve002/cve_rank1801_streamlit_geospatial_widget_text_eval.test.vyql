@@ -1,0 +1,144 @@
+# Rank 1801 / CVE-2024-41112: streamlit-geospatial's pages read their
+# visualization parameters straight from a Streamlit text widget into
+# Python's builtin eval, so anyone who can reach the app in a browser can
+# run Python on the server (CWE-95). The Earth Engine page did
+#
+#   vis_params = st.text_input(
+#       "Enter visualization parameters as a dictionary", {}
+#   )
+#   ...
+#       if vis_params.strip() == "":
+#           vis_params = "{}"
+#       vis = eval(vis_params)
+#
+# and the Timelapse and Raster pages did the same with st.text_area:
+#
+#   palette = st.text_area("Enter a custom palette:", palette_values)
+#   st.session_state["palette"] = eval(palette)
+#   st.session_state["vis_params"] = eval(vis_params)
+#
+# eight eval sites across five page files. The fixing commit replaces every
+# one with `json.loads(params.replace("'", '"'))`, which parses the
+# dictionary without executing it, and adds URL allowlists around the
+# server-side fetches fed by st.text_input urls (a second, separate
+# hardening -- the eval route is the RCE). A widget read is the framework
+# request read of a Streamlit app: st.text_input, st.text_area and
+# st.chat_input return exactly the text the client typed, and the query
+# parameter readers return the page URL the client sent, so they are
+# labelled code.HttpInput the same way the CGI and Flask request reads
+# are. st.selectbox and the other option widgets are deliberately
+# not labelled: their return value is one of the options the app itself
+# listed, so the app authored every string the client can choose. With the
+# source labelled, VYQL-INJ-003 (taint core.UserControlledData ->
+# code.CodeEval) reports every eval site; json.loads is not a sink, so the
+# patched revision reports none.
+
+test "rank1801: visualization parameters typed into a text widget reach eval"
+  lang python
+  file pages/10_Earth_Engine_Datasets.py
+  expect VYQL-INJ-003
+  code
+  ```
+  import ee
+  import geemap.foliumap as geemap
+  import streamlit as st
+
+
+  def search_data(asset_titles, ee_assets, Map):
+      dataset = st.selectbox("Select a dataset", asset_titles)
+      index = asset_titles.index(dataset)
+      ee_id = ee_assets[index]["id"]
+      uid = ee_assets[index]["uid"]
+      vis_params = st.text_input(
+          "Enter visualization parameters as a dictionary", {}
+      )
+      layer_name = st.text_input("Enter a layer name", uid)
+      button = st.button("Add dataset to map")
+      if button:
+          vis = {}
+          try:
+              if vis_params.strip() == "":
+                  vis_params = "{}"
+              vis = eval(vis_params)
+              if not isinstance(vis, dict):
+                  st.error("Visualization parameters must be a dictionary")
+          except Exception as e:
+              st.error(f"Invalid visualization parameters: {e}")
+  ```
+
+test "rank1801: a custom palette and parameters typed into a text area reach eval"
+  lang python
+  file pages/1_Timelapse.py
+  expect VYQL-INJ-003
+  code
+  ```
+  import streamlit as st
+
+
+  def app(cm):
+      col1, col2 = st.columns([1, 1])
+      with col2:
+          palette_options = st.selectbox("Color palette", cm.list_colormaps(), index=2)
+          palette_values = cm.get_palette(palette_options, 15)
+          palette = st.text_area("Enter a custom palette:", palette_values)
+          st.session_state["palette"] = eval(palette)
+
+          vis_params = st.text_area("Enter visualization parameters", "{}")
+          try:
+              st.session_state["vis_params"] = eval(vis_params)
+              st.session_state["vis_params"]["palette"] = st.session_state["palette"]
+          except Exception as e:
+              st.session_state["vis_params"] = None
+  ```
+
+test "rank1801: the patched page parses the parameters instead of executing them"
+  lang python
+  file pages/10_Earth_Engine_Datasets.py
+  reject VYQL-INJ-003
+  code
+  ```
+  import json
+  import streamlit as st
+
+
+  def search_data(asset_titles, ee_assets, Map):
+      dataset = st.selectbox("Select a dataset", asset_titles)
+      index = asset_titles.index(dataset)
+      ee_id = ee_assets[index]["id"]
+      uid = ee_assets[index]["uid"]
+      vis_params = st.text_input(
+          "Enter visualization parameters as a dictionary", {}
+      )
+      layer_name = st.text_input("Enter a layer name", uid)
+      button = st.button("Add dataset to map")
+      if button:
+          vis = {}
+          try:
+              if vis_params.strip() == "":
+                  vis_params = "{}"
+              vis = json.loads(vis_params.replace("'", '"'))
+              if not isinstance(vis, dict):
+                  st.error("Visualization parameters must be a dictionary")
+          except Exception as e:
+              st.error(f"Invalid visualization parameters: {e}")
+  ```
+
+test "rank1801: eval of an app-authored parameter string has no widget behind it"
+  lang python
+  file pages/1_Timelapse.py
+  reject VYQL-INJ-003
+  code
+  ```
+  import streamlit as st
+
+
+  def app(bands):
+      if bands:
+          vis_params = "{'bands': ['B4', 'B3', 'B2'], 'min': 0, 'max': 4000}"
+      else:
+          vis_params = "{}"
+      try:
+          st.session_state["vis_params"] = eval(vis_params)
+      except Exception as e:
+          st.session_state["vis_params"] = None
+  ```

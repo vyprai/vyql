@@ -1,0 +1,31 @@
+module bindings.csharp.deserializationBinder;
+
+// .NET's BinaryFormatter, SoapFormatter and NetDataContractSerializer
+// reconstruct whatever type the stream names, and the documented way to bound
+// that set is SerializationBinder: assigning one to the formatter's Binder
+// property routes every type resolution through BindToType, where the
+// implementation decides which types may load. This is the same hardening
+// surface JEP 290's setObjectInputFilter is for Java, and like that filter it
+// is installed on the reader rather than passed to the read.
+//
+// The assignment lowers to a call node whose path is the property being
+// written (b.Binder), so a segment match on Binder labels the installation
+// wherever it happens; the bound class's own name carries no weight, since
+// every project names its binder differently. The segment match also reaches
+// a mid-path Binder segment (a call through a binder, such as
+// binder.BindToType inside a custom implementation), which reads as binder
+// usage rather than as an unrelated name. The check anchors at that call
+// with endpoint coverage, which is dominance-based: a binder installed
+// before the read covers it, while one installed in a sibling branch or
+// after the read does not. A member named Binder on a class with no
+// serialization role would neutralise nothing an attacker can reach, because
+// the coverage still needs a deserialization sink the write dominates.
+
+binding serializationBinderAssignmentIsSafeDeserialization {
+  query pattern callExpr where callee.path ~= "Binder"
+  emit check core.SafeDeserialization at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

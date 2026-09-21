@@ -1,0 +1,11 @@
+module code;
+
+concept UploadContentScanMissingPharStub : issue {
+  cwe: [CWE_434]
+  reviewAssumption: "an attacker can upload an archive whose phar stub avoids the literal `<?php` opening tag, so the content scan sees nothing it recognises as PHP"
+  reviewCategory: upload
+  reviewCondition: "an upload validator reads the bytes of the uploaded temporary file and rejects content holding the `<?php` opening tag, but does not reject content holding `__HALT_COMPILER`, the stub marker every phar archive must contain, so a phar passes the scan and stays loadable through the phar:// stream wrapper"
+  reviewConfidence: high
+  reviewEvidence: "upload validation context {pattern} reads the uploaded temporary file and searches its bytes for `<?php` without also searching for the `__HALT_COMPILER` phar stub marker"
+  vulnerableTo: [injection.UnrestrictedUpload]
+}

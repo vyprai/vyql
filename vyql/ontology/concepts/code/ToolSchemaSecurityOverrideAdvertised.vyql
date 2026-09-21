@@ -1,0 +1,11 @@
+module code;
+
+concept ToolSchemaSecurityOverrideAdvertised : issue {
+  cwe: [CWE_862, CWE_306]
+  reviewAssumption: "the tool is registered against a model-facing schema, so whatever that schema accepts is settable by the model through a tool_use payload"
+  reviewCategory: access_control
+  reviewCondition: "a tool input schema declares a parameter that turns a security boundary off, and the schema the host advertises to the model is derived from it by omitting named fields without naming that parameter"
+  reviewConfidence: high
+  reviewEvidence: "tool schema context {pattern} declares a dangerously-prefixed override parameter as schema input and the module's omit list never names it"
+  vulnerableTo: [access_control.MissingAuthorization, access_control.PrivilegeEscalation]
+}

@@ -1,0 +1,9 @@
+module bindings.bash.generated.mde1e5fff;
+
+binding cliArgument0 {
+  requires {
+    dependency("iproute2mac")
+  }
+  query pattern callExpr where callee.path ~= "iproute2mac.argv"
+  emit source code.CliArgument at call.result
+}

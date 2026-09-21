@@ -1,0 +1,74 @@
+module bindings.python.packet_filter_chain_default_deny;
+
+// ebtables(8), iptables(8) and their ip6tables/arptables siblings give a
+// user-defined chain two separate ways to end in a deny: `-P DROP`, which sets
+// the chain's *policy*, and an explicit `-j DROP` rule sitting last in the
+// chain. Only the second is a rule. The nftables-backed compatibility binaries
+// (`ebtables-nft`, `iptables-nft`), which are the default on current
+// Debian/Ubuntu and RHEL/CentOS, implement a user chain's policy as an ordinary
+// trailing rule rather than as a persistent chain attribute, so the policy is
+// not preserved across `-F`, and a chain listed as `policy: DROP` under the
+// legacy binary ends up returning to its caller instead under the nft one.
+//
+// A chain built that way fails open: every frame or packet that matches none of
+// the accept rules falls off the end of the chain and is forwarded, which is the
+// opposite of what a default-deny chain was created for. The documented way to
+// keep the deny is to append an explicit terminal deny rule to the chain -- once
+// after creating it and again after every flush -- and to insert the accept
+// rules ahead of it rather than appending after it.
+//
+// So the chain-creation call that carries the deny only in `-P` is the issue,
+// and any explicit `-j DROP`/`-j REJECT` rule installed in the same function is
+// what covers it. The creation call is required to carry no `-j` of its own so
+// that a single command which both creates and populates a chain is not read as
+// the policy-only form.
+binding packetFilterChainPolicyOnlyDefaultDeny {
+  query pattern callExpr where callee.method in ["ebtables", "iptables", "ip6tables", "arptables", "ebtables_nft", "iptables_nft"]
+    and containsAny(args.any.literal, ["-N", "--new-chain"])
+    and containsAny(args.any.literal, ["-P", "--policy"])
+    and containsAny(args.any.literal, ["DROP", "REJECT"])
+    and not containsAny(args.any.literal, ["-j", "--jump"])
+  emit issue code.NetworkFilteringDisabled at call
+}
+
+// The same chain creation written through a generic command runner, where the
+// binary's name is the first element of the argument vector instead of the
+// callee.
+binding packetFilterChainPolicyOnlyDefaultDenyArgv {
+  query pattern callExpr where callee.method in ["run", "call", "check_call", "check_output", "execute", "Popen", "getoutput", "getstatusoutput"]
+    and containsAny(args.any.literal, ["ebtables", "iptables", "ip6tables", "arptables"])
+    and containsAny(args.any.literal, ["-N", "--new-chain"])
+    and containsAny(args.any.literal, ["-P", "--policy"])
+    and containsAny(args.any.literal, ["DROP", "REJECT"])
+    and not containsAny(args.any.literal, ["-j", "--jump"])
+  emit issue code.NetworkFilteringDisabled at call
+}
+
+// An explicit terminal deny rule: `-j DROP` or `-j REJECT` with no match
+// criteria is the documented way to make a chain deny by rule rather than by
+// policy. It is read as a control over the whole function that builds the
+// chain, because that is the scope a chain is set up in.
+binding packetFilterTerminalDenyRule {
+  query pattern callExpr where callee.method in ["ebtables", "iptables", "ip6tables", "arptables", "ebtables_nft", "iptables_nft"]
+    and containsAny(args.any.literal, ["-j", "--jump"])
+    and containsAny(args.any.literal, ["DROP", "REJECT"])
+  emit check core.PacketFilterDefaultDeny at call {
+    covers postDominates {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding packetFilterTerminalDenyRuleArgv {
+  query pattern callExpr where callee.method in ["run", "call", "check_call", "check_output", "execute", "Popen", "getoutput", "getstatusoutput"]
+    and containsAny(args.any.literal, ["ebtables", "iptables", "ip6tables", "arptables"])
+    and containsAny(args.any.literal, ["-j", "--jump"])
+    and containsAny(args.any.literal, ["DROP", "REJECT"])
+  emit check core.PacketFilterDefaultDeny at call {
+    covers postDominates {
+      from: call
+      to: call
+    }
+  }
+}

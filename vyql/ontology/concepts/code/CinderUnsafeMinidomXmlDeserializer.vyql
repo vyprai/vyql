@@ -1,0 +1,11 @@
+module code;
+
+concept CinderUnsafeMinidomXmlDeserializer : issue {
+  cwe: [CWE_611]
+  reviewAssumption: "the extension deserializer receives unauthenticated API request bodies that may contain entity-expansion payloads"
+  reviewCategory: xml
+  reviewCondition: "OpenStack Cinder XML extension deserializer parses request XML with raw minidom.parseString"
+  reviewConfidence: high
+  reviewEvidence: "Cinder XML deserializer context {pattern} passes the request XML string to minidom.parseString"
+  vulnerableTo: [deserialization.Xxe]
+}

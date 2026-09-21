@@ -1,0 +1,52 @@
+# Rank 1089 / CVE-2015-5377: Elasticsearch's transport protocol deserializes
+# remote exceptions with no restriction on which classes can be instantiated
+# (CWE-502; advisory also tags CWE-74). NVD marks the report disputed.
+#
+# FIXED. `ObjectInputStream.readObject()` / `readUnshared()` are zero-argument
+# sinks now anchored at call, so both unrestricted-stream snippets expect
+# VYQL-DESER-001. No SafeDeserialization control yet recognizes a
+# readClassDescriptor allowlist override.
+#
+# verify_current_expected: fixed
+
+test "rank1089: readObject on an unrestricted stream is a reportable sink"
+  lang java
+  file src/main/java/org/elasticsearch/common/io/ThrowableObjectInputStream.java
+  expect VYQL-DESER-001
+  code
+  ```
+  import java.io.IOException;
+  import java.io.InputStream;
+  import java.io.ObjectInputStream;
+  import java.net.Socket;
+
+  public class TransportChannel {
+      public Object handleExceptionResponse(Socket socket) throws IOException, ClassNotFoundException {
+          InputStream in = socket.getInputStream();
+          ObjectInputStream ois = new ObjectInputStream(in);
+          Object error = ois.readObject();
+          return error;
+      }
+  }
+  ```
+
+test "rank1089: readUnshared on the same unrestricted stream is too"
+  lang java
+  file src/main/java/org/elasticsearch/common/io/ThrowableObjectInputStream.java
+  expect VYQL-DESER-001
+  code
+  ```
+  import java.io.IOException;
+  import java.io.InputStream;
+  import java.io.ObjectInputStream;
+  import java.net.Socket;
+
+  public class TransportChannel {
+      public Object handleExceptionResponse(Socket socket) throws IOException, ClassNotFoundException {
+          InputStream in = socket.getInputStream();
+          ObjectInputStream ois = new ObjectInputStream(in);
+          Object error = ois.readUnshared();
+          return error;
+      }
+  }
+  ```

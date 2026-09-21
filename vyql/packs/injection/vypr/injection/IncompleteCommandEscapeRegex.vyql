@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule IncompleteCommandEscapeRegex {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_77]
+    id: "VYQL-INJ-056"
+    severity: critical
+  }
+  issue code.IncompleteCommandEscapeRegex as sink
+}

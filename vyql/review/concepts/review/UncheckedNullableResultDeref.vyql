@@ -1,0 +1,7 @@
+module code;
+
+review code.UncheckedNullableResultDeref {
+  category: memory
+  kind: attention
+  text: "review nullable result assignment and ensure a null guard dominates later dereferences"
+}

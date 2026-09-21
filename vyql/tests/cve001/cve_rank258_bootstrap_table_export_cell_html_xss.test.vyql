@@ -1,0 +1,77 @@
+test "rank258: bootstrap-table export preserves raw cell HTML"
+  lang javascript
+  expect VYQL-INJ-045
+  expect_review code.UnescapedTableExportHtml
+  code
+  ```
+  const Utils = $.fn.bootstrapTable.utils;
+
+  $.extend($.fn.bootstrapTable.defaults, {
+    exportOptions: {
+      onCellHtmlData (cell, rowIndex, colIndex, htmlData) {
+        if (cell.is('th')) {
+          return cell.find('.th-inner').text();
+        }
+
+        return htmlData;
+      }
+    }
+  });
+
+  $.BootstrapTable = class extends $.BootstrapTable {
+    initToolbar () {
+      this.$export.find('[data-type]').click(e => {
+        e.preventDefault();
+
+        const type = $(e.currentTarget).data('type');
+        const exportOptions = {
+          type,
+          escape: false
+        };
+
+        this.exportTable(exportOptions);
+      });
+    }
+
+    exportTable (options) {
+      const o = this.options;
+
+      this.$el.tableExport($.extend({
+        onAfterSaveToFile: () => {}
+      }, o.exportOptions, options));
+    }
+  };
+  ```
+
+test "rank258: bootstrap-table export leaves escaping to the plugin default"
+  lang javascript
+  reject VYQL-INJ-045
+  reject_review code.UnescapedTableExportHtml
+  code
+  ```
+  const Utils = $.fn.bootstrapTable.utils;
+
+  $.extend($.fn.bootstrapTable.defaults, {
+    exportOptions: {}
+  });
+
+  $.BootstrapTable = class extends $.BootstrapTable {
+    initToolbar () {
+      this.$export.find('[data-type]').click(e => {
+        e.preventDefault();
+
+        this.exportTable({
+          type: $(e.currentTarget).data('type')
+        });
+      });
+    }
+
+    exportTable (options) {
+      const o = this.options;
+
+      this.$el.tableExport($.extend({
+        onAfterSaveToFile: () => {}
+      }, o.exportOptions, options));
+    }
+  };
+  ```

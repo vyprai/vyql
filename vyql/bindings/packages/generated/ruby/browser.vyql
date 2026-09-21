@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mefa2b744;
+
+binding httpInput0 {
+  requires {
+    dependency("browser")
+  }
+  query pattern callExpr where callee.method == "Browser::AcceptLanguage.parse"
+  emit source code.HttpInput at call.result
+}

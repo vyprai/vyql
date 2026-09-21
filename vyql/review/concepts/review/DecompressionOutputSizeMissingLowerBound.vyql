@@ -1,0 +1,8 @@
+module code;
+
+review code.DecompressionOutputSizeMissingLowerBound {
+  category: memory
+  expected: [core.InputValidation]
+  kind: attention
+  text: "review the advertised uncompressed size for a lower bound, not only a maximum, before it sizes the output buffer"
+}

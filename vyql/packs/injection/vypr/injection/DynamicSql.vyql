@@ -1,0 +1,10 @@
+module vypr.injection;
+
+rule DynamicSql {
+  meta {
+    cwe: [CWE_89]
+    id: "VYQL-INJ-203"
+    severity: high
+  }
+  issue code.DynamicSqlQuery as sink
+}

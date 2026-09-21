@@ -1,0 +1,46 @@
+module bindings.java.byte_buffer_decode_without_grammar_check;
+
+// A wire-format decoder turns the bytes a peer sent into text a caller will
+// trust. Doing that faithfully is a loop over a ByteBuffer that reads each byte
+// and appends the character it stands for into a builder, and the formats that
+// travel this way -- HTTP field names and values, AJP, chunked trailers, form
+// bodies, certificate and ASN.1 strings -- are all grammars: RFC 9110 builds a
+// field name out of tchar (section 5.1) and a field value out of field-vchar
+// and field-content (section 5.5), and a decoder that appends a byte without
+// asking whether the resulting character is in that set admits control
+// characters and separators into a store every downstream consumer treats as
+// protocol-validated. The obligation is on the decode loop, because that is the
+// only place that sees every character before it is stored.
+//
+// The method is identified by what it does rather than by its name: it holds a
+// ByteBuffer, it reads out of it, and it appends into a builder. No library
+// documents a private decode helper, so there is no callee to bind; the shape
+// is the API. Restricting the buffer to java.nio.ByteBuffer is what keeps the
+// shape on binary wire decoding -- a Reader-backed or iterator-backed
+// accumulation loop is ordinary string building and is not reported.
+//
+// The negation lists the character checks such a loop can consult, in the
+// spellings they are actually written in: the RFC's own rule names (tchar,
+// field-vchar, field-content, token), the JDK's java.lang.Character
+// classification the check is usually implemented with, and the
+// validator names of the Java HTTP implementations that publish one. Any of
+// them, in any position in the method, discharges the obligation -- a guard in
+// a loop condition is as good as one around the append, and a check written one
+// statement away from the append is not distinguished from one written directly
+// over it. What is not seen from a method context is validation that lives in
+// the caller or in the store the decoded text is handed to, so a design that
+// centralises the check downstream of the decoder is reported here and cleared
+// there; that is the residual, and it is the false-positive direction.
+
+binding byteBufferDecodeWithoutGrammarCheck {
+  query pattern presenceNode where node.scope == "function"
+    and containsAny(node.context.paramType, ["ByteBuffer"])
+    and node.context.call in ["append", "appendCodePoint"]
+    and node.context.call in ["get", "read", "readByte", "readUnsignedByte"]
+    and not containsAny(node.context.call, ["isToken", "isTChar", "isVchar", "isFieldVChar", "isFieldContent",
+      "isValidTokenCharacter", "isValidName", "isValidValue", "isAlpha", "isNumeric", "isHex", "isControl",
+      "isPrintable", "isAllowed", "validateHeaderName", "validateHeaderValue", "Character.isLetter",
+      "Character.isDigit", "Character.isLetterOrDigit", "Character.isISOControl", "Character.isWhitespace",
+      "Character.isUpperCase", "Character.isLowerCase", "Character.isSpaceChar"])
+  emit issue code.StructuredInputDecode at node
+}

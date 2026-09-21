@@ -1,0 +1,136 @@
+# Rank 1707 / CVE-2026-31814: rust-yamux applied a peer-supplied
+# WindowUpdate credit to the per-stream send window through
+# FlowController::increase_send_window_by, whose checked_add result is
+# consumed with .expect("send window not to exceed u32"), and the two
+# receive/send window consumers likewise .expect'ed their checked_sub
+# results. A malicious peer sending credits that overflow the u32 window
+# accounting panics the process, a remote denial of service
+# (CWE-617/CWE-190; GHSA-4w32-2493-32g7, fixed in 0.13.9). The fixing commit
+# b1aae09 converts all three to fallible updates returning
+# ConnectionError::InvalidWindowUpdate, with on_window_update/on_data
+# terminating the connection on error. The remediation is present at the
+# fix and absent at its parent.
+#
+# FIXED by the reachableAssertionReview220-237 bindings in
+# vyql/bindings/rust/mdc4f74cd.vyql, emitting the existing
+# code.ReachableAssertionReview (VYQL-DOS-040): an .expect()/.unwrap() on
+# a checked_* arithmetic result is an assertion-backed invariant, and the
+# concept's question -- can external input violate it and terminate the
+# process -- is exactly the yamux case. The anchor is the std-library
+# idiom itself (checked_add returns None on overflow; expect/unwrap
+# panics on None), so the binding keys on neither yamux's nor the fixed revision's
+# vocabulary: the safe .ok_or(...)? form existed pre-fix in the
+# same tree (next_stream_id), and .expect() calls outside a checked_*
+# chain (on Result-returning functions) do not match. Measured on the
+# real tree over three --cache off runs each: the vulnerable revision
+# reports exactly three VYQL-DOS-040 at flow_control.rs:173/180/191 (one
+# per window consumer) and the patched revision reports none.
+# Collateral, measured on four other corpus Rust trees: quinn 3 (QUIC
+# peer-influenced checked_sub().unwrap() -- the same weakness class),
+# rusqlite 1 (len.checked_add(1).unwrap() before an allocation), openssl
+# bn.rs 5 and pulse-binding timeval.rs 10 (panic-on-overflow operator
+# impls, by design), each landing on an enumerated chain site and nowhere
+# else; grep over the whole corpus finds 58 such chains in total,
+# comparable to the shipped unbounded_next_await shape (82 files).
+
+test "rank1707: rust yamux window credit overflow reaches expect-backed invariant"
+  lang rust
+  file flow_control.rs
+  expect VYQL-DOS-040
+  expect_review code.ReachableAssertionReview
+  code
+  ```
+  pub(crate) struct FlowController {
+      send_window: u32,
+      receive_window: u32,
+  }
+
+  impl FlowController {
+      pub(crate) fn increase_send_window_by(&mut self, i: u32) {
+          self.send_window = self
+              .send_window
+              .checked_add(i)
+              .expect("send window not to exceed u32");
+      }
+
+      pub(crate) fn consume_receive_window(&mut self, i: u32) {
+          self.receive_window = self
+              .receive_window
+              .checked_sub(i)
+              .expect("not exceed receive window");
+      }
+  }
+  ```
+
+test "rank1707: rust checked_sub unwrap on a peer-derived timestamp delta"
+  lang rust
+  file loss.rs
+  expect VYQL-DOS-040
+  expect_review code.ReachableAssertionReview
+  code
+  ```
+  pub(crate) fn on_ack(&mut self, now: Instant) {
+      let loss_delay = self.rtt.update();
+      let lost_send_time = now.checked_sub(loss_delay).unwrap();
+      self.detect_lost(lost_send_time);
+  }
+  ```
+
+test "rank1707: rust fallible window update propagates the error instead of panicking"
+  lang rust
+  file flow_control.rs
+  reject VYQL-DOS-040
+  reject_review code.ReachableAssertionReview
+  code
+  ```
+  use crate::ConnectionError;
+
+  pub(crate) struct FlowController {
+      send_window: u32,
+      receive_window: u32,
+  }
+
+  impl FlowController {
+      pub(crate) fn increase_send_window_by(&mut self, i: u32) -> Result<(), ConnectionError> {
+          self.send_window = self
+              .send_window
+              .checked_add(i)
+              .ok_or(ConnectionError::InvalidWindowUpdate)?;
+          Ok(())
+      }
+
+      pub(crate) fn consume_receive_window(&mut self, i: u32) -> Result<(), ConnectionError> {
+          self.receive_window = self
+              .receive_window
+              .checked_sub(i)
+              .ok_or(ConnectionError::InvalidWindowUpdate)?;
+          Ok(())
+      }
+  }
+  ```
+
+test "rank1707: rust expect on a Result-returning window update is not a checked-overflow invariant"
+  lang rust
+  file stream.rs
+  reject VYQL-DOS-040
+  reject_review code.ReachableAssertionReview
+  code
+  ```
+  pub(crate) struct Shared {
+      send_window: u32,
+  }
+
+  impl Shared {
+      pub(crate) fn consume_send_window(&mut self, i: u32) -> Result<(), ()> {
+          self.send_window -= i;
+          Ok(())
+      }
+
+      pub(crate) fn poll_write(&mut self, buf: &[u8], split_send_size: usize) -> Vec<u8> {
+          let k = std::cmp::min(self.send_window as usize, buf.len());
+          let k = std::cmp::min(k, split_send_size);
+          self.consume_send_window(k as u32).expect("not exceed receive window");
+          Vec::from(&buf[..k])
+      }
+  }
+  ```

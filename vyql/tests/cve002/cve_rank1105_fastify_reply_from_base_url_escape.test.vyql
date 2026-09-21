@@ -1,0 +1,123 @@
+# fastify-reply-from's forwarding URL builder confined the resolved
+# destination to the configured base by comparing origins only, so a
+# client-controlled forwarding path could resolve to a destination outside
+# the base's path prefix while sharing its origin (CWE-20, CWE-22). URL
+# documents `origin` as scheme + host + port -- the path is not part of it
+# -- so a containment guard that reads `.origin` cannot enforce a base
+# URL's path prefix. The dependency finding carries the same weakness for
+# callers pinning a release below 4.0.2, the release the advisory names as
+# first fixed.
+
+test "rank1105: the guard compares origins, not the full resolved URL"
+  lang javascript
+  file lib/utils.js
+  expect VYQL-PATH-090
+  code
+  ```
+  function buildURL (source, reqBase) {
+    const dest = new URL(source, reqBase)
+
+    if (reqBase && !reqBase.startsWith(dest.origin)) {
+      throw new Error('source must be a relative path string')
+    }
+
+    return dest
+  }
+  ```
+
+test "rank1105: the guard compares the full resolved href against the full base"
+  lang javascript
+  file lib/utils.js
+  reject VYQL-PATH-090
+  code
+  ```
+  function buildURL (source, reqBase) {
+    const dest = new URL(source, reqBase)
+
+    if (reqBase) {
+      if (!reqBase.endsWith('/') && dest.href.length > reqBase.length) {
+        reqBase = reqBase + '/'
+      }
+
+      if (!dest.href.startsWith(reqBase)) {
+        throw new Error('source must be a relative path string')
+      }
+    }
+
+    return dest
+  }
+  ```
+
+test "rank1105: routing on a parsed request path is not containment"
+  lang javascript
+  file handler.js
+  reject VYQL-PATH-090
+  code
+  ```
+  async function handle (request) {
+    const parsedUrl = new URL(request.url)
+    const pathKey = parsedUrl.pathname.replace(/^\/+/, '')
+
+    if (request.method === 'GET' && pathKey.startsWith('api/')) {
+      return new Response(null, { status: 404 })
+    }
+
+    return new Request(`${parsedUrl.origin}/${pathKey}`, request)
+  }
+  ```
+
+test "rank1105: a pin below the first fixed release is a dependency finding"
+  lang javascript
+  file app.js
+  code
+  ```
+  const fastify = require('fastify')()
+  const from = require('fastify-reply-from')
+
+  fastify.register(from, { base: 'http://internal-host/api/v1/' })
+
+  fastify.get('/api/*', function (request, reply) {
+    return reply.from(request.raw.url)
+  })
+  ```
+  file package.json
+  code
+  ```
+  {
+    "name": "gateway",
+    "dependencies": {
+      "fastify": "^3.12.0",
+      "fastify-reply-from": "4.0.1"
+    }
+  }
+  ```
+  expect VYQL-SCA-001
+  expect_evidence VYQL-SCA-001 CVE-2021-21321
+  reject VYQL-PATH-090
+
+test "rank1105: a pin at the first fixed release is clean"
+  lang javascript
+  file app.js
+  code
+  ```
+  const fastify = require('fastify')()
+  const from = require('fastify-reply-from')
+
+  fastify.register(from, { base: 'http://internal-host/api/v1/' })
+
+  fastify.get('/api/*', function (request, reply) {
+    return reply.from(request.raw.url)
+  })
+  ```
+  file package.json
+  code
+  ```
+  {
+    "name": "gateway",
+    "dependencies": {
+      "fastify": "^5.7.2",
+      "fastify-reply-from": "^4.0.2"
+    }
+  }
+  ```
+  reject VYQL-SCA-001

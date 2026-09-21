@@ -1,0 +1,75 @@
+# Rank 1207 / CVE-2021-3757: applyPatches walked a patch path array and
+# guarded each segment against the literal strings "__proto__" and
+# "constructor" before indexing the draft with it, but the segment itself
+# was never coerced to a string first, so a path element that is a
+# non-primitive (for example the single-element array `["__proto__"]`,
+# whose string coercion is `"__proto__"`) fails the strict-equality guard
+# yet still resolves to the prototype when used as a computed property key.
+
+test "rank1207: applyPatches indexes untyped path segments after literal prototype-key guard"
+  lang javascript
+  file patches.ts
+  expect VYQL-INJ-165
+  expect_review code.CoerciblePathSegmentPrototypePollution
+  code
+  ```
+  function applyPatches_(draft, patches) {
+    patches.forEach(patch => {
+      const {path, op} = patch
+
+      let base = draft
+      for (let i = 0; i < path.length - 1; i++) {
+        const parentType = getArchtype(base)
+        const p = path[i]
+        if (
+          (parentType === Archtype.Object || parentType === Archtype.Array) &&
+          (p === "__proto__" || p === "constructor")
+        )
+          die(24)
+        if (typeof base === "function" && p === "prototype") die(24)
+        base = get(base, p)
+        if (typeof base !== "object") die(15, path.join("/"))
+      }
+
+      const key = path[path.length - 1]
+      switch (op) {
+        case REPLACE:
+          return (base[key] = deepClonePatchValue(patch.value))
+      }
+    })
+  }
+  ```
+
+test "rank1207: applyPatches coerces each path segment to a string before the prototype-key guard"
+  lang javascript
+  file patches.ts
+  reject VYQL-INJ-165
+  reject_review code.CoerciblePathSegmentPrototypePollution
+  code
+  ```
+  function applyPatches_(draft, patches) {
+    patches.forEach(patch => {
+      const {path, op} = patch
+
+      let base = draft
+      for (let i = 0; i < path.length - 1; i++) {
+        const parentType = getArchtype(base)
+        const p = "" + path[i]
+        if (
+          (parentType === Archtype.Object || parentType === Archtype.Array) &&
+          (p === "__proto__" || p === "constructor")
+        )
+          die(24)
+        if (typeof base === "function" && p === "prototype") die(24)
+        base = get(base, p)
+        if (typeof base !== "object") die(15, path.join("/"))
+      }
+
+      const key = path[path.length - 1]
+      switch (op) {
+        case REPLACE:
+          return (base[key] = deepClonePatchValue(patch.value))
+      }
+    })
+  }
+  ```

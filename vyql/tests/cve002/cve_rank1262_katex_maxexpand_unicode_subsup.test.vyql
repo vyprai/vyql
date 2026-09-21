@@ -1,0 +1,170 @@
+# Rank 1262 / CVE-2024-28244: KaTeX's Parser bounds macro expansion by
+# counting MacroExpander.expansionCount against settings.maxExpand on
+# this.gullet, but the Unicode sub/superscript branch of parseSupSub
+# (src/Parser.js) built the accumulated Unicode run into a plain string and
+# handed it to a brand-new `new Parser(str, this.settings)`. That
+# constructor creates its own MacroExpander, so the fresh instance's
+# expansionCount starts at zero: nesting user-controlled macros inside a
+# Unicode sub/superscript run resets the counter on every level and the
+# expansion blows up exponentially past whatever maxExpand is configured to
+# stop (GHSA-cvr6-37gx-v8wc: >= 0.15.4, < 0.16.10; CWE-606 unchecked input
+# for loop condition, CWE-674 uncontrolled recursion). Fix
+# 085e21b5da05414efefa932570e7201a7c70e5b2 does not touch the limit: it
+# tokenizes the run and hands it to `this.subparse(subsupTokens)`, which
+# pushes the tokens onto the current job's own gullet, so the existing
+# expansionCount keeps accruing across the sub/superscript. The first
+# release carrying the fix is v0.16.10 (`git tag --contains`); the
+# fresh-Parser construct is present at v0.15.4 and absent at v0.15.3,
+# matching the advisory's lower bound.
+#
+# The weakness is inside the library, and both revisions parse the same
+# untrusted TeX string while the caller's render is correct code, so the
+# report that belongs to this CVE is the dependency finding: an npm pin of
+# katex below 0.16.10. The feed holds one threshold per artifact, so pins
+# below the advisory's 0.15.4 lower bound report too; those releases do
+# not contain the fresh-Parser construct (verified at v0.15.3) and that
+# over-match is this row's stated residual.
+#
+# The code-level shape stays unreachable and the ENGINE-GAPS "1262" entry
+# stays open: which object instance owns a resource counter is not a
+# source/sink taint path, and code.UnboundedResourceOperation is populated
+# only by per-language Review classifiers (Rust/Python/PHP/Ruby) plus
+# narrow presence bindings, none of which generalizes to "a class
+# re-instantiates itself inside its own recursive-descent method,
+# discarding the counter the outer instance enforces". The two code-form
+# tests below hold that gap open on both sides of the fix.
+
+test "rank1262: a katex pin below the first maxExpand-enforcing release is a dependency finding"
+  lang javascript
+  file src/render.js
+  code
+  ```
+  const katex = require('katex');
+
+  function renderMath(req, el) {
+      katex.render(req.query.tex, el, {throwOnError: false});
+  }
+  ```
+  file package.json
+  code
+  ```
+  {
+    "name": "math-widget",
+    "dependencies": {
+      "katex": "0.16.9"
+    }
+  }
+  ```
+  expect VYQL-SCA-001
+  expect_evidence VYQL-SCA-001 CVE-2024-28244
+  expect VYQL-SCA-002
+
+test "rank1262: a katex pin at the first maxExpand-enforcing release is clean"
+  lang javascript
+  file src/render.js
+  code
+  ```
+  const katex = require('katex');
+
+  function renderMath(req, el) {
+      katex.render(req.query.tex, el, {throwOnError: false});
+  }
+  ```
+  file package.json
+  code
+  ```
+  {
+    "name": "math-widget",
+    "dependencies": {
+      "katex": "0.16.10"
+    }
+  }
+  ```
+  reject VYQL-SCA-001
+  reject VYQL-SCA-002
+
+test "rank1262: a pin inside the advisory's range on the older minor line is a dependency finding"
+  lang javascript
+  file src/render.js
+  code
+  ```
+  const katex = require('katex');
+
+  function renderMath(req, el) {
+      katex.render(req.query.tex, el, {throwOnError: false});
+  }
+  ```
+  file package.json
+  code
+  ```
+  {
+    "name": "math-widget",
+    "dependencies": {
+      "katex": "0.15.4"
+    }
+  }
+  ```
+  expect VYQL-SCA-001
+  expect_evidence VYQL-SCA-001 CVE-2024-28244
+  expect VYQL-SCA-002
+
+test "rank1262: the Unicode sub/superscript run parses through a fresh Parser instance, resetting expansionCount"
+  lang javascript
+  file src/Parser.js
+  reject_review code.UnboundedResourceOperation
+  code
+  ```
+  export default class Parser {
+      constructor(input, settings) {
+          this.gullet = new MacroExpander(input, settings, this.mode);
+          this.settings = settings;
+      }
+
+      parseSupSub(lex) {
+          let str = uSubsAndSups[lex.text];
+          const isSub = unicodeSubRegEx.test(lex.text);
+          this.consume();
+          while (true) {
+              const token = this.fetch().text;
+              if (!(uSubsAndSups[token])) { break; }
+              if (unicodeSubRegEx.test(token) !== isSub) { break; }
+              this.consume();
+              str += uSubsAndSups[token];
+          }
+          // Now create a (sub|super)script.
+          const body = (new Parser(str, this.settings)).parse();
+          return body;
+      }
+  }
+  ```
+
+test "rank1262: the Unicode sub/superscript run is subparsed on the current job's gullet, keeping expansionCount shared"
+  lang javascript
+  file src/Parser.js
+  reject_review code.UnboundedResourceOperation
+  code
+  ```
+  export default class Parser {
+      constructor(input, settings) {
+          this.gullet = new MacroExpander(input, settings, this.mode);
+          this.settings = settings;
+      }
+
+      parseSupSub(lex) {
+          const isSub = unicodeSubRegEx.test(lex.text);
+          const subsupTokens = [];
+          subsupTokens.push(new Token(uSubsAndSups[lex.text]));
+          this.consume();
+          while (true) {
+              const token = this.fetch().text;
+              if (!(uSubsAndSups[token])) { break; }
+              if (unicodeSubRegEx.test(token) !== isSub) { break; }
+              subsupTokens.unshift(new Token(uSubsAndSups[token]));
+              this.consume();
+          }
+          // Now create a (sub|super)script.
+          const body = this.subparse(subsupTokens);
+          return body;
+      }
+  }
+  ```

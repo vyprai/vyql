@@ -1,0 +1,8 @@
+module code;
+
+review code.ResourceReview {
+  category: resource
+  expected: [core.ResourceRelease]
+  kind: target
+  text: "verify resource usage is bounded, timed out, and released"
+}

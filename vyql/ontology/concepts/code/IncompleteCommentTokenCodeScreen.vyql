@@ -1,0 +1,11 @@
+module code;
+
+concept IncompleteCommentTokenCodeScreen : issue {
+  cwe: [CWE_184, CWE_94]
+  reviewAssumption: "attacker-supplied source reaches code screening that must hold dangerous calls back before the screened file can run, and legal tokens may sit between the construct the screen matches and its operative position"
+  reviewCategory: code_execution
+  reviewCondition: "code screening over the token stream skips whitespace tokens but treats comment tokens as match-ending, so a comment interleaved between a screened name and its call parenthesis resets the match state and the screened call runs"
+  reviewConfidence: high
+  reviewEvidence: "token-walking screen context {pattern} tokenizes source, tests for the eval construct, skips whitespace tokens, and carries no comment-token handling"
+  vulnerableTo: [injection.CodeInjection]
+}

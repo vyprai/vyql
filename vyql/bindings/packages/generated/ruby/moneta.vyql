@@ -1,0 +1,25 @@
+module bindings.ruby.generated.m69cc252a;
+
+binding storedDataRead0 {
+  requires {
+    dependency("moneta")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit source code.StoredDataRead at call.result
+}
+
+binding storedDataWrite1 {
+  requires {
+    dependency("moneta")
+  }
+  query pattern callExpr where callee.method == "store"
+  emit sink code.StoredDataWrite at args[0]
+}
+
+binding storedDataWrite2 {
+  requires {
+    dependency("moneta")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.StoredDataWrite at args[0]
+}

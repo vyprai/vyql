@@ -1,0 +1,11 @@
+module code;
+
+concept OauthQueryTokenScalarCheckMissing : issue {
+  cwe: [CWE_943, CWE_287]
+  reviewAssumption: "the token value is built by a query parser, so its runtime type is chosen by the requester rather than by the parameter's declared type"
+  reviewCategory: auth
+  reviewCondition: "a bearer-token authentication routine that also accepts the access token from the request query string spends it on a lookup without pinning it to a string first"
+  reviewConfidence: high
+  reviewEvidence: "bearer token authentication context {pattern} strips a Bearer prefix and reads the query-string access_token member, spending it with no scalar type check in the function"
+  vulnerableTo: [injection.NosqlInjection, authentication.AuthenticationBypass]
+}

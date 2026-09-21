@@ -1,0 +1,136 @@
+# Rank 1617 / CVE-2022-33684: the Pulsar C++ client's OAuth 2.0 client
+# credential flow fetched the issuer's well-known configuration and posted
+# the token request over libcurl handles with peer certificate validation
+# switched off, so a man-in-the-middle between the client and the
+# authorization server could intercept the client_id/client_secret exchange
+# and mint tokens for the cluster (improper certificate validation,
+# CWE-295). ClientCredentialFlow::initialize and ::authenticate in
+# pulsar-client-cpp/lib/auth/AuthOauth2.cc both called
+# `curl_easy_setopt(handle, CURLOPT_SSL_VERIFYPEER, 0L);` and
+# `curl_easy_setopt(handle, CURLOPT_SSL_VERIFYHOST, 0L);` unconditionally,
+# ignoring the client's TLS configuration entirely (HTTPLookupService.cc
+# gates the same options on isUseTls/tlsValidateHostname).
+#
+# The row's recorded fix commit checks out; the repository commit
+# 11b5df797b2e9cb48dfc38137f0b7ef736a8a47c is an unrelated Java SchemaHash
+# refactor from the same 2.10.2 release window, and the row's language is
+# java while the defect is C++. The advisory names apache/pulsar-client-cpp
+# because PIP-209 (f3c547b1fb, 2022-09-30) moved the C++ client out of the
+# monorepo after the change; the repo in the row stands, but the change is
+# 48c575db6fac571acd70bb6568fb067c1d52bf34 ("Clean up C++ client curl
+# configuration", #16064), which deletes the four setopt lines, and the
+# language is cpp. Cherry-picks: 0d4c0b1bc6 (branch-2.10), 3211f91ae9
+# (branch-2.9), each reverted and re-applied on 2022-11-02 ahead of
+# 2.10.2/2.9.3.
+#
+# CAUGHT by the shipped cpp binding certValidationDisabled58
+# (vyql/bindings/cpp/m4e783366.vyql: curl_easy_setopt with a
+# CURLOPT_SSL_VERIFYPEER argument carrying a 0) through rule
+# VYQL-CFG-004. Spec records both directions of the change; no definition
+# change needed.
+
+test "rank1617: the oauth2 flow disables peer certificate validation on its curl handle"
+  lang cpp
+  file pulsar-client-cpp/lib/auth/AuthOauth2.cc
+  expect VYQL-CFG-004
+  code
+  ```
+  #include <curl/curl.h>
+  #include <string>
+
+  static size_t curlWriteCallback(void* contents, size_t size, size_t nmemb, void* responseDataPtr) {
+      ((std::string*)responseDataPtr)->append((char*)contents, size * nmemb);
+      return size * nmemb;
+  }
+
+  class ClientCredentialFlow {
+      std::string issuerUrl;
+      std::string tokenEndPoint;
+
+  public:
+      void initialize();
+  };
+
+  void ClientCredentialFlow::initialize() {
+      std::string responseData;
+
+      CURL* handle = curl_easy_init();
+      struct curl_slist* list = NULL;
+      list = curl_slist_append(list, "Accept: application/json");
+      curl_easy_setopt(handle, CURLOPT_HTTPHEADER, list);
+      curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST, "GET");
+
+      std::string wellKnownUrl = issuerUrl;
+      if (wellKnownUrl.back() == '/') {
+          wellKnownUrl.pop_back();
+      }
+      wellKnownUrl.append("/.well-known/openid-configuration");
+      curl_easy_setopt(handle, CURLOPT_URL, wellKnownUrl.c_str());
+
+      curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, curlWriteCallback);
+      curl_easy_setopt(handle, CURLOPT_WRITEDATA, &responseData);
+
+      curl_easy_setopt(handle, CURLOPT_FRESH_CONNECT, 1L);
+      curl_easy_setopt(handle, CURLOPT_FORBID_REUSE, 1L);
+
+      curl_easy_setopt(handle, CURLOPT_FOLLOWLOCATION, 1L);
+      curl_easy_setopt(handle, CURLOPT_SSL_VERIFYPEER, 0L);
+      curl_easy_setopt(handle, CURLOPT_SSL_VERIFYHOST, 0L);
+
+      curl_easy_perform(handle);
+      curl_slist_free_all(list);
+      curl_easy_cleanup(handle);
+  }
+  ```
+
+test "rank1617: the patched flow leaves curl's default peer verification in place"
+  lang cpp
+  file pulsar-client-cpp/lib/auth/AuthOauth2.cc
+  reject VYQL-CFG-004
+  code
+  ```
+  #include <curl/curl.h>
+  #include <string>
+
+  static size_t curlWriteCallback(void* contents, size_t size, size_t nmemb, void* responseDataPtr) {
+      ((std::string*)responseDataPtr)->append((char*)contents, size * nmemb);
+      return size * nmemb;
+  }
+
+  class ClientCredentialFlow {
+      std::string issuerUrl;
+      std::string tokenEndPoint;
+
+  public:
+      void initialize();
+  };
+
+  void ClientCredentialFlow::initialize() {
+      std::string responseData;
+
+      CURL* handle = curl_easy_init();
+      struct curl_slist* list = NULL;
+      list = curl_slist_append(list, "Accept: application/json");
+      curl_easy_setopt(handle, CURLOPT_HTTPHEADER, list);
+      curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST, "GET");
+
+      std::string wellKnownUrl = issuerUrl;
+      if (wellKnownUrl.back() == '/') {
+          wellKnownUrl.pop_back();
+      }
+      wellKnownUrl.append("/.well-known/openid-configuration");
+      curl_easy_setopt(handle, CURLOPT_URL, wellKnownUrl.c_str());
+
+      curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, curlWriteCallback);
+      curl_easy_setopt(handle, CURLOPT_WRITEDATA, &responseData);
+
+      curl_easy_setopt(handle, CURLOPT_FRESH_CONNECT, 1L);
+      curl_easy_setopt(handle, CURLOPT_FORBID_REUSE, 1L);
+
+      curl_easy_setopt(handle, CURLOPT_FOLLOWLOCATION, 1L);
+
+      curl_easy_perform(handle);
+      curl_slist_free_all(list);
+      curl_easy_cleanup(handle);
+  }
+  ```

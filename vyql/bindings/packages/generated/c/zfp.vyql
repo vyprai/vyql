@@ -1,0 +1,257 @@
+module bindings.c.generated.m8b5e3ed1;
+
+binding deserialization0 {
+  requires {
+    dependency("zfp")
+  }
+  query pattern callExpr where callee.method == "zfp_decode_block_int32_1"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("zfp")
+  }
+  query pattern callExpr where callee.method == "zfp_decode_block_int64_1"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("zfp")
+  }
+  query pattern callExpr where callee.method == "zfp_decode_block_float_1"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("zfp")
+  }
+  query pattern callExpr where callee.method == "zfp_decode_block_double_1"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("zfp")
+  }
+  query pattern callExpr where callee.method == "zfp_decode_block_strided_int32_1"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("zfp")
+  }
+  query pattern callExpr where callee.method == "zfp_decode_block_strided_int64_1"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization6 {
+  requires {
+    dependency("zfp")
+  }
+  query pattern callExpr where callee.method == "zfp_decode_block_strided_float_1"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization7 {
+  requires {
+    dependency("zfp")
+  }
+  query pattern callExpr where callee.method == "zfp_decode_block_strided_double_1"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization8 {
+  requires {
+    dependency("zfp")
+  }
+  query pattern callExpr where callee.method == "zfp_decode_block_int32_2"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization9 {
+  requires {
+    dependency("zfp")
+  }
+  query pattern callExpr where callee.method == "zfp_decode_block_int64_2"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization10 {
+  requires {
+    dependency("zfp")
+  }
+  query pattern callExpr where callee.method == "zfp_decode_block_float_2"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization11 {
+  requires {
+    dependency("zfp")
+  }
+  query pattern callExpr where callee.method == "zfp_decode_block_double_2"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization12 {
+  requires {
+    dependency("zfp")
+  }
+  query pattern callExpr where callee.method == "zfp_decode_block_strided_int32_2"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization13 {
+  requires {
+    dependency("zfp")
+  }
+  query pattern callExpr where callee.method == "zfp_decode_block_strided_int64_2"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization14 {
+  requires {
+    dependency("zfp")
+  }
+  query pattern callExpr where callee.method == "zfp_decode_block_strided_float_2"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization15 {
+  requires {
+    dependency("zfp")
+  }
+  query pattern callExpr where callee.method == "zfp_decode_block_strided_double_2"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization16 {
+  requires {
+    dependency("zfp")
+  }
+  query pattern callExpr where callee.method == "zfp_decode_block_int32_3"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization17 {
+  requires {
+    dependency("zfp")
+  }
+  query pattern callExpr where callee.method == "zfp_decode_block_int64_3"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization18 {
+  requires {
+    dependency("zfp")
+  }
+  query pattern callExpr where callee.method == "zfp_decode_block_float_3"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization19 {
+  requires {
+    dependency("zfp")
+  }
+  query pattern callExpr where callee.method == "zfp_decode_block_double_3"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization20 {
+  requires {
+    dependency("zfp")
+  }
+  query pattern callExpr where callee.method == "zfp_decode_block_strided_int32_3"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization21 {
+  requires {
+    dependency("zfp")
+  }
+  query pattern callExpr where callee.method == "zfp_decode_block_strided_int64_3"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization22 {
+  requires {
+    dependency("zfp")
+  }
+  query pattern callExpr where callee.method == "zfp_decode_block_strided_float_3"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization23 {
+  requires {
+    dependency("zfp")
+  }
+  query pattern callExpr where callee.method == "zfp_decode_block_strided_double_3"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization24 {
+  requires {
+    dependency("zfp")
+  }
+  query pattern callExpr where callee.method == "zfp_decode_block_int32_4"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization25 {
+  requires {
+    dependency("zfp")
+  }
+  query pattern callExpr where callee.method == "zfp_decode_block_int64_4"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization26 {
+  requires {
+    dependency("zfp")
+  }
+  query pattern callExpr where callee.method == "zfp_decode_block_float_4"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization27 {
+  requires {
+    dependency("zfp")
+  }
+  query pattern callExpr where callee.method == "zfp_decode_block_double_4"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization28 {
+  requires {
+    dependency("zfp")
+  }
+  query pattern callExpr where callee.method == "zfp_decode_block_strided_int32_4"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization29 {
+  requires {
+    dependency("zfp")
+  }
+  query pattern callExpr where callee.method == "zfp_decode_block_strided_int64_4"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization30 {
+  requires {
+    dependency("zfp")
+  }
+  query pattern callExpr where callee.method == "zfp_decode_block_strided_float_4"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization31 {
+  requires {
+    dependency("zfp")
+  }
+  query pattern callExpr where callee.method == "zfp_decode_block_strided_double_4"
+  emit sink code.Deserialization at args[0]
+}

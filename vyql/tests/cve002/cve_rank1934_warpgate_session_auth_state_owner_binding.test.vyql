@@ -1,0 +1,302 @@
+# Rank 1934 / CVE-2023-48712 (GHSA-c94j-vqr5-3mxr): warpgate's POST
+# /auth/login escalates a non-admin to any named account under single-factor
+# authentication. The authentication state is bound to the session: the first
+# login request that names a principal creates the state, and every later
+# request on that session resolves it again by the session key alone -- the
+# `username` parameter of get_auth_state_for_request is consulted only on the
+# creation path. The credential, though, is verified for the principal the
+# request names: `validate_credential(&body.username, ...)`. So a requester
+# who opens the login as `admin` with a wrong password, then submits their
+# own username with their own correct password, credits a valid password to
+# admin's state and is accepted as admin (CWE-287/CWE-863; the reporter's
+# words: "logs me in as the username that I entered initially with their
+# permission").
+#
+# The fixed revision (e3b26b2) makes both ends name the same principal: the login
+# validates against the state's own owner (`validate_credential(&state.username(),
+# ...)`, the idiom the OTP login in the same file used), and the
+# resolver returns stored state only when `state.lock().await.username() ==
+# username`, creating a fresh state otherwise -- the control the SSO login in
+# the same tree carried as `if state.username() != username`. Both
+# clearing atoms predate the change; the owner read is the model's own API, not
+# a name the fixed revision introduces.
+#
+# Vocabulary: no existing concept covers a session-resolved authentication
+# state credited with a credential verified for a request-named principal
+# with no owner comparison. Considered and rejected: UnapprovedLoginArtifact
+# Authentication (an out-of-band artifact whose shared secret the requester
+# holds and which needs the account holder's approval; here the state is
+# server-created, holds no secret, and needs an owner binding), OAuthReauthen
+# ticationUserMismatch (session freshness after OAuth provider resolution),
+# SessionUserInstallWithoutAuthenticationStateCheck (installs a user into a
+# session without consulting the session; here the session's state is
+# consumed without consulting the request), HttpPersistentAuthReuse
+# (per-connection auth state on the wire, not a stored login state),
+# UnboundAuthorizationTarget (a request-selected resource without a principal
+# relation; the target here is the authentication itself). This rank mints
+# code.SessionAuthStateOwnerBindingMissing (VYQL-AUTH-167) for the class and
+# binds the warpgate auth-state instance of it.
+#
+# The binding recognises the auth-state API's own atoms -- the session
+# resolver, the named-principal credential check, the crediting call -- and
+# is cleared by the state's owner read in the same function. Measured on the
+# real checkout, three `--cache off` runs per side: the parent reports
+# VYQL-AUTH-167 once, at warpgate-protocol-http/src/api/auth.rs:104, and the
+# fix reports it zero times (83 at-or-above high both sides, 270 total both
+# sides). The sibling logins that bind the owner stay unreported in
+# both revisions: the SSO login compares `state.username() != username` and
+# the OTP login validates against `state.username()`. No other clone in the
+# corpus contains `get_auth_state_for_request`, so the shape's reachable set
+# is warpgate alone.
+
+test "rank1934: the password login credits a request-verified credential to the session state without an owner comparison"
+  lang rust
+  file warpgate-protocol-http/src/api/auth.rs
+  expect VYQL-AUTH-167
+  expect_review code.SessionAuthStateOwnerBindingMissing
+  code
+  ```
+  async fn api_auth_login(
+      &self,
+      req: &Request,
+      session: &Session,
+      services: Data<&Services>,
+      body: Json<LoginRequest>,
+  ) -> poem::Result<LoginResponse> {
+      let mut auth_state_store = services.auth_state_store.lock().await;
+      let state_arc = match get_auth_state_for_request(
+          &body.username,
+          session,
+          &mut auth_state_store,
+      )
+      .await
+      {
+          Err(WarpgateError::UserNotFound) => {
+              return Ok(LoginResponse::Failure(Json(LoginFailureResponse {
+                  state: ApiAuthState::Failed,
+              })))
+          }
+          x => x,
+      }?;
+      let mut state = state_arc.lock().await;
+
+      let mut cp = services.config_provider.lock().await;
+
+      let password_cred = AuthCredential::Password(Secret::new(body.password.clone()));
+      if cp
+          .validate_credential(&body.username, &password_cred)
+          .await?
+      {
+          state.add_valid_credential(password_cred);
+      }
+
+      match state.verify() {
+          AuthResult::Accepted { username } => {
+              auth_state_store.complete(state.id()).await;
+              authorize_session(req, username).await?;
+              Ok(LoginResponse::Success)
+          }
+          x => Ok(LoginResponse::Failure(Json(LoginFailureResponse {
+              state: x.into(),
+          }))),
+      }
+  }
+  ```
+
+test "rank1934: the same login validating against the state's own owner"
+  lang rust
+  file warpgate-protocol-http/src/api/auth.rs
+  reject VYQL-AUTH-167
+  reject_review code.SessionAuthStateOwnerBindingMissing
+  code
+  ```
+  async fn api_auth_login(
+      &self,
+      req: &Request,
+      session: &Session,
+      services: Data<&Services>,
+      body: Json<LoginRequest>,
+  ) -> poem::Result<LoginResponse> {
+      let mut auth_state_store = services.auth_state_store.lock().await;
+      let state_arc = match get_auth_state_for_request(
+          &body.username,
+          session,
+          &mut auth_state_store,
+      )
+      .await
+      {
+          Err(WarpgateError::UserNotFound) => {
+              return Ok(LoginResponse::Failure(Json(LoginFailureResponse {
+                  state: ApiAuthState::Failed,
+              })))
+          }
+          x => x,
+      }?;
+      let mut state = state_arc.lock().await;
+
+      let mut cp = services.config_provider.lock().await;
+
+      let password_cred = AuthCredential::Password(Secret::new(body.password.clone()));
+      if cp
+          .validate_credential(&state.username(), &password_cred)
+          .await?
+      {
+          state.add_valid_credential(password_cred);
+      }
+
+      match state.verify() {
+          AuthResult::Accepted { username } => {
+              auth_state_store.complete(state.id()).await;
+              authorize_session(req, username).await?;
+              Ok(LoginResponse::Success)
+          }
+          x => Ok(LoginResponse::Failure(Json(LoginFailureResponse {
+              state: x.into(),
+          }))),
+      }
+  }
+  ```
+
+test "rank1934: an owner comparison against the requested principal is the same control"
+  lang rust
+  file warpgate-protocol-http/src/api/sso_provider_list.rs
+  reject VYQL-AUTH-167
+  reject_review code.SessionAuthStateOwnerBindingMissing
+  code
+  ```
+  async fn sso_login(
+      req: &Request,
+      session: &Session,
+      services: Data<&Services>,
+      context: SsoContext,
+  ) -> Result<Result<String, String>> {
+      let cred = AuthCredential::Sso {
+          provider: context.provider,
+          email: email.clone(),
+      };
+
+      let username = services
+          .config_provider
+          .lock()
+          .await
+          .username_for_sso_credential(&cred)
+          .await?;
+      let Some(username) = username else {
+          return Ok(Err(format!("No user matching {email}")));
+      };
+
+      let mut auth_state_store = services.auth_state_store.lock().await;
+      let state_arc =
+          get_auth_state_for_request(&username, session, &mut auth_state_store).await?;
+
+      let mut state = state_arc.lock().await;
+      let mut cp = services.config_provider.lock().await;
+
+      if state.username() != username {
+          return Ok(Err(format!(
+              "Incorrect account for SSO authentication ({username})"
+          )));
+      }
+
+      if cp.validate_credential(&username, &cred).await? {
+          state.add_valid_credential(cred);
+      }
+
+      if let AuthResult::Accepted { username } = state.verify() {
+          auth_state_store.complete(state.id()).await;
+          authorize_session(req, username).await?;
+      }
+
+      Ok(Ok(context
+          .next_url
+          .as_deref()
+          .unwrap_or("/@warpgate#/login")
+          .to_owned()))
+  }
+  ```
+
+test "rank1934: a comment claiming the owner check does not clear the login"
+  lang rust
+  file warpgate-protocol-http/src/api/auth.rs
+  expect VYQL-AUTH-167
+  expect_review code.SessionAuthStateOwnerBindingMissing
+  code
+  ```
+  async fn api_auth_login(
+      &self,
+      req: &Request,
+      session: &Session,
+      services: Data<&Services>,
+      body: Json<LoginRequest>,
+  ) -> poem::Result<LoginResponse> {
+      let mut auth_state_store = services.auth_state_store.lock().await;
+      // The state is only reused when its owner matches the username this
+      // request names, so a credential for another account cannot complete
+      // the login.
+      let state_arc = get_auth_state_for_request(&body.username, session, &mut auth_state_store).await?;
+      let mut state = state_arc.lock().await;
+
+      let mut cp = services.config_provider.lock().await;
+
+      let password_cred = AuthCredential::Password(Secret::new(body.password.clone()));
+      if cp.validate_credential(&body.username, &password_cred).await? {
+          state.add_valid_credential(password_cred);
+      }
+
+      match state.verify() {
+          AuthResult::Accepted { username } => {
+              auth_state_store.complete(state.id()).await;
+              authorize_session(req, username).await?;
+              Ok(LoginResponse::Success)
+          }
+          x => Ok(LoginResponse::Failure(Json(LoginFailureResponse {
+              state: x.into(),
+          }))),
+      }
+  }
+  ```
+
+test "rank1934: an owner comparison in a sibling function does not clear the login"
+  lang rust
+  file warpgate-protocol-http/src/api/auth.rs
+  expect VYQL-AUTH-167
+  expect_review code.SessionAuthStateOwnerBindingMissing
+  code
+  ```
+  async fn state_owner_matches(
+      state: &Arc<Mutex<AuthState>>,
+      username: &str,
+  ) -> bool {
+      state.lock().await.username() == username
+  }
+
+  async fn api_auth_login(
+      &self,
+      req: &Request,
+      session: &Session,
+      services: Data<&Services>,
+      body: Json<LoginRequest>,
+  ) -> poem::Result<LoginResponse> {
+      let mut auth_state_store = services.auth_state_store.lock().await;
+      let state_arc = get_auth_state_for_request(&body.username, session, &mut auth_state_store).await?;
+      let mut state = state_arc.lock().await;
+
+      let mut cp = services.config_provider.lock().await;
+
+      let password_cred = AuthCredential::Password(Secret::new(body.password.clone()));
+      if cp.validate_credential(&body.username, &password_cred).await? {
+          state.add_valid_credential(password_cred);
+      }
+
+      match state.verify() {
+          AuthResult::Accepted { username } => {
+              auth_state_store.complete(state.id()).await;
+              authorize_session(req, username).await?;
+              Ok(LoginResponse::Success)
+          }
+          x => Ok(LoginResponse::Failure(Json(LoginFailureResponse {
+              state: x.into(),
+          }))),
+      }
+  }
+  ```

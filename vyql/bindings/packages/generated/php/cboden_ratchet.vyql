@@ -1,0 +1,25 @@
+module bindings.php.generated.m8bc2ae53;
+
+binding networkData0 {
+  requires {
+    dependency("cboden/ratchet")
+  }
+  query pattern callExpr where callee.method == "onMessage"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend1 {
+  requires {
+    dependency("cboden/ratchet")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect2 {
+  requires {
+    dependency("cboden/ratchet")
+  }
+  query pattern callExpr where callee.method == "handleConnect"
+  emit sink code.NetworkConnectSink at args[0]
+}

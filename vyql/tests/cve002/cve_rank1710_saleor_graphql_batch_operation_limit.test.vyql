@@ -1,0 +1,183 @@
+# Saleor's GraphQL view accepts a JSON body that is a list of operations
+# (query batching) and executes every entry, so one HTTP call carrying
+# thousands of aliased or chained operations forces the server to parse
+# and execute them all (resource exhaustion, CWE-770; GHSA-gqqv-xwx3-jj4h).
+# _handle_query in saleor/graphql/views.py does
+# `data = self.parse_body(request)` then
+# `if isinstance(data, list): responses = [self.get_response(request,
+# entry) for entry in data]` -- nothing caps the operation count, and the
+# per-operation cost validator (GRAPHQL_QUERY_MAX_COMPLEXITY) runs inside
+# each entry and never bounds the batch. The fixing commit e42aa4d6
+# ("Merge commit from fork", full SHA
+# e42aa4d6e588982e78942b033af051c8ec8f43fa, single parent 652df5e1) adds
+# three caps: GRAPHQL_BATCH_MAX_COUNT rejects `len(data) > limit` with a
+# 400 before the batch loop (the second snippet below), and two new
+# graphql-core validation rules (AliasCountLimitRule counting aliased
+# fields, MutationCountLimitRule counting root mutation selections) run
+# inside the existing graphql.validation.validate call alongside the cost
+# validator. The advisory's release tag e11a5557ef is the peeled 3.23.0
+# version bump and the fixing change is its ancestor, so the row points
+# at the merge.
+#
+# ATTENTION, rechecked, request-batch amplification budget. The defect is
+# a dispatch loop whose only bound is the attacker's operation count --
+# the cross-iteration budget family held at ranks 1534 (header
+# accumulation), 1554 (route combination explosion), 1559 (wire length)
+# and 1586 (recursion depth), here over a request-supplied list rather
+# than parsed members. The corpus's CWE-400 rules judge per-iteration
+# progress -- VYQL-DOS-029 parser advancement, VYQL-DOS-028 buffered-read
+# EOF, and VYQL-DOS-042's UnboundedResourceOperation, whose bindings
+# anchor on a concrete unbounded operation (an asyncio task registry, a
+# decompress call without max_length) rather than on a dispatch whose
+# cost is the element count. Nothing can ask "does the batch dispatch
+# stop at an operation-count cap".
+#
+# Re-measured on the real checkout at the parent and at the fix:
+#
+#   * `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB` over
+#     saleor/graphql/views.py reports one VYQL-AUTH-099 mass-assignment
+#     finding at each revision, source `request.body` -> parse_body ->
+#     get_response -> the bulk-apply sink. The batch loop is on the taint
+#     path but nothing about the count fires, and the finding does not
+#     move when the cap lands. The `-flags only` view reports one
+#     core.PathAccessCheck flag at each revision and nothing
+#     resource-named.
+#   * The same scan over saleor/graphql/core (76 python files), three
+#     --cache off runs per revision, reports 8 findings and 15 flags at
+#     both revisions with identical fingerprints: VYQL-AUTH-002 x2,
+#     VYQL-DESER-001, VYQL-AUTH-102, VYQL-AUTH-099 x2, VYQL-SMELL-IDOR
+#     x2, plus ObjectLookupByUserInput, PathAccessCheck and
+#     ResourceRelease flags. No DOS rule and no resource review concept
+#     at either revision.
+#   * The full saleor/graphql tree (1518 python files) reaches the
+#     -max-ram ceiling on every attempt -- "the scan reached 5.6 GiB of
+#     resident memory, past the ceiling of -max-ram 6GB; stopping" three
+#     times out of three -- so the wider tree is not measurable at this
+#     ceiling and the core-subtree and file scopes above carry the
+#     result.
+#
+# The framework-API route stays closed twice over.
+# internal/extract/sca/discover.go still reads no pyproject.toml -- its
+# manifest table lists requirements.txt, setup.py, setup.cfg,
+# package.json, .npmrc, composer.lock, go.mod, pom.xml and cargo.lock --
+# and saleor declares its dependencies in pyproject.toml with no
+# requirements.txt, so every `dependency()`-gated binding is inert on
+# this tree. Even ungated, the two generated graphene-django bindings
+# (bindings/packages/generated/python/graphene-django.vyql) label
+# `parse_body` a core.UserControlledData source and
+# `execute_graphql_request` a code.CodeEval sink; neither expresses an
+# operation-count budget, so satisfying the gate would not add this
+# detection either.
+#
+# The one discriminating anchor was written and measured, and it is not
+# shippable. A function-scoped Python presence binding on
+# `paramName in ["request"]` and `call in ["isinstance"]` and
+# `identifier in ["list"]` and `assign contains ")for"` and
+# `not (call in ["len"])` flips 1 -> 0 between views.py:169 and the fixed
+# file, and the `len` negation is an accepted language idiom for a count
+# bound in this corpus (bindings/python/unbounded_concurrent_operations.
+# vyql ships exactly that clause with the residual stated). It fails on
+# the load-bearing fact instead: nothing in it says the iterated list is
+# request-derived. Across the clone pool the shape's reachable set -- a
+# request- or req-named parameter together with an isinstance call, a
+# bare list token, an assigned comprehension and no len() in one function
+# -- is 18 functions, and with the two shipped UnboundedResourceOperation
+# emitters moved aside the probe fires on three of them: views.py:169
+# (this weakness), `generate_payload_promise_from_subscription`
+# (saleor/graphql/webhook/subscription_payload.py:102), whose
+# comprehension iterates the server-generated `payload_instance.errors`
+# in a function that merely has a parameter named `request`, and web2py's
+# `verifyURL(request, hmac_key=...)` (gluon/html.py:425), an HMAC
+# URL-signature check whose comprehension filters `list_vars` by
+# `hash_vars`. One true positive in three, and the two false positives
+# are ordinary code. The clauses are four unconnected existentials over
+# one function's token bag -- co-membership, not a connected shape -- and
+# the residual runs the other way too: a cap moved into a helper, spelled
+# as a slice, or enforced by a framework gate walks past the negation.
+# For the same measurement, the labels on `zlib.decompress` in
+# saleor/webhook/observability/buffers.py and on `bz2.decompress` in
+# pygments/lexers/special.py belong to
+# bindings/python/streaming_decomposition_output_without_cap.vyql, not to
+# the probe.
+#
+# No ENGINE-GAPS.md entry: the missing piece is budget vocabulary across
+# request items, not a localised construct. No definition change shipped.
+# This spec records the unbounded batch loop and the count-capped form,
+# both asserting reject VYQL-DOS-029 and reject VYQL-DOS-042: when
+# batch-budget vocabulary lands, the unbounded form must flip to expect.
+
+test "rank1710: every batched operation executes with no count cap"
+  lang python
+  file saleor/graphql/views.py
+  reject VYQL-DOS-029
+  reject VYQL-DOS-042
+  code
+  ```
+  class GraphQLView(View):
+      def _handle_query(self, request: HttpRequest) -> JsonResponse:
+          try:
+              data = self.parse_body(request)
+          except ValueError:
+              return JsonResponse(
+                  data={
+                      "errors": [
+                          self.format_error(GraphQLError("Unable to parse query."))
+                      ]
+                  },
+                  status=400,
+              )
+
+          result: GraphQLOperationResult | None | list[GraphQLOperationResult | None]
+          if isinstance(data, list):
+              responses = [self.get_response(request, entry) for entry in data]
+              result = [response for response, code in responses]
+              status_code = max((code for response, code in responses), default=200)
+          else:
+              result, status_code = self.get_response(request, data)
+          return JsonResponse(data=result, status=status_code, safe=False)
+  ```
+
+test "rank1710: the fixed revision rejects batches over the operation cap"
+  lang python
+  file saleor/graphql/views.py
+  reject VYQL-DOS-029
+  reject VYQL-DOS-042
+  code
+  ```
+  from django.conf import settings
+
+
+  class GraphQLView(View):
+      def _handle_query(self, request: HttpRequest) -> JsonResponse:
+          try:
+              data = self.parse_body(request)
+          except ValueError:
+              return JsonResponse(
+                  data={
+                      "errors": [
+                          self.format_error(GraphQLError("Unable to parse query."))
+                      ]
+                  },
+                  status=400,
+              )
+
+          result: GraphQLOperationResult | None | list[GraphQLOperationResult | None]
+          if isinstance(data, list):
+              if len(data) > settings.GRAPHQL_BATCH_MAX_COUNT:
+                  return JsonResponse(
+                      data={
+                          "errors": [
+                              self.format_error(
+                                  GraphQLError("Number of batch queries exceeded.")
+                              )
+                          ]
+                      },
+                      status=400,
+                  )
+              responses = [self.get_response(request, entry) for entry in data]
+              result = [response for response, code in responses]
+              status_code = max((code for response, code in responses), default=200)
+          else:
+              result, status_code = self.get_response(request, data)
+          return JsonResponse(data=result, status=status_code, safe=False)
+  ```

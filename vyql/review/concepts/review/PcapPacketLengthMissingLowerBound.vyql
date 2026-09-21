@@ -1,0 +1,8 @@
+module code;
+
+review code.PcapPacketLengthMissingLowerBound {
+  category: memory
+  expected: [core.InputValidation]
+  kind: attention
+  text: "exclude a zero packet length before handing the captured buffer to code that reads it at fixed offsets"
+}

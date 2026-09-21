@@ -1,0 +1,18 @@
+module bindings.php.upload_content_sniffed_extension_allowlist_without_client_extension;
+
+// An upload-validation function that decides admission against a list using the
+// extension sniffed from the file's content and never consults the extension of
+// the client-supplied name. The two reads are documented as a pair on the
+// uploaded-file classes that carry them: guessExtension() derives the extension
+// from the file's media type, while getClientExtension()/getClientOriginalExtension()
+// return the extension of the name the client sent and are marked untrusted. A
+// handler that admits on the sniffed one alone stores the file under whatever
+// extension its client-supplied name carried, so an upload whose bytes sniff as
+// an allowed image is still stored -- and later served -- under that extension.
+// The negation is the client-side read, which the safe handler performs on the
+// same value it admits; `call:` is AST-derived, so a comment naming it does not
+// satisfy it.
+binding uploadContentSniffedExtensionAllowlistWithoutClientExtension {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.call == "guessExtension" and node.context.call == "in_array" and not (node.context.call in ["getClientExtension", "getClientOriginalExtension"])
+  emit issue code.IncompleteFileExtensionValidation at node
+}

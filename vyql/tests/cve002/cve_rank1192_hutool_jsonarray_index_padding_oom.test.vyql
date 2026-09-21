@@ -1,0 +1,196 @@
+# Rank 1192 / CVE-2023-42276: hutool's JSONArray.add(int, Object) pads the
+# backing list up to a caller-supplied index before placing the element
+# (GHSA-rxgf-r843-g53h, issue#3286@Github). When index is at or past the
+# current size, the vulnerable form loops `while (index != this.size())
+# this.add(JSONNull.NULL);`, appending one JSONNull per step with no upper
+# bound on index -- a single call with a large index drives the loop until
+# the JVM runs out of heap. hutool-core's ListUtil.setOrPadding has the
+# identical padding loop and the same fix; the advisory names both
+# artifacts, and the fix (9ba8f9ca5) lands the same two-line guard in both.
+# The first tagged release carrying the fix is 5.8.22.
+#
+# The weakness is inside the library, so the application's call is correct
+# code -- there is no application-side pattern that separates a vulnerable
+# pin from a fixed one -- and the report that belongs to this CVE is the
+# dependency finding: a Maven pin of either artifact below 5.8.22. The
+# advisory's own CWE-120 label describes a memory-safety violation that this
+# loop is not; the class is unbounded resource consumption, so the row
+# carries CWE-400.
+
+test "rank1192: a hutool-json pin below the first index-bounded release is a dependency finding"
+  lang java
+  file src/main/java/example/App.java
+  code
+  ```
+  package example;
+
+  import cn.hutool.json.JSONArray;
+
+  public class App {
+      public void place(JSONArray array, int index, Object value) {
+          array.add(index, value);
+      }
+  }
+  ```
+  file pom.xml
+  code
+  ```
+  <project xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>example</groupId>
+    <artifactId>app</artifactId>
+    <version>1.0.0</version>
+    <dependencies>
+      <dependency>
+        <groupId>cn.hutool</groupId>
+        <artifactId>hutool-json</artifactId>
+        <version>5.8.21</version>
+      </dependency>
+    </dependencies>
+  </project>
+  ```
+  expect VYQL-SCA-001
+  expect_evidence VYQL-SCA-001 CVE-2023-42276
+
+test "rank1192: a hutool-json pin at the first index-bounded release is clean"
+  lang java
+  file src/main/java/example/App.java
+  code
+  ```
+  package example;
+
+  import cn.hutool.json.JSONArray;
+
+  public class App {
+      public void place(JSONArray array, int index, Object value) {
+          array.add(index, value);
+      }
+  }
+  ```
+  file pom.xml
+  code
+  ```
+  <project xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>example</groupId>
+    <artifactId>app</artifactId>
+    <version>1.0.0</version>
+    <dependencies>
+      <dependency>
+        <groupId>cn.hutool</groupId>
+        <artifactId>hutool-json</artifactId>
+        <version>5.8.22</version>
+      </dependency>
+    </dependencies>
+  </project>
+  ```
+  reject VYQL-SCA-001
+
+test "rank1192: a hutool-core pin below the first index-bounded release is a dependency finding"
+  lang java
+  file src/main/java/example/App.java
+  code
+  ```
+  package example;
+
+  import cn.hutool.core.collection.ListUtil;
+
+  public class App {
+      public void place(java.util.List<Object> list, int index, Object value) {
+          ListUtil.setOrPadding(list, index, value, null);
+      }
+  }
+  ```
+  file pom.xml
+  code
+  ```
+  <project xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>example</groupId>
+    <artifactId>app</artifactId>
+    <version>1.0.0</version>
+    <dependencies>
+      <dependency>
+        <groupId>cn.hutool</groupId>
+        <artifactId>hutool-core</artifactId>
+        <version>5.8.21</version>
+      </dependency>
+    </dependencies>
+  </project>
+  ```
+  expect VYQL-SCA-001
+  expect_evidence VYQL-SCA-001 CVE-2023-42276
+
+test "rank1192: a hutool-core pin at the first index-bounded release is clean"
+  lang java
+  file src/main/java/example/App.java
+  code
+  ```
+  package example;
+
+  import cn.hutool.core.collection.ListUtil;
+
+  public class App {
+      public void place(java.util.List<Object> list, int index, Object value) {
+          ListUtil.setOrPadding(list, index, value, null);
+      }
+  }
+  ```
+  file pom.xml
+  code
+  ```
+  <project xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>example</groupId>
+    <artifactId>app</artifactId>
+    <version>1.0.0</version>
+    <dependencies>
+      <dependency>
+        <groupId>cn.hutool</groupId>
+        <artifactId>hutool-core</artifactId>
+        <version>5.8.22</version>
+      </dependency>
+    </dependencies>
+  </project>
+  ```
+  reject VYQL-SCA-001
+
+# The padding call itself stays unreported as a resource finding whatever the
+# pin: the caller is doing the correct thing, the loop that grows without a
+# bound is inside the library, and detecting it in source needs the Java
+# loop-identity analysis fact the engine does not have (ENGINE-GAPS "1192").
+# The vulnerable-library report is carried by the dependency finding above.
+
+test "rank1192: the padding call is not a resource finding on a vulnerable pin"
+  lang java
+  file src/main/java/example/App.java
+  code
+  ```
+  package example;
+
+  import cn.hutool.json.JSONArray;
+
+  public class App {
+      public void place(JSONArray array, int index, Object value) {
+          array.add(index, value);
+      }
+  }
+  ```
+  file pom.xml
+  code
+  ```
+  <project xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>example</groupId>
+    <artifactId>app</artifactId>
+    <version>1.0.0</version>
+    <dependencies>
+      <dependency>
+        <groupId>cn.hutool</groupId>
+        <artifactId>hutool-json</artifactId>
+        <version>5.8.21</version>
+      </dependency>
+    </dependencies>
+  </project>
+  ```
+  reject VYQL-DOS-041

@@ -1,0 +1,45 @@
+module bindings.javascript.zitadelIdpAutoLinkWithoutResourceOwner;
+
+// ZITADEL's login application resolves an incoming external-IdP callback in one
+// server action. The user-v2 surface it drives is three documented calls:
+// `listUsers` searches accounts by email or username, `addIDPLink` attaches an
+// external identity to an account given its `userId`, and every user object
+// carries `details.resourceOwner`, the organisation that owns it. Linking
+// policy in ZITADEL is organisation-scoped -- `getLoginSettings` is read per
+// organisation -- so the account's `resourceOwner` is the principal relation a
+// link has to be authorised against.
+//
+// Auto-linking is the case where that relation is the only thing standing
+// between a callback and an account takeover. The local account is selected by
+// `listUsers` over the external identity's email or username, which are
+// attributes the operator of the external IdP asserts, and `addIDPLink` is then
+// called on whatever matched. The IDP template's own `options.isLinkingAllowed`
+// does not gate this: it speaks for the provider, not for the organisation that
+// owns the matched account. So a linking function that selects its target with
+// `listUsers` and never reads the target's `resourceOwner` has no principal
+// relation at all for the link it is about to create.
+//
+// The neutralising reading is the field read, not the guard's calls. ZITADEL's
+// own fix extracts the policy check into a sibling helper, and a JavaScript
+// function's context carries none of a sibling's calls, so a negation over the
+// helper's APIs would be keying on a body the linking function cannot see. The
+// target's `resourceOwner` is read at the helper's call site, inside the linking
+// function itself, which is why it is the clause used here: it survives the
+// check moving into a helper, being renamed, or throwing instead of returning.
+// It is a selector, so it is AST-derived and a comment naming the field does
+// not satisfy it.
+//
+// Two boundaries are deliberate. A function that links an identity onto an
+// account it just created (`addHumanUser` then `addIDPLink` on the response)
+// is out of scope: that target is not selected by a query over
+// externally-asserted attributes, so there is no cross-principal selection to
+// authorise. And a guard that reads login settings for an organisation the
+// request supplied, rather than the one that owns the matched account, does not
+// clear this -- the organisation owning the target is the relation being asked
+// for. Residual, in the false-negative direction: reading `resourceOwner`
+// without consulting any policy clears this, the same condition-blindness every
+// scope-level coverage clause in this corpus has.
+binding jsZitadelIdpAutoLinkWithoutResourceOwner {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.call == "addIDPLink" and node.context.call == "listUsers" and not (containsAny(node.context.selector, ["resourceOwner"]))
+  emit issue code.UnboundAuthorizationTarget at node
+}

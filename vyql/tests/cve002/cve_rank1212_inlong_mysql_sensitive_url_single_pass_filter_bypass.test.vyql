@@ -1,0 +1,88 @@
+test "rank1212: Inlong MySQL sensitive-URL filter strips each denylisted key once, so a nested key reconstitutes after removal"
+  lang java
+  file inlong-manager/manager-pojo/src/main/java/org/apache/inlong/manager/pojo/util/MySQLSensitiveUrlUtils.java
+  expect VYQL-DESER-022
+  expect_review code.JdbcSensitiveParamSinglePassFilterBypass
+  code
+  ```
+  package org.apache.inlong.manager.pojo.util;
+
+  import org.apache.commons.lang3.StringUtils;
+
+  import java.util.HashMap;
+  import java.util.Map;
+
+  public class MySQLSensitiveUrlUtils {
+
+    private static final Map<String, String> SENSITIVE_REPLACE_PARAM_MAP = new HashMap<String, String>() {
+
+      {
+        put("autoDeserialize", "false");
+        put("allowLoadLocalInfile", "false");
+        put("allowUrlInLocalInfile", "false");
+      }
+    };
+
+    public static String filterSensitive(String url) {
+      if (StringUtils.isBlank(url)) {
+        return url;
+      }
+      String resultUrl = url;
+      for (String key : SENSITIVE_REPLACE_PARAM_MAP.keySet()) {
+        resultUrl = StringUtils.replaceIgnoreCase(resultUrl, key + "=" + "true", "");
+        resultUrl = StringUtils.replaceIgnoreCase(resultUrl, key + "=" + "yes", "");
+      }
+      return resultUrl;
+    }
+  }
+  ```
+
+test "rank1212: Inlong MySQL sensitive-URL filter re-scans after each strip until no denylisted key remains"
+  lang java
+  file inlong-manager/manager-pojo/src/main/java/org/apache/inlong/manager/pojo/util/MySQLSensitiveUrlUtils.java
+  reject VYQL-DESER-022
+  reject_review code.JdbcSensitiveParamSinglePassFilterBypass
+  code
+  ```
+  package org.apache.inlong.manager.pojo.util;
+
+  import org.apache.commons.lang3.StringUtils;
+
+  import java.util.HashMap;
+  import java.util.Map;
+
+  public class MySQLSensitiveUrlUtils {
+
+    private static final Map<String, String> SENSITIVE_REPLACE_PARAM_MAP = new HashMap<String, String>() {
+
+      {
+        put("autoDeserialize", "false");
+        put("allowLoadLocalInfile", "false");
+        put("allowUrlInLocalInfile", "false");
+      }
+    };
+
+    public static String filterSensitive(String url) {
+      if (StringUtils.isBlank(url)) {
+        return url;
+      }
+      String resultUrl = url;
+      String sensitiveKey = containSensitiveKey(resultUrl);
+      while (StringUtils.isNotBlank(sensitiveKey)) {
+        resultUrl = StringUtils.replaceIgnoreCase(resultUrl, sensitiveKey + "=" + "true", "");
+        resultUrl = StringUtils.replaceIgnoreCase(resultUrl, sensitiveKey + "=" + "yes", "");
+        sensitiveKey = containSensitiveKey(resultUrl);
+      }
+      return resultUrl;
+    }
+
+    public static String containSensitiveKey(String url) {
+      for (String key : SENSITIVE_REPLACE_PARAM_MAP.keySet()) {
+        if (url.contains(key + "=" + "true") || url.contains(key + "=" + "yes")) {
+          return key;
+        }
+      }
+      return null;
+    }
+  }
+  ```

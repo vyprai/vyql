@@ -1,0 +1,27 @@
+module bindings.python.forwarded_for_first_hop_client_ip;
+
+// `X-Forwarded-For` is a list a proxy *appends* to: each hop adds the address
+// it received the request from, so the entries to the left of the one the
+// nearest trusted proxy wrote are whatever the client chose to send. Every
+// specification of the header says so -- RFC 7239 §7.1, the WSGI/Flask
+// "behind a proxy" note, and Django's own documentation, which prints the
+// `request.META['HTTP_X_FORWARDED_FOR'].split(',')[0]` recipe next to a
+// warning that it must not be used for anything security relevant.
+//
+// Reading the header's *first* entry therefore returns a client-controlled
+// string, not the peer's address. Deriving the request's client IP that way
+// and then feeding it to a local-network, allowlist or rate-limit decision
+// lets anyone set `X-Forwarded-For: 127.0.0.1` and be treated as local.
+//
+// The documented way to do it is to walk the list from the right, discarding
+// entries written by proxies the deployment declares trusted, and to fall
+// back to the transport peer when the direct peer is not itself trusted --
+// which is what werkzeug's `ProxyFix` and Django's `SECURE_PROXY_SSL_HEADER`
+// siblings do. So the flagged shape is specifically the leftmost read: the
+// header assigned out of a request-header mapping and then indexed at `[0]`
+// of its comma split. Walking from the right, or indexing anything else,
+// is a different computation and does not match.
+binding forwardedForFirstHopClientIp {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "python" and containsAny(node.context.callPath, ["headers.get", "META.get", "environ.get", "get_header"]) and containsAny(node.context.assign, ["X-Forwarded-For", "HTTP_X_FORWARDED_FOR"]) and containsAny(node.context.subscript, ["split(\",\")[0]", "split(',')[0]"])
+  emit issue code.ProxyClientIpSpoofingBypass at node
+}

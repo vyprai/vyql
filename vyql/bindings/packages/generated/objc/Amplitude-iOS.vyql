@@ -1,0 +1,57 @@
+module bindings.objc.generated.m7ce48b31;
+
+binding userControlledData0 {
+  requires {
+    dependency("Amplitude-iOS")
+  }
+  query pattern callExpr where callee.method == "logEvent"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("Amplitude-iOS")
+  }
+  query pattern callExpr where callee.method == "identify"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("Amplitude-iOS")
+  }
+  query pattern callExpr where callee.method == "setUserId"
+  emit source core.UserControlledData at call.result
+}
+
+binding secretValue3 {
+  requires {
+    dependency("Amplitude-iOS")
+  }
+  query pattern callExpr where callee.method == "setBearerToken"
+  emit source code.SecretValue at call.result
+}
+
+binding urlFetch4 {
+  requires {
+    dependency("Amplitude-iOS")
+  }
+  query pattern callExpr where callee.method == "setServerUrl"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding networkConnect5 {
+  requires {
+    dependency("Amplitude-iOS")
+  }
+  query pattern callExpr where callee.method == "dataTaskWithRequest"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect6 {
+  requires {
+    dependency("Amplitude-iOS")
+  }
+  query pattern callExpr where callee.method == "sendAsynchronousRequest"
+  emit sink code.NetworkConnectSink at args[0]
+}

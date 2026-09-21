@@ -1,0 +1,8 @@
+module code;
+
+review code.PublicVisibilityCacheInvalidationMissing {
+  category: auth
+  expected: [core.AuthorizationCheck]
+  kind: target
+  text: "verify public visibility changes invalidate cached public sandbox proxy or preview status"
+}

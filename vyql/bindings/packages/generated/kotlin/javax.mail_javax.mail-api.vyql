@@ -1,0 +1,89 @@
+module bindings.kotlin.generated.maf65a911;
+
+binding deserialization0 {
+  requires {
+    dependency("javax.mail:javax.mail-api")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("javax.mail:javax.mail-api")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("javax.mail:javax.mail-api")
+  }
+  query pattern callExpr where callee.method == "setFileName"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("javax.mail:javax.mail-api")
+  }
+  query pattern callExpr where callee.method == "writeTo"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding responseHeaderWrite4 {
+  requires {
+    dependency("javax.mail:javax.mail-api")
+  }
+  query pattern callExpr where callee.method == "setHeader"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding responseHeaderWrite5 {
+  requires {
+    dependency("javax.mail:javax.mail-api")
+  }
+  query pattern callExpr where callee.method == "addHeader"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding userControlledData6 {
+  requires {
+    dependency("javax.mail:javax.mail-api")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData7 {
+  requires {
+    dependency("javax.mail:javax.mail-api")
+  }
+  query pattern callExpr where callee.method == "getHeader"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData8 {
+  requires {
+    dependency("javax.mail:javax.mail-api")
+  }
+  query pattern callExpr where callee.method == "getAllHeaders"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData9 {
+  requires {
+    dependency("javax.mail:javax.mail-api")
+  }
+  query pattern callExpr where callee.method == "getMatchingHeaders"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData10 {
+  requires {
+    dependency("javax.mail:javax.mail-api")
+  }
+  query pattern callExpr where callee.method == "getNonMatchingHeaders"
+  emit source core.UserControlledData at call.result
+}

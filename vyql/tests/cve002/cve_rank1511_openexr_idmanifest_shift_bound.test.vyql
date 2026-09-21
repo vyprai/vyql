@@ -1,0 +1,153 @@
+# Rank 1511 / CVE-2026-42217: OpenEXR's IDManifest variable-length integer
+# reader shifted by an unbounded amount (CWE-758 use of undefined behavior
+# feeding out-of-bounds parsing). readVariableLengthInteger in
+# src/lib/OpenEXR/ImfIDManifest.cpp loops
+#   do { ...bounds-check readPtr against endPtr...
+#        value |= (uint64_t (byte & 127)) << shift;
+#        shift += 7;
+#   } while (byte & 128);
+# so a manifest chunk with ten or more continuation bytes drives shift to
+# 64 and beyond: shifting a uint64_t by its width is undefined behavior,
+# the corrupted value then feeds string-list length decoding and indexes
+# past the buffer. The fixing commit (confirmed --
+# "Harden IDManifest parsing against illegal shift and string prefix OOB
+# (#2378)"): a `if (shift >= 64) throw InputExc` before the shift; the
+# common-prefix out-of-bounds half named in the message moves to PR
+# #2377 and is not in this diff. .
+#
+# ATTENTION, no feature observes a shift amount. The bounds discipline in
+# the loop is otherwise real -- readPtr is guarded against endPtr -- so
+# the missing piece is specifically the shift-amount bound, and no rule
+# family asks about it: VYQL-NUM-003 (TaintedIntegerSizeArithmetic) is the
+# numeric family's nearest rule and covers size arithmetic on tainted
+# values, not shift widths. Measured on the real code: scanning
+# ImfIDManifest.cpp at both revisions reports the same low-confidence
+#NullableDeref noise (the loop's deref at parent line 118 / fix line 125
+# among them) and the same RawMemoryCopySize rows far below; nothing
+# differs between the revisions and nothing touches the shift. A binding
+# cannot express "the shift amount of this << is not provably below the
+# type width" because no context token carries the amount or its bound --
+# entered in ENGINE-GAPS.md (Medium: deciding what counts as a bounded
+# shift is a guard judgement, like the lower-bound row). No definition
+# change shipped. Spec cve_rank1511 records the unbounded-shift loop and
+# the guarded form, both asserting reject VYQL-NUM-003.
+#
+# ## Recheck measurements
+#
+# Re-probed at the current knowledge base tip, where the `<<` itself IS
+# labelled: match on the pre-fix ImfIDManifest.cpp shows
+# `__binop.shl ... code.IntegerSizeArithmeticSink @ :122` (and @ :125 at
+# the fix) from the shipped shl sink binding, so the sink half of
+# VYQL-NUM-003 is in place and has been for some time. The rule still
+# cannot fire, for two independent reasons, both re-measured:
+#
+# 1. No source. The file carries zero source labels of any concept; trace
+#    -from core.UserControlledData -to code.IntegerSizeArithmeticSink
+#    reports `0 source(s): 0 reach a sink, 0 dead-end`. The manifest
+#    bytes arrive through `Xdr::read<CharPtrIO>` (19 `Xdr.?` unresolved
+#    template call sites in this one file) and virtual Istream reads, so
+#    taint needs the C/C++ out-parameter-buffer gap that is already on
+#    file (read-style calls taint only the return value; the filled
+#    buffer never carries it).
+# 2. No discrimination even with a source. The rule's
+#    `unless endpoint coveredBy core.IntegerOverflowGuard` is satisfied
+#    only by a `*_MAX`/`numeric_limits` token in the function's binary
+#    context; the fixing commit's guard is the literal comparison
+#    `shift >= 64`, which produces `binary_shape:ID>=NUM` and no MAX
+#    token, so the rule would fire on BOTH revisions.
+#
+# Three `--cache off` runs per revision over the whole checkout at
+# 21eaa33bc^ and 21eaa33bc: 2112 findings each run at both revisions,
+# byte-identical fingerprint sets; on ImfIDManifest.cpp exactly 12
+# findings at each revision (2x VYQL-MEM-016 RawMemoryCopySize, 1x
+# VYQL-MEM-007, 1x VYQL-MEM-012, 7x VYQL-MEM-006 NullableDeref, the
+# loop's own deref at :118/:125 among them), differing only by the fix's
+# 7-line offset. The tree's single VYQL-NUM-003 is
+# src/wrappers/python/Imath.py:42 with the same fingerprint at both
+# revisions; no numeric row lands on ImfIDManifest.cpp.
+#
+# The taint-free presence route was measured and is unshippable on
+# precision. Probe bindings over `binary_shape`/`assign_op_shape` context
+# tokens on the real tree: a shift by a variable (`<<ID` shape) appears
+# in 652 functions; requiring no numeric `>=` bound in the function
+# leaves 630; adding an accumulating `+=NUM`/`-=NUM` (the loop shape)
+# leaves 55 across 25 files -- dominated by the OpenJPH block
+# coders (ojph_block_decoder64.cpp x7, ojph_block_decoder32.cpp x6,
+# encoders/variants x13), all ordinary entropy-coding code -- and the
+# same probe still reports 54 functions at the FIXED revision, including
+# IDManifest's own safe `serialize` writer (:573), because only
+# readVariableLengthInteger gained an `ID>=NUM` comparison. One true
+# positive in 55 with 54 hits surviving the fix is the measured-
+# unshippable ratio, and tightening further means naming the shifted
+# variable to correlate it with its bound, which is repro-shaped. The
+# probe incidentally confirms `binary_shape` stays function-confined for
+# C++ (the fix's in-function guard suppressed exactly that function's
+# context hit while every other function kept firing).
+#
+# The 1st-pass note says the Medium ENGINE-GAPS entry ("deciding what
+# counts as a bounded shift is a guard judgement, like the lower-bound
+# row") was entered; no such entry is present in ENGINE-GAPS.md today.
+# No definition is touched, so the OWASP Java and Python numbers are
+# unaffected by this rank.
+
+test "rank1511: continuation bytes shift past the type width"
+  lang cpp
+  file src/lib/OpenEXR/ImfIDManifest.cpp
+  reject VYQL-NUM-003
+  code
+  ```
+  #include <cstdint>
+  #include <stdexcept>
+
+  static uint64_t
+  readVariableLengthInteger (const char*& readPtr, const char* endPtr)
+  {
+      uint64_t value = 0;
+      int shift = 0;
+      unsigned char byte = 0;
+      do
+      {
+          if (readPtr >= endPtr)
+          {
+              throw std::runtime_error ("IDManifest too small for variable length integer");
+          }
+          byte = *(unsigned char*) readPtr++;
+          value |= (uint64_t (byte & 127)) << shift;
+          shift += 7;
+      } while (byte & 128);
+      return value;
+  }
+  ```
+
+test "rank1511: the fixed revision rejects shifts at the type width"
+  lang cpp
+  file src/lib/OpenEXR/ImfIDManifest.cpp
+  reject VYQL-NUM-003
+  code
+  ```
+  #include <cstdint>
+  #include <stdexcept>
+
+  static uint64_t
+  readVariableLengthInteger (const char*& readPtr, const char* endPtr)
+  {
+      uint64_t value = 0;
+      int shift = 0;
+      unsigned char byte = 0;
+      do
+      {
+          if (readPtr >= endPtr)
+          {
+              throw std::runtime_error ("IDManifest too small for variable length integer");
+          }
+          if (shift >= 64)
+          {
+              throw std::runtime_error ("Invalid variable-length integer in IDManifest");
+          }
+          byte = *(unsigned char*) readPtr++;
+          value |= (uint64_t (byte & 127)) << shift;
+          shift += 7;
+      } while (byte & 128);
+      return value;
+  }
+  ```

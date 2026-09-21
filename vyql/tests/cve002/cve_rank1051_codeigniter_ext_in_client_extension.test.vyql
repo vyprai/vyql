@@ -1,0 +1,240 @@
+# Rank 1051 / CVE-2026-48062: CodeIgniter's `ext_in` upload rule validates the
+# extension guessed from the file's content and never the one the client sends
+# (CWE-434). FileRules::ext_in in system/Validation/StrictRules/FileRules.php
+# holds
+#
+#   if (! in_array($file->guessExtension(), $params, true)) {
+#       return false;
+#   }
+#
+# so uploading GIF bytes under the name `shell.php` satisfies `ext_in[avatar,gif]`
+# while the stored file keeps the `.php` name. The fixed revision also reads
+# getClientExtension, rejects an empty one, requires it to be in the allowed
+# list, and requires the guessed and client extensions to agree.
+#
+# Detected by VYQL-INJ-037 through binding
+# uploadContentSniffedExtensionAllowlistWithoutClientExtension
+# (vyql/bindings/php/upload_content_sniffed_extension_allowlist_without_client_extension.vyql):
+# an upload-validation function that decides admission against a list using the
+# content-sniffed extension and never reads the extension of the client-supplied
+# name. The two reads are documented as a pair on the uploaded-file classes that
+# carry them -- UploadedFileInterface marks getClientExtension "NOT a trusted
+# source. For a trusted version, use guessExtension() instead" -- and the same
+# pair is spelled getClientOriginalExtension on Symfony's UploadedFile, which
+# Laravel applications receive, so the negation lists both spellings. Nothing in
+# the binding is the fixed revision's own layout: `in_array` is present at both
+# revisions and the discriminator is the absence of a client-side read.
+#
+# Measured on the real checkout, 3x `--cache off` per revision, timeout 180,
+# --max-ram 6GB: 1143 findings at the vulnerable revision and 1142 at the fixed
+# one, both stable across runs; the whole delta is the VYQL-INJ-037 row at
+# system/Validation/StrictRules/FileRules.php:193. By exhaustive grep over the
+# corpus clones, `guessExtension` occurs in no PHP file outside this repository,
+# so the measured set is the reachable set.
+#
+# Residual, stated rather than hidden: a handler that reads the client extension
+# for some other purpose while admitting on the guessed one alone is not
+# reported, and an admission idiom other than `in_array` (a framework validator
+# object, a switch over types) is not recognised either.
+
+test "rank1051: the rule admits an upload on the extension guessed from content alone"
+  lang php
+  file system/Validation/StrictRules/FileRules.php
+  expect VYQL-INJ-037
+  code
+  ```
+  <?php
+
+  namespace CodeIgniter\Validation\StrictRules;
+
+  class FileRules
+  {
+      public function ext_in(?string $blank, string $params): bool
+      {
+          // Grab the file name off the top of the $params
+          // after we split it.
+          $params = explode(',', $params);
+          $name   = array_shift($params);
+
+          $files = $this->request->getFileMultiple($name);
+          if ($files === null) {
+              $files = [$this->request->getFile($name)];
+          }
+
+          foreach ($files as $file) {
+              if ($file === null) {
+                  return false;
+              }
+
+              if ($file->getError() === UPLOAD_ERR_NO_FILE) {
+                  return true;
+              }
+
+              if (! in_array($file->guessExtension(), $params, true)) {
+                  return false;
+              }
+          }
+
+          return true;
+      }
+  }
+  ```
+
+test "rank1051: fix requires the client extension to be allowed and to agree"
+  lang php
+  file system/Validation/StrictRules/FileRules.php
+  reject VYQL-INJ-037
+  code
+  ```
+  <?php
+
+  namespace CodeIgniter\Validation\StrictRules;
+
+  class FileRules
+  {
+      public function ext_in(?string $blank, string $params): bool
+      {
+          // Grab the file name off the top of the $params
+          // after we split it.
+          $params = explode(',', $params);
+          $name   = array_shift($params);
+
+          $files = $this->request->getFileMultiple($name);
+          if ($files === null) {
+              $files = [$this->request->getFile($name)];
+          }
+
+          foreach ($files as $file) {
+              if ($file === null) {
+                  return false;
+              }
+
+              if ($file->getError() === UPLOAD_ERR_NO_FILE) {
+                  return true;
+              }
+
+              // Check the real filename extension, not only the guessed extension.
+              $clientExtension = strtolower($file->getClientExtension());
+
+              if ($clientExtension === '' || ! in_array($clientExtension, $params, true)) {
+                  return false;
+              }
+
+              if ($file->guessExtension() !== $clientExtension) {
+                  return false;
+              }
+          }
+
+          return true;
+      }
+  }
+  ```
+
+test "rank1051: a comment naming the client extension does not stand in for reading it"
+  lang php
+  file system/Validation/StrictRules/FileRules.php
+  expect VYQL-INJ-037
+  code
+  ```
+  <?php
+
+  namespace CodeIgniter\Validation\StrictRules;
+
+  class FileRules
+  {
+      public function ext_in(?string $blank, string $params): bool
+      {
+          $params = explode(',', $params);
+          $name   = array_shift($params);
+
+          $files = $this->request->getFileMultiple($name);
+          if ($files === null) {
+              $files = [$this->request->getFile($name)];
+          }
+
+          foreach ($files as $file) {
+              if ($file === null) {
+                  return false;
+              }
+
+              // TODO: also check $file->getClientExtension() against $params
+              if (! in_array($file->guessExtension(), $params, true)) {
+                  return false;
+              }
+          }
+
+          return true;
+      }
+  }
+  ```
+
+test "rank1051: a client-extension read in a sibling rule does not satisfy the same rule's check"
+  lang php
+  file system/Validation/StrictRules/FileRules.php
+  expect VYQL-INJ-037
+  code
+  ```
+  <?php
+
+  namespace CodeIgniter\Validation\StrictRules;
+
+  class FileRules
+  {
+      public function ext_in(?string $blank, string $params): bool
+      {
+          $params = explode(',', $params);
+          $name   = array_shift($params);
+
+          $files = $this->request->getFileMultiple($name);
+          if ($files === null) {
+              $files = [$this->request->getFile($name)];
+          }
+
+          foreach ($files as $file) {
+              if ($file === null) {
+                  return false;
+              }
+
+              if (! in_array($file->guessExtension(), $params, true)) {
+                  return false;
+              }
+          }
+
+          return true;
+      }
+
+      public function client_extension($file): string
+      {
+          return strtolower($file->getClientExtension());
+      }
+  }
+  ```
+
+test "rank1051: the Symfony spelling of the client extension is read and checked too"
+  lang php
+  file app/Validation/UploadRules.php
+  reject VYQL-INJ-037
+  code
+  ```
+  <?php
+
+  namespace App\Validation;
+
+  class UploadRules
+  {
+      public function extension_in($file, array $allowed): bool
+      {
+          $clientExtension = strtolower($file->getClientOriginalExtension());
+
+          if ($clientExtension === '' || ! in_array($clientExtension, $allowed, true)) {
+              return false;
+          }
+
+          if ($file->guessExtension() !== $clientExtension) {
+              return false;
+          }
+
+          return true;
+      }
+  }
+  ```

@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule MissingRateLimit {
+  meta {
+    cwe: [CWE_307]
+    id: "VYQL-AUTH-105"
+    severity: medium
+  }
+  issue code.RateLimitRequiredOp as c
+  unless c.endpoint coveredBy code.RateLimitCheck
+}

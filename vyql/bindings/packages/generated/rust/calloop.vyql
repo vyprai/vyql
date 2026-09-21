@@ -1,0 +1,33 @@
+module bindings.rust.generated.m8e94cf14;
+
+binding networkData0 {
+  requires {
+    dependency("calloop")
+  }
+  query pattern callExpr where callee.method == "poll_read"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData1 {
+  requires {
+    dependency("calloop")
+  }
+  query pattern callExpr where callee.method == "poll_read_vectored"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend2 {
+  requires {
+    dependency("calloop")
+  }
+  query pattern callExpr where callee.method == "poll_write"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend3 {
+  requires {
+    dependency("calloop")
+  }
+  query pattern callExpr where callee.method == "poll_write_vectored"
+  emit sink code.NetworkSend at args[0]
+}

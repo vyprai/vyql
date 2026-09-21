@@ -1,0 +1,215 @@
+# picklescan classifies every global a pickle file references against a
+# module-scope table, `_unsafe_globals` in src/picklescan/scanner.py, that
+# maps a module name either to "*" (the whole module is unsafe) or to a set
+# of member names. A pickle that rebuilds callables through
+# `types.CodeType` and cloudpickle.cloudpickle's reconstruction helpers
+# (`_make_function`, `_function_setstate`, `_make_cell`, `_make_empty_cell`,
+# `_builtin_type`, `subimport`) therefore scanned clean: the table named
+# eval/exec/os.system and friends but carried no entry for
+# `cloudpickle.cloudpickle` and none for `types` at all, so
+# `_build_scan_result_from_raw_globals` fell through to `Suspicious` and the
+# scanner reported the artifact safe (security-tool bypass, CWE-693/CWE-184;
+# GHSA-9m3x-qqw2-h32h). Fix 173c8f2a86 (COMMIT_OK -- the message names the
+# GHSA) adds the ten lines: the six cloudpickle members plus
+# `"types": {"CodeType"}`. The defect is the table's membership, which is
+# data, and the reference set for "which globals can execute code" comes
+# from cloudpickle's own reconstruction machinery, not from anything the
+# code states.
+#
+# ## Re-measured at the current tip
+#
+# Three `--cache off` runs per revision (timeout 180, --max-ram 6GB) over
+# the whole checkout: 24 findings at the parent and 26 at the fix, stable
+# across all six runs, every one of them VYQL-PATH-001 or VYQL-RF-001. The
+# per-revision diff is exactly the ten-line shift in scanner.py (each
+# finding below line 118 moves by ten) plus two textpattern rows on the
+# .pkl payloads the fix commit itself adds; nothing on either side touches
+# the table. The `-flags only` view reports 17 flags at both revisions --
+# core.PathAccessCheck on the `in` operators, core.ResourceRelease on two
+# `close()` calls, code.ResourceReview on the test fixtures -- so the zero
+# is real and not a `-flags` replacement misread. `vyql match` on a minimal
+# reproduction of the table and its consumer labels no source and no sink,
+# one control (`__binop.in` -> core.PathAccessCheck).
+#
+# ## The rule that asks this question is fickling-shaped
+#
+# The vocabulary exists: `code.PickleUnsafeImportBlocklistGap`,
+# VYQL-DESER-017, whose reviewCondition is "a pickle safety analyzer
+# blocklists dangerous imports but omits known code-execution modules". Its
+# only feeders (bindings/python/m21017d75.vyql, pickleUnsafeImportBlocklist
+# Gap312/313) require `node.context.functionName contains "unsafe_imports"`
+# -- fickling's accessor -- while this table is module scope and its
+# consumer is `_build_scan_result_from_raw_globals`, so neither can match
+# here. Dropping that gate as a throwaway probe and keeping the shipped
+# negations still yields 0 at both revisions: the table already blocklists
+# `ctypes` and `pydoc`, which are exactly the two omissions those bindings
+# test for. The rule exists and declines this code on its own conditions.
+#
+# ## What a binding would have to key on
+#
+# Five throwaway probes, each emitting the existing consumed concept:
+#
+# - needle `"types"` -- a fix entry, and inexpressible: the vulnerable
+#   table already carries `"ctypes"`, and `contains` is a substring, so
+#   `not (literal contains "types")` is false at both revisions. 0 / 0.
+# - needle `"marshal"`, and equally `"importlib"`, `"codeop"`,
+#   `"linecache"` -- documentation-anchored choices for a code-execution
+#   module the table omits. All four are absent at BOTH revisions, so the
+#   probe fires 111 findings at the parent and 114 at the fix, 42 of them
+#   on the 618-line scanner.py either way: no discrimination, and the
+#   patched tree scores higher. The fix adds two entries of a family it
+#   still mostly omits, so any reference list the documentation supports
+#   flags the fixed revision too.
+# - needle `"cloudpickle"` -- the fix's own table key. 111 at the parent,
+#   0 at the fix, so it does discriminate, but it names the fixing
+#   commit's own choice and costs 42 findings on one file, because the
+#   function-scope `literal:` clause leaks module-wide in Python and
+#   labels every function in the file.
+#
+# The corpus bounds any variant from below: 186 .py files under the corpus
+# checkouts carry a `runpy`/`cProfile`/`pydoc` literal (the feeder's blast
+# radius) and not one of them, nor any other file in the corpus, declares
+# an unsafe-globals or unsafe-imports table. The construct's entire corpus
+# population is this file, so a binding here answers this scanner rather
+# than the weakness -- the genericity test fails on measurement, not on
+# taste.
+#
+# Pin both revisions as a double miss. When a blocklist-completeness
+# condition that can compare a table's membership against the evaluator's
+# own reconstruction surface lands, the first block must flip to expect.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1575: the unsafe-globals table omits the code-object reconstruction path"
+  lang python
+  file src/picklescan/scanner.py
+  reject VYQL-DESER-017
+  reject VYQL-DESER-001
+  code
+  ```
+  _unsafe_globals = {
+      "builtins": {
+          "eval",
+          "compile",
+          "getattr",
+          "exec",
+          "open",
+          "breakpoint",
+      },
+      "ctypes": "*",  # Foreign function interface, can load DLLs, call C functions, manipulate raw memory
+      "functools": "partial",  # functools.partial(os.system, "echo pwned")
+      "os": "*",
+      "runpy": "*",  # Includes runpy._run_code
+      "subprocess": "*",
+      "sys": "*",
+      "code": {"InteractiveInterpreter.runcode"},
+      "cProfile": {"runctx", "run"},
+      "pdb": "*",
+      "pickle": "*",
+      "pydoc": "*",  # pydoc.locate can import arbitrary modules, pydoc.pipepager allows command execution
+  }
+
+
+  def _build_scan_result_from_raw_globals(raw_globals, file_id, scan_err=False):
+      globals = []
+      issues_count = 0
+      for rg in raw_globals:
+          g = Global(rg[0], rg[1], SafetyLevel.Dangerous)
+          safe_filter = _safe_globals.get(g.module)
+          unsafe_filter = _unsafe_globals.get(g.module)
+
+          # If any parent module is marked as dangerous with "*", submodules are also dangerous
+          if unsafe_filter is None and "." in g.module:
+              module_parts = g.module.split(".")
+              for i in range(1, len(module_parts)):
+                  parent_module = ".".join(module_parts[:i])
+                  if _unsafe_globals.get(parent_module) == "*":
+                      unsafe_filter = "*"
+                      break
+
+          if "unknown" in g.module or "unknown" in g.name:
+              g.safety = SafetyLevel.Dangerous
+              issues_count += 1
+          elif unsafe_filter is not None and (unsafe_filter == "*" or g.name in unsafe_filter):
+              g.safety = SafetyLevel.Dangerous
+              issues_count += 1
+          elif safe_filter is not None and (safe_filter == "*" or g.name in safe_filter):
+              g.safety = SafetyLevel.Innocuous
+          else:
+              g.safety = SafetyLevel.Suspicious
+          globals.append(g)
+
+      return ScanResult(globals, 1, issues_count, 1 if issues_count > 0 else 0, scan_err)
+  ```
+
+test "rank1575: the fixed table lists the cloudpickle reconstruction members"
+  lang python
+  file src/picklescan/scanner.py
+  reject VYQL-DESER-017
+  reject VYQL-DESER-001
+  code
+  ```
+  _unsafe_globals = {
+      "builtins": {
+          "eval",
+          "compile",
+          "getattr",
+          "exec",
+          "open",
+          "breakpoint",
+      },
+      # cloudpickle can reconstruct arbitrary callables via CodeType, enabling code execution
+      "cloudpickle.cloudpickle": {
+          "_builtin_type",  # Used to access CodeType for arbitrary code construction
+          "_make_function",  # Creates functions from code objects
+          "_function_setstate",  # Sets internal function state
+          "_make_cell",  # Creates closure cells
+          "_make_empty_cell",  # Creates empty closure cells
+          "subimport",  # Imports arbitrary modules
+      },
+      "types": {"CodeType"},  # Can construct arbitrary code objects for execution
+      "ctypes": "*",  # Foreign function interface, can load DLLs, call C functions, manipulate raw memory
+      "functools": "partial",  # functools.partial(os.system, "echo pwned")
+      "os": "*",
+      "runpy": "*",  # Includes runpy._run_code
+      "subprocess": "*",
+      "sys": "*",
+      "code": {"InteractiveInterpreter.runcode"},
+      "cProfile": {"runctx", "run"},
+      "pdb": "*",
+      "pickle": "*",
+      "pydoc": "*",  # pydoc.locate can import arbitrary modules, pydoc.pipepager allows command execution
+  }
+
+
+  def _build_scan_result_from_raw_globals(raw_globals, file_id, scan_err=False):
+      globals = []
+      issues_count = 0
+      for rg in raw_globals:
+          g = Global(rg[0], rg[1], SafetyLevel.Dangerous)
+          safe_filter = _safe_globals.get(g.module)
+          unsafe_filter = _unsafe_globals.get(g.module)
+
+          # If any parent module is marked as dangerous with "*", submodules are also dangerous
+          if unsafe_filter is None and "." in g.module:
+              module_parts = g.module.split(".")
+              for i in range(1, len(module_parts)):
+                  parent_module = ".".join(module_parts[:i])
+                  if _unsafe_globals.get(parent_module) == "*":
+                      unsafe_filter = "*"
+                      break
+
+          if "unknown" in g.module or "unknown" in g.name:
+              g.safety = SafetyLevel.Dangerous
+              issues_count += 1
+          elif unsafe_filter is not None and (unsafe_filter == "*" or g.name in unsafe_filter):
+              g.safety = SafetyLevel.Dangerous
+              issues_count += 1
+          elif safe_filter is not None and (safe_filter == "*" or g.name in safe_filter):
+              g.safety = SafetyLevel.Innocuous
+          else:
+              g.safety = SafetyLevel.Suspicious
+          globals.append(g)
+
+      return ScanResult(globals, 1, issues_count, 1 if issues_count > 0 else 0, scan_err)
+  ```

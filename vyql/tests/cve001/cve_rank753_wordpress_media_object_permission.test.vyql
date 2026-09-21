@@ -1,0 +1,120 @@
+# Rank 753 / CVE-2026-2732: Enable Media Replace background-removal
+# handlers checked upload_files but not the selected attachment's object
+# permission before previewing or replacing media.
+
+test "rank753: WordPress media preview uses request-selected attachment without object permission"
+  lang php
+  file RemoveBackgroundViewController.php
+  expect VYQL-AUTH-049
+  expect_review code.WordPressMediaMutationMissingObjectPermission
+  code
+  ```
+  <?php
+  class RemoveBackGroundViewController {
+      public function load() {
+          if (!current_user_can('upload_files')) {
+              $this->viewError(self::ERROR_UPLOAD_PERMISSION);
+          }
+
+          $attachment_id = intval($_REQUEST['attachment_id']);
+          $attachment = get_post($attachment_id);
+
+          $replacer = new ReplaceController($attachment_id);
+          $file = $replacer->getSourceFile(true);
+          $this->view->attachment = $attachment;
+          $this->view->sourceFile = $file;
+          $this->loadView('prepare-remove-background');
+      }
+  }
+  ```
+
+test "rank753: WordPress media preview checks selected attachment permission"
+  lang php
+  file RemoveBackgroundViewController.php
+  reject VYQL-AUTH-049
+  reject_review code.WordPressMediaMutationMissingObjectPermission
+  code
+  ```
+  <?php
+  class RemoveBackGroundViewController {
+      public function load() {
+          if (!current_user_can('upload_files')) {
+              $this->viewError(self::ERROR_UPLOAD_PERMISSION);
+          }
+
+          $attachment_id = intval($_REQUEST['attachment_id']);
+          $attachment = get_post($attachment_id);
+
+          if (! \emr()->checkImagePermission($attachment)) {
+              $this->viewError(self::ERROR_IMAGE_PERMISSION);
+          }
+
+          $replacer = new ReplaceController($attachment_id);
+          $file = $replacer->getSourceFile(true);
+          $this->view->attachment = $attachment;
+          $this->view->sourceFile = $file;
+          $this->loadView('prepare-remove-background');
+      }
+  }
+  ```
+
+test "rank753: WordPress media replacement uses request-selected post without object permission"
+  lang php
+  file RemoveBackgroundViewController.php
+  expect VYQL-AUTH-049
+  expect_review code.WordPressMediaMutationMissingObjectPermission
+  code
+  ```
+  <?php
+  class RemoveBackGroundViewController {
+      public function loadPost() {
+          if (!isset($_POST['emr_nonce']) || !wp_verify_nonce($_POST['emr_nonce'], 'media_remove_background')) {
+              $this->viewError(self::ERROR_NONCE);
+          }
+
+          $post_id = isset($_POST['ID']) ? intval($_POST['ID']) : null;
+          $result = $this->replaceBackground($post_id, sanitize_text_field($_POST['key']));
+          $replaceController = new ReplaceController($post_id);
+          $params = array(
+              'post_id' => $post_id,
+              'remove_background' => true,
+              'uploadFile' => $result->image,
+          );
+          $replaceController->setupParams($params);
+          $replaceController->run();
+      }
+  }
+  ```
+
+test "rank753: WordPress media replacement checks selected attachment permission"
+  lang php
+  file RemoveBackgroundViewController.php
+  reject VYQL-AUTH-049
+  reject_review code.WordPressMediaMutationMissingObjectPermission
+  code
+  ```
+  <?php
+  class RemoveBackGroundViewController {
+      public function loadPost() {
+          if (!isset($_POST['emr_nonce']) || !wp_verify_nonce($_POST['emr_nonce'], 'media_remove_background')) {
+              $this->viewError(self::ERROR_NONCE);
+          }
+
+          $post_id = isset($_POST['ID']) ? intval($_POST['ID']) : null;
+          $attachment = get_post($post_id);
+          if (! \emr()->checkImagePermission($attachment)) {
+              $this->viewError(self::ERROR_IMAGE_PERMISSION);
+          }
+
+          $result = $this->replaceBackground($post_id, sanitize_text_field($_POST['key']));
+          $replaceController = new ReplaceController($post_id);
+          $params = array(
+              'post_id' => $post_id,
+              'remove_background' => true,
+              'uploadFile' => $result->image,
+          );
+          $replaceController->setupParams($params);
+          $replaceController->run();
+      }
+  }
+  ```

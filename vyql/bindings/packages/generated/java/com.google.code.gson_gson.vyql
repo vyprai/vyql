@@ -1,0 +1,17 @@
+module bindings.java.generated.md2a869c8;
+
+binding deserialization0 {
+  requires {
+    dependency("com.google.code.gson:gson")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("com.google.code.gson:gson")
+  }
+  query pattern callExpr where callee.method == "fromJson"
+  emit sink code.Deserialization at args[0]
+}

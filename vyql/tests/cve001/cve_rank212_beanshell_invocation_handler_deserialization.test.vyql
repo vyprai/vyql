@@ -1,0 +1,57 @@
+test "rank212: invocation handler without serialization rejection is deserializable"
+  lang java
+  expect VYQL-DESER-009
+  code
+  ```
+  import java.lang.reflect.InvocationHandler;
+  import java.lang.reflect.Method;
+
+  public class XThis {
+    NameSpace namespace;
+    transient InvocationHandler invocationHandler = new Handler();
+
+    class Handler implements InvocationHandler {
+      public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+        return invokeImpl(proxy, method, args);
+      }
+
+      Object invokeImpl(Object proxy, Method method, Object[] args) {
+        String methodName = method.getName();
+        namespace.getMethod(methodName, new Class[] { Object.class });
+        return invokeMethod(methodName, args, null, null);
+      }
+    }
+  }
+  ```
+
+test "rank212: invocation handler readResolve rejection blocks deserialization"
+  lang java
+  reject VYQL-DESER-009
+  code
+  ```
+  import java.io.NotSerializableException;
+  import java.io.ObjectStreamException;
+  import java.lang.reflect.InvocationHandler;
+  import java.lang.reflect.Method;
+
+  public class XThis {
+    NameSpace namespace;
+    transient InvocationHandler invocationHandler = new Handler();
+
+    class Handler implements InvocationHandler {
+      private Object readResolve() throws ObjectStreamException {
+        throw new NotSerializableException();
+      }
+
+      public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+        return invokeImpl(proxy, method, args);
+      }
+
+      Object invokeImpl(Object proxy, Method method, Object[] args) {
+        String methodName = method.getName();
+        namespace.getMethod(methodName, new Class[] { Object.class });
+        return invokeMethod(methodName, args, null, null);
+      }
+    }
+  }
+  ```

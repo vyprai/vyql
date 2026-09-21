@@ -1,0 +1,7 @@
+module code;
+
+review code.SensitiveConfigInfoLog {
+  category: secret
+  kind: attention
+  text: "review configuration object logging above debug level for inline credentials or target resource secrets"
+}

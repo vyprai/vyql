@@ -1,0 +1,4 @@
+module identity;
+
+concept ExternalPrincipal : principal {
+}

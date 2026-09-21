@@ -1,0 +1,78 @@
+# Rank 448 / CVE-2020-15885: MunkiReport comment accepted posted HTML
+# and stored a DOMDocument-filtered version that could bypass XSS filtering.
+
+test "rank448: MunkiReport comment stores posted HTML after weak tag stripping"
+  lang php
+  file comment_controller.php
+  expect VYQL-INJ-028
+  expect_review code.StoredHtmlWrite
+  code
+  ```
+  <?php
+  class Comment_controller extends Module_controller
+  {
+      public function save()
+      {
+          $serial_number = post('serial_number');
+          $section = post('section');
+          $text = post('text');
+          $html = post('html');
+          if ($html) {
+              $html = $this->_filter_html($html);
+          }
+
+          if ($serial_number and $section and $text) {
+              $comment = Comment_model::updateOrCreate(
+                  ['serial_number' => $serial_number, 'section' => $section],
+                  ['text' => $text, 'html' => $html, 'user' => $_SESSION['user']]
+              );
+          }
+      }
+
+      private function _filter_html($html)
+      {
+          $dom = new DOMDocument();
+          $dom->loadHTML($html, LIBXML_HTML_NODEFDTD);
+          foreach (['script', 'style', 'iframe', 'link'] as $tag) {
+              $element = $dom->getElementsByTagName($tag);
+          }
+          return utf8_decode($dom->saveHTML($dom->documentElement));
+      }
+  }
+  ```
+
+test "rank448: MunkiReport comment renders markdown with Parsedown safe mode"
+  lang php
+  file comment_controller.php
+  reject VYQL-INJ-028
+  reject_review code.StoredHtmlWrite
+  code
+  ```
+  <?php
+  use \Parsedown;
+
+  class Comment_controller extends Module_controller
+  {
+      public function save()
+      {
+          $serial_number = post('serial_number');
+          $section = post('section');
+          $text = post('text');
+          $html = $this->ParseMarkdown($text);
+
+          if ($serial_number and $section and $text) {
+              $comment = Comment_model::updateOrCreate(
+                  ['serial_number' => $serial_number, 'section' => $section],
+                  ['text' => $text, 'html' => $html, 'user' => $_SESSION['user']]
+              );
+          }
+      }
+
+      private function ParseMarkdown($markdown)
+      {
+          $parsedown = new Parsedown();
+          $parsedown->setSafeMode(true);
+          return $parsedown->text($markdown);
+      }
+  }
+  ```

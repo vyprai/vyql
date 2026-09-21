@@ -1,0 +1,17 @@
+module bindings.ruby.generated.m18ee713f;
+
+binding filePathAccess0 {
+  requires {
+    dependency("cocoon")
+  }
+  query pattern callExpr where callee.method == "render_association"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("cocoon")
+  }
+  query pattern callExpr where callee.method == "get_partial_path"
+  emit sink code.FilePathAccess at args[0]
+}

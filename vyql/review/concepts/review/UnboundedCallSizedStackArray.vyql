@@ -1,0 +1,7 @@
+module code;
+
+review code.UnboundedCallSizedStackArray {
+  category: memory
+  kind: attention
+  text: "review whether the length sizing this stack array is bounded before the allocation; a peer-controlled length sizes the frame"
+}

@@ -1,0 +1,104 @@
+# Rank 1739 / CVE-2022-0362: showdoc's admin user controller read the
+# uid POST field with ThinkPHP's I() helper without a type modifier
+# and interpolated it straight into a raw where() string before the
+# save() -- D("User")->where(" uid = '$uid' ")->save(...) -- so a
+# crafted uid injected SQL into the UPDATE (SQL injection, CWE-89;
+# the fixing commit 2b34e267e4186125f99bfa420140634ad45801fb adds the
+# integer modifier: I("post.uid/d")). The two sibling methods in the
+# same controller (deleteUser, changePassword) read their uid
+# with /d, so the modifier is the exact discriminator between the
+# vulnerable and patched revisions.
+#
+# FIXED at the binding layer, five bindings in
+# bindings/php/mfbe84119.vyql, all reusing existing vocabulary:
+# thinkphpInputRead731 (I() -> HttpInput),
+# thinkphpInputNumericModifier732 (I() with /d or /f ->
+# core.SqlParameterization), queryBuilderWhereCondition733 (where()
+# args[0] -> SqlExecution), numericCastParameterization734
+# (intval/floatval -> SqlParameterization, the PHP form of the
+# JavaScript parseInt binding) and sqliteEscapeStringParameterization735
+# (the OO escapeString spelling joins the snake_case escape family).
+# Measured on showdoc/server, three --cache off runs each, identical
+# counts: 28 INJ-001 before -> 105 at the vulnerable revision -> 104
+# at the fixed revision, and the single finding that disappears is exactly the
+# CVE path (source I("post.uid") at :79, sink where() at :90). The
+# ThinkPHP array form where(array("uid" => $uid)) takes no sink label
+# at all, Zend-Db-style parameterised where('id = ?', $v) keeps the
+# value out of args[0] (magento-lts Catalog subtree scans 0 INJ-001),
+# and the remaining new rows elsewhere (mautic LeadBundle +2, showdoc
+# +77 over baseline) all sit on the raw condition-string idiom --
+# where('id = '.$id) and where(" uid = '$uid' ").
+# no ENGINE-GAPS entry: the taint path Call -> Format -> Arg works
+# unmodified.
+
+test "rank1739: an untyped ThinkPHP I() read reaches a raw where() string"
+  lang php
+  file server/Application/Api/Controller/AdminUserController.class.php
+  expect VYQL-INJ-001
+  code
+  ```
+  <?php
+  namespace Api\Controller;
+
+  class AdminUserController extends BaseController
+  {
+      public function addUser()
+      {
+          $login_user = $this->checkLogin();
+          $this->checkAdmin();
+          $username = I("post.username");
+          $password = I("post.password");
+          $uid = I("post.uid");
+          $name = I("post.name");
+          if (!$username) {
+              $this->sendError(10101, 'username required');
+              return;
+          }
+          if ($uid) {
+              if ($password) {
+                  D("User")->updatePwd($uid, $password);
+              }
+              if ($name) {
+                  D("User")->where(" uid = '$uid' ")->save(array("name" => $name));
+              }
+              $this->sendResult(array());
+          }
+      }
+  }
+  ```
+
+test "rank1739: the integer modifier on the I() read is the discriminator"
+  lang php
+  file server/Application/Api/Controller/AdminUserController.class.php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php
+  namespace Api\Controller;
+
+  class AdminUserController extends BaseController
+  {
+      public function addUser()
+      {
+          $login_user = $this->checkLogin();
+          $this->checkAdmin();
+          $username = I("post.username");
+          $password = I("post.password");
+          $uid = I("post.uid/d");
+          $name = I("post.name");
+          if (!$username) {
+              $this->sendError(10101, 'username required');
+              return;
+          }
+          if ($uid) {
+              if ($password) {
+                  D("User")->updatePwd($uid, $password);
+              }
+              if ($name) {
+                  D("User")->where(" uid = '$uid' ")->save(array("name" => $name));
+              }
+              $this->sendResult(array());
+          }
+      }
+  }
+  ```

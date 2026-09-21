@@ -1,0 +1,11 @@
+module vypr.lifecycle;
+
+rule RecursiveJsonMarshalUnderLock {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_667]
+    id: "VYQL-LIFE-003"
+    severity: low
+  }
+  issue code.RecursiveJsonMarshalUnderLock as m
+}

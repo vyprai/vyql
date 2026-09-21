@@ -1,0 +1,8 @@
+module code;
+
+review code.RsaKeyGenerationModulusLengthUnchecked {
+  category: crypto
+  expected: [core.InputValidation]
+  kind: attention
+  text: "review RSA key generation loops for a check that the modulus bit length equals the requested key size, because the product of two primes of half the size can be one bit short"
+}

@@ -1,0 +1,320 @@
+# Rank 1445 / CVE-2026-41574 (CWE-287): nhost/auth signs a user in through an OAuth2
+# or OIDC provider, then matches the profile's email address against the existing
+# `auth.users` row and links the new provider identity to it. Whether that link is
+# allowed turns on one field, `oidc.Profile.EmailVerified`, which each provider
+# adapter fills in from what its userinfo endpoint returned.
+#
+# Twelve of the adapters filled it in from the address being present:
+#
+#	return oidc.Profile{
+#		ProviderUserID: userProfile.ID,
+#		Email:          userProfile.Email,
+#		EmailVerified:  userProfile.Email != "",
+#		...
+#	}, nil
+#
+# (discord.go, entraid.go, facebook.go, gitlab.go, linkedin.go, spotify.go,
+# twitch.go, twitter.go, windowslive.go, workos.go, plus azuread.go and
+# bitbucket.go on a local that falls back past the checked value).
+# Every one of those endpoints returns whatever address the account currently
+# carries, verified or not: Discord's /users/@me ships a separate `verified` flag,
+# GitLab's /user a `confirmed_at` timestamp, LinkedIn's and Entra ID's userinfo an
+# `email_verified` claim, and Azure AD's v1 userinfo an unverifiable `upn` the
+# adapter accepted as an email. So an attacker sets the victim's address on the
+# provider account, skips the confirmation mail, signs in, and nhost links the
+# provider to the victim's account and issues a session for it.
+#
+# The fixed revision replaces the boolean with a three-valued oidc.EmailVerificationStatus
+# whose zero value is Unknown, has each adapter report the provider's own signal
+# (`oidc.EmailVerificationFromBool(userProfile.Verified)`, `... .ConfirmedAt != ""`)
+# or Unknown where the provider exposes none, and gates the link in
+# ensureProviderLinkAllowed on the explicit Verified status.
+#
+# Detection is code.PresenceDerivedEmailVerification (VYQL-AUTH-128,
+# CWE-287/CWE-290), emitted by goPresenceDerivedEmailVerification on a Go function
+# that sets an email-verified field while the only email predicate in scope is a
+# non-empty test of the address and no provider verification claim is read. The
+# vocabulary is the providers' own documented claim names -- OIDC Core's
+# `email_verified`, GitHub's and Discord's `verified`, GitLab's `confirmed_at`,
+# Bitbucket's `is_confirmed` -- not this commit's helper: renaming
+# EmailVerificationFromBool and EmailVerificationStatus* throughout the patched
+# tree leaves the count at 0.
+#
+# Measured on services/auth/go, three --cache off runs each: 11 flags on the
+# vulnerable revision (azuread, discord, entraid, facebook, gitlab, linkedin,
+# spotify, twitch, twitter, windowslive, workos) and 0 on the patched one, with
+# totals of 119 and 109 findings at or above high. bitbucket.go's vulnerable form
+# is the one deliberate miss: it does read Bitbucket's `is_confirmed` and only then
+# falls back past it, and crediting that read is what keeps the patched gitlab and
+# linkedin adapters -- which still carry `userProfile.Email != ""` -- at zero.
+# Collateral: the shape's reachable set across the 159 sibling clones is three Go
+# files (mattermost app/user.go, waypoint service_auth_oidc.go, juev-nebula-mesh
+# oidc.go); all three read `email_verified` and all three scan 0.
+
+test "rank1445: an OAuth profile marks the email verified because the address is non-empty"
+  lang go
+  file services/auth/go/providers/discord.go
+  expect VYQL-AUTH-128
+  expect_review code.PresenceDerivedEmailVerification
+  code
+  ```
+  package providers
+
+  import (
+  	"context"
+
+  	"github.com/nhost/nhost/services/auth/go/oidc"
+  	"golang.org/x/oauth2"
+  )
+
+  type discordUserProfile struct {
+  	ID            string `json:"id"`
+  	Username      string `json:"username"`
+  	Discriminator string `json:"discriminator"`
+  	Email         string `json:"email"`
+  	Avatar        string `json:"avatar"`
+  }
+
+  func (d *Discord) GetProfile(
+  	ctx context.Context, accessToken string, _ *oauth2.Token,
+  ) (oidc.Profile, error) {
+  	userProfile, err := fetchDiscordProfile(ctx, accessToken)
+  	if err != nil {
+  		return oidc.Profile{}, err
+  	}
+
+  	return oidc.Profile{
+  		ProviderUserID: userProfile.ID,
+  		Name:           userProfile.Username,
+  		Email:          userProfile.Email,
+  		EmailVerified:  userProfile.Email != "",
+  		Picture:        userProfile.Avatar,
+  	}, nil
+  }
+  ```
+
+test "rank1445: a directory identifier is accepted as a verified address"
+  lang go
+  file services/auth/go/providers/azuread.go
+  expect VYQL-AUTH-128
+  expect_review code.PresenceDerivedEmailVerification
+  code
+  ```
+  package providers
+
+  import (
+  	"context"
+
+  	"github.com/nhost/nhost/services/auth/go/oidc"
+  	"golang.org/x/oauth2"
+  )
+
+  type azureUser struct {
+  	OID    string `json:"oid"`
+  	Email  string `json:"email"`
+  	Name   string `json:"name"`
+  	UPN    string `json:"upn"`
+  	Prefer string `json:"preferred_username"`
+  }
+
+  func (a *AzureAD) GetProfile(
+  	ctx context.Context, accessToken string, _ *oauth2.Token,
+  ) (oidc.Profile, error) {
+  	userProfile, err := fetchAzureProfile(ctx, accessToken)
+  	if err != nil {
+  		return oidc.Profile{}, err
+  	}
+
+  	email := userProfile.Email
+  	if email == "" {
+  		email = userProfile.Prefer
+  	}
+
+  	if email == "" {
+  		email = userProfile.UPN
+  	}
+
+  	return oidc.Profile{
+  		ProviderUserID: userProfile.OID,
+  		Email:          email,
+  		EmailVerified:  email != "",
+  		Name:           userProfile.Name,
+  		Picture:        "",
+  	}, nil
+  }
+  ```
+
+test "rank1445: the provider's own verification claim decides the status"
+  lang go
+  file services/auth/go/providers/discord.go
+  reject VYQL-AUTH-128
+  reject_review code.PresenceDerivedEmailVerification
+  code
+  ```
+  package providers
+
+  import (
+  	"context"
+
+  	"github.com/nhost/nhost/services/auth/go/oidc"
+  	"golang.org/x/oauth2"
+  )
+
+  type discordUserProfile struct {
+  	ID            string `json:"id"`
+  	Username      string `json:"username"`
+  	Discriminator string `json:"discriminator"`
+  	Email         string `json:"email"`
+  	Verified      bool   `json:"verified"`
+  	Avatar        string `json:"avatar"`
+  }
+
+  func (d *Discord) GetProfile(
+  	ctx context.Context, accessToken string, _ *oauth2.Token,
+  ) (oidc.Profile, error) {
+  	userProfile, err := fetchDiscordProfile(ctx, accessToken)
+  	if err != nil {
+  		return oidc.Profile{}, err
+  	}
+
+  	return oidc.Profile{
+  		ProviderUserID: userProfile.ID,
+  		Name:           userProfile.Username,
+  		Email:          userProfile.Email,
+  		EmailVerified:  oidc.EmailVerificationFromBool(userProfile.Verified),
+  		Picture:        userProfile.Avatar,
+  	}, nil
+  }
+  ```
+
+test "rank1445: a confirmation timestamp read alongside the presence test"
+  lang go
+  file services/auth/go/providers/gitlab.go
+  reject VYQL-AUTH-128
+  reject_review code.PresenceDerivedEmailVerification
+  code
+  ```
+  package providers
+
+  import (
+  	"context"
+  	"strconv"
+
+  	"github.com/nhost/nhost/services/auth/go/oidc"
+  	"golang.org/x/oauth2"
+  )
+
+  type gitlabUserProfile struct {
+  	ID          int    `json:"id"`
+  	Name        string `json:"name"`
+  	Email       string `json:"email"`
+  	ConfirmedAt string `json:"confirmed_at"`
+  	AvatarURL   string `json:"avatar_url"`
+  }
+
+  func (g *Gitlab) GetProfile(
+  	ctx context.Context, accessToken string, _ *oauth2.Token,
+  ) (oidc.Profile, error) {
+  	userProfile, err := fetchGitlabProfile(ctx, accessToken)
+  	if err != nil {
+  		return oidc.Profile{}, err
+  	}
+
+  	return oidc.Profile{
+  		ProviderUserID: strconv.Itoa(userProfile.ID),
+  		Name:           userProfile.Name,
+  		Email:          userProfile.Email,
+  		EmailVerified: oidc.EmailVerificationFromBool(
+  			userProfile.Email != "" && userProfile.ConfirmedAt != "",
+  		),
+  		Picture: userProfile.AvatarURL,
+  	}, nil
+  }
+  ```
+
+test "rank1445: an address the provider does not attest is reported as no signal"
+  lang go
+  file services/auth/go/providers/facebook.go
+  reject VYQL-AUTH-128
+  reject_review code.PresenceDerivedEmailVerification
+  code
+  ```
+  package providers
+
+  import (
+  	"context"
+
+  	"github.com/nhost/nhost/services/auth/go/oidc"
+  	"golang.org/x/oauth2"
+  )
+
+  type facebookUserProfile struct {
+  	ID    string `json:"id"`
+  	Name  string `json:"name"`
+  	Email string `json:"email"`
+  }
+
+  func (t *Facebook) GetProfile(
+  	ctx context.Context, accessToken string, _ *oauth2.Token,
+  ) (oidc.Profile, error) {
+  	userProfile, err := fetchFacebookProfile(ctx, accessToken)
+  	if err != nil {
+  		return oidc.Profile{}, err
+  	}
+
+  	return oidc.Profile{
+  		ProviderUserID: userProfile.ID,
+  		Name:           userProfile.Name,
+  		Email:          userProfile.Email,
+  		EmailVerified:  oidc.EmailVerificationStatusUnknown,
+  		Picture:        "",
+  	}, nil
+  }
+  ```
+
+test "rank1445: a non-empty address test with no verification field is not this shape"
+  lang go
+  file services/auth/go/providers/strava.go
+  reject VYQL-AUTH-128
+  reject_review code.PresenceDerivedEmailVerification
+  code
+  ```
+  package providers
+
+  import (
+  	"context"
+  	"strconv"
+
+  	"github.com/nhost/nhost/services/auth/go/oidc"
+  	"golang.org/x/oauth2"
+  )
+
+  type stravaAthlete struct {
+  	ID            int    `json:"id"`
+  	Firstname     string `json:"firstname"`
+  	Lastname      string `json:"lastname"`
+  	Email         string `json:"email"`
+  	ProfileMedium string `json:"profile_medium"`
+  }
+
+  func (s *Strava) GetProfile(
+  	ctx context.Context, accessToken string, _ *oauth2.Token,
+  ) (oidc.Profile, error) {
+  	athlete, err := fetchStravaAthlete(ctx, accessToken)
+  	if err != nil {
+  		return oidc.Profile{}, err
+  	}
+
+  	name := athlete.Firstname + " " + athlete.Lastname
+  	if athlete.Email != "" {
+  		name = athlete.Email
+  	}
+
+  	return oidc.Profile{
+  		ProviderUserID: strconv.Itoa(athlete.ID),
+  		Name:           name,
+  		Picture:        athlete.ProfileMedium,
+  		Email:          "",
+  	}, nil
+  }
+  ```

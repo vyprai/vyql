@@ -1,0 +1,56 @@
+module bindings.javascript.static_file_request_path_component_decode;
+
+// `decodeURI` and `decodeURIComponent` are not two spellings of one operation.
+// MDN states the difference plainly: `decodeURI` leaves the escape sequences a
+// URI's reserved delimiters would have to be written as — `%23`, `%2F`, `%3F`,
+// `%3B`, `%26`, `%3D` — encoded, because decoding them would change the
+// structure of the URI; `decodeURIComponent` decodes every escape sequence,
+// which is correct for one already-extracted component and wrong for a whole
+// path. That is why the two exist.
+//
+// A static-file handler that builds the filesystem path from
+// `decodeURIComponent(request path)` therefore turns `%2F` into a directory
+// separator that was not there when the request was routed. The router matched
+// the encoded spelling, so `/static/admin%2Fsecret.txt` is one path segment to
+// route matching and to every middleware registered at `/static/admin/*`, and
+// two segments to the handler, which opens `<root>/static/admin/secret.txt` and
+// serves it. The middleware never ran. The same respelling reaches any file the
+// handler can name, so an authentication, authorization or rate-limiting
+// middleware scoped to a subtree of the served root is bypassed by any client
+// that can reach the route. Parent-directory rejection does not address this:
+// no `..` segment is involved.
+//
+// So the binding reads the decoder, the request path it is applied to, and the
+// fact that the result is used to open a file under a root:
+//
+//   * `call_path:decodeURIComponent` — the whole-string decoder, the one that
+//     decodes reserved delimiters. A handler that decodes with `decodeURI`, or
+//     that decodes segment by segment after splitting on `/`, does not carry
+//     this token and is not reported;
+//   * a `req.path` / `req.url` / `ctx.path` / `url.pathname` selector — the
+//     value being decoded is the request's own path rather than a query
+//     parameter or a form field, which are components and are `decodeURIComponent`'s
+//     documented use;
+//   * a `join` or `resolve` — the decoded path is composed onto a serving root;
+//   * and a filesystem read of the composed path.
+//
+// Nothing here names a remediation helper. The route out of the defect is to
+// stop decoding reserved delimiters, which removes the first conjunct however
+// the author spells it — a direct `decodeURI`, a wrapper around it, or a
+// per-segment decode — so a fix is not recognised by its own vocabulary.
+//
+// Two costs. A JavaScript function context inherits the tokens of the functions
+// nested inside it, so a handler returned from a factory reports on the factory
+// as well as on the handler; the extra row points at the same defect. And a
+// handler that reaches `decodeURIComponent` through a helper of its own keeps
+// the token in the helper's context rather than its own, so that spelling is
+// not reported.
+binding staticFileRequestPathComponentDecode {
+  query pattern presenceNode where node.scope == "function"
+    and node.context.language == "javascript"
+    and node.context.callPath == "decodeURIComponent"
+    and containsAny(node.context.selector, ["req.path", "req.url", "req.originalUrl", "request.path", "request.url", "ctx.path", "ctx.url", "url.pathname"])
+    and node.context.callPath in ["join", "path.join", "resolve", "path.resolve"]
+    and node.context.callPath in ["createReadStream", "fs.createReadStream", "readFile", "readFileSync", "fs.readFile", "fs.readFileSync", "statSync", "fs.statSync", "sendFile", "openSync", "fs.openSync"]
+  emit issue code.MiddlewarePathMatchNormalizationMismatch at node
+}

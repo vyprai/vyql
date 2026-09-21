@@ -1,0 +1,33 @@
+module bindings.objc.generated.m34da1740;
+
+binding filePathAccess0 {
+  requires {
+    dependency("JXHTTP")
+  }
+  query pattern callExpr where callee.method == "initWithFilePath"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding urlFetch1 {
+  requires {
+    dependency("JXHTTP")
+  }
+  query pattern callExpr where callee.method == "initWithURL"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding networkData2 {
+  requires {
+    dependency("JXHTTP")
+  }
+  query pattern callExpr where callee.method == "connection:didReceiveResponse:"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend3 {
+  requires {
+    dependency("JXHTTP")
+  }
+  query pattern callExpr where callee.method == "connection:didSendBodyData:totalBytesWritten:totalBytesExpectedToWrite:"
+  emit sink code.NetworkSend at args[0]
+}

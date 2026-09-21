@@ -1,0 +1,7 @@
+module code;
+
+review code.CryptoVariableTimeDivision {
+  category: crypto
+  kind: attention
+  text: "review modular arithmetic for hardware division or remainder applied to a secret-dependent value; constant-time implementations reduce by shift-multiply (Barrett/Montgomery) or a constant-time division helper"
+}

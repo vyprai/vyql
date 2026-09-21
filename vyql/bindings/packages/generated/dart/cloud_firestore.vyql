@@ -1,0 +1,9 @@
+module bindings.dart.generated.mdb6a0506;
+
+binding nosqlQuery0 {
+  requires {
+    dependency("cloud_firestore")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.NosqlQuery at args[0]
+}

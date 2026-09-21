@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule DtlsEpochZeroApplicationData {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_287, CWE_294, CWE_841]
+    id: "VYQL-AUTH-044"
+    severity: critical
+  }
+  issue code.DtlsEpochZeroApplicationData as record
+}

@@ -1,0 +1,48 @@
+module bindings.javascript.link_scheme_denylist_missing_data_scheme;
+
+// A renderer or sanitizer that decides whether a link URL may be emitted by
+// enumerating the schemes a browser executes documents from has four to
+// enumerate, not three: `javascript:`, `vbscript:`, `file:` and `data:`. A
+// `data:text/html;base64,...` URL is a document the browser parses in the
+// embedding page's context -- `data:image/svg+xml` likewise, since SVG carries
+// script and event-handler attributes -- so a scheme denylist that names
+// javascript and vbscript but never mentions data returns exactly the execution
+// it exists to refuse. Handling the data: scheme at all names it, in every form
+// the documentation suggests: a quoted `'data'` entry in the refused list, a
+// `data:image/` media-type allowlist for the one benign use, a `data|` branch in
+// a scheme alternation, a `/^data:/i` pattern. So a module that enumerates
+// browser-executable schemes and spells the data scheme nowhere has not
+// considered it.
+//
+// `vbscript` is what makes the enumeration legible: nobody writes it in a URL by
+// accident, and a module listing it beside `javascript` is enumerating schemes
+// rather than languages. That is not quite enough on its own -- a
+// syntax-highlighter grammar registry names both as language identifiers -- so
+// the predicate also requires the scheme normalization a URL comparison needs
+// (`toLowerCase`, since schemes are case-insensitive and `Data:` must compare
+// equal to `data:`) and a URL-ish identifier in scope.
+//
+// Module scope rather than function scope: the scheme list is a module-level
+// definition and the predicate consuming it is a handful of lines, so a
+// function-scope query would see the membership test and none of the scheme
+// names it has to read.
+//
+// Each scheme name is matched in a spelling that only appears where the name is
+// data -- inside quotes, quote-then-colon, or as a `|`-delimited branch of a
+// regex alternation -- and the data-scheme condition likewise, because a
+// module-scope context carries the module's own source text, comments included,
+// alongside its structured tokens. A bare `javascript` is satisfied by a comment
+// saying which schemes a filter refuses, and a bare `data` by any prose about
+// metadata or passing data between rules; the second is the damaging one, since
+// a negative condition satisfied by prose declines the very module it is there
+// to read.
+binding linkSchemeDenylistMissingDataScheme {
+  query pattern presenceNode where node.scope == "module"
+    and node.context.language == "javascript"
+    and containsAny(node.context.literal, ["'javascript'", "\"javascript\"", "'javascript:", "\"javascript:", "|javascript", "javascript|"])
+    and containsAny(node.context.literal, ["'vbscript'", "\"vbscript\"", "'vbscript:", "\"vbscript:", "|vbscript", "vbscript|"])
+    and node.context.call contains "toLowerCase"
+    and containsAny(node.context.identifier, ["url", "uri", "href", "link"])
+    and not containsAny(node.context.literal, ["data:", "'data'", "\"data\"", "|data", "data|"])
+  emit issue code.HtmlSanitizerLogicReview at node
+}

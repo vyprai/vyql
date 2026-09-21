@@ -1,0 +1,248 @@
+# Pillow's Targa RLE decoder walks the input with one cursor and two byte
+# counters. `ImagingTgaRleDecode` in src/libImaging/TgaRleDecode.c receives
+# the compressed scan line in `buf` with its length in `bytes`, sets
+# `ptr = buf`, and the outer `for (;;)` exits when `bytes < 1` -- so `bytes`
+# is the count of bytes that still sit behind `ptr`. Every consumption in the
+# outer loop keeps that relation: the run path does `ptr += 1 + depth;
+# bytes -= 1 + depth;` and the literal path `ptr += 1 + n; bytes -= 1 + n;`.
+# The literal path can hand a remainder to the inner cross-scan-line loop
+# through `extra_bytes`, and that loop's own consumption keeps only its own
+# counter: `memcpy(state->buffer + state->x, ptr, n); ptr += n;
+# extra_bytes -= n;`. The `bytes` that bounds the whole call never shrank by
+# `n`, so a truncated scan line left the outer loop believing data remained
+# and reading past the end of `buf` (out-of-bounds read, CWE-125/CWE-835;
+# the added cross_scan_line_truncated.tga fixture is the regressor). Fix
+# c846cc881e ("When reading past the end of a scan line, reduce bytes left")
+# adds the single line `bytes -= n;`, so the third consumption site decrements
+# both counters over the cursor.
+#
+# ## The miss is counter-set coherence, and it is loop-carried
+#
+# The defect is one consumption site that advances a cursor while decrementing
+# only one of the two counters the function itself establishes over that
+# cursor. Nothing in the vocabulary asks "does every consumed chunk decrement
+# every bound that bounds it": which counter a consumption belongs to is a
+# relation between the cursor and the resource behind it, and it is carried
+# across loop iterations, not stated at the site.
+#
+# ## Re-measured at the current tip
+#
+# Three `--cache off` runs per revision (timeout 180, --max-ram 6GB) over
+# src/libImaging/TgaRleDecode.c: 5 findings at the parent and 5 at the fix,
+# identical on every run -- VYQL-MEM-020 at function scope,
+# VYQL-MEM-010 at the shuffle index, and VYQL-MEM-016 on each memcpy
+# (:63, :81 and the vulnerable :121), all memory heuristics that fire on the
+# guarded copies and say nothing about the stale bound. The `-flags only` view
+# reports 30 flags per revision whose only difference is the one-line shift.
+# Whole-tree `src/` scans: 5569 findings at the parent and 5569 at the fix,
+# stable across all six runs, with identical per-rule multisets. So no rule
+# discriminates, and the zero on the defect is real rather than a `-flags`
+# replacement misread.
+#
+# The two later-shipped items in the nearest families do not reach it.
+# VYQL-DOS-050 (`code.LoopRestartWithoutProgressCheck`, the loop-progress
+# umbrella) is a JavaScript frontend fact over a *restart*: a `continue` whose
+# dominating path passes no progress step for the variables the loop's exit
+# reads. This loop has no restart -- the inner loop breaks on `extra_bytes`
+# and `state->x`, and it advances both -- and the shape here is C, where that
+# fact is not emitted at all. VYQL-DOS-029 (`code.NumericParserMissingProgressCheck`)
+# does have a C feeder, but it is the fio_atol/fio_atof spelling of one
+# library, not a construct predicate. VYQL-MEM-071 asks whether a
+# destination's capacity is consulted; here it is, at `state->x + n >
+# state->bytes` and in the inner loop's own clamp, and the defect is on the
+# source side.
+#
+# ## The syntactic form of the question was measured and is not shippable
+#
+# The one relation the syntax can carry -- a cursor advanced at a site where a
+# counter is decremented, while the same function advances the same cursor at
+# another site decrementing a different counter -- was counted over five real
+# C trees (1886 files: gpac, grpc, hermes, httpd, ImageMagick): 15 hits, every
+# one of them correct code -- quicksort's `pi`/`pj` cursors, parser main loops
+# that advance a data cursor over `data_size` while a block loop advances it
+# over `desc_len`/`nal_size`/`length` (mpegts.c, decrypt_cenc_isma.c,
+# meta.c's 8BIM walker), image kernels walking `p`/`q`/`r`, and dtoa's
+# exponent scalings. The pattern of two counters over one cursor with
+# different accounting sites is how ordinary parsers are written, and whether
+# the outer bound must absorb the inner consumption is exactly what the
+# syntax cannot see. A fact that counted it would report roughly one correct
+# function per 125 files to reach this one.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1576: the cross-scan-line copy leaves the outer byte bound stale"
+  lang c
+  file src/libImaging/TgaRleDecode.c
+  reject VYQL-DOS-029
+  reject VYQL-DOS-050
+  code
+  ```
+  #include <string.h>
+  #include <stdint.h>
+
+  typedef struct {
+      uint8_t *buffer;
+      int x;
+      int bytes;
+  } ImagingCodecState;
+
+  int ImagingTgaRleDecode(uint8_t *im, ImagingCodecState *state, uint8_t *buf,
+                          int bytes)
+  {
+      int n, depth;
+      uint8_t *ptr;
+      int extra_bytes = 0;
+
+      ptr = buf;
+      depth = 4;
+
+      for (;;) {
+          if (bytes < 1) {
+              return ptr - buf;
+          }
+
+          n = depth * ((ptr[0] & 0x7f) + 1);
+          if (ptr[0] & 0x80) {
+              if (bytes < 1 + depth) {
+                  break;
+              }
+
+              memset(state->buffer + state->x, ptr[1], n);
+
+              ptr += 1 + depth;
+              bytes -= 1 + depth;
+          } else {
+              if (bytes < 1 + n) {
+                  break;
+              }
+
+              if (state->x + n > state->bytes) {
+                  extra_bytes = n;
+                  n = state->bytes - state->x;
+                  extra_bytes -= n;
+              }
+
+              memcpy(state->buffer + state->x, ptr + 1, n);
+
+              ptr += 1 + n;
+              bytes -= 1 + n;
+          }
+
+          for (;;) {
+              state->x += n;
+
+              if (state->x >= state->bytes) {
+                  state->x = 0;
+              }
+
+              if (extra_bytes == 0) {
+                  break;
+              }
+
+              if (state->x > 0) {
+                  break;
+              }
+
+              if (extra_bytes >= state->bytes) {
+                  n = state->bytes;
+              } else {
+                  n = extra_bytes;
+              }
+              memcpy(state->buffer + state->x, ptr, n);
+              ptr += n;
+              extra_bytes -= n;
+          }
+      }
+
+      return ptr - buf;
+  }
+  ```
+
+test "rank1576: the fixed copy decrements both counters over the cursor"
+  lang c
+  file src/libImaging/TgaRleDecode.c
+  reject VYQL-DOS-029
+  reject VYQL-DOS-050
+  code
+  ```
+  #include <string.h>
+  #include <stdint.h>
+
+  typedef struct {
+      uint8_t *buffer;
+      int x;
+      int bytes;
+  } ImagingCodecState;
+
+  int ImagingTgaRleDecode(uint8_t *im, ImagingCodecState *state, uint8_t *buf,
+                          int bytes)
+  {
+      int n, depth;
+      uint8_t *ptr;
+      int extra_bytes = 0;
+
+      ptr = buf;
+      depth = 4;
+
+      for (;;) {
+          if (bytes < 1) {
+              return ptr - buf;
+          }
+
+          n = depth * ((ptr[0] & 0x7f) + 1);
+          if (ptr[0] & 0x80) {
+              if (bytes < 1 + depth) {
+                  break;
+              }
+
+              memset(state->buffer + state->x, ptr[1], n);
+
+              ptr += 1 + depth;
+              bytes -= 1 + depth;
+          } else {
+              if (bytes < 1 + n) {
+                  break;
+              }
+
+              if (state->x + n > state->bytes) {
+                  extra_bytes = n;
+                  n = state->bytes - state->x;
+                  extra_bytes -= n;
+              }
+
+              memcpy(state->buffer + state->x, ptr + 1, n);
+
+              ptr += 1 + n;
+              bytes -= 1 + n;
+          }
+
+          for (;;) {
+              state->x += n;
+
+              if (state->x >= state->bytes) {
+                  state->x = 0;
+              }
+
+              if (extra_bytes == 0) {
+                  break;
+              }
+
+              if (state->x > 0) {
+                  break;
+              }
+
+              if (extra_bytes >= state->bytes) {
+                  n = state->bytes;
+              } else {
+                  n = extra_bytes;
+              }
+              memcpy(state->buffer + state->x, ptr, n);
+              ptr += n;
+              bytes -= n;
+              extra_bytes -= n;
+          }
+      }
+
+      return ptr - buf;
+  }
+  ```

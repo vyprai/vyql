@@ -1,0 +1,11 @@
+module vypr.request_forgery;
+
+rule OauthErrorResponseRedirectUriWithoutPreauth {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_601]
+    id: "VYQL-RF-055"
+    severity: medium
+  }
+  issue code.OauthErrorResponseRedirectUriWithoutPreauth as redirect
+}

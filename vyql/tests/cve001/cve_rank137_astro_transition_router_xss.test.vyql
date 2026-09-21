@@ -1,0 +1,26 @@
+# Rank 137 / CVE-2024-47885: Astro transition router script clobbering/XSS family.
+# Fresh scan evidence includes VYQL-INJ-004 touching transition router code.
+
+test "rank137: Astro transition router writes request-controlled HTML"
+  lang javascript
+  file router.ts
+  expect VYQL-INJ-004
+  code
+  ```
+  export function runScripts(req, document) {
+    const html = req.query.html;
+    document.body.innerHTML = html;
+  }
+  ```
+
+test "rank137: Astro transition router uses text content"
+  lang javascript
+  file router.ts
+  reject VYQL-INJ-004
+  code
+  ```
+  export function runScripts(req, document) {
+    const html = req.query.html;
+    document.body.textContent = html;
+  }
+  ```

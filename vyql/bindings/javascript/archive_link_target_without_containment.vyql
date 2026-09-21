@@ -1,0 +1,41 @@
+module bindings.javascript.archive_link_target_without_containment;
+
+// A tar entry carries two paths the extracting code did not choose: the
+// entry's own name and, on a link entry, the target the link is to point at.
+// Node documents fs.symlink(target, path) with target as "the location the
+// symlink points to" and says nothing else about it -- the target resolves
+// against the process working directory when the link is read, not against
+// any extraction root, and an absolute target or one built from `..`
+// components is taken verbatim. An extraction driver that hands the archive's
+// link-target field straight to symlink therefore reproduces whatever the
+// archive declares: a link created inside the destination that points outside
+// it, and every later entry written through that link lands outside too
+// (CWE-22/CWE-59). Confining the entry's own name -- joining it to the root
+// through a `/` prefix, or validating the parent directory -- constrains a
+// different string under a different field name and leaves the target free.
+//
+// The documented ways to keep a created link inside a base directory all
+// resolve the target and compare the result against the root: startsWith on
+// the resolved absolute target, path.relative(base, target) inspected for
+// leading `..`, or realpath once the link exists. Any of them means the link's
+// destination is being decided by the extracting code rather than by the
+// archive, so none of those forms reports. The comparison is read at module
+// scope rather than in the function that creates the link, because the
+// containment is routinely a helper the extraction driver shares across its
+// entry handlers, and a link-creating entry handler nested three functions
+// deep does not see its sibling's comparison; that width costs recall in one
+// direction only, since a module that compares prefixes anywhere does not
+// report.
+//
+// The judgement lives in the pack rule; this binding only recognises the
+// atoms. `linkname` is the tar format's own field name for a link target, so
+// that clause is answerable to the format rather than to any one library's
+// spelling of it. The creation call is matched exactly rather than by
+// substring: an extraction driver's link handler is routinely named after the
+// entry type it handles, and `onsymlink()` as a substring would report a
+// driver that refuses link entries and never creates one.
+
+binding jsArchiveSymlinkTargetWithoutContainment {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.call in ["symlink", "symlinkSync", "ensureSymlink", "createSymlink"] and node.context.selector contains "linkname" and not (node.context.call in ["startsWith", "relative", "realpath", "realpathSync"])
+  emit issue code.ArchiveSymlinkFilterBypass at node
+}

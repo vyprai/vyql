@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule RemoteMethodCodeExecutionMissingAuthorization {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_862, CWE_269]
+    id: "VYQL-AUTH-163"
+    severity: critical
+  }
+  issue code.RemoteMethodCodeExecutionMissingAuthorization as endpoint
+}

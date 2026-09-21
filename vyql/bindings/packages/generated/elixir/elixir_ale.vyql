@@ -1,0 +1,86 @@
+module bindings.elixir.generated.m6b07d79b;
+
+binding privilegedOp0 {
+  requires {
+    dependency("elixir_ale")
+  }
+  query pattern callExpr where callee.method == "Elixir.ElixirALE.GPIO.write"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("elixir_ale")
+  }
+  query pattern callExpr where callee.method == "Elixir.ElixirALE.GPIO.read"
+  emit source core.UserControlledData at call.result
+}
+
+binding privilegedOp2 {
+  requires {
+    dependency("elixir_ale")
+  }
+  query pattern callExpr where callee.method == "Elixir.ElixirALE.I2C.write"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}
+
+binding privilegedOp3 {
+  requires {
+    dependency("elixir_ale")
+  }
+  query pattern callExpr where callee.method == "Elixir.ElixirALE.I2C.write_device"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}
+
+binding privilegedOp4 {
+  requires {
+    dependency("elixir_ale")
+  }
+  query pattern callExpr where callee.method == "Elixir.ElixirALE.I2C.write_read"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}
+
+binding privilegedOp5 {
+  requires {
+    dependency("elixir_ale")
+  }
+  query pattern callExpr where callee.method == "Elixir.ElixirALE.I2C.write_read_device"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}
+
+binding userControlledData6 {
+  requires {
+    dependency("elixir_ale")
+  }
+  query pattern callExpr where callee.method == "Elixir.ElixirALE.I2C.read"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData7 {
+  requires {
+    dependency("elixir_ale")
+  }
+  query pattern callExpr where callee.method == "Elixir.ElixirALE.I2C.read_device"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData8 {
+  requires {
+    dependency("elixir_ale")
+  }
+  query pattern callExpr where callee.method == "Elixir.ElixirALE.I2C.write_read"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData9 {
+  requires {
+    dependency("elixir_ale")
+  }
+  query pattern callExpr where callee.method == "Elixir.ElixirALE.I2C.write_read_device"
+  emit source core.UserControlledData at call.result
+}

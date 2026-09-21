@@ -1,0 +1,9 @@
+module bindings.python.generated.me7353ec6;
+
+binding logOutput0 {
+  requires {
+    dependency("systemd-python")
+  }
+  query pattern callExpr where callee.method == "systemd.journal.send"
+  emit sink code.LogOutput at args[0]
+}

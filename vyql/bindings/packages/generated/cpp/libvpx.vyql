@@ -1,0 +1,97 @@
+module bindings.cpp.generated.md0e9ae1e;
+
+binding cliArgument0 {
+  requires {
+    dependency("libvpx")
+  }
+  query pattern callExpr where callee.method == "arg_parse_uint"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument1 {
+  requires {
+    dependency("libvpx")
+  }
+  query pattern callExpr where callee.method == "arg_parse_int"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument2 {
+  requires {
+    dependency("libvpx")
+  }
+  query pattern callExpr where callee.method == "arg_parse_rational"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument3 {
+  requires {
+    dependency("libvpx")
+  }
+  query pattern callExpr where callee.method == "arg_parse_enum"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument4 {
+  requires {
+    dependency("libvpx")
+  }
+  query pattern callExpr where callee.method == "arg_parse_enum_or_int"
+  emit source code.CliArgument at call.result
+}
+
+binding filePathAccess5 {
+  requires {
+    dependency("libvpx")
+  }
+  query pattern callExpr where callee.method == "vpx_video_reader_open"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess6 {
+  requires {
+    dependency("libvpx")
+  }
+  query pattern callExpr where callee.method == "vpx_video_reader_read_frame"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess7 {
+  requires {
+    dependency("libvpx")
+  }
+  query pattern callExpr where callee.method == "vpx_video_reader_get_frame"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess8 {
+  requires {
+    dependency("libvpx")
+  }
+  query pattern callExpr where callee.method == "ivf_read_frame"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess9 {
+  requires {
+    dependency("libvpx")
+  }
+  query pattern callExpr where callee.method == "y4m_input_open"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess10 {
+  requires {
+    dependency("libvpx")
+  }
+  query pattern callExpr where callee.method == "webm_read_frame"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding weakHash11 {
+  requires {
+    dependency("libvpx")
+  }
+  query pattern callExpr where callee.method == "MD5Final"
+  emit issue code.WeakHash at call
+}

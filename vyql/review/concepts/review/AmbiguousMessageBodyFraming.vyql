@@ -1,0 +1,7 @@
+module code;
+
+review code.AmbiguousMessageBodyFraming {
+  category: request
+  kind: attention
+  text: "review HTTP/1 header-block parsers that frame the body from Transfer-Encoding and Content-Length without rejecting a message carrying both"
+}

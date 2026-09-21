@@ -1,0 +1,7 @@
+module code;
+
+review code.UrlAuthoritySplitWithoutBackslashNormalization {
+  category: request_forgery
+  kind: attention
+  text: "normalize backslash to slash before splitting URL authority components, matching browser URL resolution, so a backslash-delimited URL cannot parse to a different host"
+}

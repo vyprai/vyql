@@ -1,0 +1,41 @@
+module bindings.perl.generated.mce95b754;
+
+binding deserialization0 {
+  requires {
+    dependency("OpenFrame")
+  }
+  query pattern callExpr where callee.method == "req2cookie_tin"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("OpenFrame")
+  }
+  query pattern callExpr where callee.method == "params2hash"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("OpenFrame")
+  }
+  query pattern callExpr where callee.method == "parse_multipart_data"
+  emit sink code.Deserialization at args[0]
+}
+
+binding httpInput3 {
+  requires {
+    dependency("OpenFrame")
+  }
+  query pattern callExpr where callee.method == "cookies"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput4 {
+  requires {
+    dependency("OpenFrame")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit source code.HttpInput at call.result
+}

@@ -1,0 +1,8 @@
+module code;
+
+review code.RecursiveObjectParentResolveWithoutCycleGuard {
+  category: resource
+  expected: [core.InputValidation]
+  kind: target
+  text: "review object parent traversal for a shared visited-object or recursion guard across repeated parent resolution"
+}

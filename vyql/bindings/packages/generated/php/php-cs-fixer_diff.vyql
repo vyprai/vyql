@@ -1,0 +1,9 @@
+module bindings.php.generated.mcd1bc724;
+
+binding deserialization0 {
+  requires {
+    dependency("php-cs-fixer/diff")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

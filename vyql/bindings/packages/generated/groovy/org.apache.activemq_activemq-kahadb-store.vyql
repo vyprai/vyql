@@ -1,0 +1,41 @@
+module bindings.groovy.generated.mc43097c1;
+
+binding storedDataRead0 {
+  requires {
+    dependency("org.apache.activemq:activemq-kahadb-store")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.StoredDataRead at call.result
+}
+
+binding storedDataWrite1 {
+  requires {
+    dependency("org.apache.activemq:activemq-kahadb-store")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.StoredDataWrite at args[0]
+}
+
+binding storedDataWrite2 {
+  requires {
+    dependency("org.apache.activemq:activemq-kahadb-store")
+  }
+  query pattern callExpr where callee.method == "addMessage"
+  emit sink code.StoredDataWrite at args[0]
+}
+
+binding storedDataWrite3 {
+  requires {
+    dependency("org.apache.activemq:activemq-kahadb-store")
+  }
+  query pattern callExpr where callee.method == "removeMessage"
+  emit sink code.StoredDataWrite at args[0]
+}
+
+binding storedDataRead4 {
+  requires {
+    dependency("org.apache.activemq:activemq-kahadb-store")
+  }
+  query pattern callExpr where callee.method == "recover"
+  emit source code.StoredDataRead at call.result
+}

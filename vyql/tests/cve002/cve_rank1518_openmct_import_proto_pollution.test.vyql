@@ -1,0 +1,229 @@
+# Rank 1518 / CVE-2023-45282: Open MCT's import-from-JSON action handed an
+# uploaded file's text straight to JSON.parse and then walked the parsed tree
+# into the object model, so an export file carrying a __proto__ key reached
+# Object.assign on a fresh model and polluted Object.prototype across the
+# application (prototype pollution, CWE-1321). onSave in
+# src/plugins/importFromJSONAction/ImportFromJSONAction.js ran
+#   const selectFile = changes.selectFile;
+#   const objectTree = selectFile.body;
+#   this._importObjectTree(object, JSON.parse(objectTree));
+# -- the body is the text the dialog's FileInput control read with
+# FileReader.readAsText and handed back as the form value -- and the
+# validation twin at :284 parsed the same body bare. The fixing commit
+# 2243381d52 ("Protect against prototype pollution in import action (#7094)")
+# adds src/utils/sanitization.js exporting filter__proto__, a JSON.parse
+# reviver that returns undefined for a __proto__ key, and threads it through
+# every parse the action and the localStorage provider perform.
+#
+# ## What fires, both revisions
+#
+# Three --cache off runs per revision over src (790 analysed javascript files)
+# report 357 findings each, deterministically, identically on the vulnerable
+# parent 3c7d3397 and the fixed 2243381d: 122 VYQL-INJ-013, 90 VYQL-INJ-001,
+# 61 VYQL-INJ-134, 39 VYQL-CRY-006, 13 VYQL-INJ-009, 11 VYQL-RF-001 and the
+# tail. Every one of the 122 INJ-013 rows pairs a code.DomInput or
+# code.HttpInput source with a code.ProtoPollute sink on a computed-key write
+# (the __js_dynamic_property_write call the frontend lowers obj[key] = value
+# to), and none of them names ImportFromJSONAction.js or
+# LocalStorageObjectProvider.js. Over src/plugins/importFromJSONAction alone
+# the count is zero at both revisions, all six runs. The only rows naming the
+# action are unrelated noise: five syntactic code.SqlExecution and a
+# code.RegexCompileSink / code.FormatString pair on the
+# new RegExp(oldIdKeyString, 'g') at :227.
+#
+# `vyql match` on the action labels no source and no code.ProtoPollute sink.
+# On the localStorage provider it labels three code.ProtoPollute sinks -- the
+# computed-key writes at :61, :72 and :94 -- and no source: getSpace() reads
+# `this.localStorage[this.spaceKey]` through a constructor-assigned field, so
+# no DomInput label reaches the parse it feeds. The two halves of the rule are
+# therefore missing in mirror image on the two files the fix touched.
+#
+# ## Why no binding converts it
+#
+# A reverted probe binding `selectFile.body` as core.UserControlledData does
+# label the read (verified on a copy of the file) and leaves the tree scan
+# unchanged: 357 findings, 122 INJ-013, nothing on the action. A second probe
+# binding `Object.assign` to code.ProtoPollute at args[1] does light the merge
+# up -- api/objects/MutableDomainObject.js:151 becomes a labelled sink and
+# seven new INJ-013 rows appear, one of them tainting createMutable's object
+# parameter from the couch persistence provider's code.DomInput through
+# ObjectAPI.observe -> ObjectAPI.toMutable -- so the merge half is reachable
+# once labelled. The import action still contributes nothing: its flow runs
+# this.newObjects.push(newModel) -> Promise.all(this.newObjects.map(
+# this._instantiate, this)) -> openmct.objects.save(model), and no hop of that
+# carries taint. Both halves are missing for this rank and one of them is
+# project-local: `changes.selectFile.body` is Open MCT's own form-control
+# convention, the same object-field provenance boundary as ranks 1521, 1526
+# and 1545.
+#
+# The merge half does carry a genuine, measured defect that this rank cannot
+# decide: the shipped protoPollute32 binds `callee.path ~= "Object.assign"`
+# to `code.ProtoPollute at args.any.collection` behind dependency("lodash"),
+# which is doubly inert -- Object.assign is a JavaScript language built-in
+# rather than a lodash API, so a project that does not declare lodash never
+# gets the sink, and args.any.collection labels nothing when the merged
+# argument is a plain identifier (measured: Object.assign(mutable, object)
+# takes no label from the shipped binding while `at args[1]` does). Correcting
+# it is generic but converts nothing here and adds seven rows whose only
+# source is the couch persistence provider, so it stays for a rank it decides.
+#
+# The fix's own control has no reader either: match on
+# src/utils/sanitization.js labels nothing at all, so filter__proto__'s
+# `key !== '__proto__'` comparison produces no prototypeKeyGuard fact, and the
+# guard concept the rule consumes (core.PrototypePollutionGuard, anchored by
+# proto_key_guarded_dynamic_write to the function holding the computed-key
+# write) could not cover a reviver in onSave guarding a merge in another file
+# without cross-file control attribution.
+#
+# Until upload-field provenance lands and the merge sink is reachable, both
+# forms of the parse are equally unreported. The last two blocks below hold
+# the boundary pair that isolates which half is which: a computed-key copy of
+# stored input is reported, the same input through Object.assign is not.
+
+test "rank1518: the import action parses the uploaded body bare"
+  lang javascript
+  file src/plugins/importFromJSONAction/ImportFromJSONAction.js
+  reject VYQL-INJ-013
+  code
+  ```
+  import objectUtils from 'objectUtils';
+  import { v4 as uuid } from 'uuid';
+
+  export default class ImportAsJSONAction {
+    constructor(openmct) {
+      this.newObjects = [];
+      this.openmct = openmct;
+    }
+
+    onSave(object, changes) {
+      const selectFile = changes.selectFile;
+      const objectTree = selectFile.body;
+      this._importObjectTree(object, JSON.parse(objectTree));
+    }
+
+    _generateNewIdentifiers(tree, namespace) {
+      Object.keys(tree.openmct).forEach((domainObjectId) => {
+        const newId = { namespace, key: uuid() };
+        const oldId = objectUtils.parseKeyString(domainObjectId);
+        tree = this._rewriteId(oldId, newId, tree);
+      }, this);
+      return tree;
+    }
+
+    async _importObjectTree(domainObject, objTree) {
+      const namespace = domainObject.identifier.namespace;
+      const tree = this._generateNewIdentifiers(objTree, namespace);
+      const rootId = tree.rootId;
+      const rootObj = tree.openmct[rootId];
+      delete rootObj.persisted;
+      this.newObjects.push(rootObj);
+
+      await Promise.all(this.newObjects.map(this._instantiate, this));
+      this.openmct.objects.mutate(rootObj, 'location', namespace);
+    }
+
+    _instantiate(model) {
+      return this.openmct.objects.save(model);
+    }
+  }
+  ```
+
+test "rank1518: the fixed revision drops proto keys through a reviver"
+  lang javascript
+  file src/plugins/importFromJSONAction/ImportFromJSONAction.js
+  reject VYQL-INJ-013
+  code
+  ```
+  import { filter__proto__ } from 'utils/sanitization';
+
+  export default class ImportAsJSONAction {
+    constructor(openmct) {
+      this.newObjects = [];
+      this.openmct = openmct;
+    }
+
+    onSave(object, changes) {
+      const selectFile = changes.selectFile;
+      const jsonTree = selectFile.body;
+      const objectTree = JSON.parse(jsonTree, filter__proto__);
+
+      this._importObjectTree(object, objectTree);
+    }
+
+    _instantiate(model) {
+      return this.openmct.objects.save(model);
+    }
+  }
+  ```
+
+test "rank1518: the localStorage provider parses its own space bare"
+  lang javascript
+  file src/plugins/localStorage/LocalStorageObjectProvider.js
+  reject VYQL-INJ-013
+  code
+  ```
+  export default class LocalStorageObjectProvider {
+    constructor(spaceKey = 'mct') {
+      this.localStorage = window.localStorage;
+      this.spaceKey = spaceKey;
+    }
+
+    persistObject(domainObject) {
+      let space = this.getSpaceAsObject();
+      space[domainObject.identifier.key] = domainObject;
+      this.persistSpace(space);
+      return Promise.resolve(true);
+    }
+
+    persistSpace(space) {
+      this.localStorage[this.spaceKey] = JSON.stringify(space);
+    }
+
+    getSpace() {
+      return this.localStorage[this.spaceKey];
+    }
+
+    getSpaceAsObject() {
+      return JSON.parse(this.getSpace());
+    }
+  }
+  ```
+
+test "rank1518: a computed-key copy of stored input is reported"
+  lang javascript
+  file src/api/objects/MutableDomainObject.js
+  expect VYQL-INJ-013
+  code
+  ```
+  function copyInto(target, source) {
+    for (const key in source) {
+      target[key] = source[key];
+    }
+    return target;
+  }
+
+  function loadModel() {
+    const stored = window.localStorage.getItem('mct');
+    return copyInto({}, JSON.parse(stored));
+  }
+  ```
+
+test "rank1518: the same stored input through Object.assign is not"
+  lang javascript
+  file src/api/objects/MutableDomainObject.js
+  reject VYQL-INJ-013
+  code
+  ```
+  export default class MutableDomainObject {
+    static createMutable(object, mutationTopic) {
+      let mutable = Object.create(new MutableDomainObject(mutationTopic));
+      Object.assign(mutable, object);
+      return mutable;
+    }
+  }
+
+  function loadModel() {
+    const stored = window.localStorage.getItem('mct');
+    return MutableDomainObject.createMutable(JSON.parse(stored));
+  }
+  ```

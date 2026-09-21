@@ -1,0 +1,35 @@
+module bindings.javascript.request_filtering_agent;
+
+// request-filtering-agent exists for one purpose: its agents resolve the
+// target name and test the resulting address at connect time, refusing the
+// socket when it lands on a private, loopback, link-local or reserved range.
+// useAgent(url) picks the http or https agent for the URL's scheme and is
+// what the documentation tells callers to pass as the `agent` option of a
+// request; RequestFilteringHttpAgent and RequestFilteringHttpsAgent are the
+// same filter constructed directly. Passing one of these to a fetch or
+// request call is the address check applied to the address the connection
+// actually uses, which is what distinguishes it from resolving the name
+// separately beforehand and testing that answer.
+binding requestFilteringAgentUrl {
+  requires {
+    dependency("request-filtering-agent")
+  }
+  query pattern callExpr where callee.path ~= "useAgent" or callee.path ~= "useAgentDeprecated"
+  emit check core.AllowlistValidation at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding requestFilteringAgentConstructed {
+  requires {
+    dependency("request-filtering-agent")
+  }
+  query pattern callExpr where callee.path ~= "RequestFilteringHttpAgent" or callee.path ~= "RequestFilteringHttpsAgent"
+  emit check core.AllowlistValidation at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

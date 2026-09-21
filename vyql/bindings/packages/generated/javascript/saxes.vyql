@@ -1,0 +1,17 @@
+module bindings.javascript.generated.m5d428ae9;
+
+binding deserialization0 {
+  requires {
+    dependency("saxes")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("saxes")
+  }
+  query pattern callExpr where callee.method == "parseEntity"
+  emit sink code.Deserialization at args[0]
+}

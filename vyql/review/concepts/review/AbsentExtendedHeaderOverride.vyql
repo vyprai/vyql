@@ -1,0 +1,8 @@
+module code;
+
+review code.AbsentExtendedHeaderOverride {
+  category: input_validation
+  expected: [core.InputValidation]
+  kind: attention
+  text: "review archive parsers that size an entry's data read from the base header alone and never consult the extended-header records, where the format gives the records precedence"
+}

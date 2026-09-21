@@ -1,0 +1,37 @@
+module bindings.c.generated.md601388a;
+
+binding secretValue0 {
+  requires {
+    dependency("s2n")
+  }
+  query pattern callExpr where callee.method == "s2n_cert_chain_and_key_load_pem"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("s2n")
+  }
+  query pattern callExpr where callee.method == "s2n_cert_chain_and_key_load_pem_bytes"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue2 {
+  requires {
+    dependency("s2n")
+  }
+  query pattern callExpr where callee.method == "s2n_cert_chain_and_key_load_public_pem_bytes"
+  emit source code.SecretValue at call.result
+}
+
+binding authenticationCheck3 {
+  requires {
+    dependency("s2n")
+  }
+  query pattern callExpr where callee.method == "s2n_config_set_verification_ca_location"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

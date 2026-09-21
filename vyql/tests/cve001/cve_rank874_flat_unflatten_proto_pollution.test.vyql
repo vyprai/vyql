@@ -1,0 +1,57 @@
+# Rank 874 / CVE-2020-36632: flat unflatten wrote dotted path segments into
+# recipient objects without rejecting __proto__, allowing prototype pollution.
+
+test "rank874: flat unflatten writes path segment without prototype guard"
+  lang javascript
+  file index.js
+  expect VYQL-INJ-134
+  expect_review code.NestedPathInheritedPropertyPrototypePollution
+  code
+  ```
+  function unflatten(target, opts) {
+    Object.keys(target).forEach(function (key) {
+      const split = key.split('.')
+      let key1 = split.shift()
+      let key2 = split[0]
+      let recipient = {}
+
+      while (key2 !== undefined) {
+        if (recipient[key1] == null) {
+          recipient[key1] = {}
+        }
+        recipient = recipient[key1]
+        key1 = split.shift()
+        key2 = split[0]
+      }
+    })
+  }
+  ```
+
+test "rank874: flat unflatten rejects __proto__ path segment"
+  lang javascript
+  file index.js
+  reject VYQL-INJ-134
+  reject_review code.NestedPathInheritedPropertyPrototypePollution
+  code
+  ```
+  function unflatten(target, opts) {
+    Object.keys(target).forEach(function (key) {
+      const split = key.split('.')
+      let key1 = split.shift()
+      let key2 = split[0]
+      let recipient = {}
+
+      while (key2 !== undefined) {
+        if (key1 === '__proto__') {
+          return
+        }
+        if (recipient[key1] == null) {
+          recipient[key1] = {}
+        }
+        recipient = recipient[key1]
+        key1 = split.shift()
+        key2 = split[0]
+      }
+    })
+  }
+  ```

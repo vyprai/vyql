@@ -1,0 +1,7 @@
+module code;
+
+review code.CommonsCompressBzip2FallbackSortMissing {
+  category: resource
+  kind: attention
+  text: "review bzip2 block sorting for fallback sorting when the main sorter exceeds its comparison work limit"
+}

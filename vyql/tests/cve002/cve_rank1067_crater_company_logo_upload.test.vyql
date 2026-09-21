@@ -1,0 +1,180 @@
+# Rank 1067 / CVE-2021-4080: Crater took the stored file name of a company logo
+# straight from the request body, so a base64 upload named .php landed in public
+# storage and ran (CWE-434).
+#
+# The upload sinks were already labelled: `addMediaFromBase64` and
+# `usingFileName` emit code.UnsafeUpload for the media library, and the
+# ordinary request accessors were already sources. What was missing is
+# Laravel's primary input channel -- a controller action receives the request
+# as a `Request $request` parameter and reads fields off it as attributes,
+# which start no path when nothing labels the parameter. A parameter
+# type-hinted with the framework's base request class now emits code.HttpInput.
+#
+# The type hint is also what separates the fixed revision: the fix types the
+# three upload actions with form request classes whose `rules()` decode the
+# payload and require an allowed image type, so a parameter typed with a class
+# derived from the request is not labelled and the same body stops reporting.
+#
+# verify_current_expected: fixed
+
+test "rank1067: the stored name comes from the request body"
+  lang php
+  file composer.lock
+  code
+  ```
+  {
+      "packages": [
+          {"name": "spatie/laravel-medialibrary", "version": "9.6.0"}
+      ],
+      "packages-dev": []
+  }
+  ```
+  file app/Http/Controllers/V1/Admin/Settings/CompanyController.php
+  expect VYQL-INJ-015
+  code
+  ```
+  <?php
+
+  namespace Crater\Http\Controllers\V1\Admin\Settings;
+
+  use Illuminate\Http\Request;
+
+  class CompanyController extends Controller
+  {
+      public function uploadCompanyLogo(Request $request)
+      {
+          $company = Company::find($request->header('company'));
+
+          $this->authorize('manage company', $company);
+
+          $data = json_decode($request->company_logo);
+
+          if ($data) {
+              $company->clearMediaCollection('logo');
+
+              $company->addMediaFromBase64($data->data)
+                  ->usingFileName($data->name)
+                  ->toMediaCollection('logo');
+          }
+
+          return response()->json(['success' => true]);
+      }
+  }
+  ```
+
+test "rank1067: the same upload with a validated request"
+  lang php
+  file composer.lock
+  code
+  ```
+  {
+      "packages": [
+          {"name": "spatie/laravel-medialibrary", "version": "9.6.0"}
+      ],
+      "packages-dev": []
+  }
+  ```
+  file app/Http/Controllers/V1/Admin/Settings/CompanyController.php
+  reject VYQL-INJ-015
+  code
+  ```
+  <?php
+
+  namespace Crater\Http\Controllers\V1\Admin\Settings;
+
+  use Crater\Http\Requests\CompanyLogoRequest;
+
+  class CompanyController extends Controller
+  {
+      public function uploadCompanyLogo(CompanyLogoRequest $request)
+      {
+          $company = Company::find($request->header('company'));
+
+          $this->authorize('manage company', $company);
+
+          $data = json_decode($request->company_logo);
+
+          if ($data) {
+              $company->clearMediaCollection('logo');
+
+              $company->addMediaFromBase64($data->data)
+                  ->usingFileName($data->name)
+                  ->toMediaCollection('logo');
+          }
+
+          return response()->json(['success' => true]);
+      }
+  }
+  ```
+
+test "rank1067: the same action storing no request data"
+  lang php
+  file composer.lock
+  code
+  ```
+  {
+      "packages": [
+          {"name": "spatie/laravel-medialibrary", "version": "9.6.0"}
+      ],
+      "packages-dev": []
+  }
+  ```
+  file app/Http/Controllers/V1/Admin/Settings/CompanyController.php
+  reject VYQL-INJ-015
+  code
+  ```
+  <?php
+
+  namespace Crater\Http\Controllers\V1\Admin\Settings;
+
+  use Illuminate\Http\Request;
+
+  class CompanyController extends Controller
+  {
+      public function uploadCompanyLogo(Request $request)
+      {
+          $company = Company::find(1);
+
+          $company->addMediaFromBase64(base64_encode('x'))
+              ->usingFileName('logo.png')
+              ->toMediaCollection('logo');
+      }
+  }
+  ```
+
+test "rank1067: the same upload from an ordinary request accessor"
+  lang php
+  file composer.lock
+  code
+  ```
+  {
+      "packages": [
+          {"name": "spatie/laravel-medialibrary", "version": "9.6.0"}
+      ],
+      "packages-dev": []
+  }
+  ```
+  file app/Http/Controllers/V1/Admin/Settings/CompanyController.php
+  expect VYQL-INJ-015
+  code
+  ```
+  <?php
+
+  namespace Crater\Http\Controllers\V1\Admin\Settings;
+
+  class CompanyController extends Controller
+  {
+      public function uploadCompanyLogo()
+      {
+          $data = json_decode($_POST['company_logo']);
+
+          if ($data) {
+              $company = Company::find(1);
+
+              $company->addMediaFromBase64($data->data)
+                  ->usingFileName($data->name)
+                  ->toMediaCollection('logo');
+          }
+      }
+  }
+  ```

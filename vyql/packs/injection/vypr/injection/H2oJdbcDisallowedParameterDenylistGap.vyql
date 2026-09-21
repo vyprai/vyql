@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule H2oJdbcDisallowedParameterDenylistGap {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_94]
+    id: "VYQL-INJ-205"
+    severity: critical
+  }
+  issue code.H2oJdbcDisallowedParameterDenylistGap as config
+}

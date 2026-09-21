@@ -1,0 +1,57 @@
+module bindings.cpp.generated.m4fa6ca30;
+
+binding userControlledData0 {
+  requires {
+    dependency("aws-crt-cpp")
+  }
+  query pattern callExpr where callee.method == "Base64Decode"
+  emit source core.UserControlledData at call.result
+}
+
+binding weakHash1 {
+  requires {
+    dependency("aws-crt-cpp")
+  }
+  query pattern callExpr where callee.method == "SetBYOCryptoNewMD5Callback"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash2 {
+  requires {
+    dependency("aws-crt-cpp")
+  }
+  query pattern callExpr where callee.method == "SetBYOCryptoNewSHA1Callback"
+  emit issue code.WeakHash at call
+}
+
+binding weakCipher3 {
+  requires {
+    dependency("aws-crt-cpp")
+  }
+  query pattern callExpr where callee.method == "SetBYOCryptoNewSHA256HMACCallback"
+  emit issue code.WeakCipher at call
+}
+
+binding weakCipher4 {
+  requires {
+    dependency("aws-crt-cpp")
+  }
+  query pattern callExpr where callee.method == "SetBYOCryptoNewSHA512HMACCallback"
+  emit issue code.WeakCipher at call
+}
+
+binding certValidationDisabled5 {
+  requires {
+    dependency("aws-crt-cpp")
+  }
+  query pattern callExpr where callee.method == "SetBYOCryptoClientTlsCallback"
+  emit issue code.CertValidationDisabled at call
+}
+
+binding certValidationDisabled6 {
+  requires {
+    dependency("aws-crt-cpp")
+  }
+  query pattern callExpr where callee.method == "SetBYOCryptoTlsContextCallbacks"
+  emit issue code.CertValidationDisabled at call
+}

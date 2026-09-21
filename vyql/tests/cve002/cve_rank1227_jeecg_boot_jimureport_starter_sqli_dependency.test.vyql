@@ -1,0 +1,110 @@
+# Rank 1227 / CVE-2023-40989: jeecg-boot serves the JimuReport designer from the
+# jimureport-spring-boot-starter dependency, whose queryFieldBySql endpoint runs
+# caller-supplied SQL. The application code holds no vulnerable statement — the
+# Maven coordinate is the whole evidence, so the pinned release is what the scan
+# has to read.
+
+test "rank1227: a jimureport starter pinned below the fixed release is reported"
+  lang java
+  expect VYQL-SCA-001
+  file src/main/java/org/jeecg/JeecgApplication.java
+  code
+  ```
+  package org.jeecg;
+
+  public class JeecgApplication {
+      public static void main(String[] args) {
+      }
+  }
+  ```
+  file pom.xml
+  code
+  ```
+  <project xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>org.jeecgframework.boot</groupId>
+    <artifactId>jeecg-boot-parent</artifactId>
+    <version>3.5.3</version>
+    <properties>
+      <jimureport-spring-boot-starter.version>1.6.1</jimureport-spring-boot-starter.version>
+    </properties>
+    <dependencyManagement>
+      <dependencies>
+        <dependency>
+          <groupId>org.jeecgframework.jimureport</groupId>
+          <artifactId>jimureport-spring-boot-starter</artifactId>
+          <version>${jimureport-spring-boot-starter.version}</version>
+        </dependency>
+      </dependencies>
+    </dependencyManagement>
+  </project>
+  ```
+
+test "rank1227: the same coordinate at the fixed release is clean"
+  lang java
+  reject VYQL-SCA-001
+  file src/main/java/org/jeecg/JeecgApplication.java
+  code
+  ```
+  package org.jeecg;
+
+  public class JeecgApplication {
+      public static void main(String[] args) {
+      }
+  }
+  ```
+  file pom.xml
+  code
+  ```
+  <project xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>org.jeecgframework.boot</groupId>
+    <artifactId>jeecg-boot-parent</artifactId>
+    <version>3.6.0</version>
+    <properties>
+      <jimureport-spring-boot-starter.version>1.6.2-GA</jimureport-spring-boot-starter.version>
+    </properties>
+    <dependencyManagement>
+      <dependencies>
+        <dependency>
+          <groupId>org.jeecgframework.jimureport</groupId>
+          <artifactId>jimureport-spring-boot-starter</artifactId>
+          <version>${jimureport-spring-boot-starter.version}</version>
+        </dependency>
+      </dependencies>
+    </dependencyManagement>
+  </project>
+  ```
+
+test "rank1227: a module that inherits the managed version is not reported as unpinned"
+  lang java
+  reject VYQL-SCA-001
+  file src/main/java/org/jeecg/JeecgApplication.java
+  code
+  ```
+  package org.jeecg;
+
+  public class JeecgApplication {
+      public static void main(String[] args) {
+      }
+  }
+  ```
+  file pom.xml
+  code
+  ```
+  <project xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+      <groupId>org.jeecgframework.boot</groupId>
+      <artifactId>jeecg-boot-parent</artifactId>
+      <version>3.6.0</version>
+    </parent>
+    <artifactId>jeecg-system-biz</artifactId>
+    <dependencies>
+      <dependency>
+        <groupId>org.jeecgframework.jimureport</groupId>
+        <artifactId>jimureport-spring-boot-starter</artifactId>
+      </dependency>
+    </dependencies>
+  </project>
+  ```

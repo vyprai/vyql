@@ -1,0 +1,9 @@
+module bindings.php.generated.m9e291cf9;
+
+binding deserialization0 {
+  requires {
+    dependency("moment/moment")
+  }
+  query pattern callExpr where callee.method == "parseWeekday"
+  emit sink code.Deserialization at args[0]
+}

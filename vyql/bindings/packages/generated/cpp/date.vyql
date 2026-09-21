@@ -1,0 +1,17 @@
+module bindings.cpp.generated.mbab8f7df;
+
+binding urlFetch0 {
+  requires {
+    dependency("date")
+  }
+  query pattern callExpr where callee.method == "remote_download"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("date")
+  }
+  query pattern callExpr where callee.method == "parse_info"
+  emit sink code.Deserialization at args[0]
+}

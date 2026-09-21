@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule IncompleteCommentTokenCodeScreen {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_184, CWE_94]
+    id: "VYQL-INJ-282"
+    severity: high
+  }
+  issue code.IncompleteCommentTokenCodeScreen as validator
+}

@@ -1,0 +1,25 @@
+module bindings.go.urlPolicyNotReappliedOnRedirect;
+
+// net/http documents Get, Head, Post and PostForm as wrappers around
+// DefaultClient, and Client.CheckRedirect as the only place a redirect policy
+// can live: "If CheckRedirect is nil, the Client uses its default policy, which
+// is to stop after 10 consecutive requests." DefaultClient leaves it nil and is
+// shared process-wide, so a caller of the package-level helpers has no way to
+// inspect a redirect target -- the helper follows the 3xx and issues the next
+// request itself.
+//
+// That is only a weakness where the URL is under policy. A function that checks
+// its URL against a host, address or scheme policy -- a named URL/host validator,
+// or the stdlib address predicates an inline policy is built from -- and then
+// fetches through one of those helpers enforces the policy on the first request
+// and on nothing after it, so a 3xx from the approved host reaches whatever the
+// redirect names. Owning the client is what restores the hook, which is why the
+// clause declines a fetch issued through a client value.
+//
+// Residual: a function that merely reads an interface address and calls
+// net/http's Get, without a URL policy of its own, matches on the stdlib
+// predicates alone.
+binding goUrlPolicyBoundToFirstHopOnly {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "go" and node.context.callPath in ["http.Get", "http.Post", "http.Head", "http.PostForm", "http.DefaultClient.Get", "http.DefaultClient.Post", "http.DefaultClient.Head", "http.DefaultClient.Do", "http.DefaultClient.PostForm"] and containsAny(node.context.callPath, ["ValidateURL", "ValidateUrl", "validateURL", "validateUrl", "CheckURL", "CheckUrl", "checkURL", "checkUrl", "IsSafeURL", "isSafeURL", "IsAllowedURL", "isAllowedURL", "IsAllowedHost", "isAllowedHost", "SSRF", "Ssrf", "ssrf", "IsLoopback", "IsPrivate", "IsLinkLocalUnicast", "net.ParseIP", "netip.ParseAddr", "net.LookupIP"])
+  emit issue code.UrlPolicyNotReappliedOnRedirect at node
+}

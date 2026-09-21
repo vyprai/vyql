@@ -1,0 +1,17 @@
+module bindings.groovy.generated.m7c47fee5;
+
+binding expressionEval0 {
+  requires {
+    dependency("ognl:ognl")
+  }
+  query pattern callExpr where callee.method == "parseExpression"
+  emit sink code.ExpressionEval at args[0]
+}
+
+binding expressionEval1 {
+  requires {
+    dependency("ognl:ognl")
+  }
+  query pattern callExpr where callee.method == "compileExpression"
+  emit sink code.ExpressionEval at args[0]
+}

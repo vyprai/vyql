@@ -1,0 +1,38 @@
+# Sanitizer (control) coverage for thin-tier languages with a canonical neutralizer.
+
+test "lua: ngx.quote_sql_str neutralizes SQLi"
+  lang lua
+  reject VYQL-INJ-001
+  code
+  ```
+  local function h(db)
+    local x = ngx.req.get_uri_args()
+    local q = ngx.quote_sql_str(x)
+    db:query("SELECT " .. q)
+  end
+  ```
+
+test "lua: unsanitized arg is still SQLi (no FN)"
+  lang lua
+  expect VYQL-INJ-001
+  code
+  ```
+  local function h(db)
+    local x = ngx.req.get_uri_args()
+    db:query("SELECT " .. x)
+  end
+  ```
+
+test "scala: escapeHtml4 neutralizes XSS"
+  lang scala
+  reject VYQL-INJ-004
+  code
+  ```
+  object H {
+    def h(req: Request) = {
+      val p = req.getQueryString
+      val s = StringEscapeUtils.escapeHtml4(p)
+      Html(s)
+    }
+  }
+  ```

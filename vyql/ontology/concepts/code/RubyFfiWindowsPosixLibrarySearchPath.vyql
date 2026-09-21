@@ -1,0 +1,11 @@
+module code;
+
+concept RubyFfiWindowsPosixLibrarySearchPath : issue {
+  cwe: [CWE_427]
+  reviewAssumption: "native Windows library loading can resolve unintended DLLs from Cygwin or other lower-trust POSIX-style directories"
+  reviewCategory: path
+  reviewCondition: "native Windows FFI library loading falls back to POSIX library directories"
+  reviewConfidence: high
+  reviewEvidence: "Ruby FFI library loader context {pattern} searches /usr library paths after DynamicLibrary.open fails without a Windows guard"
+  vulnerableTo: [path.UncontrolledSearchPath]
+}

@@ -1,0 +1,57 @@
+module bindings.ruby.generated.mddd10154;
+
+binding weakHash0 {
+  requires {
+    dependency("mixlib-authentication")
+  }
+  query pattern callExpr where callee.method == "Mixlib::Authentication::Digester.hash_file"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash1 {
+  requires {
+    dependency("mixlib-authentication")
+  }
+  query pattern callExpr where callee.method == "Mixlib::Authentication::Digester.hash_string"
+  emit issue code.WeakHash at call
+}
+
+binding authenticationCheck2 {
+  requires {
+    dependency("mixlib-authentication")
+  }
+  query pattern callExpr where callee.method == "Mixlib::Authentication::SignatureVerification.authenticate_user_request"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck3 {
+  requires {
+    dependency("mixlib-authentication")
+  }
+  query pattern callExpr where callee.method == "Mixlib::Authentication::SignatureVerification.authenticate_request"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding secretValue4 {
+  requires {
+    dependency("mixlib-authentication")
+  }
+  query pattern callExpr where callee.method == "Mixlib::Authentication::SignedHeaderAuth.sign"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue5 {
+  requires {
+    dependency("mixlib-authentication")
+  }
+  query pattern callExpr where callee.method == "Mixlib::Authentication::SignedHeaderAuth.do_sign"
+  emit source code.SecretValue at call.result
+}

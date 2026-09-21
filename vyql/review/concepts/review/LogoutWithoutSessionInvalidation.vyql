@@ -1,0 +1,7 @@
+module code;
+
+review code.LogoutWithoutSessionInvalidation {
+  category: auth
+  kind: attention
+  text: "review logout handlers for session destruction or identifier regeneration that ends the session server-side rather than only clearing its data"
+}

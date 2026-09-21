@@ -1,0 +1,6 @@
+module core;
+
+review core.CsrfProtection {
+  category: request
+  kind: check
+}

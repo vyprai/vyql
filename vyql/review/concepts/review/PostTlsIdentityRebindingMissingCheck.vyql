@@ -1,0 +1,8 @@
+module code;
+
+review code.PostTlsIdentityRebindingMissingCheck {
+  category: request
+  expected: [core.AuthenticationCheck]
+  kind: target
+  text: "verify post-TLS identity exchanges compare stable peer identity fields before replacing the active handshake identity"
+}

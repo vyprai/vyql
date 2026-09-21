@@ -1,0 +1,316 @@
+# NodeBB lets a user export their own profile, posts or uploads. src/api/users.js
+# turns the requested export kind straight into the module path of a Node child
+# process:
+#
+#   const usersAPI = module.exports;
+#
+#   usersAPI.generateExport = async (caller, { uid, type }) => {
+#     const count = await db.incrObjectField('locks', `export:${uid}${type}`);
+#     ...
+#     const child = require('child_process').fork(`./src/user/jobs/export-${type}.js`, [], {
+#       env: process.env,
+#     });
+#
+# `type` is request data. The HTTP route `POST /api/v3/users/:uid/exports/:type`
+# reaches it through `controllers/write/users.js` as
+# `api.users.generateExport(req, req.params)`, and the deprecated socket call
+# reaches it through `src/socket.io/user/profile.js`:
+#
+#   api.users.generateExport(socket, { type, ...data });
+#
+# where the spread of the client's own payload is written *after* the
+# server-chosen `type`, so a client that sends `{ uid: 1, type: '../../..' }`
+# overwrites it. Either way `fork()` resolves `./src/user/jobs/export-<type>.js`
+# relative to the install directory and executes whatever JavaScript file the
+# traversal lands on, as the NodeBB process.
+#
+# The fixed revision has both halves: `generateExport` gains
+# `const validTypes = ['profile', 'posts', 'uploads']; if
+# (!validTypes.includes(type)) throw`, and the socket handler stops spreading
+# the payload (`{ type, uid: data.uid }`). The HTTP route still calls
+# `api.users.generateExport(req, req.params)` after the fix, so the runtime
+# allowlist is the only thing standing between `req.params.type` and `fork` --
+# a control the engine has no reading for (measured below).
+#
+# What this detection covers, in three layers:
+#
+#   * `child_process.fork` as a `code.CommandExecution` sink under the
+#     spellings Node actually documents and Node code actually writes. Before,
+#     only `callee.path ~= "child_process.fork"` bound -- covering a module
+#     object literally named `child_process`. `require('child_process')
+#     .fork(...)` (NodeBB's own spelling, callee path `require.fork`), `const
+#     { fork } = require('child_process'); fork(...)`, `cp.fork(...)` and
+#     `childProcess.fork(...)` are bound as well, while the bare receiverless
+#     `fork(...)` uses `callee.path == "fork"` so `cluster.fork(env)` and
+#     MikroORM's `em.fork(opts)` stay unlabelled. Enumerated over the ~100
+#     repository clones on this machine, `.fork(` occurs on 731 lines:
+#     `cluster.fork(` 98, bare `fork(` 96 (almost all of them
+#     `const { fork } = require('child_process')`), `o.fork(` 12, `cp.fork(` 9,
+#     and single-digit counts for every other receiver.
+#
+#   * A destructuring parameter keeps its position and binds the names it
+#     introduces. `jsConv.params` collected only `identifier`,
+#     `required_parameter`/`optional_parameter` with an identifier pattern, and
+#     `assignment_pattern`; `object_pattern` and `array_pattern` matched no case
+#     and were dropped silently, so `async (caller, { uid, type })` yielded one
+#     parameter (`caller`) and the argument at index 1 had nowhere to land --
+#     which also shifted every later parameter's index, so in `f(a, { b }, c)`
+#     an argument at index 2 bound to `c` at index 1. A destructuring parameter
+#     now occupies one positional slot named after the first name it binds, and
+#     the remaining names bind to that slot's value -- the same whole-value
+#     reading the `const { a, b } = v` declaration lowering gives each bound
+#     name. Cases 3 and 4 hold the pair against cases 1 and 2.
+#
+#   * A local alias of `module.exports` is an export root. `exportedNames` marked
+#     `module.exports = ident` and `exports.f = fn`, and the assignment lowering
+#     turned `member = function` into a FuncDef only when the receiver was
+#     `exports`/`module.exports` or its root identifier was already exported.
+#     `const usersAPI = module.exports;` -- the declaration NodeBB opens
+#     src/api/users.js with -- declared no export, so
+#     `usersAPI.generateExport = async function ...` produced no FuncDef at all
+#     and no call to it could resolve. A `variable_declarator` (and a plain
+#     identifier assignment) whose value is `module.exports` now marks the
+#     declared name, and the existing member-root branch does the rest. Cases 5
+#     and 6 hold that pair.
+#
+# On NodeBB's own tree the vulnerable revision reports
+# `VYQL-INJ-002 critical, code.ExternalEntryInput @ src/api/users.js:445 ->
+# code.CommandExecution @ src/api/users.js:451` three runs out of three: the
+# export alias makes `generateExport` a public API method, the library
+# param-source labels its destructured parameter, and the parameter carries the
+# taint into `fork`'s module path. The fixed revision reports the same row one
+# statement lower, because the fix is a runtime allowlist, not a change to what
+# flows -- see the rejected control below.
+#
+# Measured and rejected: the fixed revision's own `validTypes.includes(type)`
+# guard does not suppress, because no JavaScript binding emits
+# `core.CommandArgumentValidation` for a membership test. Adding
+# `callee.method == "includes"` as a `core.CommandArgumentValidation` endpoint
+# check makes that case go to 0 and also deletes six unrelated
+# command-injection findings: n8n-mcp `src/` `VYQL-INJ-002` 7 -> 2 and
+# LibreChat 8 -> 7. The n8n-mcp deletions are the tell --
+# `services/expression-validator.ts` calls `fullMatch.includes('.invalid')` ten
+# lines above the sinks, on a value that has nothing to do with them, and
+# `endpointGuarded` only asks that the check dominate the sink. A membership
+# test on some other string is not a control on this one, so the clause is left
+# off; the shipped `binding521` treats `.includes` as an *advisory* neutralizer
+# for `code.FilePathAccess`, which annotates and never suppresses, and that is
+# the right strength for this shape.
+#
+# Still out of reach, and deliberately not worked around here: a call through a
+# member chain whose receiver is neither a name nor a constructor
+# (`api.users.generateExport(...)`, `module.exports.f(...)`) does not resolve,
+# because `resolveTargets` returns before the unique-name fallback that an
+# untyped single-segment receiver gets. Extending that fallback to chained
+# receivers was measured and set aside: it is shared lowering, it flips seven
+# pinned-miss cases across five other ranks in three languages, and it costs one
+# shipped expectation elsewhere -- a corpus-wide sweep of its own, not a
+# correction that belongs to this weakness.
+
+test "rank1462: a request-supplied export kind is interpolated into the module path of child_process.fork"
+  lang javascript
+  file src/api/users.js
+  expect VYQL-INJ-002
+  code
+  ```
+  'use strict';
+
+  const express = require('express');
+  const db = require('./database');
+
+  async function generateExport(caller, params) {
+  	const uid = params.uid;
+  	const type = params.type;
+
+  	const count = await db.incrObjectField('locks', `export:${uid}${type}`);
+  	if (count > 1) {
+  		throw new Error('[[error:already-exporting]]');
+  	}
+
+  	const child = require('child_process').fork(`./src/user/jobs/export-${type}.js`, [], {
+  		env: process.env,
+  	});
+  	child.send({ uid });
+  }
+
+  const router = express.Router();
+
+  router.post('/:uid/exports/:type', async (req, res) => {
+  	await generateExport(req, req.params);
+  	res.sendStatus(202);
+  });
+
+  module.exports = router;
+  ```
+
+test "rank1462: the same fork call with a fixed module path and the request data only in the child's message"
+  lang javascript
+  file install/web.js
+  reject VYQL-INJ-002
+  code
+  ```
+  'use strict';
+
+  const express = require('express');
+  const db = require('./database');
+
+  async function generateExport(caller, params) {
+  	const uid = params.uid;
+
+  	const count = await db.incrObjectField('locks', `export:${uid}`);
+  	if (count > 1) {
+  		throw new Error('[[error:already-exporting]]');
+  	}
+
+  	const child = require('child_process').fork('./src/user/jobs/export-profile.js', [], {
+  		env: process.env,
+  	});
+  	child.send({ uid });
+  }
+
+  const router = express.Router();
+
+  router.post('/:uid/exports/:type', async (req, res) => {
+  	await generateExport(req, req.params);
+  	res.sendStatus(202);
+  });
+
+  module.exports = router;
+  ```
+
+test "rank1462: the same flow whose export kind arrives through a destructuring parameter"
+  lang javascript
+  file src/api/users.js
+  expect VYQL-INJ-002
+  code
+  ```
+  'use strict';
+
+  const express = require('express');
+  const db = require('./database');
+
+  async function generateExport(caller, { uid, type }) {
+  	const count = await db.incrObjectField('locks', `export:${uid}${type}`);
+  	if (count > 1) {
+  		throw new Error('[[error:already-exporting]]');
+  	}
+
+  	const child = require('child_process').fork(`./src/user/jobs/export-${type}.js`, [], {
+  		env: process.env,
+  	});
+  	child.send({ uid });
+  }
+
+  const router = express.Router();
+
+  router.post('/:uid/exports/:type', async (req, res) => {
+  	await generateExport(req, req.params);
+  	res.sendStatus(202);
+  });
+
+  module.exports = router;
+  ```
+
+test "rank1462: the destructuring parameter with a fixed module path and the request data only in the child's message"
+  lang javascript
+  file install/web.js
+  reject VYQL-INJ-002
+  code
+  ```
+  'use strict';
+
+  const express = require('express');
+  const db = require('./database');
+
+  async function generateExport(caller, { uid, type }) {
+  	const count = await db.incrObjectField('locks', `export:${uid}`);
+  	if (count > 1) {
+  		throw new Error('[[error:already-exporting]]');
+  	}
+
+  	const child = require('child_process').fork('./src/user/jobs/export-profile.js', [], {
+  		env: process.env,
+  	});
+  	child.send({ uid });
+  }
+
+  const router = express.Router();
+
+  router.post('/:uid/exports/:type', async (req, res) => {
+  	await generateExport(req, req.params);
+  	res.sendStatus(202);
+  });
+
+  module.exports = router;
+  ```
+
+test "rank1462: the same flow whose function is assigned to a local alias of module.exports"
+  lang javascript
+  file src/api/users.js
+  expect VYQL-INJ-002
+  code
+  ```
+  'use strict';
+
+  const express = require('express');
+  const db = require('./database');
+
+  const usersAPI = module.exports;
+
+  usersAPI.generateExport = async function (caller, params) {
+  	const uid = params.uid;
+  	const type = params.type;
+
+  	const count = await db.incrObjectField('locks', `export:${uid}${type}`);
+  	if (count > 1) {
+  		throw new Error('[[error:already-exporting]]');
+  	}
+
+  	const child = require('child_process').fork(`./src/user/jobs/export-${type}.js`, [], {
+  		env: process.env,
+  	});
+  	child.send({ uid });
+  };
+
+  const router = express.Router();
+
+  router.post('/:uid/exports/:type', async (req, res) => {
+  	await usersAPI.generateExport(req, req.params);
+  	res.sendStatus(202);
+  });
+  ```
+
+test "rank1462: the export alias with a fixed module path and the request data only in the child's message"
+  lang javascript
+  file install/web.js
+  reject VYQL-INJ-002
+  code
+  ```
+  'use strict';
+
+  const express = require('express');
+  const db = require('./database');
+
+  const usersAPI = module.exports;
+
+  usersAPI.generateExport = async function (caller, params) {
+  	const uid = params.uid;
+
+  	const count = await db.incrObjectField('locks', `export:${uid}`);
+  	if (count > 1) {
+  		throw new Error('[[error:already-exporting]]');
+  	}
+
+  	const child = require('child_process').fork('./src/user/jobs/export-profile.js', [], {
+  		env: process.env,
+  	});
+  	child.send({ uid });
+  };
+
+  const router = express.Router();
+
+  router.post('/:uid/exports/:type', async (req, res) => {
+  	await usersAPI.generateExport(req, req.params);
+  	res.sendStatus(202);
+  });
+  ```

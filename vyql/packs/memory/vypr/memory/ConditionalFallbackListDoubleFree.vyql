@@ -1,0 +1,11 @@
+module vypr.memory;
+
+rule ConditionalFallbackListDoubleFree {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_415, CWE_416]
+    id: "VYQL-MEM-044"
+    severity: high
+  }
+  issue code.ConditionalFallbackListDoubleFree as free
+}

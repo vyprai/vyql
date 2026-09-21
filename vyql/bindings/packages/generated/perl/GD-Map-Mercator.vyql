@@ -1,0 +1,25 @@
+module bindings.perl.generated.mb5913edd;
+
+binding userControlledData0 {
+  requires {
+    dependency("GD-Map-Mercator")
+  }
+  query pattern callExpr where callee.path ~= "bin/wdb2merc.pl::read_wdb"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("GD-Map-Mercator")
+  }
+  query pattern callExpr where callee.method == "new"
+  emit source core.UserControlledData at call.result
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("GD-Map-Mercator")
+  }
+  query pattern callExpr where callee.method == "save"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,275 @@
+# homarr's user-media route reads a previously uploaded file's bytes and
+# content type straight out of the database and writes them into the response
+# body verbatim:
+#
+#   const image = await db.query.medias.findFirst({ ... });
+#   headers.set("Content-Type", image.contentType);
+#   return new NextResponse(new Uint8Array(image.content), { status: 200, headers });
+#
+# A media uploaded as image/svg+xml can hold a <script> element, and SVG is an
+# active content type a browser executes when it loads the response directly,
+# so a stored upload becomes a stored XSS payload (CWE-79, CWE-434). The fixed
+# revision names the renderable content types in order to branch on them --
+# image/svg+xml and image/svg run through DOMPurify before they reach the
+# response -- and marks the response nosniff behind a sandboxing
+# Content-Security-Policy, so every documented neutraliser is present at once.
+#
+# Detection is code.UploadDeclaredResponseContentType (VYQL-INJ-246),
+# jsUploadDeclaredResponseContentType in
+# vyql/bindings/javascript/uploadDeclaredResponseContentType.vyql: a function
+# that constructs a bare `new Response(...)` / `new NextResponse(...)` (the
+# constructor itself, not a member call like NextResponse.json) and names a
+# Content-Type header, with no hardcoded content-type pair in the
+# constructor's init object and none of the neutralisers anywhere in its body.
+# The same concept's Go binding covers the grpc-gateway form of the class.
+#
+# databaseRead902/903 in vyql/bindings/javascript/mfb63017a.vyql bind
+# findFirst/findMany under dependency("drizzle-orm") to code.DatabaseRead --
+# Drizzle's relational-query API. The last two cases keep that source paired
+# with the shipped code.CommandExecution sink for child_process.exec
+# (StoredCommand, VYQL-INJ-032).
+
+test "rank1176: a media row's bytes reach the response with no sanitization"
+  lang javascript
+  file route.ts
+  expect VYQL-INJ-246
+  expect_review code.UploadDeclaredResponseContentType
+  code
+  ```
+  import { NextResponse } from "next/server";
+  import { drizzle } from "drizzle-orm/node-postgres";
+  import { eq } from "drizzle-orm";
+
+  const db = drizzle(pool, { schema });
+
+  export async function GET(_req, props) {
+    const params = await props.params;
+    const image = await db.query.medias.findFirst({
+      where: eq(medias.id, params.id),
+      columns: {
+        content: true,
+        contentType: true,
+      },
+    });
+
+    const headers = new Headers();
+    headers.set("Content-Type", image.contentType);
+    headers.set("Content-Length", image.content.length.toString());
+
+    return new NextResponse(new Uint8Array(image.content), {
+      status: 200,
+      headers,
+    });
+  }
+  ```
+
+test "rank1176: svg bytes are sanitized and the response is marked nosniff"
+  lang javascript
+  file route.ts
+  reject VYQL-INJ-246
+  code
+  ```
+  import { NextResponse } from "next/server";
+  import { drizzle } from "drizzle-orm/node-postgres";
+  import { eq } from "drizzle-orm";
+  import DOMPurify from "isomorphic-dompurify";
+
+  const db = drizzle(pool, { schema });
+
+  export async function GET(_req, props) {
+    const params = await props.params;
+    const image = await db.query.medias.findFirst({
+      where: eq(medias.id, params.id),
+      columns: {
+        content: true,
+        contentType: true,
+      },
+    });
+
+    let content = new Uint8Array(image.content);
+
+    if (image.contentType === "image/svg+xml" || image.contentType === "image/svg") {
+      const svgText = new TextDecoder().decode(content);
+      const sanitized = DOMPurify.sanitize(svgText, {
+        USE_PROFILES: { svg: true, svgFilters: true },
+      });
+      content = new TextEncoder().encode(sanitized);
+    }
+
+    const headers = new Headers();
+    headers.set("Content-Type", image.contentType);
+    headers.set("Content-Length", content.length.toString());
+    headers.set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; sandbox");
+    headers.set("X-Content-Type-Options", "nosniff");
+
+    return new NextResponse(content, {
+      status: 200,
+      headers,
+    });
+  }
+  ```
+
+test "rank1176: naming the renderable content types to branch on them is the neutralizer"
+  lang javascript
+  file route.ts
+  reject VYQL-INJ-246
+  code
+  ```
+  import { NextResponse } from "next/server";
+  import DOMPurify from "isomorphic-dompurify";
+
+  export async function GET(_req, props) {
+    const image = await db.query.medias.findFirst({ where: eq(medias.id, props.params.id) });
+
+    let content = new Uint8Array(image.content);
+
+    if (image.contentType === "image/svg+xml" || image.contentType === "image/svg") {
+      const svgText = new TextDecoder().decode(content);
+      const sanitized = DOMPurify.sanitize(svgText, {
+        USE_PROFILES: { svg: true, svgFilters: true },
+      });
+      content = new TextEncoder().encode(sanitized);
+    }
+
+    const headers = new Headers();
+    headers.set("Content-Type", image.contentType);
+    headers.set("Content-Length", content.length.toString());
+
+    return new NextResponse(content, {
+      status: 200,
+      headers,
+    });
+  }
+  ```
+
+test "rank1176: a hardcoded content type pair in the init object is the safe spelling"
+  lang javascript
+  file download.ts
+  reject VYQL-INJ-246
+  code
+  ```
+  export async function GET(_req, props) {
+    const row = await db.query.reports.findFirst({ where: eq(reports.id, props.params.id) });
+
+    return new Response(new Uint8Array(row.content), {
+      headers: {
+        "Content-Type": "text/csv",
+      },
+    });
+  }
+  ```
+
+test "rank1176: forcing an inert type neutralizes the stored one"
+  lang javascript
+  file download.ts
+  reject VYQL-INJ-246
+  code
+  ```
+  export async function GET(_req, props) {
+    const image = await db.query.medias.findFirst({ where: eq(medias.id, props.params.id) });
+
+    const headers = new Headers();
+    headers.set("Content-Type", "application/octet-stream");
+    headers.set("Content-Length", image.content.length.toString());
+
+    return new NextResponse(new Uint8Array(image.content), {
+      status: 200,
+      headers,
+    });
+  }
+  ```
+
+test "rank1176: an attachment disposition makes the response a download"
+  lang javascript
+  file download.ts
+  reject VYQL-INJ-246
+  code
+  ```
+  export async function GET(_req, props) {
+    const image = await db.query.medias.findFirst({ where: eq(medias.id, props.params.id) });
+
+    const headers = new Headers();
+    headers.set("Content-Type", image.contentType);
+    headers.set("Content-Disposition", `attachment; filename="${props.params.id}"`);
+
+    return new NextResponse(new Uint8Array(image.content), {
+      status: 200,
+      headers,
+    });
+  }
+  ```
+
+test "rank1176: a nosniff mark alone stops the browser re-reading the body"
+  lang javascript
+  file download.ts
+  reject VYQL-INJ-246
+  code
+  ```
+  export async function GET(_req, props) {
+    const image = await db.query.medias.findFirst({ where: eq(medias.id, props.params.id) });
+
+    const headers = new Headers();
+    headers.set("Content-Type", image.contentType);
+    headers.set("X-Content-Type-Options", "nosniff");
+
+    return new NextResponse(new Uint8Array(image.content), {
+      status: 200,
+      headers,
+    });
+  }
+  ```
+
+test "rank1176: a stored asset served under a name-derived mime type is the same class"
+  lang javascript
+  file asset-handler.ts
+  expect VYQL-INJ-246
+  code
+  ```
+  const mime = require("mime");
+
+  export async function getAssetFromKV(event, options) {
+    const pathKey = new URL(event.request.url).pathname.replace(/^\/+/, "");
+    let mimeType = mime.getType(pathKey) || options.defaultMimeType;
+    if (mimeType.startsWith("text") || mimeType === "application/javascript") {
+      mimeType += "; charset=utf-8";
+    }
+
+    const object = await options.ASSET_NAMESPACE.get(pathKey, { type: "arrayBuffer" });
+    const headers = new Headers();
+    headers.set("Content-Type", mimeType);
+    headers.set("Cache-Control", "public, max-age=14400");
+
+    return new Response(object.body, {
+      status: 200,
+      headers,
+    });
+  }
+  ```
+
+test "rank1176: the shipped Drizzle source is not orphaned -- it reaches an existing command sink"
+  lang javascript
+  file job.ts
+  expect VYQL-INJ-032
+  code
+  ```
+  import { eq } from "drizzle-orm";
+  import { exec } from "child_process";
+
+  async function run(db, id) {
+    const row = await db.query.jobs.findFirst({ where: eq(jobs.id, id) });
+    exec(row.command);
+  }
+  ```
+
+test "rank1176: the same sink with no Drizzle read reaching it stays silent"
+  lang javascript
+  file job.ts
+  reject VYQL-INJ-032
+  code
+  ```
+  import { exec } from "child_process";
+
+  async function run() {
+    exec("echo hello");
+  }
+  ```

@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule ColorscoreImagemagickCommandInjection {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_78]
+    id: "VYQL-INJ-090"
+    severity: critical
+  }
+  issue code.ColorscoreImagemagickCommandInjection as sink
+}

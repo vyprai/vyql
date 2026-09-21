@@ -1,0 +1,18 @@
+module bindings.java.catastrophic_regex;
+
+// java.util.regex takes every pattern as a plain string, so a static
+// pattern with catastrophic-backtracking structure is data, not syntax:
+// it reaches `Pattern.compile`/`Pattern.matches` as an argument, sits in
+// one of String's own regex methods (`s.matches`, `s.replaceAll`,
+// `s.replaceFirst`), or is hoisted into a class-level `static final
+// String` whose name is then handed to a wrapper that compiles it. The
+// extractor runs the shared ambiguity analysis over the resolved pattern
+// text at each of those places and reports the construct here.
+//
+// This binding only recognises the analysis result; whether a nested or
+// ambiguous quantifier is a finding is VYQL-DOS-003's judgement.
+
+binding catastrophicRegex {
+  query pattern callExpr where callee.analysis ~= "dos.catastrophic_regex"
+  emit issue code.CatastrophicRegex at call
+}

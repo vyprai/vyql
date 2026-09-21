@@ -1,0 +1,11 @@
+module vypr.path;
+
+rule UnqualifiedPosixProgramLaunch {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_426]
+    id: "VYQL-PATH-081"
+    severity: high
+  }
+  issue code.UnqualifiedPosixProgramLaunch as sink
+}

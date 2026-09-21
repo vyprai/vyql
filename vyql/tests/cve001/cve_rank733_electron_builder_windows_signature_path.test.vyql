@@ -1,0 +1,75 @@
+test "rank733: Authenticode verifier accepts publisher without binding signed path"
+  lang javascript
+  file windowsExecutableCodeSignatureVerifier.ts
+  expect VYQL-CRY-017
+  expect_review code.AuthenticodeSignaturePathBindingBypass
+  code
+  ```
+  import { parseDn } from "builder-util-runtime"
+  import { execFile } from "child_process"
+
+  export function verifySignature(publisherNames: Array<string>, unescapedTempUpdateFile: string, logger: Logger): Promise<string | null> {
+    return new Promise<string | null>((resolve, reject) => {
+      const tempUpdateFile = unescapedTempUpdateFile.replace(/'/g, "''")
+      execFile(
+        `set "PSModulePath="; chcp 65001 >NUL & powershell.exe`,
+        ["-NoProfile", "-NonInteractive", "-InputFormat", "None", "-Command", `"Get-AuthenticodeSignature -LiteralPath '${tempUpdateFile}' | ConvertTo-Json -Compress"`],
+        { shell: true, timeout: 20 * 1000 },
+        (error, stdout, stderr) => {
+          const data = parseOut(stdout)
+          if (data.Status === 0) {
+            const subject = parseDn(data.SignerCertificate.Subject)
+            for (const name of publisherNames) {
+              if (name === subject.get("CN")!) {
+                resolve(null)
+                return
+              }
+            }
+          }
+        }
+      )
+    })
+  }
+  ```
+
+test "rank733: Authenticode verifier compares signed path to intended update path"
+  lang javascript
+  file windowsExecutableCodeSignatureVerifier.ts
+  reject VYQL-CRY-017
+  reject_review code.AuthenticodeSignaturePathBindingBypass
+  code
+  ```
+  import { parseDn } from "builder-util-runtime"
+  import { execFile } from "child_process"
+  import * as path from "path"
+
+  export function verifySignature(publisherNames: Array<string>, unescapedTempUpdateFile: string, logger: Logger): Promise<string | null> {
+    return new Promise<string | null>((resolve, reject) => {
+      const tempUpdateFile = unescapedTempUpdateFile.replace(/'/g, "''")
+      execFile(
+        `set "PSModulePath="; chcp 65001 >NUL & powershell.exe`,
+        ["-NoProfile", "-NonInteractive", "-InputFormat", "None", "-Command", `"Get-AuthenticodeSignature -LiteralPath '${tempUpdateFile}' | ConvertTo-Json -Compress"`],
+        { shell: true, timeout: 20 * 1000 },
+        (error, stdout, stderr) => {
+          const data = parseOut(stdout)
+          if (data.Status === 0) {
+            const normalizedSignaturePath = path.normalize(data.Path)
+            const normalizedTempUpdateFile = path.normalize(unescapedTempUpdateFile)
+            if (normalizedSignaturePath !== normalizedTempUpdateFile) {
+              resolve(null)
+              return
+            }
+
+            const subject = parseDn(data.SignerCertificate.Subject)
+            for (const name of publisherNames) {
+              if (name === subject.get("CN")!) {
+                resolve(null)
+                return
+              }
+            }
+          }
+        }
+      )
+    })
+  }
+  ```

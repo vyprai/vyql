@@ -1,0 +1,25 @@
+module bindings.java.solr_configset_operation_authentication;
+
+// Solr's ConfigSets API is an administrative interface: its operations create,
+// delete and enumerate the shared configuration sets every collection's schema
+// and solrconfig are served from, and the reference guide documents the API as
+// subject to the authentication an AuthenticationPlugin enforces. Each action
+// is dispatched to a constant-specific body of the ConfigSetOperation enum,
+// whose `call` method receives the request and returns the message the
+// overseer applies -- so the body is where the operation's trust decisions
+// live.
+//
+// The binding names the requirement unmet: a configset operation body that
+// reads request parameters through SolrParams and never consults the
+// authentication state leaves the operation's effect decided by whatever
+// caller reached the API. The check spellings are the API's own --
+// CoreContainer.getAuthenticationPlugin, the documented way handler code asks
+// which authentication plugin is installed, and getUserPrincipal, the servlet
+// identity accessor -- so a body carrying either stays quiet.
+binding solrConfigSetOpWithoutAuthentication {
+  query pattern presenceNode where node.scope == "function"
+    and containsAny(node.context.classBase, ["ConfigSetOperation"])
+    and containsAny(node.context.scopeCall, ["getParams"])
+    and not containsAny(node.context.scopeCall, ["getAuthenticationPlugin", "getUserPrincipal"])
+  emit issue code.AuthenticationRequiredOp at node
+}

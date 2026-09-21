@@ -1,0 +1,204 @@
+# FreePBX's Api module regenerates its OAuth signing keys on install.
+# install() derives the key paths from the PKCS store location --
+# $keyfile = "$location/$this->oauthKey.key" and
+# $pubkeyfile = "{$location}/{$this->oauthKey}_public.key" -- then calls
+# $this->freepbx->PKCS->generateKey() and ->extractPublicKey(), which create
+# those two files with the process umask. On shared hosting that leaves the
+# private key group/world readable, and the private key file is the only
+# thing standing between any co-user of the machine and the API's signing
+# identity. The fix adds chmod($keyfile, 0600) and chmod($pubkeyfile, 0600)
+# immediately after the extraction; nothing else in the method changes.
+#
+# There is no taint path to judge -- the secret never crosses a trust
+# boundary the engine models, and the weakness turns entirely on filesystem
+# permissions -- so this is the permission-hardening shape
+# code.SecretFilePermissionReview names ("secret or key material is generated
+# without an observed restrictive file-permission hardening call"), and
+# VYQL-SEC-055 judges that concept as a high exposure finding. The PHP
+# binding keys only on what the APIs document: the OpenSSL exports that write
+# a private key to a named file (openssl_pkey_export_to_file,
+# openssl_pkcs12_export_to_file), or a keypair helper named
+# generateKey/extractPublicKey in a function that has just assigned a
+# key-extension path (.key/.pem/.pfx/.p12), with no chmod or umask call in
+# the body. The extension requirement is what keeps the binding honest:
+# generateKey is also the template-cache idiom, and those callers generate a
+# filename, not key material -- pinned as a reject below.
+#
+# Measured on the module at each revision of the fix (55 PHP files, all
+# scanned, three --cache off runs per side): VYQL-SEC-055 fires once at
+# Api.class.php:104 (install) on the vulnerable parent and not at all on the
+# fixed revision; the other 17 findings are identical on both sides. Sweeping
+# every checkout reachable through the binding's identifiers -- each file
+# calling generateKey, extractPublicKey, openssl_pkey_export_to_file or
+# openssl_pkcs12_export_to_file across twig, linkace, auth0-PHP, wbce_cms,
+# Zenario, AVideo's htmlpurifier and ratchet trees, a Zeppelin Scala tree and
+# php-src's own openssl extension -- yields exactly one further finding, on
+# php-src's test CertificateGenerator.inc, which writes a private key through
+# openssl_pkey_export_to_file with no mode restriction and is the same shape.
+# The earlier name-only form of this binding measured 17+1 false flags on the
+# first two of those trees. Function confinement is pinned below: the
+# key-extension assignment in one method and the key generation in its
+# sibling complete the shape in neither. A commented-out chmod does not
+# neutralise, because call and assign tokens are AST-derived and comments
+# produce no nodes.
+#
+# Residual, stated rather than hidden: chown/chgrp do not satisfy the
+# negation -- only chmod/umask do -- so a function that hands the key file to
+# a service account without restricting its mode still reports; and in a file
+# of top-level functions the call-token route is file-wide, so a chmod
+# anywhere in such a file silences every function in it.
+
+test "rank90: OAuth keypair regenerated into key files without owner-only mode"
+  lang php
+  expect VYQL-SEC-055
+  expect_review code.SecretFilePermissionReview
+  code
+  ```
+  <?php
+  class Api {
+    public function install() {
+      $keyRegenerate = $this->getConfig('key-regenerated');
+      if (!$keyRegenerate) {
+        $location = $this->freepbx->PKCS->getKeysLocation();
+        $keyfile = "$location/$this->oauthKey.key";
+        $pubkeyfile = "{$location}/{$this->oauthKey}_public.key";
+        if (file_exists($keyfile)) {
+          unlink($keyfile);
+        }
+        if (file_exists($pubkeyfile)) {
+          unlink($pubkeyfile);
+        }
+      }
+
+      $this->freepbx->PKCS->generateKey($this->oauthKey);
+      $this->freepbx->PKCS->extractPublicKey($this->oauthKey);
+      if (isset($keyfile) && file_exists($keyfile)) {
+        $this->setConfig('key-regenerated', true);
+      }
+    }
+  }
+  ```
+
+test "rank90: chmod to 0600 after extraction is the remediated form"
+  lang php
+  reject VYQL-SEC-055
+  reject_review code.SecretFilePermissionReview
+  code
+  ```
+  <?php
+  class Api {
+    public function install() {
+      $keyRegenerate = $this->getConfig('key-regenerated');
+      if (!$keyRegenerate) {
+        $location = $this->freepbx->PKCS->getKeysLocation();
+        $keyfile = "$location/$this->oauthKey.key";
+        $pubkeyfile = "{$location}/{$this->oauthKey}_public.key";
+        if (file_exists($keyfile)) {
+          unlink($keyfile);
+        }
+        if (file_exists($pubkeyfile)) {
+          unlink($pubkeyfile);
+        }
+      }
+
+      $this->freepbx->PKCS->generateKey($this->oauthKey);
+      $this->freepbx->PKCS->extractPublicKey($this->oauthKey);
+      chmod($keyfile, 0600);
+      chmod($pubkeyfile, 0600);
+      if (isset($keyfile) && file_exists($keyfile)) {
+        $this->setConfig('key-regenerated', true);
+      }
+    }
+  }
+  ```
+
+test "rank90: a template cache key generator is not key material"
+  lang php
+  reject VYQL-SEC-055
+  reject_review code.SecretFilePermissionReview
+  code
+  ```
+  <?php
+  class Environment {
+    public function getCacheKey(string $name): string {
+      $mainCls = $this->getTemplateClass($name);
+      $key = $this->cache->generateKey($name, $mainCls);
+      return $key;
+    }
+  }
+  ```
+
+test "rank90: key generation split across sibling methods reports neither"
+  lang php
+  reject VYQL-SEC-055
+  reject_review code.SecretFilePermissionReview
+  code
+  ```
+  <?php
+  class Api {
+    public function keyPaths() {
+      $location = $this->freepbx->PKCS->getKeysLocation();
+      $keyfile = "$location/$this->oauthKey.key";
+      $pubkeyfile = "{$location}/{$this->oauthKey}_public.key";
+      return [$keyfile, $pubkeyfile];
+    }
+
+    public function install() {
+      $this->freepbx->PKCS->generateKey($this->oauthKey);
+      $this->freepbx->PKCS->extractPublicKey($this->oauthKey);
+      return true;
+    }
+  }
+  ```
+
+test "rank90: a commented-out chmod does not harden the key files"
+  lang php
+  expect VYQL-SEC-055
+  expect_review code.SecretFilePermissionReview
+  code
+  ```
+  <?php
+  class Api {
+    public function install() {
+      $location = $this->freepbx->PKCS->getKeysLocation();
+      $keyfile = "$location/$this->oauthKey.key";
+      $this->freepbx->PKCS->generateKey($this->oauthKey);
+      $this->freepbx->PKCS->extractPublicKey($this->oauthKey);
+      // chmod($keyfile, 0600);
+      return $keyfile;
+    }
+  }
+  ```
+
+test "rank90: OpenSSL private-key export without a mode restriction"
+  lang php
+  expect VYQL-SEC-055
+  expect_review code.SecretFilePermissionReview
+  code
+  ```
+  <?php
+  class CertificateStore {
+    public function exportPrivateKey($key, $storageDir) {
+      $out = $storageDir . '/server.key';
+      openssl_pkey_export_to_file($key, $out);
+      return $out;
+    }
+  }
+  ```
+
+test "rank90: OpenSSL private-key export chmods the file it wrote"
+  lang php
+  reject VYQL-SEC-055
+  reject_review code.SecretFilePermissionReview
+  code
+  ```
+  <?php
+  class CertificateStore {
+    public function exportPrivateKey($key, $storageDir) {
+      $out = $storageDir . '/server.key';
+      openssl_pkey_export_to_file($key, $out);
+      chmod($out, 0600);
+      return $out;
+    }
+  }
+  ```

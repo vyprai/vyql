@@ -1,0 +1,11 @@
+module code;
+
+concept RawHtmlResponse : issue {
+  cwe: [CWE_79]
+  reviewAssumption: "the dynamic component reaches the markup unescaped"
+  reviewCategory: xss
+  reviewCondition: "a response body is a dynamically built HTML string that bypasses template escaping"
+  reviewConfidence: medium
+  reviewEvidence: "response {pattern} returns raw HTML assembled at runtime"
+  vulnerableTo: [injection.Xss]
+}

@@ -1,0 +1,11 @@
+module vypr.lifecycle;
+
+rule BlockingReadInAcceptLoop {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_400, CWE_667]
+    id: "VYQL-LIFE-005"
+    severity: high
+  }
+  issue code.BlockingReadInAcceptLoop as read
+}

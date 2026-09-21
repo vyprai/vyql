@@ -1,0 +1,81 @@
+module bindings.scala.generated.m7e40519e;
+
+binding networkSend0 {
+  requires {
+    dependency("org.mule.connectors:mule-sockets-connector")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkData1 {
+  requires {
+    dependency("org.mule.connectors:mule-sockets-connector")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend2 {
+  requires {
+    dependency("org.mule.connectors:mule-sockets-connector")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkData3 {
+  requires {
+    dependency("org.mule.connectors:mule-sockets-connector")
+  }
+  query pattern callExpr where callee.method == "sendAndReceive"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend4 {
+  requires {
+    dependency("org.mule.connectors:mule-sockets-connector")
+  }
+  query pattern callExpr where callee.method == "sendAndReceive"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend5 {
+  requires {
+    dependency("org.mule.connectors:mule-sockets-connector")
+  }
+  query pattern callExpr where callee.method == "sendUdpPackages"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect6 {
+  requires {
+    dependency("org.mule.connectors:mule-sockets-connector")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkData7 {
+  requires {
+    dependency("org.mule.connectors:mule-sockets-connector")
+  }
+  query pattern callExpr where callee.method == "handle"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData8 {
+  requires {
+    dependency("org.mule.connectors:mule-sockets-connector")
+  }
+  query pattern callExpr where callee.method == "onStart"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData9 {
+  requires {
+    dependency("org.mule.connectors:mule-sockets-connector")
+  }
+  query pattern callExpr where callee.method == "onSuccess"
+  emit source code.NetworkData at call.result
+}

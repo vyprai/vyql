@@ -1,0 +1,8 @@
+# Rank 74 / CVE-2013-4260: Ansible predictable retry temp file.
+
+test "rank74: insecure temporary file is a CVE anchor"
+  expect VYQL-PATH-003
+  graph
+  ```
+  node path code.InsecureTempFile
+  ```

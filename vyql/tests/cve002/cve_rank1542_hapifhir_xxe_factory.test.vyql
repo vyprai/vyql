@@ -1,0 +1,91 @@
+# Rank 1542 / CVE-2024-51132: HAPI FHIR built its XML parsers from
+# DocumentBuilderFactory.newInstance() with no secure-processing or
+# disallow-doctype-decl feature anywhere at the site, so every code path
+# parsing untrusted FHIR or CDA XML resolved external entities (XXE,
+# CWE-611; GHSA-8498-9ggv-vcj9). The fix replaces each instantiation with
+# XMLUtil.newXXEProtectedDocumentBuilderFactory(), the project helper that
+# sets the XXE-disabling features centrally; CDAUtilities.java:54 is one of
+# the 43 sites the sweep touches.
+#
+# VYQL-DESER-004 reports the raw form through code.XmlParserCreate at
+# newDocumentBuilder(). The hardened form is cleared by the constructor's
+# own credit: the helper centralises the features, so the call site has no
+# setFeature to key a receiver on, and the hardening travels with the call
+# that produces the factory.
+
+test "rank1542: the parser factory is created raw"
+  lang java
+  file org.hl7.fhir.convertors/src/main/java/org/hl7/fhir/convertors/misc/CDAUtilities.java
+  expect VYQL-DESER-004
+  code
+  ```
+  package org.hl7.fhir.convertors.misc;
+
+  import javax.xml.parsers.DocumentBuilder;
+  import javax.xml.parsers.DocumentBuilderFactory;
+  import org.w3c.dom.Document;
+  import org.xml.sax.InputSource;
+
+  public class CDAUtilities {
+
+      public static Document load(String source) throws Exception {
+          DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+          DocumentBuilder builder = factory.newDocumentBuilder();
+          return builder.parse(new InputSource(source));
+      }
+  }
+  ```
+
+test "rank1542: the factory comes from the XXE-protected constructor"
+  lang java
+  file org.hl7.fhir.convertors/src/main/java/org/hl7/fhir/convertors/misc/CDAUtilities.java
+  reject VYQL-DESER-004
+  code
+  ```
+  package org.hl7.fhir.convertors.misc;
+
+  import javax.xml.parsers.DocumentBuilder;
+  import javax.xml.parsers.DocumentBuilderFactory;
+  import org.hl7.fhir.utilities.xml.XMLUtil;
+  import org.w3c.dom.Document;
+  import org.xml.sax.InputSource;
+
+  public class CDAUtilities {
+
+      public static Document load(String source) throws Exception {
+          DocumentBuilderFactory factory = XMLUtil.newXXEProtectedDocumentBuilderFactory();
+          DocumentBuilder builder = factory.newDocumentBuilder();
+          return builder.parse(new InputSource(source));
+      }
+  }
+  ```
+
+test "rank1542: a constructor call in a sibling method does not clear this one"
+  lang java
+  file org.hl7.fhir.convertors/src/main/java/org/hl7/fhir/convertors/misc/CDAUtilities.java
+  expect VYQL-DESER-004
+  code
+  ```
+  package org.hl7.fhir.convertors.misc;
+
+  import javax.xml.parsers.DocumentBuilder;
+  import javax.xml.parsers.DocumentBuilderFactory;
+  import org.hl7.fhir.utilities.xml.XMLUtil;
+  import org.w3c.dom.Document;
+  import org.xml.sax.InputSource;
+
+  public class CDAUtilities {
+
+      public static Document loadHardened(String source) throws Exception {
+          DocumentBuilderFactory factory = XMLUtil.newXXEProtectedDocumentBuilderFactory();
+          DocumentBuilder builder = factory.newDocumentBuilder();
+          return builder.parse(new InputSource(source));
+      }
+
+      public static Document loadRaw(String source) throws Exception {
+          DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+          DocumentBuilder builder = factory.newDocumentBuilder();
+          return builder.parse(new InputSource(source));
+      }
+  }
+  ```

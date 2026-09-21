@@ -1,0 +1,121 @@
+module bindings.php.generated.m001c4b27;
+
+binding htmlRender0 {
+  requires {
+    dependency("laravelcollective/html")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender1 {
+  requires {
+    dependency("laravelcollective/html")
+  }
+  query pattern callExpr where callee.method == "label"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender2 {
+  requires {
+    dependency("laravelcollective/html")
+  }
+  query pattern callExpr where callee.method == "text"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender3 {
+  requires {
+    dependency("laravelcollective/html")
+  }
+  query pattern callExpr where callee.method == "password"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender4 {
+  requires {
+    dependency("laravelcollective/html")
+  }
+  query pattern callExpr where callee.method == "textarea"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender5 {
+  requires {
+    dependency("laravelcollective/html")
+  }
+  query pattern callExpr where callee.method == "email"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender6 {
+  requires {
+    dependency("laravelcollective/html")
+  }
+  query pattern callExpr where callee.method == "url"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender7 {
+  requires {
+    dependency("laravelcollective/html")
+  }
+  query pattern callExpr where callee.method == "number"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender8 {
+  requires {
+    dependency("laravelcollective/html")
+  }
+  query pattern callExpr where callee.method == "date"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender9 {
+  requires {
+    dependency("laravelcollective/html")
+  }
+  query pattern callExpr where callee.method == "time"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender10 {
+  requires {
+    dependency("laravelcollective/html")
+  }
+  query pattern callExpr where callee.method == "range"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender11 {
+  requires {
+    dependency("laravelcollective/html")
+  }
+  query pattern callExpr where callee.method == "search"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender12 {
+  requires {
+    dependency("laravelcollective/html")
+  }
+  query pattern callExpr where callee.method == "link_to"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender13 {
+  requires {
+    dependency("laravelcollective/html")
+  }
+  query pattern callExpr where callee.method == "link_to_asset"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender14 {
+  requires {
+    dependency("laravelcollective/html")
+  }
+  query pattern callExpr where callee.method == "link_to_route"
+  emit sink code.HtmlRender at args[0]
+}

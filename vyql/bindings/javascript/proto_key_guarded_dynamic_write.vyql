@@ -1,0 +1,25 @@
+module bindings.javascript.proto_key_guarded_dynamic_write;
+
+// Writing `obj[key] = value` with a key the program did not spell out is
+// the one assignment that can reach the prototype machinery instead of
+// creating an own property: a key of `__proto__` hits Object.prototype's
+// accessor and sets the object's [[Prototype]]. Every published
+// prototype-pollution advisory gives the same remediation — compare the
+// computed key against `__proto__` (often `constructor` and `prototype`
+// too) before the write — so a function that both performs a computed-key
+// write and carries that comparison has the guard the rule asks for.
+//
+// The two facts are structural and already produced by the JavaScript
+// frontend for this purpose: `dynamic_property_write` is the computed-key
+// assignment itself, and `prototype_key_guard` is a comparison of anything
+// against the dunder-proto (or constructor-prototype) name in the same
+// function. Requiring the write is what keeps this about the guarded
+// write rather than about every function that merely mentions `__proto__`.
+binding protoKeyGuardedDynamicPropertyWrite {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.dynamicPropertyWrite == "true" and node.context.prototypeKeyGuard == "true"
+  emit check core.PrototypePollutionGuard at node {
+    covers endpoint {
+      anchor: node
+    }
+  }
+}

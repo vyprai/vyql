@@ -1,0 +1,33 @@
+# Rank 804 / CVE-2016-3101: Jenkins Extra Columns rendered project
+# description tooltip HTML without passing it through the configured markup
+# formatter.
+
+test "rank804: Extra Columns renders tooltip alias without markup formatter"
+  lang config
+  file column.jelly
+  expect VYQL-INJ-004
+  code
+  ```
+  <?jelly escape-by-default='true'?>
+  <j:jelly xmlns:j="jelly:core">
+    <j:set var="tooltipdesc" value="${it.getToolTip(job)}"/>
+    <div tooltip="${tooltipdesc}">
+      <j:out value="${app.markupFormatter.translate(desc)}"/>
+    </div>
+  </j:jelly>
+  ```
+
+test "rank804: Extra Columns tooltip alias uses markup formatter"
+  lang config
+  file column.jelly
+  reject VYQL-INJ-004
+  code
+  ```
+  <?jelly escape-by-default='true'?>
+  <j:jelly xmlns:j="jelly:core">
+    <j:set var="tooltipdesc" value="${it.getToolTip(job)}"/>
+    <div tooltip="${app.markupFormatter.translate(tooltipdesc)}">
+      <j:out value="${app.markupFormatter.translate(desc)}"/>
+    </div>
+  </j:jelly>
+  ```

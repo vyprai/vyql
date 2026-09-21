@@ -1,0 +1,6 @@
+test "rank89: Spacemesh previous-ATX validation requires protocol-state review"
+  expect_review code.ProtocolStateReview
+  graph
+  ```
+  node op code.ProtocolStateReview
+  ```

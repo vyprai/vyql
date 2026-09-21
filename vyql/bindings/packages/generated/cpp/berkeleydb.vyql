@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m4aca2a12;
+
+binding sqlExecution0 {
+  requires {
+    dependency("berkeleydb")
+  }
+  query pattern callExpr where callee.method == "do_parse"
+  emit sink code.SqlExecution at args[0]
+}

@@ -1,0 +1,10 @@
+module vypr.injection;
+
+rule LineProtocolCommandInjection {
+  meta {
+    cwe: [CWE_93, CWE_20]
+    id: "VYQL-INJ-245"
+    severity: medium
+  }
+  taint core.UserControlledData -> code.LineProtocolCommandWrite
+}

@@ -1,0 +1,47 @@
+test "rank584: server-side DataTables raw attribute uses unescaped model title"
+  lang php
+  expect VYQL-INJ-126
+  expect_review code.RawDatatablesAttributeXss
+  code
+  ```
+  <?php
+  class TasksController
+  {
+      public function anyData()
+      {
+          $tasks = Task::with(['user'])->select(['external_id', 'title']);
+
+          return Datatables::of($tasks)
+              ->addColumn('view', function ($tasks) {
+                  return '<a data-toggle="modal" data-id="' . route('tasks.destroy', $tasks->external_id) .
+                      '" data-title="' . $tasks->title . '" data-target="#deletion">Delete</a>';
+              })
+              ->rawColumns(['view'])
+              ->make(true);
+      }
+  }
+  ```
+
+test "rank584: server-side DataTables raw attribute escapes model title"
+  lang php
+  reject VYQL-INJ-126
+  reject_review code.RawDatatablesAttributeXss
+  code
+  ```
+  <?php
+  class TasksController
+  {
+      public function anyData()
+      {
+          $tasks = Task::with(['user'])->select(['external_id', 'title']);
+
+          return Datatables::of($tasks)
+              ->addColumn('view', function ($tasks) {
+                  return '<a data-toggle="modal" data-id="' . route('tasks.destroy', $tasks->external_id) .
+                      '" data-title="' . e($tasks->title) . '" data-target="#deletion">Delete</a>';
+              })
+              ->rawColumns(['view'])
+              ->make(true);
+      }
+  }
+  ```

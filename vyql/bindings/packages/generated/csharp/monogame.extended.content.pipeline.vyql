@@ -1,0 +1,17 @@
+module bindings.csharp.generated.mc4865e90;
+
+binding deserialization0 {
+  requires {
+    dependency("monogame.extended.content.pipeline")
+  }
+  query pattern callExpr where callee.method == "Import"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("monogame.extended.content.pipeline")
+  }
+  query pattern callExpr where callee.method == "Process"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,49 @@
+module bindings.python.generated.mf63958f9;
+
+binding networkConnect0 {
+  requires {
+    dependency("stripe")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("stripe")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkData2 {
+  requires {
+    dependency("stripe")
+  }
+  query pattern callExpr where callee.method == "handle_error_response"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData3 {
+  requires {
+    dependency("stripe")
+  }
+  query pattern callExpr where callee.method == "specific_v2_api_error"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData4 {
+  requires {
+    dependency("stripe")
+  }
+  query pattern callExpr where callee.method == "specific_v1_api_error"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData5 {
+  requires {
+    dependency("stripe")
+  }
+  query pattern callExpr where callee.method == "specific_oauth_error"
+  emit source code.NetworkData at call.result
+}

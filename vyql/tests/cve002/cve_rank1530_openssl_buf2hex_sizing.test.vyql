@@ -1,0 +1,161 @@
+# Rank 1530 / CVE-2026-31789: OpenSSL's exported hex-conversion helper
+# sized its output buffer from an unchecked multiply of the caller-supplied
+# length -- `tmp_n = (sep != CH_ZERO) ? buflen * 3 : 1 + buflen * 2;` in
+# ossl_buf2hexstr_sep (crypto/o_str.c) -- so a length near LONG_MAX wrapped
+# the size_t computation and the 2-or-3-bytes-per-input-byte write loop
+# overflowed the undersized allocation (CWE-190/CWE-787). The fix
+# (a91e537d16, "Avoid possible buffer overflow in buf2hex conversion")
+# refuses lengths that cannot fit before either conversion path:
+# `if ((sep != CH_ZERO && (size_t)buflen > SIZE_MAX / 3) || (sep ==
+# CH_ZERO && (size_t)buflen > (SIZE_MAX - 1) / 2)) { ERR_raise(...);
+# return NULL; }`, with the arithmetic made explicitly size_t-cast.
+#
+# The trust boundary is the caller: ossl_buf2hexstr_sep has external
+# linkage, so any application can hand it any length, while the file-local
+# `static` twin buf2hexstr_sep is reached only through ordinary call flow
+# and is not an entry point. Under the library profile the parameter
+# source labels that boundary and VYQL-NUM-003
+# (TaintedIntegerSizeArithmetic) carries a caller-controlled length into
+# the sizing multiply; the SIZE_MAX comparison is recognised as
+# core.IntegerOverflowGuard, so the guarded form reports clean.
+#
+# Parity, stated as measured rather than asserted: this gives C the same
+# mechanism the Java, C# and Rust frontends feed (the exported flag the
+# parameter source reads), at a much coarser threshold -- Java marks
+# syntactically declared `public` and C has no such opt-in, only the
+# `static`/storage-macro/macro-type/macro-name exclusions the marking
+# applies. Same profile, same binary: Hadoop (1113 Java files) reports
+# 939 rows / 520 at-or-above-high = 0.84 rows and 0.47 high per file,
+# while libgit2 (656 C files) reports 7142 / 1726 = 10.9 and 2.6 -- about
+# 13x the rows and 5.6x the high per file, the cost of C's coarser
+# threshold. The library profile never auto-resolves (these trees resolve
+# Generic), so the cost is opt-in only.
+#
+# Real-tree A/B, 3 x --cache off / timeout 180 / --max-ram 6GB on
+# crypto/o_str.c at a91e537d16^ (vulnerable) and a91e537d16 (fixed):
+# the default profile reports the same 20 memory-family findings at both
+# revisions on both binaries; the library profile reports 35 findings at
+# the vulnerable revision and 32 at the fixed one, the difference being
+# three VYQL-NUM-003 rows whose sinks are the sizing multiplies the fix
+# guards (o_str.c:237 and :263 in the static helper, reached from
+# OPENSSL_buf2hexstr_ex, and :283, the exported wrapper's own
+# `buflen * 3`/`1 + buflen * 2`). The whole openssl tree aborts at the
+# 6 GiB ceiling at both revisions under both profiles, with and without
+# the marking.
+
+test "rank1530: exported hex conversion sizes its buffer by an unchecked multiply"
+  lang c
+  profile library
+  file crypto/o_str.c
+  expect VYQL-NUM-003
+  code
+  ```
+  #include <stddef.h>
+
+  #define CH_ZERO ((char)0)
+
+  char *ossl_buf2hexstr_sep(const unsigned char *buf, long buflen, char sep)
+  {
+      char *tmp;
+      size_t tmp_n;
+
+      if (buflen == 0)
+          return OPENSSL_zalloc(1);
+
+      tmp_n = (sep != CH_ZERO) ? buflen * 3 : 1 + buflen * 2;
+      if ((tmp = OPENSSL_malloc(tmp_n)) == NULL)
+          return NULL;
+
+      size_t i = 0;
+      for (long j = 0; j < buflen; j++) {
+          if (sep != CH_ZERO && j != 0)
+              tmp[i++] = sep;
+          tmp[i++] = "0123456789ABCDEF"[(buf[j] >> 4) & 0xF];
+          tmp[i++] = "0123456789ABCDEF"[buf[j] & 0xF];
+      }
+      tmp[i] = CH_ZERO;
+      return tmp;
+  }
+  ```
+
+test "rank1530: lengths that cannot fit are refused before the arithmetic"
+  lang c
+  profile library
+  file crypto/o_str.c
+  reject VYQL-NUM-003
+  code
+  ```
+  #include <stddef.h>
+  #include <stdint.h>
+
+  #define CH_ZERO ((char)0)
+
+  char *ossl_buf2hexstr_sep(const unsigned char *buf, long buflen, char sep)
+  {
+      char *tmp;
+      size_t tmp_n;
+
+      if (buflen < 0)
+          return NULL;
+      if (buflen == 0)
+          return OPENSSL_zalloc(1);
+
+      if ((sep != CH_ZERO && (size_t)buflen > SIZE_MAX / 3)
+          || (sep == CH_ZERO && (size_t)buflen > (SIZE_MAX - 1) / 2)) {
+          ERR_raise(ERR_LIB_CRYPTO, CRYPTO_R_TOO_MANY_BYTES);
+          return NULL;
+      }
+
+      tmp_n = (sep != CH_ZERO) ? (size_t)buflen * 3 : 1 + (size_t)buflen * 2;
+      if ((tmp = OPENSSL_malloc(tmp_n)) == NULL)
+          return NULL;
+
+      size_t i = 0;
+      for (long j = 0; j < buflen; j++) {
+          if (sep != CH_ZERO && j != 0)
+              tmp[i++] = sep;
+          tmp[i++] = "0123456789ABCDEF"[(buf[j] >> 4) & 0xF];
+          tmp[i++] = "0123456789ABCDEF"[buf[j] & 0xF];
+      }
+      tmp[i] = CH_ZERO;
+      return tmp;
+  }
+  ```
+
+test "rank1530: the file-local static twin is not a caller-controlled entry point"
+  lang c
+  profile library
+  file crypto/o_str.c
+  reject VYQL-NUM-003
+  code
+  ```
+  #include <stddef.h>
+
+  #define CH_ZERO ((char)0)
+
+  static int buf2hexstr_sep(char *str, size_t str_n, size_t *strlength,
+                            const unsigned char *buf, size_t buflen, char sep)
+  {
+      int has_sep = (sep != CH_ZERO);
+      size_t len = has_sep ? buflen * 3 : 1 + buflen * 2;
+
+      if (len == 0)
+          ++len;
+      if (strlength != NULL)
+          *strlength = len;
+      if (str == NULL)
+          return 1;
+      if (len > str_n)
+          return 0;
+
+      size_t i = 0;
+      for (size_t j = 0; j < buflen; j++) {
+          if (has_sep && j != 0)
+              str[i++] = sep;
+          str[i++] = "0123456789ABCDEF"[(buf[j] >> 4) & 0xF];
+          str[i++] = "0123456789ABCDEF"[buf[j] & 0xF];
+      }
+      str[i] = CH_ZERO;
+      return 1;
+  }
+  ```

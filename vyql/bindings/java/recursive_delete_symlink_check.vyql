@@ -1,0 +1,30 @@
+module bindings.java.recursive_delete_symlink_check;
+
+// JGit's FileUtils.delete with the RECURSIVE flag removes a directory
+// tree by walking its entries, and an entry that is a symbolic link
+// sends the recursion into the link target's tree: the delete then
+// removes files outside the listed directory. Java cleanup code that
+// enumerates a directory with File.listFiles and passes each entry to
+// the recursive delete -- the spool and clone-directory cleanup idiom --
+// removes whatever was planted inside the directory, links included.
+// The documented safe forms keep the link handling in the deleting
+// code: a Files.isSymbolicLink test on the entry, a Path.toRealPath
+// resolution with LinkOption.NOFOLLOW_LINKS, or an NIO walk that
+// passes no FOLLOW_LINKS option and deletes each visited entry without
+// recursion.
+//
+// The judgement lives in the pack rule; this binding only recognises
+// the shape. Every clause is an exact-token match over the deleting
+// function's own context tokens, so prose in a comment satisfies
+// neither side and a sibling method's link test cannot silence the
+// delete.
+
+binding recursiveDeleteSymlinkCheck {
+  query pattern presenceNode where node.scope == "function"
+    and node.context.call == "delete"
+    and containsAny(node.context.attrPath, ["FileUtils.RECURSIVE"])
+    and node.context.call in ["listFiles"]
+    and not (node.context.call in ["isSymbolicLink", "toRealPath"])
+    and not (containsAny(node.context.attrPath, ["LinkOption.NOFOLLOW_LINKS"]))
+  emit issue code.RecursiveDeleteWithoutSymlinkCheck at node
+}

@@ -1,0 +1,80 @@
+# Rank 881 / CVE-2026-9813: FlowIntel probed external-reference URLs with
+# requests.head before validating that the host resolved only to public IPs.
+
+test "rank881: external reference probe fetches URL before DNS/IP SSRF guard"
+  lang python
+  file task.py
+  expect VYQL-RF-001
+  code
+  ```
+  import requests
+
+  def _probe_external_url(url):
+      try:
+          requests.head(url, timeout=10, allow_redirects=True)
+      except requests.exceptions.ConnectionError:
+          return "Could not connect to the host"
+      return None
+
+  def convert_external_reference_to_note(request):
+      external_ref = TaskModel.get_external_reference(request.args["erid"])
+      probe_error = _probe_external_url(external_ref.url)
+      if probe_error:
+          return {"message": probe_error}, 400
+      return {"message": "ok"}, 200
+  ```
+
+test "rank881: external reference probe rejects non-public resolved IPs before fetch"
+  lang python
+  file task.py
+  reject VYQL-RF-001
+  code
+  ```
+  import ipaddress
+  import requests
+  import socket
+  from urllib.parse import urlparse
+
+  def _probe_external_url(url):
+      try:
+          parsed_url = urlparse(url)
+      except ValueError:
+          return "The URL is not valid"
+
+      if parsed_url.scheme not in ["http", "https"]:
+          return "Only http:// and https:// URLs are allowed"
+
+      if not parsed_url.hostname:
+          return "The URL is missing a hostname"
+
+      try:
+          addrinfo = socket.getaddrinfo(parsed_url.hostname, None)
+      except socket.gaierror:
+          return "The host likely doesn't exist"
+
+      for result in addrinfo:
+          ip = result[4][0]
+          parsed_ip = ipaddress.ip_address(ip)
+          if (
+              parsed_ip.is_private
+              or parsed_ip.is_loopback
+              or parsed_ip.is_link_local
+              or parsed_ip.is_multicast
+              or parsed_ip.is_reserved
+              or parsed_ip.is_unspecified
+          ):
+              return "The URL resolves to a restricted network address"
+
+      try:
+          requests.head(url, timeout=10, allow_redirects=True)
+      except requests.exceptions.ConnectionError:
+          return "Could not connect to the host"
+      return None
+
+  def convert_external_reference_to_note(request):
+      external_ref = TaskModel.get_external_reference(request.args["erid"])
+      probe_error = _probe_external_url(external_ref.url)
+      if probe_error:
+          return {"message": probe_error}, 400
+      return {"message": "ok"}, 200
+  ```

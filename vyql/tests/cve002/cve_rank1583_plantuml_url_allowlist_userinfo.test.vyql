@@ -1,0 +1,233 @@
+# Rank 1583 / CVE-2023-3432: PlantUML's URL allowlist matched by
+# string prefix, so a URL carrying userinfo --
+# https://plantuml.com@attacker.example/ -- passed the check because
+# the prefix matched before the @ while the request went to the host
+# after it (URL allowlist bypass, CWE-918/CWE-706; credit Agasthya
+# Kasturi in the fix). isInUrlAllowList and forbiddenURL in
+# src/net/sourceforge/plantuml/security/SURL.java compared
+# startsWith(cleanPath(allow)) against the full URL string, and
+# cleanPath's PATTERN_USERINFO --
+# "(^https?://)([-_0-9a-zA-Z]+@)([^@]*)", its character class has no
+# dot -- never stripped a dotted userinfo like plantuml.com@, so the
+# @ and everything before it stayed in the compared string and
+# impersonated the allowed host. The fixing commit b32500bb61 ("fix:
+# improve filelist support and nwdiag", carrying the SURL hardening):
+# both methods reject outright `if (full.contains("@"))`, and
+# PATTERN_USERINFO anchors with $.
+#
+# ATTENTION, prefix-matched URL allowlists, held on recheck. The
+# allowlist exists and runs -- its defeat is that string prefixes are
+# not URL structure: userinfo, and any grammar element before the
+# host, matches first, the same normalization-strength family as
+# rank 1522 (bracket-blind hosts) and 1582 (the wildcard pattern).
+# Nothing can ask "does the allowlist compare parsed hosts rather
+# than string prefixes" -- that is URL-structure vocabulary. The
+# URL-family concepts that exist are JavaScript-bound and read other
+# axes (UrlAuthoritySplitWithoutBackslashNormalization is a
+# backslash-split parser, HostHeaderUserinfoConfusion is a Host
+# header), and the Java prefix-comparison twin that exists
+# (canonicalPathStringPrefixContainment257 in m420f6b67.vyql) is
+# keyed on its own application's getValidDirectoryPath -- a binding
+# on PlantUML's own SURL would likewise detect this tool rather than
+# the weakness.
+#
+# Measured on the real code at the span tip (3 x --cache off per
+# revision, timeout 180, --max-ram 6GB): the security package
+# reports 2 findings at b32500bb61^ and the same 2 at b32500bb61,
+# stable across all six runs -- VYQL-SEC-002 HIGH on
+# SecurityCredentials.java:255 and VYQL-CFG-008 MEDIUM on
+# SFile.java:245, nothing on SURL.java in either the findings view
+# or -flags only (the 8 flags there are core.ResourceRelease stream
+# closes). A full-tree scan of src (2905 java files, 236 findings,
+# 167 at or above high) also reports zero on SURL.java. Fresh
+# diagnosis: `vyql match` labels the fetch side --
+# code.UrlFetch on every openConnection (:467 :479 :485 :510),
+# code.HttpInput on connection.getInputStream (:560),
+# RegexCompileSink on Pattern.compile, and NeutralizerAssumption on
+# url.startsWith (:142), full.startsWith (:295) and full.matches
+# (:297 :299 :301) -- and nothing on the allowlist comparison. A
+# function-scope probe on call == "startsWith" labels three
+# functions at both revisions (create :138, forbiddenURL :294,
+# isInUrlAllowList :306/:309): the prefix loop is identical across
+# the fix, so the shape gives 3 -> 3 and no discrimination, and the
+# only token-level difference the fix introduces is the added
+# call:contains -- the fix's own spelling. Narrowing to the allowlist
+# idiom costs the precision that decides it: across the 294,876 java
+# files under the rank clones, 1,650 functions hold a for-each loop
+# containing .startsWith( and 209 of those mention
+# url/uri/host/http/allow in the loop -- jetty's
+# VirtualHostRuleContainer among them, a host allowlist written
+# correctly -- so the best generic shape flags 209 lookalikes for
+# one true positive, the ratio measured unshippable before. Java
+# emits no loop token at all, so even that narrowing is a text match
+# over the function body. No engine construct is mishandled --
+# startsWith, Pattern.compile and the for-each all label -- so no
+# ENGINE-GAPS.md entry. No definition change shipped. Spec
+# cve_rank1583 records the prefix-matched allowlist and the
+# @-rejecting form modelled on the real file, both asserting reject
+# VYQL-RF-001: when url-structure vocabulary lands, the prefix form
+# must flip to expect.
+
+test "rank1583: the allowlist matches url prefixes"
+  lang java
+  file src/net/sourceforge/plantuml/security/SURL.java
+  reject VYQL-RF-001
+  code
+  ```
+  import java.net.URL;
+  import java.util.Arrays;
+  import java.util.Collections;
+  import java.util.List;
+  import java.util.Locale;
+  import java.util.Map;
+  import java.util.concurrent.ConcurrentHashMap;
+  import java.util.regex.Matcher;
+  import java.util.regex.Pattern;
+
+  public class SURL {
+      private final URL internal;
+
+      private static final Pattern PATTERN_USERINFO = Pattern.compile("(^https?://)([-_0-9a-zA-Z]+@)([^@]*)");
+
+      private static final Map<String, Long> BAD_HOSTS = new ConcurrentHashMap<String, Long>();
+
+      private boolean isUrlOk() {
+          if (isInUrlAllowList())
+              return true;
+          if (forbiddenURL(cleanPath(internal.toString())))
+              return false;
+          final int port = internal.getPort();
+          return port == 80 || port == 443 || port == -1;
+      }
+
+      private boolean forbiddenURL(String full) {
+          if (full.startsWith("https://") == false && full.startsWith("http://") == false)
+              return true;
+          if (full.matches("^https?://[-#.0-9:\\[\\]+]+/.*"))
+              return true;
+          if (full.matches("^https?://[^.]+/.*"))
+              return true;
+          if (full.matches("^https?://[^.]+$"))
+              return true;
+          return false;
+      }
+
+      private boolean isInUrlAllowList() {
+          final String full = cleanPath(internal.toString());
+          for (String allow : getUrlAllowList())
+              if (full.startsWith(cleanPath(allow)))
+                  return true;
+
+          return false;
+      }
+
+      private String cleanPath(String path) {
+          path = removeUserInfoFromUrlPath(path);
+          path = path.trim().toLowerCase(Locale.US);
+          path = path.replace(":80/", "");
+          path = path.replace(":443/", "");
+          return path;
+      }
+
+      private List<String> getUrlAllowList() {
+          final String env = SecurityUtils.getenv(SecurityUtils.ALLOWLIST_URL);
+          if (env == null)
+              return Collections.emptyList();
+
+          return Arrays.asList(env.split(";"));
+      }
+
+      private static String removeUserInfoFromUrlPath(String url) {
+          final Matcher matcher = PATTERN_USERINFO.matcher(url);
+          if (matcher.find())
+              return matcher.replaceFirst("$1$3");
+
+          return url;
+      }
+  }
+  ```
+
+test "rank1583: the fixed revision rejects userinfo outright"
+  lang java
+  file src/net/sourceforge/plantuml/security/SURL.java
+  reject VYQL-RF-001
+  code
+  ```
+  import java.net.URL;
+  import java.util.Arrays;
+  import java.util.Collections;
+  import java.util.List;
+  import java.util.Locale;
+  import java.util.Map;
+  import java.util.concurrent.ConcurrentHashMap;
+  import java.util.regex.Matcher;
+  import java.util.regex.Pattern;
+
+  public class SURL {
+      private final URL internal;
+
+      private static final Pattern PATTERN_USERINFO = Pattern.compile("(^https?://)([-_0-9a-zA-Z]+@)([^@]*)$");
+
+      private static final Map<String, Long> BAD_HOSTS = new ConcurrentHashMap<String, Long>();
+
+      private boolean isUrlOk() {
+          if (isInUrlAllowList())
+              return true;
+          if (forbiddenURL(cleanPath(internal.toString())))
+              return false;
+          final int port = internal.getPort();
+          return port == 80 || port == 443 || port == -1;
+      }
+
+      private boolean forbiddenURL(String full) {
+          // Thanks to Agasthya Kasturi
+          if (full.contains("@"))
+              return true;
+          if (full.startsWith("https://") == false && full.startsWith("http://") == false)
+              return true;
+          if (full.matches("^https?://[-#.0-9:\\[\\]+]+/.*"))
+              return true;
+          if (full.matches("^https?://[^.]+/.*"))
+              return true;
+          if (full.matches("^https?://[^.]+$"))
+              return true;
+          return false;
+      }
+
+      private boolean isInUrlAllowList() {
+          final String full = cleanPath(internal.toString());
+          // Thanks to Agasthya Kasturi
+          if (full.contains("@"))
+              return false;
+          for (String allow : getUrlAllowList())
+              if (full.startsWith(cleanPath(allow)))
+                  return true;
+
+          return false;
+      }
+
+      private String cleanPath(String path) {
+          path = removeUserInfoFromUrlPath(path);
+          path = path.trim().toLowerCase(Locale.US);
+          path = path.replace(":80/", "");
+          path = path.replace(":443/", "");
+          return path;
+      }
+
+      private List<String> getUrlAllowList() {
+          final String env = SecurityUtils.getenv(SecurityUtils.ALLOWLIST_URL);
+          if (env == null)
+              return Collections.emptyList();
+
+          return Arrays.asList(env.split(";"));
+      }
+
+      private static String removeUserInfoFromUrlPath(String url) {
+          final Matcher matcher = PATTERN_USERINFO.matcher(url);
+          if (matcher.find())
+              return matcher.replaceFirst("$1$3");
+
+          return url;
+      }
+  }
+  ```

@@ -1,0 +1,11 @@
+module code;
+
+concept ExpressParamArrayValuePollution : issue {
+  cwe: [CWE_20, CWE_235]
+  reviewAssumption: "callers can supply duplicated HTTP parameters that Express exposes as arrays"
+  reviewCategory: input_validation
+  reviewCondition: "Express request parameter lookup can return array values from duplicated parameters without normalization"
+  reviewConfidence: high
+  reviewEvidence: "parameter lookup context {pattern} reads req.params/body/query by key and returns the value without an Array.isArray collapse or rejection"
+  vulnerableTo: [validation.ImproperInputValidation]
+}

@@ -1,0 +1,9 @@
+module bindings.dart.generated.ma6ff64bb;
+
+binding deserialization0 {
+  requires {
+    dependency("pubspec_parse")
+  }
+  query pattern callExpr where callee.method == "Pubspec.fromJson"
+  emit sink code.Deserialization at args[0]
+}

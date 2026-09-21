@@ -1,0 +1,45 @@
+module bindings.php.generated.m4864f250;
+
+binding fileUse0 {
+  requires {
+    dependency("zizaco/entrust")
+  }
+  query pattern callExpr where callee.method == "fwrite"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding authorizationCheck1 {
+  requires {
+    dependency("zizaco/entrust")
+  }
+  query pattern callExpr where callee.method == "routeNeedsRole"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck2 {
+  requires {
+    dependency("zizaco/entrust")
+  }
+  query pattern callExpr where callee.method == "routeNeedsPermission"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck3 {
+  requires {
+    dependency("zizaco/entrust")
+  }
+  query pattern callExpr where callee.method == "routeNeedsRoleOrPermission"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

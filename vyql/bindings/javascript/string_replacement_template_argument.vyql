@@ -1,0 +1,26 @@
+module bindings.javascript.string_replacement_template_argument;
+
+// When the replacement argument of String.prototype.replace or
+// String.prototype.replaceAll is a string, the platform treats it as a
+// substitution template rather than literal text: `$&` names the match,
+// `` $` `` the subject before it, `$'` the subject after it, `$$` a literal
+// dollar, and `$n` the regex capture groups. Data that reaches that
+// argument therefore decides more than the characters it contributes --
+// `$'` splices everything after the match into the substitution position,
+// so a value spliced into serialized payload text can pull the rest of the
+// payload across the quoting that value was given. The documented literal
+// form is the function replacement, whose return value is substituted
+// verbatim with no template interpretation.
+//
+// The fact recorded here is the argument's interpretation, so the sink sits
+// on the argument a caller's data flows into. A function passed in that
+// position is control flow rather than data -- nothing flows into the
+// argument node itself -- so the literal form needs no separate clause. The
+// key is the method name alone, matching the character-filter binding that
+// already labels this call, and the pattern side of the call is left out of
+// the predicate because the template interpretation is documented for string
+// and regex patterns alike.
+binding stringReplacementTemplateArgument {
+  query pattern callExpr where callee.method in ["replace", "replaceAll"]
+  emit sink code.FormatString at args[1]
+}

@@ -1,0 +1,7 @@
+module sbom;
+
+review sbom.CertValidationDependency {
+  category: dependency
+  kind: attention
+  text: "review dependency constraints for certificate-validation regressions or missing TLS verification guarantees"
+}

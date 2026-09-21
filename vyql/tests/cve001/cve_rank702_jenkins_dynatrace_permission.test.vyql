@@ -1,0 +1,61 @@
+test "rank702: Jenkins Dynatrace form validation connects without admin permission"
+  lang java
+  expect VYQL-AUTH-045
+  expect_review code.JenkinsRemoteValidationMissingPermission
+  code
+  ```
+  import com.dynatrace.sdk.server.BasicServerConfiguration;
+  import com.dynatrace.sdk.server.DynatraceClient;
+  import com.dynatrace.sdk.server.systemprofiles.SystemProfiles;
+  import hudson.util.FormValidation;
+  import org.kohsuke.stapler.QueryParameter;
+  import org.kohsuke.stapler.interceptor.RequirePOST;
+
+  class TAGlobalConfiguration {
+      @RequirePOST
+      public FormValidation doTestDynatraceConnection(
+              @QueryParameter("protocol") final String protocol,
+              @QueryParameter("host") final String host,
+              @QueryParameter("port") final String port,
+              @QueryParameter("username") final String username,
+              @QueryParameter("password") final String password) {
+          final SystemProfiles connection = new SystemProfiles(
+              new DynatraceClient(new BasicServerConfiguration(username, password, protocol.startsWith("https"), host, Integer.parseInt(port), true, 10000))
+          );
+          connection.getSystemProfiles();
+          return FormValidation.ok();
+      }
+  }
+  ```
+
+test "rank702: Jenkins Dynatrace form validation checks admin permission"
+  lang java
+  reject VYQL-AUTH-045
+  reject_review code.JenkinsRemoteValidationMissingPermission
+  code
+  ```
+  import com.dynatrace.sdk.server.BasicServerConfiguration;
+  import com.dynatrace.sdk.server.DynatraceClient;
+  import com.dynatrace.sdk.server.systemprofiles.SystemProfiles;
+  import hudson.util.FormValidation;
+  import jenkins.model.Jenkins;
+  import org.kohsuke.stapler.QueryParameter;
+  import org.kohsuke.stapler.interceptor.RequirePOST;
+
+  class TAGlobalConfiguration {
+      @RequirePOST
+      public FormValidation doTestDynatraceConnection(
+              @QueryParameter("protocol") final String protocol,
+              @QueryParameter("host") final String host,
+              @QueryParameter("port") final String port,
+              @QueryParameter("username") final String username,
+              @QueryParameter("password") final String password) {
+          Jenkins.getInstance().checkPermission(Jenkins.ADMINISTER);
+          final SystemProfiles connection = new SystemProfiles(
+              new DynatraceClient(new BasicServerConfiguration(username, password, protocol.startsWith("https"), host, Integer.parseInt(port), true, 10000))
+          );
+          connection.getSystemProfiles();
+          return FormValidation.ok();
+      }
+  }
+  ```

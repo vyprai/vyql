@@ -1,0 +1,57 @@
+module bindings.dart.generated.m30cff533;
+
+binding storedDataWrite0 {
+  requires {
+    dependency("shared_preferences_windows")
+  }
+  query pattern callExpr where callee.method == "setValue"
+  emit sink code.StoredDataWrite at args[0]
+}
+
+binding storedDataWrite1 {
+  requires {
+    dependency("shared_preferences_windows")
+  }
+  query pattern callExpr where callee.method == "remove"
+  emit sink code.StoredDataWrite at args[0]
+}
+
+binding storedDataWrite2 {
+  requires {
+    dependency("shared_preferences_windows")
+  }
+  query pattern callExpr where callee.method == "clear"
+  emit sink code.StoredDataWrite at args[0]
+}
+
+binding storedDataWrite3 {
+  requires {
+    dependency("shared_preferences_windows")
+  }
+  query pattern callExpr where callee.method == "clearWithPrefix"
+  emit sink code.StoredDataWrite at args[0]
+}
+
+binding storedDataWrite4 {
+  requires {
+    dependency("shared_preferences_windows")
+  }
+  query pattern callExpr where callee.method == "clearWithParameters"
+  emit sink code.StoredDataWrite at args[0]
+}
+
+binding storedDataRead5 {
+  requires {
+    dependency("shared_preferences_windows")
+  }
+  query pattern callExpr where callee.method == "getAll"
+  emit source code.StoredDataRead at call.result
+}
+
+binding storedDataRead6 {
+  requires {
+    dependency("shared_preferences_windows")
+  }
+  query pattern callExpr where callee.method == "getAllWithPrefix"
+  emit source code.StoredDataRead at call.result
+}

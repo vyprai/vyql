@@ -1,0 +1,145 @@
+# Rank 1800 / CVE-2024-42474: streamlit's AppStaticFileHandler, the handler
+# behind /app/static/<path> when server.enableStaticServing is on, overrides
+# Tornado's StaticFileHandler.validate_absolute_path — the documented hook
+# where the framework checks the request-derived path against the configured
+# root and raises 403 when it escapes. The override ran its own checks first
+# (os.path.isdir, an os.path.commonpath containment gate, an
+# os.path.exists/os.path.getsize size gate) and deferred the
+# super().validate_absolute_path delegation to its final statement. An
+# escaping path therefore never reached the framework's verdict: the
+# override's own, weaker gate decided the request, and on Windows that gate —
+# commonpath over the resolved path — is bypassable, giving a path traversal
+# out of the static directory (the advisory's impact: leaking the Windows
+# user's password hash). The fixed revision hoists the delegation to run first, so the
+# framework validates before any override logic; the updated tests pin
+# escapes returning Tornado's 403 instead of the override's 404.
+#
+# Detection is the ordering the change modifies, expressed with the engine's
+# reaches relation the way VYQL-RACE-001 pairs check and use: the binding
+# file vyql/bindings/python/static_file_validation_order.vyql emits the
+# existing code.FileCheck (the same concept the C bindings use for
+# access/stat) at the os.path state predicates and the new
+# code.PathValidationHookDeferred at the super() delegation, and
+# VYQL-PATH-084 reports the delegation when a probe in the same function
+# reaches it. Both revisions contain every call; only their order differs, so
+# no clause keys on the fixed revision's own spelling (the hoisted delegation keeps
+# working under any local name, and a probe-anywhere-before-delegation
+# variant stays flagged).
+#
+# The reject block is the patched form verbatim. The second expect pins the
+# partial-deferral variant — a probe before a mid-function delegation — and
+# the third pins that the relation is function-confined: a probe in a sibling
+# method of the same file does not reach the delegation.
+
+test "rank1800: static file handler override defers the framework path validation until after its own probes"
+  lang python
+  file lib/streamlit/web/server/app_static_file_handler.py
+  expect VYQL-PATH-084
+  code
+  ```
+  import os
+  from typing import Final
+
+  import tornado.web
+
+  MAX_APP_STATIC_FILE_SIZE = 200 * 1024 * 1024
+
+
+  class AppStaticFileHandler(tornado.web.StaticFileHandler):
+      def validate_absolute_path(self, root: str, absolute_path: str) -> str | None:
+          full_path = os.path.realpath(absolute_path)
+
+          if os.path.isdir(full_path):
+              # we don't want to serve directories, and serve only files
+              raise tornado.web.HTTPError(404)
+
+          if os.path.commonpath([full_path, root]) != root:
+              # Don't allow misbehaving clients to break out of the static files directory
+              raise tornado.web.HTTPError(404)
+
+          if (
+              os.path.exists(full_path)
+              and os.path.getsize(full_path) > MAX_APP_STATIC_FILE_SIZE
+          ):
+              raise tornado.web.HTTPError(404)
+
+          return super().validate_absolute_path(root, absolute_path)
+  ```
+
+test "rank1800: a probe before a mid-function delegation is the same deferred validation"
+  lang python
+  file lib/streamlit/web/server/app_static_file_handler.py
+  expect VYQL-PATH-084
+  code
+  ```
+  import os
+
+  import tornado.web
+
+
+  class AppStaticFileHandler(tornado.web.StaticFileHandler):
+      def validate_absolute_path(self, root: str, absolute_path: str) -> str | None:
+          if os.path.isdir(absolute_path):
+              raise tornado.web.HTTPError(404)
+
+          ret_val = super().validate_absolute_path(root, absolute_path)
+          return ret_val
+  ```
+
+test "rank1800: delegating first, then probing, is the documented contract"
+  lang python
+  file lib/streamlit/web/server/app_static_file_handler.py
+  reject VYQL-PATH-084
+  code
+  ```
+  import os
+  from typing import Final
+
+  import tornado.web
+
+  MAX_APP_STATIC_FILE_SIZE = 200 * 1024 * 1024
+
+
+  class AppStaticFileHandler(tornado.web.StaticFileHandler):
+      def validate_absolute_path(self, root: str, absolute_path: str) -> str | None:
+          full_path = os.path.realpath(absolute_path)
+
+          ret_val = super().validate_absolute_path(root, absolute_path)
+
+          if os.path.isdir(full_path):
+              # we don't want to serve directories, and serve only files
+              raise tornado.web.HTTPError(404)
+
+          if os.path.commonpath([full_path, root]) != root:
+              # Don't allow misbehaving clients to break out of the static files directory
+              raise tornado.web.HTTPError(404)
+
+          if (
+              os.path.exists(full_path)
+              and os.path.getsize(full_path) > MAX_APP_STATIC_FILE_SIZE
+          ):
+              raise tornado.web.HTTPError(404)
+
+          return ret_val
+  ```
+
+test "rank1800: a probe in a sibling method does not reach the delegation"
+  lang python
+  file lib/streamlit/web/server/app_static_file_handler.py
+  reject VYQL-PATH-084
+  code
+  ```
+  import os
+  from pathlib import Path
+
+  import tornado.web
+
+
+  class AppStaticFileHandler(tornado.web.StaticFileHandler):
+      def set_extra_headers(self, path: str) -> None:
+          if os.path.exists(path):
+              self.set_header("X-Static", "1")
+
+      def validate_absolute_path(self, root: str, absolute_path: str) -> str | None:
+          return super().validate_absolute_path(root, absolute_path)
+  ```

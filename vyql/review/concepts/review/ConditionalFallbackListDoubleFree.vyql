@@ -1,0 +1,8 @@
+module code;
+
+review code.ConditionalFallbackListDoubleFree {
+  category: memory
+  expected: [core.ResourceRelease]
+  kind: attention
+  text: "review fallback error paths that free a parsed list before a successful fallback can continue into shared cleanup"
+}

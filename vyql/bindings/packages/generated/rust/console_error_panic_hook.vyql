@@ -1,0 +1,17 @@
+module bindings.rust.generated.mba49b984;
+
+binding logOutput0 {
+  requires {
+    dependency("console_error_panic_hook")
+  }
+  query pattern callExpr where callee.method == "error"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput1 {
+  requires {
+    dependency("console_error_panic_hook")
+  }
+  query pattern callExpr where callee.method == "hook"
+  emit sink code.LogOutput at args[0]
+}

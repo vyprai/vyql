@@ -1,0 +1,25 @@
+module bindings.c.generated.m2e732851;
+
+binding httpInput0 {
+  requires {
+    dependency("functions-framework-cpp")
+  }
+  query pattern callExpr where callee.method == "HttpRequest"
+  emit source code.HttpInput at call.result
+}
+
+binding responseHeaderWrite1 {
+  requires {
+    dependency("functions-framework-cpp")
+  }
+  query pattern callExpr where callee.method == "HttpResponse.set_header"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding htmlRender2 {
+  requires {
+    dependency("functions-framework-cpp")
+  }
+  query pattern callExpr where callee.method == "HttpResponse.set_payload"
+  emit sink code.HtmlRender at args[0]
+}

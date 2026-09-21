@@ -1,0 +1,33 @@
+module bindings.python.generated.mf093cc62;
+
+binding commandExecution0 {
+  requires {
+    dependency("setuptools")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution1 {
+  requires {
+    dependency("setuptools")
+  }
+  query pattern callExpr where callee.method == "create_and_wait_for_subprocess"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution2 {
+  requires {
+    dependency("setuptools")
+  }
+  query pattern callExpr where callee.method == "execv"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("setuptools")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

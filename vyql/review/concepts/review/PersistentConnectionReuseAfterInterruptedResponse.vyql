@@ -1,0 +1,7 @@
+module code;
+
+review code.PersistentConnectionReuseAfterInterruptedResponse {
+  category: lifecycle
+  kind: target
+  text: "verify persistent connections are reset after interrupted or incomplete response reads before socket reuse"
+}

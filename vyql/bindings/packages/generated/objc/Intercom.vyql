@@ -1,0 +1,57 @@
+module bindings.objc.generated.m268f8503;
+
+binding secretValue0 {
+  requires {
+    dependency("Intercom")
+  }
+  query pattern callExpr where callee.method == "setUserHash"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("Intercom")
+  }
+  query pattern callExpr where callee.method == "setUserJwt"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue2 {
+  requires {
+    dependency("Intercom")
+  }
+  query pattern callExpr where callee.method == "setAuthTokens"
+  emit source code.SecretValue at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("Intercom")
+  }
+  query pattern callExpr where callee.method == "loginUserWithUserAttributes"
+  emit source core.UserControlledData at call.result
+}
+
+binding secretValue4 {
+  requires {
+    dependency("Intercom")
+  }
+  query pattern callExpr where callee.method == "setDeviceToken"
+  emit source code.SecretValue at call.result
+}
+
+binding userControlledData5 {
+  requires {
+    dependency("Intercom")
+  }
+  query pattern callExpr where callee.method == "searchHelpCenter"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData6 {
+  requires {
+    dependency("Intercom")
+  }
+  query pattern callExpr where callee.method == "logEventWithName"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,190 @@
+# Rank 1519 / CVE-2023-28326: OpenMeetings' invitation dialog enabled
+# its personal-URL generate button whenever exactly one recipient was
+# selected, without checking who the recipient was, so an inviter could
+# generate a personal access URL for an ordinary user and bypass the
+# intended permission path (broken access control, CWE-863; OPENMEETINGS-
+# 2739; the advisory records CWE-306 for the same access-control family).
+# updateButtons in openmeetings-web/src/main/java/org/apache/openmeetings/
+# web/common/InvitationForm.java did
+# `dialog.getGenerate().setEnabled(recpnts.size() == 1)` -- the condition
+# covers the count but not the principal: generating a URL is legitimate
+# only for the inviter's own account (WebSession.getUserId()) or a
+# CONTACT-type user. The fixing commit 1fb71af36 ("[OPENMEETINGS-2739]
+# generate URL is disabled if non-contact is selected"): generateEnabled
+# starts false and turns true only when the single recipient satisfies
+# `getUserId().equals(u.getId()) || User.Type.CONTACT == u.getType()`.
+#
+# ATTENTION, capability-gate completeness. The guard exists and runs --
+# its condition names the wrong principal vocabulary (count, not
+# type/identity), the same decision-completeness family as ranks 1540
+# (permission-switch branches), 1556 (sibling route groups) and 1567
+# (submit paths without the form token): nothing can ask "does the
+# enabled-state condition of a capability cover the principal types
+# allowed to exercise it" -- UI component state is not authorization
+# vocabulary anywhere in the corpus. A binding on OpenMeetings' own
+# dialog would detect this application rather than the weakness.
+#
+# Re-probed at the recheck span tip, which carries every definition and
+# engine change shipped since the first pass. Path 1 does not convert:
+# the AUTH additions since the first pass (VYQL-AUTH-160 through
+# VYQL-AUTH-179) are logout invalidation, result staging, admission
+# policy, host validation, ignored-authorization-result and their kin --
+# none names a UI component's enabled state, and no concept in
+# ontology/ or review/concepts/review/ is about component state at all
+# (the nearest authz-shaped review concepts -- AuthorizationCheck,
+# IgnoredAuthorizationResult, BackendRouteMissingModuleAuthorization --
+# are route, endpoint and permission-API concepts; Wicket's
+# updateButtons is none of those). Measured 3x --cache off /
+# timeout 180 / --max-ram 6GB per revision on the real checkout,
+# vulnerable parent 1fb71af36^ against fix 1fb71af36:
+#
+#   openmeetings-web/src/main/java/org/apache/openmeetings/web/common/
+#   InvitationForm.java -- 0/0/0 findings naming the file at BOTH
+#   revisions, full findings view, deterministic; the whole repository
+#   reports 646 findings at the vulnerable revision and 646 at the fix
+#   with 314 at or above high each, and no delta row touches the file.
+#   The flags view carries exactly one flag on the file at both
+#   revisions: core.ResourceRelease on dialog.close at line 248, a
+#   control fact outside updateButtons. vyql match on the file labels
+#   nothing in the method at all -- no source, no sink, no control; the
+#   only labels are log.error sinks at lines 237 and 245. A hard zero
+#   in both views, not a misread one.
+#
+# Path 3 is not shippable today, measured on this very tree: setEnabled
+# is called 99 times across 611 Java files, and only four of those
+# calls are gated on a size or emptiness test -- the vulnerable
+# generate, its sibling getSend().setEnabled(!recpnts.isEmpty()) in the
+# same target.add(...) statement, RoomInvitationForm's
+# getSend().setEnabled(!to.isEmpty()) for the group case, and
+# MessagesContactsPanel's deleteBtn.setEnabled(!selectedMessages.isEmpty())
+# over the session user's own messages. Three of the four are correct
+# code: they gate capabilities whose exercise never touches another
+# principal's account. A shape-only rule over the count condition
+# therefore fires backwards on this tree, and the discriminator it is
+# missing is exactly the ontology piece named above -- which principals
+# a gated capability may be exercised against. Narrowing instead on
+# OpenMeetings' own dialog accessor or on the fix's inline-expression
+# spelling would be a repro-shaped patch keying the fixing commit's
+# layout. No definition change shipped. Spec cve_rank1519 records the
+# count-only condition, the principal-checked form and the three safe
+# count-gated controls from the same tree, all asserting reject
+# VYQL-AUTH-079: when capability-gate vocabulary lands, the count-only
+# form must flip to expect and the three safe forms must stay reject.
+
+test "rank1519: the generate button trusts the count alone"
+  lang java
+  file openmeetings-web/src/main/java/org/apache/openmeetings/web/common/InvitationForm.java
+  reject VYQL-AUTH-079
+  code
+  ```
+  package org.apache.openmeetings.web.common;
+
+  import java.util.Collection;
+
+  public abstract class InvitationForm extends Form<Invitation> {
+      protected void updateButtons(AjaxRequestTarget target) {
+          Collection<User> recpnts = recipients.getModelObject();
+          target.add(
+                  dialog.getSend().setEnabled(!recpnts.isEmpty())
+                  , dialog.getGenerate().setEnabled(recpnts.size() == 1)
+                  );
+      }
+  }
+  ```
+
+test "rank1519: the fixed revision gates the button on the principal"
+  lang java
+  file openmeetings-web/src/main/java/org/apache/openmeetings/web/common/InvitationForm.java
+  reject VYQL-AUTH-079
+  code
+  ```
+  package org.apache.openmeetings.web.common;
+
+  import java.util.Collection;
+
+  public abstract class InvitationForm extends Form<Invitation> {
+      protected void updateButtons(AjaxRequestTarget target) {
+          Collection<User> recpnts = recipients.getModelObject();
+          boolean generateEnabled = false;
+          if (recpnts.size() == 1) {
+              User u = recpnts.iterator().next();
+              generateEnabled = getUserId().equals(u.getId()) || User.Type.CONTACT == u.getType();
+          }
+          target.add(
+                  dialog.getSend().setEnabled(!recpnts.isEmpty())
+                  , dialog.getGenerate().setEnabled(generateEnabled)
+                  );
+      }
+  }
+  ```
+
+test "rank1519: the group branch disables the personal URL outright"
+  lang java
+  file openmeetings-web/src/main/java/org/apache/openmeetings/web/room/menu/RoomInvitationForm.java
+  reject VYQL-AUTH-079
+  code
+  ```
+  package org.apache.openmeetings.web.room.menu;
+
+  import java.util.Collection;
+
+  public class RoomInvitationForm extends InvitationForm {
+      @Override
+      protected void updateButtons(AjaxRequestTarget target) {
+          if (rdi.getModelObject() == InviteeType.USER) {
+              super.updateButtons(target);
+          } else {
+              Collection<Group> to = groups.getModelObject();
+              target.add(
+                      dialog.getSend().setEnabled(!to.isEmpty())
+                      , dialog.getGenerate().setEnabled(false)
+                      );
+          }
+      }
+  }
+  ```
+
+test "rank1519: count-gated controls over the session user's own messages"
+  lang java
+  file openmeetings-web/src/main/java/org/apache/openmeetings/web/user/profile/MessagesContactsPanel.java
+  reject VYQL-AUTH-079
+  code
+  ```
+  package org.apache.openmeetings.web.user.profile;
+
+  public class MessagesContactsPanel extends Panel {
+      private void updateControls(AjaxRequestTarget target) {
+          deleteBtn.setEnabled(!selectedMessages.isEmpty());
+          Long selFldr = selectedFolderModel.getObject();
+          readBtn.setEnabled(!TRASH_FOLDER_ID.equals(selFldr) && !selectedMessages.isEmpty());
+          unreadBtn.setEnabled(!TRASH_FOLDER_ID.equals(selFldr) && !selectedMessages.isEmpty());
+          toInboxBtn.setVisible(!INBOX_FOLDER_ID.equals(selFldr) && !SENT_FOLDER_ID.equals(selFldr) && !selectedMessages.isEmpty());
+          target.add(deleteBtn, readBtn, unreadBtn, toInboxBtn);
+      }
+  }
+  ```
+
+test "rank1519: field enablement derived from the form's own validity radio"
+  lang java
+  file openmeetings-web/src/main/java/org/apache/openmeetings/web/common/InvitationForm.java
+  reject VYQL-AUTH-079
+  code
+  ```
+  package org.apache.openmeetings.web.common;
+
+  public abstract class InvitationForm extends Form<Invitation> {
+      protected void onInitialize() {
+          RadioGroup<Valid> valid = new RadioGroup<>("valid");
+          valid.add(new AjaxFormChoiceComponentUpdatingBehavior() {
+              private static final long serialVersionUID = 1L;
+
+              @Override
+              protected void onUpdate(AjaxRequestTarget target) {
+                  boolean dateEnabled = InvitationForm.this.getModelObject().getValid() == Valid.PERIOD;
+                  target.add(from.setEnabled(dateEnabled), to.setEnabled(dateEnabled), timeZoneId.setEnabled(dateEnabled));
+              }
+          });
+          super.onInitialize();
+      }
+  }
+  ```

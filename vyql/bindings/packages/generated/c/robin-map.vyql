@@ -1,0 +1,9 @@
+module bindings.c.generated.m54f8ea44;
+
+binding deserialization0 {
+  requires {
+    dependency("robin-map")
+  }
+  query pattern callExpr where callee.method == "deserialize"
+  emit sink code.Deserialization at args[0]
+}

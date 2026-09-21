@@ -1,0 +1,55 @@
+# Rank 54 / CVE-2020-7780: akka-http-session accepted a double-submit CSRF
+# token comparison without rejecting empty cookie/header values.
+
+test "rank54: akka-http-session compares submitted csrf token to possibly empty cookie"
+  lang scala
+  file core/src/main/scala/com/softwaremill/session/CsrfDirectives.scala
+  expect VYQL-RF-006
+  code
+  ```
+  package com.softwaremill.session
+
+  trait CsrfDirectives {
+    def randomTokenCsrfProtection[T](checkMode: CsrfCheckMode[T]): Directive0 = {
+      csrfTokenFromCookie(checkMode).flatMap {
+        case Some(cookie) =>
+          get.recover { _ =>
+            submittedCsrfToken(checkMode).flatMap { submitted =>
+              if (submitted == cookie) {
+                pass
+              } else {
+                reject(checkMode.csrfManager.tokenInvalidRejection).toDirective[Unit]
+              }
+            }
+          }
+      }
+    }
+  }
+  ```
+
+test "rank54: akka-http-session requires non-empty csrf token"
+  lang scala
+  file core/src/main/scala/com/softwaremill/session/CsrfDirectives.scala
+  reject VYQL-RF-006
+  code
+  ```
+  package com.softwaremill.session
+
+  trait CsrfDirectives {
+    def randomTokenCsrfProtection[T](checkMode: CsrfCheckMode[T]): Directive0 = {
+      csrfTokenFromCookie(checkMode).flatMap {
+        case Some(cookie) =>
+          get.recover { _ =>
+            submittedCsrfToken(checkMode).flatMap { submitted =>
+              if (submitted == cookie && !cookie.isEmpty) {
+                pass
+              } else {
+                reject(checkMode.csrfManager.tokenInvalidRejection).toDirective[Unit]
+              }
+            }
+          }
+      }
+    }
+  }
+  ```
+

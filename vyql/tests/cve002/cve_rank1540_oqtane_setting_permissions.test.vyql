@@ -1,0 +1,316 @@
+# Rank 1540 / CVE-2024-55470: Oqtane's settings controller defaulted
+# its authorization flag to true and only computed a real decision for
+# one permission name, so every other permission (View among them)
+# passed open for any authenticated user (broken access control,
+# CWE-862; PR #4878 "User Settings should only be accessible to
+# individual users or administrators"; the task list's nocommit flag
+# was advisory-side absence). The User-entity branch of IsAuthorized
+# in Oqtane.Server/Controllers/SettingController.cs did `authorized =
+# true; if (permissionName == PermissionNames.Edit) { authorized =
+# _userPermissions.IsAuthorized(User, _alias.SiteId, entityName, -1,
+# PermissionNames.Write, RoleNames.Admin) ||
+# (_userPermissions.GetUser(User).UserId == entityId); }`, and the
+# listing filter checked only the Admin role and the caller's user id,
+# missing the permission path entirely. Pool commit cdd03bf3d4 (the
+# merge of PR #4878; parent e83399a is the vulnerable tree, and the
+# merge's combined diff is empty, so the fix reads via `git diff
+# e83399a cdd03bf3d4`) carries the controller change: the User-entity
+# decision applies to every permission name unconditionally and the
+# filter uses the same permission decision.
+#
+# ATTENTION, default-open authorization branches. The defect is an
+# authorization variable that starts true and is narrowed in only one
+# branch of a permission conditional -- decision-completeness over
+# the permission vocabulary, the same family as ranks 1519
+# (capability gates), 1535 (startup guards) and 1556 (sibling route
+# groups): no rule can ask "does every permission name receive an
+# authorization decision", and the default-true initialization is not
+# an observable guard shape. A binding on Oqtane's own
+# _userPermissions would detect this application rather than the
+# weakness.
+#
+# Re-probed at the recheck span tip, which carries every definition
+# and engine change shipped since the first pass (loaded:
+# concepts=1007 rules=879 bindings=32983 reviews=678; binary built in
+# the worktree, data directory resolving to the worktree's own
+# vyql/). Measured 3x --cache off / timeout 180 / --max-ram 6GB per
+# revision on the real checkout, vulnerable parent e83399a against
+# fix cdd03bf3d4:
+#
+#   whole repository (javascript:14 csharp:554 bash:4 powershell:2
+#   config:15 textpattern:579 files analysed) -- 309/309/309 findings
+#   at the vulnerable revision, 309/309/309 at the fix, 154 at or
+#   above high at each, deterministic. The finding set is identical
+#   across the pair: the same 22 rule ids with the same counts (101
+#   VYQL-CFG-014, 69 VYQL-PATH-001, 60 VYQL-AUTH-002, ...) and the
+#   same 270 rule+source-location pairs. No finding names
+#   SettingController.cs at either revision in the full findings view
+#   (3x each). The flags view carries two
+#   code.ObjectLookupByUserInput flags on the controller's
+#   `GetUser(User).UserId` comparisons -- :275/:322 at the vulnerable
+#   revision, :272/:318 at the fix, the same expressions on both
+#   sides -- consumed by VYQL-AUTH-002, which reports nothing there
+#   at either revision. vyql match on the controller: sources
+#   Param/ExternalEntryInput and HttpInput on the action parameters,
+#   sinks exactly those two ObjectLookupByUserInput labels, no
+#   control labels at all.
+#
+# Path 1 does not convert: the AUTH additions since the first pass
+# (VYQL-AUTH-160 through VYQL-AUTH-179) are tool-schema security
+# overrides, result staging, admission and request-scope policy, host
+# validation and ignored-authorization-result -- and every emitter of
+# code.IgnoredAuthorizationResult keys on another application's own
+# call names (canFlush, canPerformSystemActions, InternalClient), so
+# none fires here; the one csharp emitter of the pinned
+# code.SensitiveOperation keys on an unrelated MigrateEmail function.
+# Path 2 was a hard zero in the full findings view, not a misread
+# one, and the flags that do exist label both revisions identically.
+# Path 3 is not shippable today, and the blocker is measured rather
+# than supposed: the default-open construct (`authorized = true; if
+# (permissionName == PermissionNames.Edit) {...}`) SURVIVES the fix
+# in the same switch's `default:` custom-entity case, so a rule on
+# the construct fires on the fixed revision of the fix's own file and
+# no 1 -> 0 exists on the real checkout. Separating the User-entity
+# case from the surviving default case requires keying on
+# EntityNames.User or on the guarded branch's own argument layout
+# (the -1 id, the GetUser disjunct) -- application vocabulary and the
+# fixing commit's layout. The missing piece is a
+# decision-completeness vocabulary, which is not a taint, resolution
+# or pattern construct the engine mishandles, so no ENGINE-GAPS.md
+# entry. No definition change shipped. Spec cve_rank1540 records the
+# default-open User-entity branch, the surviving default-open
+# custom-entity case, the unconditional fixed form and both listing
+# filters, all asserting reject VYQL-AUTH-079: when
+# decision-completeness vocabulary lands, the default-open blocks
+# must flip to expect and the unconditional forms must stay reject.
+
+test "rank1540: the User entity branch decides only for Edit"
+  lang csharp
+  file Oqtane.Server/Controllers/SettingController.cs
+  reject VYQL-AUTH-079
+  code
+  ```
+  using Microsoft.AspNetCore.Authorization;
+  using Microsoft.AspNetCore.Mvc;
+  using Oqtane.Models;
+  using Oqtane.Shared;
+  using Oqtane.Security;
+
+  namespace Oqtane.Controllers
+  {
+      [Route(ControllerRoutes.ApiRoute)]
+      public class SettingController : Controller
+      {
+          private readonly IUserPermissions _userPermissions;
+          private readonly Alias _alias;
+
+          public SettingController(IUserPermissions userPermissions, IAliasAccessor aliasAccessor)
+          {
+              _userPermissions = userPermissions;
+              _alias = aliasAccessor.Alias;
+          }
+
+          private bool IsAuthorized(string entityName, int entityId, string permissionName)
+          {
+              bool authorized = false;
+              switch (entityName)
+              {
+                  case EntityNames.User:
+                      authorized = true;
+                      if (permissionName == PermissionNames.Edit)
+                      {
+                          authorized = _userPermissions.IsAuthorized(User, _alias.SiteId, entityName, -1, PermissionNames.Write, RoleNames.Admin)
+                              || (_userPermissions.GetUser(User).UserId == entityId);
+                      }
+                      break;
+                  default:
+                      authorized = false;
+                      break;
+              }
+              return authorized;
+          }
+      }
+  }
+  ```
+
+test "rank1540: the custom-entity default case keeps the default-open shape after the fix"
+  lang csharp
+  file Oqtane.Server/Controllers/SettingController.cs
+  reject VYQL-AUTH-079
+  code
+  ```
+  using Microsoft.AspNetCore.Authorization;
+  using Microsoft.AspNetCore.Mvc;
+  using Oqtane.Models;
+  using Oqtane.Shared;
+  using Oqtane.Security;
+
+  namespace Oqtane.Controllers
+  {
+      [Route(ControllerRoutes.ApiRoute)]
+      public class SettingController : Controller
+      {
+          private readonly IUserPermissions _userPermissions;
+          private readonly Alias _alias;
+
+          public SettingController(IUserPermissions userPermissions, IAliasAccessor aliasAccessor)
+          {
+              _userPermissions = userPermissions;
+              _alias = aliasAccessor.Alias;
+          }
+
+          private bool IsAuthorized(string entityName, int entityId, string permissionName)
+          {
+              bool authorized = false;
+              switch (entityName)
+              {
+                  default: // custom entity
+                      authorized = true;
+                      if (permissionName == PermissionNames.Edit)
+                      {
+                          authorized = _userPermissions.IsAuthorized(User, _alias.SiteId, entityName, entityId, permissionName)
+                              || _userPermissions.IsAuthorized(User, _alias.SiteId, entityName, -1, PermissionNames.Write, RoleNames.Admin);
+                      }
+                      break;
+              }
+              return authorized;
+          }
+      }
+  }
+  ```
+
+test "rank1540: the fixed revision decides for every permission name"
+  lang csharp
+  file Oqtane.Server/Controllers/SettingController.cs
+  reject VYQL-AUTH-079
+  code
+  ```
+  using Microsoft.AspNetCore.Authorization;
+  using Microsoft.AspNetCore.Mvc;
+  using Oqtane.Models;
+  using Oqtane.Shared;
+  using Oqtane.Security;
+
+  namespace Oqtane.Controllers
+  {
+      [Route(ControllerRoutes.ApiRoute)]
+      public class SettingController : Controller
+      {
+          private readonly IUserPermissions _userPermissions;
+          private readonly Alias _alias;
+
+          public SettingController(IUserPermissions userPermissions, IAliasAccessor aliasAccessor)
+          {
+              _userPermissions = userPermissions;
+              _alias = aliasAccessor.Alias;
+          }
+
+          private bool IsAuthorized(string entityName, int entityId, string permissionName)
+          {
+              bool authorized = false;
+              switch (entityName)
+              {
+                  case EntityNames.User:
+                      authorized = _userPermissions.IsAuthorized(User, _alias.SiteId, entityName, -1, PermissionNames.Write, RoleNames.Admin)
+                          || (_userPermissions.GetUser(User).UserId == entityId);
+                      break;
+                  default:
+                      authorized = false;
+                      break;
+              }
+              return authorized;
+          }
+      }
+  }
+  ```
+
+test "rank1540: the private-listing filter checks only the Admin role"
+  lang csharp
+  file Oqtane.Server/Controllers/SettingController.cs
+  reject VYQL-AUTH-079
+  code
+  ```
+  using Microsoft.AspNetCore.Authorization;
+  using Microsoft.AspNetCore.Mvc;
+  using Oqtane.Models;
+  using Oqtane.Shared;
+  using Oqtane.Security;
+
+  namespace Oqtane.Controllers
+  {
+      [Route(ControllerRoutes.ApiRoute)]
+      public class SettingController : Controller
+      {
+          private readonly IUserPermissions _userPermissions;
+          private readonly Alias _alias;
+
+          public SettingController(IUserPermissions userPermissions, IAliasAccessor aliasAccessor)
+          {
+              _userPermissions = userPermissions;
+              _alias = aliasAccessor.Alias;
+          }
+
+          private bool FilterPrivate(string entityName, int entityId)
+          {
+              bool filter = false;
+              switch (entityName)
+              {
+                  case EntityNames.User:
+                      filter = !User.IsInRole(RoleNames.Admin) && _userPermissions.GetUser(User).UserId != entityId;
+                      break;
+                  default:
+                      filter = !User.IsInRole(RoleNames.Admin)
+                          && !_userPermissions.IsAuthorized(User, _alias.SiteId, entityName, entityId, PermissionNames.Edit);
+                      break;
+              }
+              return filter;
+          }
+      }
+  }
+  ```
+
+test "rank1540: the fixed listing filter uses the permission decision"
+  lang csharp
+  file Oqtane.Server/Controllers/SettingController.cs
+  reject VYQL-AUTH-079
+  code
+  ```
+  using Microsoft.AspNetCore.Authorization;
+  using Microsoft.AspNetCore.Mvc;
+  using Oqtane.Models;
+  using Oqtane.Shared;
+  using Oqtane.Security;
+
+  namespace Oqtane.Controllers
+  {
+      [Route(ControllerRoutes.ApiRoute)]
+      public class SettingController : Controller
+      {
+          private readonly IUserPermissions _userPermissions;
+          private readonly Alias _alias;
+
+          public SettingController(IUserPermissions userPermissions, IAliasAccessor aliasAccessor)
+          {
+              _userPermissions = userPermissions;
+              _alias = aliasAccessor.Alias;
+          }
+
+          private bool FilterPrivate(string entityName, int entityId)
+          {
+              bool filter = false;
+              switch (entityName)
+              {
+                  case EntityNames.User:
+                      filter = !_userPermissions.IsAuthorized(User, _alias.SiteId, entityName, -1, PermissionNames.Write, RoleNames.Admin)
+                          && _userPermissions.GetUser(User).UserId != entityId;
+                      break;
+                  default:
+                      filter = !User.IsInRole(RoleNames.Admin)
+                          && !_userPermissions.IsAuthorized(User, _alias.SiteId, entityName, entityId, PermissionNames.Edit);
+                      break;
+              }
+              return filter;
+          }
+      }
+  }
+  ```

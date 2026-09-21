@@ -1,0 +1,16 @@
+module bindings.javascript.iframe_document_write_sandbox;
+
+// A frame's `contentDocument` (or `contentWindow.document`) is a live
+// `Document`, so `write()` on it runs the string through that frame's HTML
+// parser: script elements execute and event-handler attributes fire, in a
+// frame that -- absent a `sandbox` attribute -- shares the embedder's origin
+// and reaches it through `window.parent`. The two documented controls are
+// independent: `sandbox` on the frame element withholds script execution and
+// same-origin access no matter what the markup says, and a sanitizer
+// (DOMPurify and the like) strips the active markup before the parser sees
+// it. Either one present means the markup cannot become script here; a frame
+// document written with neither is parsing whatever string it was handed.
+binding unsanitizedFrameDocumentWrite {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and containsAny(node.context.selector, ["contentDocument", "contentWindow"]) and node.context.callPath contains ".write" and not (node.context.literal contains "sandbox") and not (containsAny(node.context.callPath, ["sanitize", "purify", "Purify", "escapeHtml"]))
+  emit issue code.UnsanitizedFrameDocumentWrite at node
+}

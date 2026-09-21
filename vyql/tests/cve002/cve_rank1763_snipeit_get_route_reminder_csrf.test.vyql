@@ -1,0 +1,248 @@
+# snipe/snipe-it acceptance-reminder mail over GET. The reminder action is
+# registered as Route::get('reports/unaccepted_assets/{acceptanceId}/
+# sent_reminder', [ReportsController::class, 'sentAssetAcceptanceReminder']),
+# and the handler dispatched a CheckoutAssetNotification mail through the
+# Notification facade. Laravel's VerifyCsrfToken middleware only validates the
+# state-changing verbs, so a GET route sits outside CSRF protection by
+# construction: any page a signed-in operator visits could trigger the mail
+# (cross-site request forgery, CWE-352; GHSA-33vj-r6p6-x4p8).
+#
+# The fixed revision (6d55d782, "Set resend acceptance to POST") changes
+# exactly one discriminating thing: the registration becomes
+# Route::post('reports/unaccepted_assets/sent_reminder', ...), which brings
+# the route under the web group's token middleware, and the report view swaps
+# the reminder <a href> for a <form method="post"> carrying @csrf. Inside the
+# controller the fixed revision only re-reads the identifier from
+# $request->input('acceptance_id') and adds \Log::debug calls -- no token
+# validation appears in the handler, because the middleware supplies it.
+#
+# ATTENTION, rechecked, csrf-decision completeness in its route-wiring form
+# -- the same family as 1567 (phpBB form key), 1581 (pkp FormValidatorCSRF),
+# 1592 (polarlearn oauth state), 1601 (prefect csrf client), 1786 (Squidex
+# antiforgery attribute) and 1932 (wallabag delete client). The discriminator
+# is the HTTP verb at the route registration, which lives in routes/web.php
+# while the state change lives in a handler reached only through the string
+# literal inside the [Controller::class, 'method'] array. Measured again on
+# the real code, three --cache off runs per side over app/Http/Controllers +
+# routes (98 files, timeout 180, --max-ram 6GB):
+#
+# 1. 388/388/388 findings at the vulnerable revision (334 at or above high)
+#    and 389/389/389 at the fixed revision (335). The whole difference is on
+#    the safe side: the fixed revision gains code.HttpInput on the
+#    `Request $request` parameter (ReportsController.php:1046) and a
+#    VYQL-AUTH-002 code.ObjectLookupByUserInput row on the find() argument
+#    (:1050), while the sibling deleteAssetAcceptance rows only shift line
+#    (:1093 -> :1103, :1098 -> :1108) under the ten added \Log::debug lines.
+#    Nothing fires on the reminder route or its handler at either revision,
+#    in the default report or the -flags only view (662 flags a side,
+#    differing only by those same line shifts and the one fixed-only flag).
+# 2. The source vocabulary that shipped after the 1st pass points the wrong
+#    way. A parameter type-hinted with the framework request class is now
+#    labelled code.HttpInput, so the fixed revision -- which is the one that
+#    takes `Request $request` -- gains a source the vulnerable revision does
+#    have no counterpart for: the vulnerable `$acceptanceId` route parameter
+#    stays unlabelled. Every rule that could consume a request source
+#    therefore fires on the patched code and stays dark on the defect.
+# 3. The notification-dispatch sink was re-measured and stays
+#    unshippable. A probe binding `callee.path ~= "Notification.send"` /
+#    "Notification.locale.send" as code.StateChangingOp(Sink) moves the runs
+#    to 391/391 and 392/392: the same three rows appear at both revisions
+#    (the two dispatch sites in sentAssetAcceptanceReminder plus one
+#    collateral `->send()` in Api/SettingsController.php:157), so it buys
+#    zero discrimination and one permanent false positive. VYQL-RF-003 does
+#    not fire at either revision under the probe, because taint from the
+#    request parameter dies before the dispatch arguments.
+# 4. No route-table resolution exists. `vyql resolve` on routes/web.php
+#    reports every Route::get and Route::post call unresolved, and
+#    Route::get / Route::post carry no label at either revision -- the only
+#    Route marks come from the generic `callee.method == "delete"` state-
+#    changing mark catching Route::delete. No route-registration concept
+#    exists in the ontology. The 1380 counterweight fails as before: the fix
+#    leaves no API-documented control call inside the guarded method, only
+#    logging and a different parameter source.
+# 5. Keying on the verb alone still labels every legitimate GET route. This
+#    one file holds 67 Route::get registrations whose action names are
+#    arbitrary application methods (show, index, profile, settings, purge,
+#    postSettings, logout, sentAssetAcceptanceReminder); Laravel documents
+#    nothing that maps an action name to state, only the verb to CSRF
+#    applicability, so a name-keyed binding has no documentation basis and
+#    fails the genericity test.
+#
+# The first four tests pin both halves of the pair at both revisions as
+# misses on the rules that would consume csrf-decision vocabulary:
+# VYQL-RF-003 (taint core.UserControlledData -> code.StateChangingOpSink
+# unless endpoint coveredBy core.CsrfProtection) and VYQL-RF-043
+# (code.StateChangingOp). The fifth is a firing control: the same fixed
+# handler, read through its request-typed parameter, does report
+# VYQL-AUTH-002 on the find() argument, so the suite exercises a firing
+# rule and pins that today's newest source vocabulary lights the safe
+# revision rather than the defect. When route-table vocabulary lands, the
+# GET-registered tests must flip to expect.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1763: the reminder action is registered on GET and dispatches the mail"
+  lang php
+  file routes/web.php
+  reject VYQL-RF-003
+  reject VYQL-RF-043
+  reject VYQL-AUTH-079
+  code
+  ```
+  <?php
+
+  Route::group(['middleware' => ['auth']], function () {
+      Route::get(
+          'reports/unaccepted_assets/{deleted?}',
+          [ReportsController::class, 'getAssetAcceptanceReport']
+      )->name('reports/unaccepted_assets');
+
+      Route::get(
+          'reports/unaccepted_assets/{acceptanceId}/sent_reminder',
+          [ReportsController::class, 'sentAssetAcceptanceReminder']
+      )->name('reports/unaccepted_assets_sent_reminder');
+  });
+  ```
+
+test "rank1763: the reminder handler sends the acceptance notification"
+  lang php
+  file app/Http/Controllers/ReportsController.php
+  reject VYQL-RF-003
+  reject VYQL-RF-043
+  reject VYQL-AUTH-079
+  code
+  ```
+  <?php
+
+  class ReportsController extends Controller
+  {
+      public function sentAssetAcceptanceReminder($acceptanceId = null)
+      {
+          $this->authorize('reports.view');
+
+          if (!$acceptance = CheckoutAcceptance::pending()->find($acceptanceId)) {
+              return redirect()->route('reports/unaccepted_assets')->with('error', trans('general.bad_data'));
+          }
+          $assetItem = $acceptance->checkoutable;
+
+          if (is_null($acceptance->created_at)) {
+              return redirect()->route('reports/unaccepted_assets')->with('error', trans('general.bad_data'));
+          } else {
+              $logItem_res = $assetItem->checkouts()->where('created_at', '=', $acceptance->created_at)->get();
+              if ($logItem_res->isEmpty()) {
+                  return redirect()->route('reports/unaccepted_assets')->with('error', trans('general.bad_data'));
+              }
+              $logItem = $logItem_res[0];
+          }
+
+          if (!$assetItem->assignedTo->locale) {
+              Notification::locale(Setting::getSettings()->locale)->send(
+                  $assetItem->assignedTo,
+                  new CheckoutAssetNotification($assetItem, $assetItem->assignedTo, $logItem->user, $acceptance, $logItem->note)
+              );
+          } else {
+              Notification::send(
+                  $assetItem->assignedTo,
+                  new CheckoutAssetNotification($assetItem, $assetItem->assignedTo, $logItem->user, $acceptance, $logItem->note)
+              );
+          }
+
+          return redirect()->route('reports/unaccepted_assets')->with('success', trans('admin/reports/general.reminder_sent'));
+      }
+  }
+  ```
+
+test "rank1763: the fixed revision registers the reminder action on POST"
+  lang php
+  file routes/web.php
+  reject VYQL-RF-003
+  reject VYQL-RF-043
+  reject VYQL-AUTH-079
+  code
+  ```
+  <?php
+
+  Route::group(['middleware' => ['auth']], function () {
+      Route::get(
+          'reports/unaccepted_assets/{deleted?}',
+          [ReportsController::class, 'getAssetAcceptanceReport']
+      )->name('reports/unaccepted_assets');
+
+      Route::post(
+          'reports/unaccepted_assets/sent_reminder',
+          [ReportsController::class, 'sentAssetAcceptanceReminder']
+      )->name('reports/unaccepted_assets_sent_reminder');
+  });
+  ```
+
+test "rank1763: the handler at the fixed revision reads the identifier from the request body"
+  lang php
+  file app/Http/Controllers/ReportsController.php
+  reject VYQL-RF-003
+  reject VYQL-RF-043
+  reject VYQL-AUTH-079
+  code
+  ```
+  <?php
+
+  class ReportsController extends Controller
+  {
+      public function sentAssetAcceptanceReminder(Request $request)
+      {
+          $this->authorize('reports.view');
+
+          if (!$acceptance = CheckoutAcceptance::pending()->find($request->input('acceptance_id'))) {
+              \Log::debug('No pending acceptances');
+              return redirect()->route('reports/unaccepted_assets')->with('error', trans('general.bad_data'));
+          }
+          $assetItem = $acceptance->checkoutable;
+
+          if (is_null($acceptance->created_at)) {
+              \Log::debug('No acceptance created_at');
+              return redirect()->route('reports/unaccepted_assets')->with('error', trans('general.bad_data'));
+          } else {
+              $logItem_res = $assetItem->checkouts()->where('created_at', '=', $acceptance->created_at)->get();
+              if ($logItem_res->isEmpty()) {
+                  \Log::debug('Acceptance date mismatch');
+                  return redirect()->route('reports/unaccepted_assets')->with('error', trans('general.bad_data'));
+              }
+              $logItem = $logItem_res[0];
+          }
+
+          if (!$assetItem->assignedTo->locale) {
+              Notification::locale(Setting::getSettings()->locale)->send(
+                  $assetItem->assignedTo,
+                  new CheckoutAssetNotification($assetItem, $assetItem->assignedTo, $logItem->user, $acceptance, $logItem->note)
+              );
+          } else {
+              Notification::send(
+                  $assetItem->assignedTo,
+                  new CheckoutAssetNotification($assetItem, $assetItem->assignedTo, $logItem->user, $acceptance, $logItem->note)
+              );
+          }
+
+          return redirect()->route('reports/unaccepted_assets')->with('success', trans('admin/reports/general.reminder_sent'));
+      }
+  }
+  ```
+
+test "rank1763: the request-typed parameter lights the fixed revision, not the defect"
+  lang php
+  file app/Http/Controllers/ReportsController.php
+  expect VYQL-AUTH-002
+  code
+  ```
+  <?php
+
+  class ReportsController extends Controller
+  {
+      public function sentAssetAcceptanceReminder(Request $request)
+      {
+          if (!$acceptance = CheckoutAcceptance::pending()->find($request->input('acceptance_id'))) {
+              return redirect()->route('reports/unaccepted_assets')->with('error', trans('general.bad_data'));
+          }
+
+          return redirect()->route('reports/unaccepted_assets')->with('success', trans('admin/reports/general.reminder_sent'));
+      }
+  }
+  ```

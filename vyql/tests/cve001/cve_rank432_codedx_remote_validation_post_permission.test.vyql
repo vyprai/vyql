@@ -1,0 +1,89 @@
+# Rank 432 / CVE-2023-2195: Jenkins Code Dx descriptor endpoints connected
+# to caller-supplied URLs without POST requirements or item/admin permission checks.
+
+test "rank432: Code Dx remote validation endpoints lack POST and permission checks"
+  lang java
+  file CodeDxPublisher.java
+  expect VYQL-RF-018
+  expect_review code.CodeDxJenkinsRemoteValidationMissingPostPermission
+  code
+  ```
+  package org.jenkinsci.plugins.codedx;
+
+  public class CodeDxPublisher {
+    public static final class DescriptorImpl {
+      public FormValidation doCheckUrl(@QueryParameter final String value,
+                                       @QueryParameter final String selfSignedCertificateFingerprint) {
+        CodeDxClient client = buildClient(value, "", selfSignedCertificateFingerprint);
+        client.getProjects();
+        return FormValidation.ok();
+      }
+
+      public FormValidation doCheckSelfSignedCertificateFingerprint(@QueryParameter final String value,
+                                                                    @QueryParameter final String url) {
+        CodeDxClient client = buildClient(url, "", value);
+        client.getProjects();
+        return FormValidation.ok();
+      }
+
+      public ListBoxModel doFillProjectIdItems(@QueryParameter final String url,
+                                               @QueryParameter final String selfSignedCertificateFingerprint,
+                                               @QueryParameter final String key,
+                                               @AncestorInPath AbstractProject project) {
+        CodeDxClient client = buildClient(url, key, selfSignedCertificateFingerprint);
+        client.getProjects();
+        return new ListBoxModel();
+      }
+    }
+  }
+  ```
+
+test "rank432: Code Dx remote validation endpoints require POST and permission checks"
+  lang java
+  file CodeDxPublisher.java
+  reject VYQL-RF-018
+  reject_review code.CodeDxJenkinsRemoteValidationMissingPostPermission
+  code
+  ```
+  package org.jenkinsci.plugins.codedx;
+
+  public class CodeDxPublisher {
+    public static final class DescriptorImpl {
+      private void checkPermissionForRemoteRequests(Item item) {
+        if (item != null) item.checkPermission(Item.CONFIGURE);
+        else Jenkins.get().checkPermission(Jenkins.ADMINISTER);
+      }
+
+      @POST
+      public FormValidation doCheckUrl(@QueryParameter final String value,
+                                       @QueryParameter final String selfSignedCertificateFingerprint,
+                                       @AncestorInPath Item item) {
+        checkPermissionForRemoteRequests(item);
+        CodeDxClient client = buildClient(value, "", selfSignedCertificateFingerprint);
+        client.getProjects();
+        return FormValidation.ok();
+      }
+
+      @POST
+      public FormValidation doCheckSelfSignedCertificateFingerprint(@QueryParameter final String value,
+                                                                    @QueryParameter final String url,
+                                                                    @AncestorInPath Item item) {
+        checkPermissionForRemoteRequests(item);
+        CodeDxClient client = buildClient(url, "", value);
+        client.getProjects();
+        return FormValidation.ok();
+      }
+
+      @POST
+      public ListBoxModel doFillProjectIdItems(@QueryParameter final String url,
+                                               @QueryParameter final String selfSignedCertificateFingerprint,
+                                               @QueryParameter final String key,
+                                               @AncestorInPath Item item) {
+        checkPermissionForRemoteRequests(item);
+        CodeDxClient client = buildClient(url, key, selfSignedCertificateFingerprint);
+        client.getProjects();
+        return new ListBoxModel();
+      }
+    }
+  }
+  ```

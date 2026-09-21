@@ -1,0 +1,25 @@
+module bindings.go.generated.m64d019ad;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/googleapis/gnostic")
+  }
+  query pattern callExpr where callee.method == "ParseList"
+  emit sink code.Deserialization at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("github.com/googleapis/gnostic")
+  }
+  query pattern callExpr where callee.method == "NewSchemaFromFile"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding urlFetch2 {
+  requires {
+    dependency("github.com/googleapis/gnostic")
+  }
+  query pattern callExpr where callee.method == "isURL"
+  emit sink code.UrlFetch at args[0]
+}

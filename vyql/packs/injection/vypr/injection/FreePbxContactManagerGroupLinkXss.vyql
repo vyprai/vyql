@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule FreePbxContactManagerGroupLinkXss {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_79]
+    id: "VYQL-INJ-102"
+    severity: high
+  }
+  issue code.FreePbxContactManagerGroupLinkXss as sink
+}

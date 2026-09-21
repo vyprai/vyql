@@ -1,0 +1,49 @@
+test "rank309: Camel K builder pod namespace is controlled by Build configuration"
+  lang go
+  expect VYQL-AUTH-008
+  expect_review code.ExternalResourceNamespaceControl
+  code
+  ```
+  package build
+
+  type Build struct {
+      Namespace string
+  }
+
+  func (build *Build) BuilderPodNamespace() string {
+      return build.Spec.Tasks[0].Builder.Configuration.BuilderPodNamespace
+  }
+
+  func newBuildPod(build *Build) *corev1.Pod {
+      pod := &corev1.Pod{
+          ObjectMeta: metav1.ObjectMeta{
+              Namespace: build.BuilderPodNamespace(),
+              Name:      buildPodName(build),
+          },
+      }
+      return pod
+  }
+  ```
+
+test "rank309: Camel K builder pod stays in the Build namespace"
+  lang go
+  reject VYQL-AUTH-008
+  reject_review code.ExternalResourceNamespaceControl
+  code
+  ```
+  package build
+
+  type Build struct {
+      Namespace string
+  }
+
+  func newBuildPod(build *Build) *corev1.Pod {
+      pod := &corev1.Pod{
+          ObjectMeta: metav1.ObjectMeta{
+              Namespace: build.Namespace,
+              Name:      buildPodName(build),
+          },
+      }
+      return pod
+  }
+  ```

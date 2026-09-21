@@ -104,7 +104,7 @@ func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, k
 	// in the hot loop) when the store supports it — the basis for keeping only int adjacency +
 	// labels resident while ids/payload spill to disk. Produces identical findings.
 	if ig, ok := store.(usg.IntGraph); ok {
-		return findTaintFlowsInt(ig, sourceConcepts, sinkConcepts, taintKinds, killControls, excluded, charFilters), nil
+		return findTaintFlowsInt(ig, store, sourceConcepts, sinkConcepts, taintKinds, killControls, excluded, charFilters), nil
 	}
 	// collect source nodes (nodes carrying any source concept)
 	sourceNodes := map[string]bool{}
@@ -307,20 +307,12 @@ func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, k
 
 	// witness path: walk pred from a tainted node back to its source root (recorded during the
 	// fixpoint, so no second traversal). path[0] is a valid source for the (rule, sink) finding.
+	wenv := strWitnessEnv{store: store, predOf: pred, taintOf: tainted, succs: forEachSucc}
 	pathTo := func(sink string) []string {
-		var rev []string
-		for n := sink; ; {
-			rev = append(rev, n)
-			p, ok := pred[n]
-			if !ok {
-				break
-			}
-			n = p
+		if p, ok := siteAwareWitness(wenv, sink, len(tainted)); ok {
+			return p
 		}
-		for i, j := 0, len(rev)-1; i < j; i, j = i+1, j-1 {
-			rev[i], rev[j] = rev[j], rev[i]
-		}
-		return rev
+		return plainWitness(wenv, sink)
 	}
 
 	// A sink whose own call is one of this rule's neutralizing controls is a witness of
@@ -419,7 +411,7 @@ func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, k
 // int32 (no string maps in the hot loop), and adjacency/labels/concept-sets come from the
 // IntGraph. String ids are produced only when emitting findings (NodeID), so the inner loop
 // touches no ids or payload — exactly what an out-of-core (ids/payload-on-disk) store needs.
-func findTaintFlowsInt(g usg.IntGraph, sourceConcepts, sinkConcepts, taintKinds, killControls map[string]bool, excluded string, charFilters map[string]bool) []TaintFlow {
+func findTaintFlowsInt(g usg.IntGraph, store usg.Store, sourceConcepts, sinkConcepts, taintKinds, killControls map[string]bool, excluded string, charFilters map[string]bool) []TaintFlow {
 	n := g.NodeCount()
 	kind := firstKey(taintKinds)
 
@@ -581,15 +573,12 @@ func findTaintFlowsInt(g usg.IntGraph, sourceConcepts, sinkConcepts, taintKinds,
 	}
 
 	pathTo := func(sink int32) []string {
-		var rev []int32
-		for i := sink; i >= 0; i = pred[i] {
-			rev = append(rev, i)
+		id := g.NodeID(sink)
+		wenv := intWitnessEnv{g: g, store: store, predOf: pred, taintOf: tainted}
+		if p, ok := siteAwareWitness(wenv, id, n); ok {
+			return p
 		}
-		out := make([]string, len(rev))
-		for k := range rev { // reverse to source→sink order, mapping to string ids
-			out[k] = g.NodeID(rev[len(rev)-1-k])
-		}
-		return out
+		return plainWitness(wenv, id)
 	}
 
 	// a sink whose own call is one of this rule's neutralizing controls is reported only
@@ -706,4 +695,217 @@ func dedupPairs(ps [][2]string) [][2]string {
 		}
 	}
 	return out
+}
+
+// --- call-site-sensitive witness reconstruction ---------------------------------------------
+
+// witnessEnv is one twin's view of the solved graph, for the witness walk only: pred and
+// tainted come from that twin's fixpoint, node payload and adjacency from the store. The
+// walk runs once per emitted finding (cold, never in the fixpoint hot loop), so string-id
+// conversions on the int side cost nothing that matters.
+type witnessEnv interface {
+	pred(id string) (string, bool)
+	tainted(id string) bool
+	nodeType(id string) string
+	argIDs(id string) []string // argument node ids recorded on a call node, in slot order
+	flowsTo(src, dst string) bool
+}
+
+// strWitnessEnv adapts the string-keyed twin's maps and store.
+type strWitnessEnv struct {
+	store   usg.Store
+	predOf  map[string]string
+	taintOf map[string]bool
+	succs   func(id string, fn func(string))
+}
+
+func (e strWitnessEnv) pred(id string) (string, bool) { p, ok := e.predOf[id]; return p, ok }
+func (e strWitnessEnv) tainted(id string) bool        { return e.taintOf[id] }
+func (e strWitnessEnv) nodeType(id string) string {
+	n, ok, _ := e.store.GetNode(id)
+	if !ok {
+		return ""
+	}
+	return n.Type
+}
+func (e strWitnessEnv) argIDs(id string) []string {
+	n, ok, _ := e.store.GetNode(id)
+	if !ok {
+		return nil
+	}
+	return argIDsOf(n)
+}
+func (e strWitnessEnv) flowsTo(src, dst string) bool {
+	found := false
+	e.succs(src, func(d string) {
+		if d == dst {
+			found = true
+		}
+	})
+	return found
+}
+
+// intWitnessEnv adapts the int-indexed twin: pred/tainted are its arrays, payload and
+// adjacency resolve through NodeIndex/NodeID so the fixpoint itself stays id-free.
+type intWitnessEnv struct {
+	g       usg.IntGraph
+	store   usg.Store
+	predOf  []int32
+	taintOf []bool
+}
+
+func (e intWitnessEnv) pred(id string) (string, bool) {
+	i, ok := e.g.NodeIndex(id)
+	if !ok || e.predOf[i] < 0 {
+		return "", false
+	}
+	return e.g.NodeID(e.predOf[i]), true
+}
+func (e intWitnessEnv) tainted(id string) bool {
+	i, ok := e.g.NodeIndex(id)
+	return ok && e.taintOf[i]
+}
+func (e intWitnessEnv) nodeType(id string) string {
+	n, ok, _ := e.store.GetNode(id)
+	if !ok {
+		return ""
+	}
+	return n.Type
+}
+func (e intWitnessEnv) argIDs(id string) []string {
+	n, ok, _ := e.store.GetNode(id)
+	if !ok {
+		return nil
+	}
+	return argIDsOf(n)
+}
+func (e intWitnessEnv) flowsTo(src, dst string) bool {
+	si, ok1 := e.g.NodeIndex(src)
+	di, ok2 := e.g.NodeIndex(dst)
+	if !ok1 || !ok2 {
+		return false
+	}
+	found := false
+	e.g.RangeOut(si, "FLOWS", func(d int32) bool {
+		if d == di {
+			found = true
+			return false
+		}
+		return true
+	})
+	return found
+}
+
+// argIDsOf reads a call node's recorded argument ids, slots are contiguous from arg0.
+func argIDsOf(n usg.Node) []string {
+	var out []string
+	for i := 0; ; i++ {
+		a := n.Prop(usg.ArgPropKey(i))
+		if a == "" {
+			return out
+		}
+		out = append(out, a)
+	}
+}
+
+// plainWitness walks the pred chain from n back to its source root: the witness exactly as
+// the fixpoint recorded it. It is the fallback when the site-aware walk cannot terminate,
+// so a reported witness is never lost, only left as it was.
+func plainWitness(env witnessEnv, n string) []string {
+	var rev []string
+	for {
+		rev = append(rev, n)
+		p, ok := env.pred(n)
+		if !ok {
+			break
+		}
+		n = p
+	}
+	reversePath(rev)
+	return rev
+}
+
+// siteAwareWitness reconstructs a witness that enters and leaves each helper through the
+// SAME call site. A lowered function has ONE shared Param/Return pair (context
+// insensitivity by design; precision comes from facts, not from cloning callee bodies per
+// call site), so taint crosses call sites freely — a value entering a helper at one
+// invocation can leave at another's result. Which sinks are tainted must keep working
+// that way, but the ORIGIN a finding reports does not: walking pred blindly follows
+// whichever call site's argument tainted the shared parameter first, so a helper invoked
+// at two sites reports the other site's value as the source. quill's notary reported the
+// vulnerable fetch's own response — the sink — as the source of the URL it fetched, when
+// the metadata fetch two lines up (through the client wrapper's Do) actually supplied it.
+//
+// The repair keys on the two structural points where the sharing is visible. Stepping
+// backward from a Call node to a Return node is a return attribution — the callee's body
+// below that step belongs to that call site, so it opens a frame. Stepping backward out of
+// a Param node with a frame open must then leave through an argument OF THAT CALL (the
+// arg ids are recorded on the call node); a predecessor from another invocation is a
+// crossing, re-anchored to a tainted argument of this call that flows into the parameter.
+// Where none exists the crossing stands — that witness is the only real one there is.
+//
+// The frames form a stack, because wrappers nest: a helper whose body calls a second
+// helper and returns its result (`get` -> `do` in quill's client) passes an inner
+// attribution between entering the outer helper and reaching its param, and a walk that
+// carried only the innermost call site would arrive at the outer param frameless and
+// report the crossing the outer repair exists to undo. A function body is entered
+// backward only through its own return attribution — FLOWS is the only edge type, and
+// taint reaches a body from its param or a source inside it — so the param the walk is
+// leaving belongs to exactly the call site on top of the stack.
+//
+// Every step of a re-anchored witness is a real FLOWS edge between nodes the fixpoint
+// marked tainted, so the path shown is still a genuine source→sink path. The repair is
+// presentation-only: findings, fingerprints and scores key on (rule, sink) and do not
+// move. A re-anchor can in principle revisit a node (a value that left a call and came
+// back as its own argument), so the walk carries a step budget and reports failure rather
+// than loop, leaving plainWitness as the answer.
+func siteAwareWitness(env witnessEnv, sink string, budget int) ([]string, bool) {
+	var rev []string
+	var frames []string // call sites whose callee bodies the walk is inside, innermost last
+	for n := sink; ; {
+		if len(rev) > budget {
+			return nil, false
+		}
+		rev = append(rev, n)
+		p, ok := env.pred(n)
+		if !ok {
+			break
+		}
+		nt, pt := env.nodeType(n), env.nodeType(p)
+		switch {
+		case nt == "code.Call" && pt == "code.Return":
+			frames = append(frames, n) // return attribution: the body below belongs to this call site
+		case nt == "code.Param" && len(frames) > 0:
+			frame := frames[len(frames)-1]
+			if q := siteConsistentArg(env, frame, n, p); q != "" {
+				p = q
+			}
+			frames = frames[:len(frames)-1] // that callee body is left either way
+		}
+		n = p
+	}
+	reversePath(rev)
+	return rev, true
+}
+
+// siteConsistentArg returns the argument of call site frame whose value entered param, or
+// "" when pred already is one or no argument of that call carries taint into the parameter.
+func siteConsistentArg(env witnessEnv, frame, param, pred string) string {
+	for _, a := range env.argIDs(frame) {
+		if a == pred {
+			return ""
+		}
+	}
+	for _, a := range env.argIDs(frame) {
+		if env.tainted(a) && env.flowsTo(a, param) {
+			return a
+		}
+	}
+	return ""
+}
+
+func reversePath(rev []string) {
+	for i, j := 0, len(rev)-1; i < j; i, j = i+1, j-1 {
+		rev[i], rev[j] = rev[j], rev[i]
+	}
 }

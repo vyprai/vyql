@@ -1,0 +1,11 @@
+module vypr.validation;
+
+rule UnvalidatedAttachmentPlaceholderIndex {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_1287, CWE_129, CWE_20]
+    id: "VYQL-VAL-031"
+    severity: high
+  }
+  issue code.UnvalidatedAttachmentPlaceholderIndex as index
+}

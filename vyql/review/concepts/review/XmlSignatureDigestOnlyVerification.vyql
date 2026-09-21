@@ -1,0 +1,8 @@
+module code;
+
+review code.XmlSignatureDigestOnlyVerification {
+  category: auth
+  expected: [core.AuthenticationCheck]
+  kind: attention
+  text: "review XML signature verification to ensure the signature value is checked against a key, not only the SignedInfo reference digests"
+}

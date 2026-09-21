@@ -1,0 +1,9 @@
+module bindings.c.generated.m6ff31838;
+
+binding deserialization0 {
+  requires {
+    dependency("litehtml")
+  }
+  query pattern callExpr where callee.method == "document::createFromString"
+  emit sink code.Deserialization at args[0]
+}

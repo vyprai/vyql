@@ -1,0 +1,8 @@
+module code;
+
+review code.UncheckedDecodeResult {
+  category: input_validation
+  expected: [core.InputValidation]
+  kind: attention
+  text: "review structured decode errors that are unwrapped instead of returned or rejected"
+}

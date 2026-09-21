@@ -1,0 +1,99 @@
+module bindings.java.generated.me32f2523;
+
+binding htmlEscape0 {
+  requires {
+    dependency("org.springframework.security:spring-security-taglibs")
+  }
+  query pattern callExpr where callee.method == "setHtmlEscape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape1 {
+  requires {
+    dependency("org.springframework.security:spring-security-taglibs")
+  }
+  query pattern callExpr where callee.method == "isHtmlEscape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding authorizationCheck2 {
+  requires {
+    dependency("org.springframework.security:spring-security-taglibs")
+  }
+  query pattern callExpr where callee.method == "authorize"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck3 {
+  requires {
+    dependency("org.springframework.security:spring-security-taglibs")
+  }
+  query pattern callExpr where callee.method == "authorizeUsingAccessExpression"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck4 {
+  requires {
+    dependency("org.springframework.security:spring-security-taglibs")
+  }
+  query pattern callExpr where callee.method == "authorizeUsingUrlCheck"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding csrfProtection5 {
+  requires {
+    dependency("org.springframework.security:spring-security-taglibs")
+  }
+  query pattern callExpr where callee.method == "handleToken"
+  emit check core.CsrfProtection at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding csrfProtection6 {
+  requires {
+    dependency("org.springframework.security:spring-security-taglibs")
+  }
+  query pattern callExpr where callee.method == "doEndTag"
+  emit check core.CsrfProtection at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck7 {
+  requires {
+    dependency("org.springframework.security:spring-security-taglibs")
+  }
+  query pattern callExpr where callee.method == "evalOrSkip"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

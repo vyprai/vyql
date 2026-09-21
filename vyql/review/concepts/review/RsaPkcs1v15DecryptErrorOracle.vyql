@@ -1,0 +1,7 @@
+module code;
+
+review code.RsaPkcs1v15DecryptErrorOracle {
+  category: crypto
+  kind: attention
+  text: "review RSA PKCS#1 v1.5 decrypt paths for indistinguishable failure behavior and constant-time error handling"
+}

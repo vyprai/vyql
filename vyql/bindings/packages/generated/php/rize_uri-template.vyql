@@ -1,0 +1,17 @@
+module bindings.php.generated.mcd6f8ca4;
+
+binding deserialization0 {
+  requires {
+    dependency("rize/uri-template")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("rize/uri-template")
+  }
+  query pattern callExpr where callee.method == "extract"
+  emit source core.UserControlledData at call.result
+}

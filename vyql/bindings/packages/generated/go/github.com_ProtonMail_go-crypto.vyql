@@ -1,0 +1,25 @@
+module bindings.go.generated.m35b02089;
+
+binding secretValue0 {
+  requires {
+    dependency("github.com/ProtonMail/go-crypto")
+  }
+  query pattern callExpr where callee.method == "ReadArmoredKeyRing"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("github.com/ProtonMail/go-crypto")
+  }
+  query pattern callExpr where callee.method == "ReadKeyRing"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue2 {
+  requires {
+    dependency("github.com/ProtonMail/go-crypto")
+  }
+  query pattern callExpr where callee.method == "ReadEntity"
+  emit source code.SecretValue at call.result
+}

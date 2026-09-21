@@ -1,0 +1,283 @@
+# Rank 1539 / CVE-2019-1010295: OP-TEE's syscall layer copied
+# memory-reference parameters from a user Trusted Application without
+# checking the TA's access rights to those ranges, so a user TA could
+# pass hostile pointers that a pseudo TA (running with the TEE's own
+# privileges) then read or wrote (missing pointer validation at a
+# trust boundary, CWE-20/CWE-822). utee_param_to_param in
+# core/tee/tee_svc.c took the raw utee_params values and stuffed them
+# into the callee's tee_ta_param -- for TEE_PARAM_TYPE_MEMREF_* it
+# copied the address and size with no validation, and tee_svc_copy_param
+# calls it for every TA after checking only that the utee_params struct
+# itself is readable. The fixing commit d5c5b0b77b ("core: svc: always
+# check ta parameters. Always check TA parameters from a user TA. This
+# prevents a user TA from passing invalid pointers to a pseudo TA."):
+# the function gains the user TA context and returns TEE_Result, and
+# every memref case runs tee_mmu_check_access_rights(utc, flags, a, b)
+# -- TEE_MEMORY_ACCESS_READ | TEE_MEMORY_ACCESS_ANY_OWNER, plus WRITE
+# for output refs -- returning TEE_ERROR_ACCESS_DENIED on failure, with
+# the caller propagating.
+#
+# ATTENTION, trust-boundary pointer validation. The defect is a
+# trust-boundary crossing whose pointer arguments are trusted by
+# construction -- no rule can ask "are memory references from the
+# untrusted side validated against the caller's address space before
+# entering the trusted side"; the memory rules label derefs, not
+# parameter crossings. A binding on OP-TEE's own
+# tee_mmu_check_access_rights would detect this platform rather than
+# the weakness.
+#
+# Re-probed at the recheck span tip, which carries every definition and
+# engine change shipped since the first pass (loaded: concepts=1007
+# rules=879 bindings=32982 reviews=678; binary built in the worktree,
+# data directory resolving to the worktree's own vyql/). Measured 3x
+# --cache off / timeout 180 / --max-ram 6GB per revision on the real
+# checkout, vulnerable parent c6edc12 (d5c5b0b77b^) against fix
+# d5c5b0b77b, scanning core/tee/tee_svc.c alone:
+#
+#   48/48/48 findings at both revisions -- 41 VYQL-MEM-006, 2
+#   VYQL-MEM-008, 5 VYQL-MEM-016 -- deterministic across all six runs.
+#   The two line sets are identical modulo the +10-line shift the fix's
+#   own hunks introduce (tee_svc.c:532 becomes :542, :534 becomes :544,
+#   ...); lines before the fix hunk match exactly. Not one finding or
+#   label lands inside utee_param_to_param or the tee_svc_copy_param
+#   handoff at either revision: vyql match on the vulnerable file
+#   reports no label of any kind at tee_svc.c:490-539. The first pass
+#   measured 47 findings; the knowledge base has since grown one
+#   memory-heuristic finding elsewhere in the file, none in the defect
+#   region.
+#
+# Path 1 does not convert: no rule or binding added since the first
+# pass names a trust boundary, a caller address space, or a parameter
+# crossing. Path 2 was a hard zero in both views, not a misread one.
+# The recheck's concrete finding is that the boundary vocabulary the
+# first pass called missing does exist in the ontology --
+# code.TrustBoundary (a CWE-501 sink) with rule VYQL-CFG-014, "taint
+# core.UserControlledData -> code.TrustBoundary unless coveredBy
+# core.InputValidation" -- but it is benchmark-only in C: no C binding
+# emits core.UserControlledData at all, and the only C emitter of
+# code.TrustBoundary is the OWASP harness route (callee.analysis ==
+# "module.context", args category "trustbound"). Path 3 is not
+# shippable today: connecting CFG-014 to this code needs three OP-TEE
+# platform bindings -- a source on the user-pointer read, a sink on the
+# privileged-callee handoff, and a control on tee_mmu_check_access_
+# rights -- which detects this platform rather than the weakness and
+# fails the genericity test; the untrusted side has no generic C-level
+# marker at all (callee_params is a user address-space pointer validated
+# only for readability, its content untrusted by construction), and the
+# taint route is separately blocked by the known engine-gap family
+# where a deref- or memcpy-filled buffer is not a source (rank 1206
+# family), a dataflow-relation change rather than a mechanical one. No
+# definition change shipped. Spec cve_rank1539 records the unchecked
+# caller handoff, the unchecked memref copy and the access-checked form,
+# all asserting reject VYQL-CFG-014, the rule the boundary vocabulary
+# lives in: when C bindings for the two sides of that rule land, the
+# first two must flip to expect and the access-checked form must stay
+# reject.
+
+test "rank1539: the syscall layer hands caller params over after checking only the struct's own readability"
+  lang c
+  file core/tee/tee_svc.c
+  reject VYQL-CFG-014
+  code
+  ```
+  #include <stdint.h>
+  #include <string.h>
+
+  #define TEE_NUM_PARAMS 4
+  #define TEE_MEMORY_ACCESS_READ 1
+  #define TEE_MEMORY_ACCESS_ANY_OWNER 4
+  #define TEE_SUCCESS 0
+
+  struct mobj;
+
+  struct utee_params {
+      unsigned long types;
+      unsigned long vals[4];
+  };
+
+  struct tee_ta_param {
+      unsigned int types;
+      union {
+          struct { struct mobj *mobj; unsigned long offs; size_t size; } mem;
+          struct { unsigned long a; unsigned long b; } val;
+      } u[TEE_NUM_PARAMS];
+  };
+
+  struct user_ta_ctx;
+
+  int tee_mmu_check_access_rights(struct user_ta_ctx *utc,
+                                  unsigned int flags,
+                                  unsigned long addr, size_t size);
+
+  static void utee_param_to_param(struct tee_ta_param *p,
+                                  struct utee_params *up);
+
+  static int tee_svc_copy_param(struct user_ta_ctx *utc,
+                                struct utee_params *callee_params,
+                                struct tee_ta_param *param)
+  {
+      int res;
+
+      if (!callee_params) {
+          memset(param, 0, sizeof(*param));
+          return TEE_SUCCESS;
+      }
+      res = tee_mmu_check_access_rights(utc,
+          TEE_MEMORY_ACCESS_READ | TEE_MEMORY_ACCESS_ANY_OWNER,
+          (unsigned long)callee_params, sizeof(struct utee_params));
+      if (res != TEE_SUCCESS)
+          return res;
+      utee_param_to_param(param, callee_params);
+      return TEE_SUCCESS;
+  }
+  ```
+
+test "rank1539: memref address and size cross into the callee's params unchecked"
+  lang c
+  file core/tee/tee_svc.c
+  reject VYQL-CFG-014
+  code
+  ```
+  #include <stdint.h>
+  #include <string.h>
+
+  #define TEE_NUM_PARAMS 4
+  #define TEE_PARAM_TYPE_GET(t, i) (((t) >> (4 * (i))) & 0xf)
+  #define TEE_PARAM_TYPE_VALUE_INPUT 1
+  #define TEE_PARAM_TYPE_VALUE_INOUT 3
+  #define TEE_PARAM_TYPE_MEMREF_INPUT 5
+  #define TEE_PARAM_TYPE_MEMREF_OUTPUT 6
+  #define TEE_PARAM_TYPE_MEMREF_INOUT 7
+
+  struct mobj;
+  extern struct mobj mobj_virt;
+
+  struct utee_params {
+      unsigned long types;
+      unsigned long vals[4];
+  };
+
+  struct tee_ta_param {
+      unsigned int types;
+      union {
+          struct { struct mobj *mobj; unsigned long offs; size_t size; } mem;
+          struct { unsigned long a; unsigned long b; } val;
+      } u[TEE_NUM_PARAMS];
+  };
+
+  static void utee_param_to_param(struct tee_ta_param *p,
+                                  struct utee_params *up)
+  {
+      size_t n;
+      uint32_t types = up->types;
+
+      p->types = types;
+      for (n = 0; n < TEE_NUM_PARAMS; n++) {
+          uintptr_t a = up->vals[n * 2];
+          size_t b = up->vals[n * 2 + 1];
+
+          switch (TEE_PARAM_TYPE_GET(types, n)) {
+          case TEE_PARAM_TYPE_MEMREF_INPUT:
+          case TEE_PARAM_TYPE_MEMREF_OUTPUT:
+          case TEE_PARAM_TYPE_MEMREF_INOUT:
+              p->u[n].mem.mobj = &mobj_virt;
+              p->u[n].mem.offs = a;
+              p->u[n].mem.size = b;
+              break;
+          case TEE_PARAM_TYPE_VALUE_INPUT:
+          case TEE_PARAM_TYPE_VALUE_INOUT:
+              p->u[n].val.a = a;
+              p->u[n].val.b = b;
+              break;
+          default:
+              memset(&p->u[n], 0, sizeof(p->u[n]));
+              break;
+          }
+      }
+  }
+  ```
+
+test "rank1539: the fixed revision access-checks every memref against the caller"
+  lang c
+  file core/tee/tee_svc.c
+  reject VYQL-CFG-014
+  code
+  ```
+  #include <stdint.h>
+  #include <string.h>
+
+  #define TEE_NUM_PARAMS 4
+  #define TEE_PARAM_TYPE_GET(t, i) (((t) >> (4 * (i))) & 0xf)
+  #define TEE_PARAM_TYPE_VALUE_INPUT 1
+  #define TEE_PARAM_TYPE_VALUE_INOUT 3
+  #define TEE_PARAM_TYPE_MEMREF_INPUT 5
+  #define TEE_PARAM_TYPE_MEMREF_OUTPUT 6
+  #define TEE_PARAM_TYPE_MEMREF_INOUT 7
+  #define TEE_MEMORY_ACCESS_READ 1
+  #define TEE_MEMORY_ACCESS_WRITE 2
+  #define TEE_MEMORY_ACCESS_ANY_OWNER 4
+  #define TEE_SUCCESS 0
+  #define TEE_ERROR_ACCESS_DENIED 0x00000006
+
+  struct mobj;
+  extern struct mobj mobj_virt;
+
+  struct utee_params {
+      unsigned long types;
+      unsigned long vals[4];
+  };
+
+  struct tee_ta_param {
+      unsigned int types;
+      union {
+          struct { struct mobj *mobj; unsigned long offs; size_t size; } mem;
+          struct { unsigned long a; unsigned long b; } val;
+      } u[TEE_NUM_PARAMS];
+  };
+
+  struct user_ta_ctx;
+
+  int tee_mmu_check_access_rights(struct user_ta_ctx *utc,
+                                  unsigned int flags,
+                                  unsigned long addr, size_t size);
+
+  static int utee_param_to_param(struct user_ta_ctx *utc,
+                                 struct tee_ta_param *p,
+                                 struct utee_params *up)
+  {
+      size_t n;
+      uint32_t types = up->types;
+
+      p->types = types;
+      for (n = 0; n < TEE_NUM_PARAMS; n++) {
+          uintptr_t a = up->vals[n * 2];
+          size_t b = up->vals[n * 2 + 1];
+          uint32_t flags = TEE_MEMORY_ACCESS_READ |
+                           TEE_MEMORY_ACCESS_ANY_OWNER;
+
+          switch (TEE_PARAM_TYPE_GET(types, n)) {
+          case TEE_PARAM_TYPE_MEMREF_OUTPUT:
+          case TEE_PARAM_TYPE_MEMREF_INOUT:
+              flags |= TEE_MEMORY_ACCESS_WRITE;
+              /*FALLTHROUGH*/
+          case TEE_PARAM_TYPE_MEMREF_INPUT:
+              p->u[n].mem.mobj = &mobj_virt;
+              p->u[n].mem.offs = a;
+              p->u[n].mem.size = b;
+              if (tee_mmu_check_access_rights(utc, flags, a, b))
+                  return TEE_ERROR_ACCESS_DENIED;
+              break;
+          case TEE_PARAM_TYPE_VALUE_INPUT:
+          case TEE_PARAM_TYPE_VALUE_INOUT:
+              p->u[n].val.a = a;
+              p->u[n].val.b = b;
+              break;
+          default:
+              memset(&p->u[n], 0, sizeof(p->u[n]));
+              break;
+          }
+      }
+
+      return TEE_SUCCESS;
+  }
+  ```

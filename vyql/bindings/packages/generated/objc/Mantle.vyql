@@ -1,0 +1,17 @@
+module bindings.objc.generated.m428618f3;
+
+binding deserialization0 {
+  requires {
+    dependency("Mantle")
+  }
+  query pattern callExpr where callee.method == "modelOfClass:fromJSONDictionary:error:"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("Mantle")
+  }
+  query pattern callExpr where callee.method == "modelsOfClass:fromJSONArray:error:"
+  emit sink code.Deserialization at args[0]
+}

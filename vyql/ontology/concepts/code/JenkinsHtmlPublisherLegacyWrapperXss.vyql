@@ -1,0 +1,11 @@
+module code;
+
+concept JenkinsHtmlPublisherLegacyWrapperXss : issue {
+  cwe: [CWE_79]
+  reviewAssumption: "the job name, root URL, job URL and zip-link target can carry attacker-controlled markup from an Item/Configure-permitted rename or config change"
+  reviewCategory: xss
+  reviewCondition: "the HTML Publisher plugin builds the legacy wrapper file's links-data-holder span by concatenating the job name, root URL, job URL and zip-link target into single-quoted HTML attributes without escaping"
+  reviewConfidence: high
+  reviewEvidence: "publishReports context {pattern} concatenates job.getName into the links-data-holder span with single-quoted attribute delimiters, the form the fix replaces with htmlAttributeEscape and double-quoted attributes"
+  vulnerableTo: [injection.Xss]
+}

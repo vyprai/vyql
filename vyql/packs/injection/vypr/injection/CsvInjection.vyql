@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule CsvInjection {
+  meta {
+    cwe: [CWE_1236]
+    id: "VYQL-INJ-014"
+    severity: low
+  }
+  taint core.UserControlledData -> code.CsvCell
+  unless path coveredBy core.CsvEscape
+}

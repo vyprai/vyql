@@ -1,0 +1,164 @@
+# Rank 1004 / CVE-2026-26959: Alex4SSB/ADB-Explorer remote code execution.
+# A settings value selects which executable the app launches. The settings
+# file lives under a directory taken from the first command-line argument, is
+# parsed into the WPF application property dictionary, and ManualAdbPath is
+# read back from that dictionary by a static accessor and a property getter
+# before ADBService.VerifyAdbVersion passes it down through ExecuteCommand to
+# StartCommandProcess, which assigns it to ProcessStartInfo.FileName and
+# starts the process. Nothing between the settings read and the launch
+# verifies the binary, so a crafted settings file pointing ManualAdbPath at an
+# arbitrary executable runs attacker code at startup (CWE-829, untrusted
+# binary execution). The fixed revision computes the binary SHA-256 and
+# requires a match against a known-good hash list before launching.
+#
+# ATTENTION. Three barriers hold today, each at a different layer:
+#  - No source label covers the settings read: the file-content read APIs
+#    (StreamReader.ReadLine and kin) are not sources in C#, and no settings
+#    or configuration API is either. code.ConfigFileInput exists as a concept
+#    and the generic profile lists it as an entrypoint, so only a C# emitter
+#    is missing — but labelling every file read as untrusted input is the
+#    broad config-read false-positive surface, and on this app the emitted
+#    labels change nothing (see the engine barrier below).
+#  - Engine: taint does not cross the WPF property dictionary. The settings
+#    value is written into Application.Current.Properties under one method
+#    and read back through a static accessor in another; with a probe
+#    labelling the file read as code.ConfigFileInput, 0 of 8 sources reach
+#    any code.CommandExecution sink — every path stops at the dictionary or
+#    an untraced accessor. Modelling a string-keyed dictionary store as a
+#    dataflow relation is a new relation, not a mechanical correction.
+#  - Rule and control vocabulary: code.CommandExecution carries CWE-78
+#    (argument injection into a fixed binary), which is a different weakness
+#    from CWE-829 (choosing which binary runs). Pairing a config-read source
+#    with the launch sink flags every legitimate "run the configured external
+#    tool" feature — editors run a configured compiler, git clients a
+#    configured git.exe, media apps a configured ffmpeg, and almost none
+#    hash-verify them. The neutralizing control (hash the binary, require a
+#    known-good digest) has no control concept, so no rule that fires on the
+#    vulnerable form can spare the fixed form either.
+# Both blocks reject VYQL-INJ-002: the weakness is not command injection
+# (the arguments are a constant), and no shipped detection covers choosing an
+# unverified executable. The reject on the vulnerable block is the tripwire —
+# a future config-read source binding that reaches the launch sink turns it
+# red and forces the discrimination question.
+#
+# verify_current_expected: attention-precision-cost
+
+test "rank1004: settings-selected executable is launched with no integrity check"
+  lang csharp
+  file ADB Explorer/Services/ADB/ADBService.cs
+  reject VYQL-INJ-002
+  code
+  ```
+  using System.Collections.Generic;
+  using System.Diagnostics;
+
+  namespace ADB_Explorer;
+
+  public static class Storage
+  {
+      public static object RetrieveValue(string key) => App.Properties[key];
+  }
+
+  public static class AppSettings
+  {
+      private string manualAdbPath;
+      public string ManualAdbPath
+      {
+          get => manualAdbPath ??= (string)Storage.RetrieveValue(nameof(ManualAdbPath)) ?? "";
+      }
+  }
+
+  public static class ADBService
+  {
+      public static Process StartCommandProcess(string file, string cmd, params string[] args)
+      {
+          var cmdProcess = new Process();
+          cmdProcess.StartInfo.UseShellExecute = false;
+          cmdProcess.StartInfo.FileName = file;
+          cmdProcess.StartInfo.Arguments = string.Join(' ', args.Prepend(cmd));
+          cmdProcess.Start();
+          return cmdProcess;
+      }
+
+      public static int ExecuteCommand(string file, string cmd, params string[] args)
+      {
+          using var cmdProcess = StartCommandProcess(file, cmd, args: args);
+          return cmdProcess.ExitCode;
+      }
+
+      public static void VerifyAdbVersion(AppSettings settings)
+      {
+          var adbPath = settings.ManualAdbPath;
+          if (string.IsNullOrEmpty(adbPath))
+              return;
+
+          ExecuteCommand(adbPath, "version");
+      }
+  }
+  ```
+
+test "rank1004: fix verifies the binary SHA-256 against a known list before executing"
+  lang csharp
+  file ADB Explorer/Services/ADB/ADBService.cs
+  reject VYQL-INJ-002
+  code
+  ```
+  using System.Collections.Generic;
+  using System.Diagnostics;
+
+  namespace ADB_Explorer;
+
+  public static class Storage
+  {
+      public static object RetrieveValue(string key) => App.Properties[key];
+  }
+
+  public static class AppSettings
+  {
+      private string manualAdbPath;
+      public string ManualAdbPath
+      {
+          get => manualAdbPath ??= (string)Storage.RetrieveValue(nameof(ManualAdbPath)) ?? "";
+      }
+  }
+
+  public static class Security
+  {
+      public static string CalculateWindowsFileHash(string path, bool useSHA = false)
+          => useSHA ? SHA256.HashData(File.ReadAllBytes(path)) as string : null;
+  }
+
+  public static class ADBService
+  {
+      public static IEnumerable<string> HashList = new[] { "6A9C..." };
+
+      public static Process StartCommandProcess(string file, string cmd, params string[] args)
+      {
+          var cmdProcess = new Process();
+          cmdProcess.StartInfo.UseShellExecute = false;
+          cmdProcess.StartInfo.FileName = file;
+          cmdProcess.StartInfo.Arguments = string.Join(' ', args.Prepend(cmd));
+          cmdProcess.Start();
+          return cmdProcess;
+      }
+
+      public static int ExecuteCommand(string file, string cmd, params string[] args)
+      {
+          using var cmdProcess = StartCommandProcess(file, cmd, args: args);
+          return cmdProcess.ExitCode;
+      }
+
+      public static void VerifyAdbVersion(AppSettings settings)
+      {
+          var adbPath = settings.ManualAdbPath;
+          if (string.IsNullOrEmpty(adbPath))
+              return;
+
+          var adbSHA = Security.CalculateWindowsFileHash(adbPath, true);
+          if (adbSHA is null || !HashList.Contains(adbSHA))
+              return;
+
+          ExecuteCommand(adbPath, "version");
+      }
+  }
+  ```

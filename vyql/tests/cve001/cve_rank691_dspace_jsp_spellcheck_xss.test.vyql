@@ -1,0 +1,73 @@
+# Rank 691 / CVE-2022-31191: DSpace JSPUI spellcheck rendered the
+# "Did you mean" suggestion text without HTML escaping.
+
+test "rank691: JSP scriptlet spellcheck suggestion text is rendered raw"
+  lang config
+  file discovery.jsp
+  expect VYQL-INJ-004
+  code
+  ```
+  <%@page import="org.dspace.core.Utils"%>
+  <%
+      String spellCheckQuery = (String) request.getAttribute("spellcheck");
+  %>
+  <% if (StringUtils.isNotBlank(spellCheckQuery)) {%>
+      <p class="lead"><fmt:message key="jsp.search.didyoumean"><fmt:param><a id="spellCheckQuery" data-spell="<%= Utils.addEntities(spellCheckQuery) %>" href="#"><%= spellCheckQuery %></a></fmt:param></fmt:message></p>
+  <% } %>
+  ```
+
+test "rank691: JSP scriptlet spellcheck suggestion text is escaped"
+  lang config
+  file discovery.jsp
+  reject VYQL-INJ-004
+  code
+  ```
+  <%@page import="org.dspace.core.Utils"%>
+  <%
+      String spellCheckQuery = (String) request.getAttribute("spellcheck");
+  %>
+  <% if (StringUtils.isNotBlank(spellCheckQuery)) {%>
+      <p class="lead"><fmt:message key="jsp.search.didyoumean"><fmt:param><a id="spellCheckQuery" data-spell="<%= Utils.addEntities(spellCheckQuery) %>" href="#"><%= Utils.addEntities(spellCheckQuery) %></a></fmt:param></fmt:message></p>
+  <% } %>
+  ```
+
+test "rank691: JSPUI autocomplete label uses raw displayedValue"
+  lang config
+  file discovery.jsp
+  expect VYQL-INJ-151
+  expect_review code.DspaceJspuiAutocompleteLabelXss
+  code
+  ```
+  <script type="text/javascript">
+    jQ("#filterquery").autocomplete({
+      source: function(request, response) {
+        response(jQ.map(data.autocomplete, function(item) {
+          return {
+            label: item.displayedValue + " (" + item.count + ")",
+            value: item.authorityKey
+          };
+        }));
+      }
+    });
+  </script>
+  ```
+
+test "rank691: JSPUI autocomplete label escapes displayedValue"
+  lang config
+  file discovery.jsp
+  reject VYQL-INJ-151
+  code
+  ```
+  <script type="text/javascript">
+    jQ("#filterquery").autocomplete({
+      source: function(request, response) {
+        response(jQ.map(data.autocomplete, function(item) {
+          return {
+            label: escapeHtml(item.displayedValue) + " (" + item.count + ")",
+            value: item.authorityKey
+          };
+        }));
+      }
+    });
+  </script>
+  ```

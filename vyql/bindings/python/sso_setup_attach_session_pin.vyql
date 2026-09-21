@@ -1,0 +1,49 @@
+module bindings.python.sso_setup_attach_session_pin;
+
+// Sentry's AuthIdentityHandler attaches a provider identity to a local
+// account, and its `user` property names the account the identity lands on
+// by resolving the provider-asserted email (`resolve_email_to_user`): the
+// address the upstream account currently carries picks the local account it
+// resolves to, which is the exposure OpenID Connect Core 5.7 describes for
+// the `email` claim. `handle_attach_identity` is the attach entry point and
+// states its own contract -- "Given an already authenticated user, attach or
+// re-attach an identity" -- so the attaching flow is the one that must
+// decide who that already-authenticated user is.
+//
+// The login flow honours the contract: it attaches only under
+// `self.request.user.id == self.user.id`, requiring the provider-resolved
+// account to match the session user. The SSO setup flow passed the provider
+// identity through unmodified (`self.auth_handler(identity)
+// .handle_attach_identity(om)`), so during provider configuration -- where
+// an authenticated admin is already acting -- the address the IdP asserted
+// about anyone chose the account that received the identity, and an
+// identity set up on a victim's address linked straight to the victim. The
+// fix pins the resolution to the session (`{**identity, "email":
+// request.user.email}`), the email-shaped spelling of the same match the
+// login flow checks by id.
+//
+// The binding requires one of the two session-match controls the API's own
+// callers use: the session-email pin on Django's documented `request.user`
+// chain, or a resolved-user id equality in either operand order. Both are
+// the library's spellings, not the remediation's: the pin is keyed on the
+// attribute chain, so it survives any renaming of the local it is assigned
+// to, and the equality matches with or without the `self.` prefix.
+//
+// Residual, stated rather than hidden, false-negative direction only: a
+// pin read through an intermediate local (`u = request.user; ... u.email`)
+// is not seen, and the equality is matched as text over the comparison, so
+// an equivalent guard phrased as a `!=` early return is missed. A
+// docstring or comment cannot satisfy either negation -- both clauses read
+// AST-derived facts, which prose produces none of.
+binding ssoSetupAttachUnpinnedSessionEmail {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "python"
+    and node.context.call == "handle_attach_identity"
+    and not (node.context.selector contains "request.user.email")
+    and not (containsAny(node.context.binary, [
+      "request.user.id==self.user.id",
+      "self.user.id==request.user.id",
+      "request.user.id==user.id",
+      "user.id==request.user.id",
+    ]))
+  emit issue code.UnverifiedEmailClaimIdentity at node
+}

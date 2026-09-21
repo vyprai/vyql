@@ -1,0 +1,33 @@
+module bindings.java.jenkins_security_realm_id_strategy;
+
+// A Jenkins security realm resolves the identity a provider hands back into the
+// ID Jenkins stores users and authorizations under, and `hudson.security.SecurityRealm`
+// documents exactly one place where that resolution is decided: `getUserIdStrategy()`,
+// "the IdStrategy that should be used for turning UserDetails.getUsername() into
+// an ID", with its sibling `getGroupIdStrategy()` for `GroupDetails.getName()`.
+// A realm that never declares one inherits `IdStrategy.CASE_INSENSITIVE`, so the
+// mapping from provider identity to Jenkins ID is many-to-one: every spelling of
+// a username that differs only in letter case resolves to the same Jenkins user,
+// and to that user's permissions. Whether that is right is a property of the
+// identity source, not of Jenkins -- a directory that is itself case-folding has
+// nothing to lose, while a provider that treats `Alice` and `alice` as two
+// principals loses the boundary between them.
+//
+// The class this labels is the one that owns that decision and never makes it:
+// a class extending `hudson.security.SecurityRealm` directly, configured from the
+// Jenkins UI (`@DataBoundConstructor`, the stapler annotation that makes a realm's
+// fields settable from `config.jelly`), that declares no `getUserIdStrategy`
+// override. Realms whose base is `AbstractPasswordBasedSecurityRealm` are not
+// named here: those authenticate a password against a directory, and the
+// directory's own identity semantics -- not the realm -- decide the strategy.
+// A `Descriptor<SecurityRealm>` carries the realm type as a generic argument
+// rather than as its own contract, so it is excluded too.
+//
+// The finding is a review flag, not a verdict: the concept's stated assumption is
+// that the identity source has principals differing only by case, which the code
+// cannot know. What the flag reports is that no uniqueness boundary was declared
+// where the API puts it.
+binding jenkinsSecurityRealmIdentityStrategyReview8410 {
+  query pattern presenceNode where node.scope == "class" and node.context.classBase contains "SecurityRealm" and node.context.annotation contains "DataBoundConstructor" and not (node.context.classBase contains "Descriptor") and not (node.context.functionName contains "getUserIdStrategy")
+  emit issue code.UserIdentityMappingReview at node
+}

@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule UnescapedDiagnosticHtml {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_79]
+    id: "VYQL-INJ-047"
+    severity: medium
+  }
+  issue code.UnescapedDiagnosticHtml as sink
+}

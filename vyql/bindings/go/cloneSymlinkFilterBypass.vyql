@@ -1,0 +1,31 @@
+module bindings.go.cloneSymlinkFilterBypass;
+
+// go-git documents PlainClone and PlainCloneContext as cloning "a repository
+// from the given URL" into the given path, and Clone and CloneContext as
+// cloning into the worktree filesystem the caller supplies -- the checkout
+// `git clone` performs, so every tree entry the repository declares is written
+// to that filesystem, and a mode-120000 entry is written as a symbolic link
+// pointing where the repository says. A clone of a repository whose content is
+// not the cloner's own is therefore an extraction that reproduces link entries
+// verbatim into the destination (CWE-22/CWE-59): the application's own later
+// open through the checked-out path resolves wherever the link points.
+//
+// The documented ways to keep that materialisation off the host all appear
+// here, and any one of them means link entries are decided by the cloning
+// code rather than by the repository. A worktree filesystem that is not the
+// host's -- go-billy's memfs is in memory, so nothing materialises on disk --
+// is one. A wrapper or inspection that names symlinks is the other: the
+// wrapping filesystem whose Symlink refuses, an os.ModeSymlink or
+// filemode.ModeSymlink mode test, or the link-mode sentinel error, all leave
+// an identifier or selector mentioning one in the function. A resolution
+// probe on the result (filepath.EvalSymlinks, os.Readlink, os.Lstat) reads
+// the same way. None of those forms reports.
+//
+// The call must be qualified to report. go-git's own forwarders call
+// PlainCloneContext and CloneContext unqualified from inside the package, and
+// a binding reading those bodies would report the library to itself, so the
+// clause reads the qualified spelling every caller outside the package uses.
+binding goGitCloneWithoutSymlinkDefense {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "go" and containsAny(node.context.callPath, [".PlainClone", ".CloneContext"]) and not (node.context.identifier contains "Symlink") and not (node.context.selector contains "Symlink") and not (node.context.callPath contains "memfs") and not containsAny(node.context.callPath, ["filepath.EvalSymlinks", "os.Readlink", "os.Lstat"])
+  emit issue code.ArchiveSymlinkFilterBypass at node
+}

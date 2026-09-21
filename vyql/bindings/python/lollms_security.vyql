@@ -1,0 +1,31 @@
+module bindings.python.lollms_security;
+
+// `lollms.security` is the lollms library's request-validation module, and the
+// two functions below are its documented path sanitizers. Both take the
+// untrusted path, normalise backslashes to forward slashes, and then raise
+// `HTTPException(400)` rather than return when the value is absolute, carries a
+// run of two or more dots, carries a repeated separator, carries a `$(...)`
+// command substitution, or carries any character outside their allowed set;
+// only a value that survives every one of those checks, stripped of a leading
+// separator, is returned. The returned value is what callers use --
+// `name = sanitize_path(name)` is the documented idiom -- so the coverage runs
+// from the call onward and leaves the same value reaching the same sink
+// unsanitized reportable.
+//
+// `sanitize_path` also documents `allow_absolute_path`, which drops the
+// absolute-path rejection: with it the helper still refuses `..`, but it hands
+// back `/etc/shadow` unchanged, so the call no longer confines the value to a
+// base directory and is not a containment control. `allow_absolute_path` is the
+// only boolean parameter either signature takes -- the rest are the two message
+// strings -- so a `True` anywhere in the argument list is that opt-out, whether
+// it was passed by keyword or positionally, and such a call is left uncovered.
+binding lollmsSanitizePath {
+  query pattern callExpr where callee.path in ["lollms.security.sanitize_path", "lollms.security.sanitize_path_from_endpoint"]
+    and not (args.any.literal contains "True")
+  emit check core.PathCanonicalization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

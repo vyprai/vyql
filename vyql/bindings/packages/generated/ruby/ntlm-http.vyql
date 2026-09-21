@@ -1,0 +1,73 @@
+module bindings.ruby.generated.mc9010118;
+
+binding deserialization0 {
+  requires {
+    dependency("ntlm-http")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding secretValue1 {
+  requires {
+    dependency("ntlm-http")
+  }
+  query pattern callExpr where callee.method == "lm_hash"
+  emit source code.SecretValue at call.result
+}
+
+binding weakHash2 {
+  requires {
+    dependency("ntlm-http")
+  }
+  query pattern callExpr where callee.method == "lm_hash"
+  emit issue code.WeakHash at call
+}
+
+binding secretValue3 {
+  requires {
+    dependency("ntlm-http")
+  }
+  query pattern callExpr where callee.method == "ntlm_hash"
+  emit source code.SecretValue at call.result
+}
+
+binding weakHash4 {
+  requires {
+    dependency("ntlm-http")
+  }
+  query pattern callExpr where callee.method == "ntlm_hash"
+  emit issue code.WeakHash at call
+}
+
+binding secretValue5 {
+  requires {
+    dependency("ntlm-http")
+  }
+  query pattern callExpr where callee.method == "ntlmv2_hash"
+  emit source code.SecretValue at call.result
+}
+
+binding weakHash6 {
+  requires {
+    dependency("ntlm-http")
+  }
+  query pattern callExpr where callee.method == "ntlmv2_hash"
+  emit issue code.WeakHash at call
+}
+
+binding weakCipher7 {
+  requires {
+    dependency("ntlm-http")
+  }
+  query pattern callExpr where callee.method == "apply_des"
+  emit issue code.WeakCipher at call
+}
+
+binding networkSend8 {
+  requires {
+    dependency("ntlm-http")
+  }
+  query pattern callExpr where callee.method == "old_request"
+  emit sink code.NetworkSend at args[0]
+}

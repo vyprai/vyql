@@ -1,0 +1,11 @@
+module vypr.validation;
+
+rule MultipleDropdownScalarFallbackMissing {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_20]
+    id: "VYQL-VAL-010"
+    severity: high
+  }
+  issue code.MultipleDropdownScalarFallbackMissing as dropdown
+}

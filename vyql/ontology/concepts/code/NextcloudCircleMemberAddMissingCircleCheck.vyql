@@ -1,0 +1,11 @@
+module code;
+
+concept NextcloudCircleMemberAddMissingCircleCheck : issue {
+  cwe: [CWE_639]
+  reviewAssumption: "a caller who learns a private circle id can submit it as a member id to track or add that circle through the API"
+  reviewCategory: auth
+  reviewCondition: "Nextcloud Circles API converts a caller-supplied circle member id into a federated member without first resolving the referenced circle"
+  reviewConfidence: high
+  reviewEvidence: "LocalController member-add context {pattern} calls generateFederatedUser for circle members before circleService->getCircle validates visibility"
+  vulnerableTo: [access_control.Idor, access_control.IncorrectAuthorization]
+}

@@ -1,0 +1,9 @@
+module bindings.dart.generated.m9cec7922;
+
+binding htmlRender0 {
+  requires {
+    dependency("audio_service_web")
+  }
+  query pattern callExpr where callee.method == "setState"
+  emit sink code.HtmlRender at args[0]
+}

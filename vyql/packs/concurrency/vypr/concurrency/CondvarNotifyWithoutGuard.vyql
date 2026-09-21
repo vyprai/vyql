@@ -1,0 +1,11 @@
+module vypr.concurrency;
+
+rule CondvarNotifyWithoutGuard {
+  meta {
+    confidenceFloor: low
+    cwe: [CWE_667, CWE_362]
+    id: "VYQL-RACE-009"
+    severity: medium
+  }
+  issue code.CondvarNotifyWithoutGuard as n
+}

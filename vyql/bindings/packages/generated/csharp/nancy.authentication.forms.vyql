@@ -1,0 +1,175 @@
+module bindings.csharp.generated.mf90978f3;
+
+binding cookie0 {
+  requires {
+    dependency("nancy.authentication.forms")
+  }
+  query pattern callExpr where callee.method == "GetAuthenticatedUserFromCookie"
+  emit source code.Cookie at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("nancy.authentication.forms")
+  }
+  query pattern callExpr where callee.method == "GetAuthenticatedUserFromCookie"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue2 {
+  requires {
+    dependency("nancy.authentication.forms")
+  }
+  query pattern callExpr where callee.method == "EncryptAndSignCookie"
+  emit source code.SecretValue at call.result
+}
+
+binding redirectTarget3 {
+  requires {
+    dependency("nancy.authentication.forms")
+  }
+  query pattern callExpr where callee.method == "UserLoggedInRedirectResponse"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}
+
+binding redirectTarget4 {
+  requires {
+    dependency("nancy.authentication.forms")
+  }
+  query pattern callExpr where callee.method == "LogOutAndRedirectResponse"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}
+
+binding authenticationCheck5 {
+  requires {
+    dependency("nancy.authentication.forms")
+  }
+  query pattern callExpr where callee.method == "BuildCookie"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck6 {
+  requires {
+    dependency("nancy.authentication.forms")
+  }
+  query pattern callExpr where callee.method == "DecryptAndValidateAuthenticationCookie"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck7 {
+  requires {
+    dependency("nancy.authentication.forms")
+  }
+  query pattern callExpr where callee.method == "UserLoggedInResponse"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck8 {
+  requires {
+    dependency("nancy.authentication.forms")
+  }
+  query pattern callExpr where callee.method == "LogOutResponse"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck9 {
+  requires {
+    dependency("nancy.authentication.forms")
+  }
+  query pattern callExpr where callee.method == "Login"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck10 {
+  requires {
+    dependency("nancy.authentication.forms")
+  }
+  query pattern callExpr where callee.method == "LoginAndRedirect"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck11 {
+  requires {
+    dependency("nancy.authentication.forms")
+  }
+  query pattern callExpr where callee.method == "LoginWithoutRedirect"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck12 {
+  requires {
+    dependency("nancy.authentication.forms")
+  }
+  query pattern callExpr where callee.method == "Logout"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck13 {
+  requires {
+    dependency("nancy.authentication.forms")
+  }
+  query pattern callExpr where callee.method == "LogoutAndRedirect"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck14 {
+  requires {
+    dependency("nancy.authentication.forms")
+  }
+  query pattern callExpr where callee.method == "LogoutWithoutRedirect"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck15 {
+  requires {
+    dependency("nancy.authentication.forms")
+  }
+  query pattern callExpr where callee.method == "Enable"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

@@ -1,0 +1,201 @@
+# socket.io's binary packet format replaces every binary value in an encoded
+# event with a placeholder object the protocol spells
+# `{ _placeholder: true, num: n }` and sends the binaries as an attachment
+# list after the packet string. Reconstructing the packet walks the decoded
+# payload and substitutes each placeholder:
+#
+#   function _reconstructPacket(data, buffers) {
+#     if (!data) return data;
+#     if (data && data._placeholder) {
+#       return buffers[data.num]; // appropriate buffer (should be natural order anyway)
+#     } else if (isArray(data)) { ... data[i] = _reconstructPacket(data[i], buffers); ...
+#
+# The marker and its index both travel inside the JSON payload the peer
+# composed, so `num` is attacker-chosen and unvalidated: the string "splice"
+# resolves `Array.prototype.splice` out of the attachment array's prototype
+# chain, a negative or oversized index resolves undefined, and either way a
+# value of a type the application never expects lands in the decoded packet's
+# data. The fixed revision (fb21e422fc193b34347395a33e0f625bebc09983, backported across
+# the 2.x/3.x/4.x parser releases) accepts the index only when it is a number
+# within the attachment list's bounds and throws "illegal attachments"
+# otherwise.
+#
+# The discriminating facts are function-local: the placeholder marker read,
+# the attachment subscript keyed by the marker's index field, and the absence
+# of any comparison of that field. The walk's own loop counters cannot
+# silence it because they are compared as `i < data.length`, never as `.num`.
+
+test "rank1769: placeholder substitution indexes the attachment list with the decoded num field"
+  lang javascript
+  file binary.js
+  expect VYQL-VAL-031
+  code
+  ```
+  var isArray = require('isarray');
+
+  exports.reconstructPacket = function(packet, buffers) {
+    packet.data = _reconstructPacket(packet.data, buffers);
+    packet.attachments = undefined; // no longer useful
+    return packet;
+  };
+
+  function _reconstructPacket(data, buffers) {
+    if (!data) return data;
+
+    if (data && data._placeholder) {
+      return buffers[data.num]; // appropriate buffer (should be natural order anyway)
+    } else if (isArray(data)) {
+      for (var i = 0; i < data.length; i++) {
+        data[i] = _reconstructPacket(data[i], buffers);
+      }
+    } else if (typeof data === 'object') {
+      for (var key in data) {
+        data[key] = _reconstructPacket(data[key], buffers);
+      }
+    }
+
+    return data;
+  }
+  ```
+
+test "rank1769: the index validated as an in-range number before the substitution"
+  lang javascript
+  file binary.js
+  reject VYQL-VAL-031
+  code
+  ```
+  var isArray = require('isarray');
+
+  exports.reconstructPacket = function(packet, buffers) {
+    packet.data = _reconstructPacket(packet.data, buffers);
+    packet.attachments = undefined; // no longer useful
+    return packet;
+  };
+
+  function _reconstructPacket(data, buffers) {
+    if (!data) return data;
+
+    if (data && data._placeholder === true) {
+      var isIndexValid =
+        typeof data.num === 'number' &&
+        data.num >= 0 &&
+        data.num < buffers.length;
+      if (isIndexValid) {
+        return buffers[data.num];
+      } else {
+        throw new Error('illegal attachments');
+      }
+    } else if (isArray(data)) {
+      for (var i = 0; i < data.length; i++) {
+        data[i] = _reconstructPacket(data[i], buffers);
+      }
+    } else if (typeof data === 'object') {
+      for (var key in data) {
+        data[key] = _reconstructPacket(data[key], buffers);
+      }
+    }
+
+    return data;
+  }
+  ```
+
+test "rank1769: integer predicate on the index field without a range comparison"
+  lang javascript
+  file binary.js
+  reject VYQL-VAL-031
+  code
+  ```
+  var isArray = require('isarray');
+
+  function _reconstructPacket(data, buffers) {
+    if (!data) return data;
+
+    if (data && data._placeholder === true) {
+      if (!Number.isInteger(data.num)) {
+        throw new Error('illegal attachments');
+      }
+      return buffers[data.num];
+    } else if (isArray(data)) {
+      for (var i = 0; i < data.length; i++) {
+        data[i] = _reconstructPacket(data[i], buffers);
+      }
+    } else if (typeof data === 'object') {
+      for (var key in data) {
+        data[key] = _reconstructPacket(data[key], buffers);
+      }
+    }
+
+    return data;
+  }
+  ```
+
+test "rank1769: minified type guard with the comparison operand reversed"
+  lang javascript
+  file lib/parser-reversed.js
+  reject VYQL-VAL-031
+  code
+  ```
+  function _reconstructPacket(t, n) {
+    if (!t) return t;
+    if (t && t._placeholder) {
+      if ("number" != typeof t.num) throw new Error("illegal attachments");
+      return n[t.num];
+    } else if (Array.isArray(t)) {
+      for (var r = 0; r < t.length; r++) t[r] = _reconstructPacket(t[r], n);
+    } else if (typeof t === "object") {
+      for (var e in t) t[e] = _reconstructPacket(t[e], n);
+    }
+    return t;
+  }
+  ```
+
+test "rank1769: recursive walk that subscripts by a name field without a placeholder marker"
+  lang javascript
+  file lib/deepwalk.js
+  reject VYQL-VAL-031
+  code
+  ```
+  function resolveHandlers(payload, handlers) {
+    if (!payload) return payload;
+
+    if (typeof payload.event === 'string') {
+      return handlers[payload.event];
+    } else if (Array.isArray(payload)) {
+      for (var i = 0; i < payload.length; i++) {
+        payload[i] = resolveHandlers(payload[i], handlers);
+      }
+    } else if (typeof payload === 'object') {
+      for (var key in payload) {
+        payload[key] = resolveHandlers(payload[key], handlers);
+      }
+    }
+
+    return payload;
+  }
+  ```
+
+test "rank1769: placeholder marker read for a write-back, never used as an index"
+  lang javascript
+  file lib/marker.js
+  reject VYQL-VAL-031
+  code
+  ```
+  function stripPlaceholders(data, out) {
+    if (!data) return data;
+
+    if (data && data._placeholder === true) {
+      out.push(data.num);
+      return null;
+    } else if (Array.isArray(data)) {
+      for (var i = 0; i < data.length; i++) {
+        data[i] = stripPlaceholders(data[i], out);
+      }
+    } else if (typeof data === 'object') {
+      for (var key in data) {
+        data[key] = stripPlaceholders(data[key], out);
+      }
+    }
+
+    return data;
+  }
+  ```

@@ -1,0 +1,9 @@
+module bindings.javascript.generated.md7997539;
+
+binding deserialization0 {
+  requires {
+    dependency("@svgr/hast-util-to-babel-ast")
+  }
+  query pattern callExpr where callee.method == "toBabelAST"
+  emit sink code.Deserialization at args[0]
+}

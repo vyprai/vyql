@@ -1,0 +1,11 @@
+module code;
+
+concept RevocationCheckAgainstCurrentTime : issue {
+  cwe: [CWE_287, CWE_613]
+  reviewAssumption: "a revocation record's timestamp states the instant from which credentials for that subject stop being honoured, so the credential the request presents is what the timestamp has to be measured against"
+  reviewCondition: "a revocation record is looked up by subject and the entry's timestamp is weighed against the current clock rather than against the presented credential's issuance time"
+  reviewCategory: auth
+  reviewConfidence: high
+  reviewEvidence: "revocation lookup context {pattern} indexes a revocation record and reads the current time, with no issuance or not-before time of the presented credential in scope"
+  vulnerableTo: [authentication.ImproperAuthentication, authentication.AuthenticationBypass]
+}

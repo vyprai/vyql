@@ -1,0 +1,160 @@
+# Rank 1042 / CVE-2022-3741: Chatwoot's rate limits were keyed on exact
+# request path equality, so appending a Rails format suffix skipped every
+# throttle (CWE-307). config/initializers/rack_attack.rb throttled with
+#
+#   throttle('login/ip', limit: 5, period: 20.seconds) do |req|
+#     req.ip if req.path == '/auth/sign_in' && req.post?
+#   end
+#
+# and Rails routes /auth/sign_in.json to the same action, so the comparison is
+# false, the block returns nil, the request is never counted, and the
+# brute-force limit does not run; the same holds for the signup, password
+# reset, super admin login and widget throttles. The fixed revision
+# (9525d4f034) adds Request#path_without_extentions returning path[/^[^.]+/],
+# compares against it in all nine throttles, and tightens the limits.
+#
+# The discriminator is structural on the binary token: the vulnerable form's
+# comparison emits a token beginning `req.path==`, and every derived form --
+# path_without_extentions ==, path.sub(...) ==, path.start_with?(...) -- emits
+# one whose character after the accessor name is not `=`, so startsWith
+# separates them while contains cannot (`req.path` is a prefix of
+# `req.path_without_extentions`). The binding is
+# vyql/bindings/ruby/rack_attack_throttle_raw_path_equality.vyql, emitting the
+# existing code.AuthAttemptLimitReview under VYQL-AUTH-088; no concept, rule or
+# identifier is minted.
+#
+# Measured on the real checkout (3 x --cache off per revision, timeout 180,
+# --max-ram 6GB): the vulnerable revision reports
+# VYQL-AUTH-088 high at config/initializers/rack_attack.rb:1 in all three runs
+# (135/135/135 findings) and the fixed revision none (134/134/134). Across
+# every Ruby file in the corpus clones (12007 files) a throttle call and a raw
+# path equality co-occur only in this initializer; the other two rack-attack
+# initializers in the corpus (zammad, autolab) key on start_with?/include?
+# predicates and are correctly not reported.
+#
+# verify_current_expected: fixed, 1 -> 0.
+
+test "rank1042: the throttles are keyed on exact path equality"
+  lang ruby
+  file config/initializers/rack_attack.rb
+  expect VYQL-AUTH-088
+  expect_review code.AuthAttemptLimitReview
+  code
+  ```
+  class Rack::Attack
+    class Request < ::Rack::Request
+      def remote_ip
+        @remote_ip ||= (env['action_dispatch.remote_ip'] || ip).to_s
+      end
+    end
+
+    throttle('login/ip', limit: 5, period: 20.seconds) do |req|
+      req.ip if req.path == '/auth/sign_in' && req.post?
+    end
+
+    throttle('login/email', limit: 20, period: 5.minutes) do |req|
+      if req.path == '/auth/sign_in' && req.post?
+        email = req.params['email'].presence || ActionDispatch::Request.new(req.env).params['email'].presence
+        email.to_s.downcase.gsub(/\s+/, '')
+      end
+    end
+
+    throttle('reset_password/email', limit: 5, period: 1.hour) do |req|
+      if req.path == '/auth/password' && req.post?
+        email = req.params['email'].presence || ActionDispatch::Request.new(req.env).params['email'].presence
+        email.to_s.downcase.gsub(/\s+/, '')
+      end
+    end
+  end
+  ```
+
+test "rank1042: the fix compares against the path with the extension stripped"
+  lang ruby
+  file config/initializers/rack_attack.rb
+  reject VYQL-AUTH-088
+  code
+  ```
+  class Rack::Attack
+    class Request < ::Rack::Request
+      def remote_ip
+        @remote_ip ||= (env['action_dispatch.remote_ip'] || ip).to_s
+      end
+
+      # Rails would allow requests to paths with extentions, so lets compare against the path with extention stripped
+      # example /auth & /auth.json would both work
+      def path_without_extentions
+        path[/^[^.]+/]
+      end
+    end
+
+    throttle('login/ip', limit: 5, period: 5.minutes) do |req|
+      req.ip if req.path_without_extentions == '/auth/sign_in' && req.post?
+    end
+
+    throttle('login/email', limit: 10, period: 15.minutes) do |req|
+      if req.path_without_extentions == '/auth/sign_in' && req.post?
+        email = req.params['email'].presence || ActionDispatch::Request.new(req.env).params['email'].presence
+        email.to_s.downcase.gsub(/\s+/, '')
+      end
+    end
+
+    throttle('reset_password/email', limit: 5, period: 1.hour) do |req|
+      if req.path_without_extentions == '/auth/password' && req.post?
+        email = req.params['email'].presence || ActionDispatch::Request.new(req.env).params['email'].presence
+        email.to_s.downcase.gsub(/\s+/, '')
+      end
+    end
+  end
+  ```
+
+test "rank1042: the pair, exact equality"
+  lang ruby
+  file config/initializers/rack_attack.rb
+  expect VYQL-AUTH-088
+  code
+  ```
+  class Rack::Attack
+    throttle('login/ip', limit: 5, period: 20.seconds) do |req|
+      req.ip if req.path == '/auth/sign_in' && req.post?
+    end
+  end
+  ```
+
+test "rank1042: the pair, derived accessor"
+  lang ruby
+  file config/initializers/rack_attack.rb
+  reject VYQL-AUTH-088
+  code
+  ```
+  class Rack::Attack
+    throttle('login/ip', limit: 5, period: 5.minutes) do |req|
+      req.ip if req.path_without_extentions == '/auth/sign_in' && req.post?
+    end
+  end
+  ```
+
+test "rank1042: a normalization written as a method chain is the safe shape"
+  lang ruby
+  file config/initializers/rack_attack.rb
+  reject VYQL-AUTH-088
+  code
+  ```
+  class Rack::Attack
+    throttle('login/ip', limit: 5, period: 5.minutes) do |req|
+      req.ip if req.path.sub(/\.[^.]+$/, '') == '/auth/sign_in' && req.post?
+    end
+  end
+  ```
+
+test "rank1042: a raw path equality outside a throttle reports nothing"
+  lang ruby
+  file app/controllers/concerns/path_check.rb
+  reject VYQL-AUTH-088
+  code
+  ```
+  class PathCheck
+    def signed_in?(req)
+      req.path == '/auth/sign_in'
+    end
+  end
+  ```

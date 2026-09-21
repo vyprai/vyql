@@ -1,0 +1,6 @@
+module code;
+
+concept PublicNetworkExposure : issue {
+  cwe: [CWE_284]
+  vulnerableTo: [iac.PublicNetworkExposure]
+}

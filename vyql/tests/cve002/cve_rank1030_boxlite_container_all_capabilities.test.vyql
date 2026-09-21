@@ -1,0 +1,177 @@
+# Rank 1030 / CVE-2026-46695: BoxLite runs untrusted code in a container and
+# handed that container the whole Linux capability set through
+# all_capabilities(), CAP_SYS_ADMIN included. With mount powers the code inside
+# can remount a read-only directory read-write and write wherever it likes
+# (CWE-284). The fixed revision replaces the full set with default_capabilities(),
+# an allow-list that leaves out CAP_SYS_ADMIN, CAP_NET_ADMIN, CAP_SYS_MODULE and
+# CAP_BPF, and enforces the read-only mount at the hypervisor level as well.
+#
+# Detected by binding containerCapabilitySetAdministrativeGrant
+# (vyql/bindings/rust/container_capability_set_administrative_grant.vyql)
+# emitting the existing code.PrivilegedContainer / VYQL-CFG-010: the function
+# that materialises the granted set collects an iterator of
+# oci_spec::runtime::Capability values naming a host-administrative variant.
+# Both clauses are AST-derived, so the doc comment the fixed revision states its
+# exclusion in satisfies neither side.
+#
+# The three reject cases are the shapes that name the same variants innocently
+# and are what the collect clause separates the grant from: the fixed
+# allow-list, the regression test asserting the dangerous variants are absent,
+# and the conversion table mapping every spec capability onto the syscall
+# layer's constant. A comment naming the excluded variant does not satisfy the
+# identifier clause either.
+
+test "rank1030: capability set granted to the container includes the mount capability"
+  lang rust
+  file src/guest/src/container/capabilities.rs
+  expect VYQL-CFG-010
+  code
+  ```
+  use oci_spec::runtime::Capability;
+  use std::collections::HashSet;
+
+  pub fn all_capabilities() -> HashSet<Capability> {
+      [
+          Capability::Chown,
+          Capability::DacOverride,
+          Capability::Setuid,
+          Capability::NetBindService,
+          Capability::NetAdmin,
+          Capability::SysModule,
+          Capability::SysAdmin,
+          Capability::SysRawio,
+          Capability::Bpf,
+          Capability::CheckpointRestore,
+      ]
+      .into_iter()
+      .collect()
+  }
+  ```
+
+test "rank1030: fix grants an allow-list that leaves out the mount capability"
+  lang rust
+  file src/guest/src/container/capabilities.rs
+  reject VYQL-CFG-010
+  code
+  ```
+  use oci_spec::runtime::Capability;
+  use std::collections::HashSet;
+
+  /// Matches Docker's default capability set — sufficient for most workloads
+  /// while excluding dangerous capabilities like CAP_SYS_ADMIN (mount/remount,
+  /// namespace manipulation), CAP_NET_ADMIN (network reconfiguration),
+  /// CAP_SYS_MODULE (kernel module loading), and CAP_BPF.
+  pub fn default_capabilities() -> HashSet<Capability> {
+      [
+          Capability::Chown,
+          Capability::DacOverride,
+          Capability::Fowner,
+          Capability::Fsetid,
+          Capability::Kill,
+          Capability::Setgid,
+          Capability::Setuid,
+          Capability::Setpcap,
+          Capability::NetBindService,
+          Capability::NetRaw,
+          Capability::SysChroot,
+          Capability::Mknod,
+          Capability::AuditWrite,
+          Capability::Setfcap,
+      ]
+      .into_iter()
+      .collect()
+  }
+  ```
+
+test "rank1030: regression test asserting the dangerous variants are absent"
+  lang rust
+  file src/guest/src/container/capabilities.rs
+  reject VYQL-CFG-010
+  code
+  ```
+  use oci_spec::runtime::Capability;
+  use std::collections::HashSet;
+
+  pub fn default_capabilities() -> HashSet<Capability> {
+      [Capability::Chown, Capability::Setuid].into_iter().collect()
+  }
+
+  #[cfg(test)]
+  mod tests {
+      use super::*;
+
+      #[test]
+      fn default_capabilities_excludes_dangerous_caps() {
+          let caps = default_capabilities();
+          let dangerous = [
+              Capability::SysAdmin,
+              Capability::NetAdmin,
+              Capability::SysModule,
+              Capability::SysRawio,
+              Capability::MacOverride,
+          ];
+          for cap in &dangerous {
+              assert!(!caps.contains(cap));
+          }
+      }
+  }
+  ```
+
+test "rank1030: conversion table names every capability and builds no set"
+  lang rust
+  file src/guest/src/container/capabilities.rs
+  reject VYQL-CFG-010
+  code
+  ```
+  use oci_spec::runtime::Capability as SpecCapability;
+
+  pub trait CapabilityExt {
+      fn to_cap(&self) -> u32;
+  }
+
+  impl CapabilityExt for SpecCapability {
+      fn to_cap(&self) -> u32 {
+          match self {
+              SpecCapability::Chown => 1,
+              SpecCapability::Setuid => 7,
+              SpecCapability::NetAdmin => 12,
+              SpecCapability::SysAdmin => 21,
+              SpecCapability::SysModule => 16,
+              _ => 0,
+          }
+      }
+  }
+  ```
+
+test "rank1030: comment naming the excluded variant does not satisfy the clause"
+  lang rust
+  file src/guest/src/container/capabilities.rs
+  reject VYQL-CFG-010
+  code
+  ```
+  use oci_spec::runtime::Capability;
+  use std::collections::HashSet;
+
+  pub fn default_capabilities() -> HashSet<Capability> {
+      // Capability::SysAdmin is deliberately excluded from the default set
+      [Capability::Chown, Capability::Setuid].into_iter().collect()
+  }
+  ```
+
+test "rank1030: qualified and aliased spellings of the granted variant"
+  lang rust
+  file src/guest/src/container/capabilities.rs
+  expect VYQL-CFG-010
+  code
+  ```
+  use std::collections::HashSet;
+
+  pub fn granted() -> HashSet<oci_spec::runtime::Capability> {
+      [
+          oci_spec::runtime::Capability::Chown,
+          oci_spec::runtime::Capability::SysAdmin,
+      ]
+      .into_iter()
+      .collect()
+  }
+  ```

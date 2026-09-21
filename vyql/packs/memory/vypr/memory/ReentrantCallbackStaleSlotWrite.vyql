@@ -1,0 +1,11 @@
+module vypr.memory;
+
+rule ReentrantCallbackStaleSlotWrite {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_416]
+    id: "VYQL-MEM-060"
+    severity: high
+  }
+  issue code.ReentrantCallbackStaleSlotWrite as slot
+}

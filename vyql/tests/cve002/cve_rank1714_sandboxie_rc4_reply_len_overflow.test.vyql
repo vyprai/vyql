@@ -1,0 +1,207 @@
+# SbieIniServer::RC4Crypt in Sandboxie's SbieSvc
+# (Sandboxie/core/svc/sbieiniserver.cpp, a SYSTEM service reachable from any
+# sandboxed process) sizes its reply with a length taken straight from the ALPC
+# request buffer:
+#
+#   ULONG rpl_len = sizeof(SBIE_INI_RC4_CRYPT_RPL) + req->value_len;
+#   SBIE_INI_RC4_CRYPT_RPL *rpl = (SBIE_INI_RC4_CRYPT_RPL *)LONG_REPLY(rpl_len);
+#   ...
+#   memcpy(rpl->value, req->value, req->value_len);
+#
+# The addition runs in 64-bit and truncates into the 32-bit ULONG rpl_len, so a
+# value_len near ULONG_MAX allocates a short reply while the memcpy moves
+# value_len bytes both ways: heap overflow, CWE-190 -> CWE-122. The only prior
+# validation is req->h.length >= sizeof(SBIE_INI_RC4_CRYPT_REQ), which bounds
+# the header, not the embedded value_len. The fixed revision rejects
+# req->value_len > (ULONG_MAX - sizeof(SBIE_INI_RC4_CRYPT_RPL)) before the
+# arithmetic.
+#
+# Revisions: 965df03 ("prevent integer overflow in RC4 in sbieiniserver.cpp")
+# is the fix and is what the pool row carries; its parent 6a1dcce is the fully
+# vulnerable state (no guard at all). The merge 000492f8 that collates the
+# change into master takes 965df03 as its first parent and an independent,
+# weaker bound (req->h.length - sizeof(SBIE_INI_RC4_CRYPT_REQ)) on its other
+# side, which the merge discards in favour of the ULONG_MAX form -- so a
+# checkout of the merge's ^ lands on fixed code and the vulnerable state has
+# to be taken at 6a1dcce directly.
+#
+# ATTENTION, rechecked: engine gap, and the sink half is proven complete. The
+# sink and the rule machinery both work: `sizeof(T) + field` is labelled
+# code.IntegerSizeArithmeticSink (integerSizeArithmetic94, cpp.flags), and with
+# any labelled source present VYQL-NUM-003 fires on the vulnerable form and is
+# suppressed by the ULONG_MAX comparison (integerOverflowGuard163 keys
+# containsAny(node.context.binary, [...MAX...]) -- the first and fourth tests
+# below, plus a recv-filled buffer whose ULONG_MAX guard reports nothing).
+# Re-measured end to end on the real file with a throwaway source binding on
+# every `value_len` read: the vulnerable revision reports 343 findings with 9
+# VYQL-NUM-003 rows, one of them with source and sink both at the rpl_len
+# addition (sbieiniserver.cpp:1627); the fixed revision reports 342 with 8, and
+# the addition's row is the only one gone. Stable over three `--cache off`
+# runs per side. The source is the only thing missing.
+#
+# Nothing shipped discriminates the pair. Three `--cache off` runs per
+# revision over the extracted Sandboxie/core/svc subtree (c:24 cpp:47 parse)
+# give 333/333/333 findings at 6a1dcce and 333/333/333 at 965df03, with
+# identical per-rule tables (254 VYQL-MEM-006, 64 VYQL-MEM-016, 8
+# VYQL-LIFE-001, 3 VYQL-AUTH-079, 3 VYQL-PATH-075, 1 VYQL-CRY-003) and
+# identical locations -- every sbieiniserver.cpp row shifts by exactly the
+# three lines the guard adds. The `-flags with` view agrees: 1607 flags at the
+# vulnerable revision, 1608 at the fixed one, the single difference being the
+# guard's own `ULONG_MAX - sizeof(...)` subtraction flagging
+# code.IntegerSizeArithmetic on the fixed side. The two rows inside RC4Crypt
+# (VYQL-CRY-003 on srand(GetTickCount()), VYQL-MEM-016 on the memcpy) fire on
+# both revisions; nothing fires on the rpl_len addition that is the defect.
+#
+# The source is missing twice over, and both halves are re-measured:
+#
+#   * the message originates at NtReplyWaitReceivePort (PipeServer.cpp:339),
+#     which has no binding anywhere in the tree, and could not use one as
+#     things stand: the received message is an out-parameter (arg 3), and
+#     out-parameter taint for C/C++ is the hardcoded cReaders table
+#     (internal/extract/frontend/treesitter/c.go:74), so a source emitted at
+#     call.result taints the NTSTATUS return, not the buffer -- the
+#     read-style-source family on file (ranks 1206/1304/1316/1407). Measured:
+#     adding the table entry plus a throwaway source at the call's result
+#     (label confirmed at PipeServer.cpp:339) reports 0 VYQL-NUM-003 and
+#     leaves the tree at its 333-finding baseline, because the taint dies
+#     further downstream.
+#   * the buffer then reaches RC4Crypt only through the registered-handler
+#     dispatch `(*target->handler)(target->context, msg)` (PipeServer.cpp:838,
+#     inside CallTarget's __try, where `pipeServer->Register(MSGID_SBIE_INI,
+#     this, Handler)` in the constructor deposits it; the same construct at
+#     :918 is NotifyTargets' broadcast). `vyql resolve` lists the site as `?`
+#     -- "no callee body, not a known source/sink/control", taint terminates --
+#     and the enclosing same-file member call
+#     `CallTarget(client->buf_hdr, PortHandle, msg)` at :743 is listed
+#     UNRESOLVED too, so the real path from the ALPC buffer to RC4Crypt
+#     carries at least three opaque hops. The first two tests below are the
+#     isolating pair for the last of them: the identical handler, source and
+#     sink, invoked directly versus through a function pointer, report and do
+#     not report.
+#
+# This is the C++ instance of "a call through a table of function values is
+# opaque" (rank 1485, Go and JavaScript); 29,350 `(*f)(...)` call sites across
+# the corpus clones' 4,624 C/C++ files sit behind it. Not mechanical: routing
+# a function-pointer call to its statically-known target here means following
+# the function value through the Register store into a TARGET list node walked
+# with List_Head/List_Next -- a new dataflow relation (indirect-call
+# resolution), not a correction to a known construct.
+#
+# A presence route is measured and is unshippable: "a sizeof()+ addition with
+# no _MAX bound in its function" fires 35 times over Sandboxie/core's 171
+# .cpp/.c files -- not one of which contains any MAX literal anywhere -- for
+# exactly one true positive, and keying instead on the handler parameter's
+# project-internal type MSG_HEADER* would not survive one unrelated codebase.
+#
+# verify_current_expected: attention-engine-gap, real revisions both rejected.
+
+test "rank1714: an IPC request length reaches the reply-size addition when a source is labelled"
+  lang cpp
+  file rc4direct.cpp
+  expect VYQL-NUM-003
+  code
+  ```
+  struct HDR { unsigned long length; };
+  struct REQ { struct HDR h; unsigned long value_len; char value[1]; };
+  struct RPL { struct HDR h; unsigned long value_len; char value[1]; };
+
+  extern int recv(int s, void *b, unsigned long n, int f);
+  extern void *alloc(unsigned long n);
+
+  void on_msg(int s)
+  {
+      struct REQ reqbuf;
+      recv(s, &reqbuf, sizeof(reqbuf), 0);
+      struct REQ *req = &reqbuf;
+      unsigned long rpl_len = sizeof(struct RPL) + req->value_len;
+      struct RPL *rpl = (struct RPL *)alloc(rpl_len);
+      memcpy(rpl->value, req->value, req->value_len);
+  }
+  ```
+
+test "rank1714: the same handler invoked through a registered function pointer reports nothing"
+  lang cpp
+  file rc4dispatch.cpp
+  reject VYQL-NUM-003
+  code
+  ```
+  struct HDR { unsigned long length; };
+  struct REQ { struct HDR h; unsigned long value_len; char value[1]; };
+  struct RPL { struct HDR h; unsigned long value_len; char value[1]; };
+
+  typedef void *(*handler_t)(void *ctx, struct HDR *msg);
+
+  extern int recv(int s, void *b, unsigned long n, int f);
+  extern void *alloc(unsigned long n);
+
+  void *target(void *ctx, struct HDR *msg)
+  {
+      struct REQ *req = (struct REQ *)msg;
+      unsigned long rpl_len = sizeof(struct RPL) + req->value_len;
+      struct RPL *rpl = (struct RPL *)alloc(rpl_len);
+      memcpy(rpl->value, req->value, req->value_len);
+      return 0;
+  }
+
+  void *dispatch(handler_t h, void *ctx, struct HDR *msg)
+  {
+      return (*h)(ctx, msg);
+  }
+
+  void server(int s)
+  {
+      struct REQ buf;
+      struct HDR *msg = (struct HDR *)&buf;
+      recv(s, &buf, sizeof(buf), 0);
+      dispatch(target, 0, msg);
+  }
+  ```
+
+test "rank1714: RC4Crypt sizes the reply with the request's own value_len"
+  lang cpp
+  file Sandboxie/core/svc/sbieiniserver.cpp
+  reject VYQL-NUM-003
+  code
+  ```
+  MSG_HEADER *SbieIniServer::RC4Crypt(MSG_HEADER *msg, HANDLE idProcess, bool isSandboxed)
+  {
+      SBIE_INI_RC4_CRYPT_REQ *req = (SBIE_INI_RC4_CRYPT_REQ *)msg;
+      if (req->h.length < sizeof(SBIE_INI_RC4_CRYPT_REQ))
+          return SHORT_REPLY(STATUS_INVALID_PARAMETER);
+
+      ULONG rpl_len = sizeof(SBIE_INI_RC4_CRYPT_RPL) + req->value_len;
+      SBIE_INI_RC4_CRYPT_RPL *rpl = (SBIE_INI_RC4_CRYPT_RPL *)LONG_REPLY(rpl_len);
+      if (!rpl)
+          return SHORT_REPLY(STATUS_INSUFFICIENT_RESOURCES);
+
+      rpl->value_len = req->value_len;
+      memcpy(rpl->value, req->value, req->value_len);
+      return (MSG_HEADER *)rpl;
+  }
+  ```
+
+test "rank1714: the reply-size addition capped against ULONG_MAX"
+  lang cpp
+  file Sandboxie/core/svc/sbieiniserver.cpp
+  reject VYQL-NUM-003
+  code
+  ```
+  MSG_HEADER *SbieIniServer::RC4Crypt(MSG_HEADER *msg, HANDLE idProcess, bool isSandboxed)
+  {
+      SBIE_INI_RC4_CRYPT_REQ *req = (SBIE_INI_RC4_CRYPT_REQ *)msg;
+      if (req->h.length < sizeof(SBIE_INI_RC4_CRYPT_REQ))
+          return SHORT_REPLY(STATUS_INVALID_PARAMETER);
+
+      if (req->value_len > (ULONG_MAX - sizeof(SBIE_INI_RC4_CRYPT_RPL)))
+          return SHORT_REPLY(STATUS_INVALID_PARAMETER);
+
+      ULONG rpl_len = sizeof(SBIE_INI_RC4_CRYPT_RPL) + req->value_len;
+      SBIE_INI_RC4_CRYPT_RPL *rpl = (SBIE_INI_RC4_CRYPT_RPL *)LONG_REPLY(rpl_len);
+      if (!rpl)
+          return SHORT_REPLY(STATUS_INSUFFICIENT_RESOURCES);
+
+      rpl->value_len = req->value_len;
+      memcpy(rpl->value, req->value, req->value_len);
+      return (MSG_HEADER *)rpl;
+  }
+  ```

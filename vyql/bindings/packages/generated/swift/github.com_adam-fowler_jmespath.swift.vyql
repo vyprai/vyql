@@ -1,0 +1,25 @@
+module bindings.swift.generated.m7c290bbb;
+
+binding expressionEval0 {
+  requires {
+    dependency("github.com/adam-fowler/jmespath.swift")
+  }
+  query pattern callExpr where callee.method == "compile"
+  emit sink code.ExpressionEval at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/adam-fowler/jmespath.swift")
+  }
+  query pattern callExpr where callee.method == "search"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("github.com/adam-fowler/jmespath.swift")
+  }
+  query pattern callExpr where callee.method == "fromJson"
+  emit sink code.Deserialization at args[0]
+}

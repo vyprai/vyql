@@ -1,0 +1,11 @@
+module code;
+
+concept EverestFormsEntryFileDeleteWithoutPathGuard : issue {
+  cwe: [CWE_22, CWE_73]
+  reviewAssumption: "Everest Forms entry metadata can contain file URLs or paths that are later used during entry deletion"
+  reviewCategory: path
+  reviewCondition: "entry-file deletion derives filesystem paths from entry metadata and deletes them without resolving the path and checking it remains under the uploads base directory"
+  reviewConfidence: high
+  reviewEvidence: "Everest Forms delete_entry_files context {pattern} reads entry meta and directly calls wp_delete_file or unlink without a safe_delete_file/realpath containment guard"
+  vulnerableTo: [path.PathTraversal]
+}

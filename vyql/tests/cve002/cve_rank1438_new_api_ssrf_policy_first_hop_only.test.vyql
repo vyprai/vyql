@@ -1,0 +1,218 @@
+# Rank 1438 / CVE-2025-62155: new-api's `service.DoDownloadRequest` is the one
+# place the relay layer fetches an image or file URL that came out of an upstream
+# provider response or a user request. An earlier CVE is fixed by putting
+# `common.ValidateURLWithFetchSetting` in front of it -- scheme, domain filter, IP
+# filter, allowed-port list, private-address rejection -- and the same call guards
+# `DoWorkerRequest`. Both then issue the request with `net/http`'s package-level
+# helpers, `http.Get(originUrl)` and `http.Post(workerUrl, ...)`.
+#
+# Those helpers are wrappers around `http.DefaultClient`, whose `CheckRedirect` is
+# nil, and net/http documents the nil policy as "follow up to 10 consecutive
+# requests". So the URL policy binds the first request and nothing after it: a
+# host that passes the filter -- the advisory's proof of concept runs a Flask app
+# on port 8080, inside the default allowed-port range -- answers 302 to
+# `http://127.0.0.1:8003/uid.txt` and the helper fetches the loopback target
+# itself. Server-side request forgery, CWE-918, by redirect out of a validated
+# first hop.
+#
+# Pool-row correction. The row's commit e8966c73746d35bb ("feat: pplx channel")
+# is a Perplexity-adaptor feature: request struct fields, a model list, a channel
+# icon. It touches no HTTP client and no URL policy. The advisory's own reference
+# list names it, so this is failure mode 3 (an unrelated commit from the same
+# release window) reached through the advisory rather than through a misrecorded
+# SHA. The fixing commit is bdb522021a0222dcc2d9644f54064dc6e9ea6170, merged as
+# d326e88ab260d4a2ac3d6712037087a400f6d817 ("Merge commit from fork", the GHSA
+# private-fork merge); both read in full with plain `git show`, and both parents
+# are fully vulnerable. It adds `service.checkRedirect`, which re-runs
+# `ValidateURLWithFetchSetting` on every hop and caps the chain at 10, installs it
+# as `CheckRedirect` on the shared client and on both proxy clients, and moves
+# `download.go` off the package-level helpers onto `GetHttpClient()`.
+#
+# Vocabulary. `code.UrlFetch`/VYQL-RF-001 reports the vulnerable
+# `http.Get` as a taint sink, but for the pre-existing SSRF rather than for this
+# one, and it goes quiet at the fixed revision only because `urlFetch88`-`urlFetch91` key the
+# client-method sinks on a receiver *named* `client`, so `GetHttpClient().Get(...)`
+# is unlabelled -- a spelling accident, not a reading of the redirect policy.
+# Nothing in the ontology says "the policy covers the first hop only".
+# `code.WebhookUrlFetchMissingSsrfGuard` is the absence of a guard and this code
+# has one; `code.UnpinnedResolvedAddressCheck` is the same "validated target is
+# not the contacted target" family but specifically on the DNS axis, and widening
+# its name to redirects would make it wrong; `code.SvgNestedResourceValidationBypass`
+# is the nested-reference form and is SVG-shaped; `code.IncompleteIpDenylist` and
+# `code.RequestHostUrlValidationBypass` are about the policy's own contents. So
+# `code.UrlPolicyNotReappliedOnRedirect` is minted, with VYQL-RF-048, for the
+# class: a URL policy enforced on the first request and on no redirect after it.
+#
+# The Go binding keys on the documented property of the package-level helpers --
+# they are bound to `DefaultClient`, so no caller of them can supply a redirect
+# hook at all -- paired with evidence that the function has a URL policy to lose,
+# either a named URL/host validator or the stdlib address predicates an inline
+# policy is built from. Owning the client is what restores the hook, so a fetch
+# issued through a client value is declined.
+#
+# Discrimination, union of three `--cache off` runs of the whole repository each
+# revision: 2 VYQL-RF-048 at bdb52202^ on `service/download.go` -- `DoWorkerRequest`
+# and `DoDownloadRequest`, the two functions the fixed revision changes -- and 0 at bdb52202.
+# Tree totals 474 -> 476 and 474 -> 474.
+#
+# Hostile variants:
+#   - the patched tree with `GetHttpClient` renamed to `ObtainOutboundClient` and
+#     `checkRedirect` to `hopPolicy`                                        -> 0
+#     (so nothing keys on the fixed revision's own vocabulary)
+#   - the guard moved into a sibling function, fetch left alone             -> 0
+#   - a comment reading "SSRF protection is handled by the caller" above an
+#     otherwise bare `http.Get`                                             -> 0
+#     (Go context tokens are AST-derived; a comment produces no node)
+#   - the guard kept and the fetch issued through a client value            -> 0
+#
+# Collateral: an enumeration of the shape over 23,979 non-vendor .go files in the
+# other clones under /tmp/cve-work finds 491 functions calling the package-level
+# helpers and one that also carries policy vocabulary; scanning eight of those
+# trees confirms it -- nats-server's `test/monitor_test.go:757`, a test that skips
+# loopback interfaces with `ip.IsLoopback()` and then fetches a monitoring URL.
+# That is the residual the binding's comment records: the stdlib address
+# predicates are what make the clause reach an inline policy, and they also reach
+# a function that merely inspects an address.
+
+test "rank1438: a validated download URL fetched with net/http's package-level helper"
+  lang go
+  file service/download.go
+  expect VYQL-RF-048
+  expect_review code.UrlPolicyNotReappliedOnRedirect
+  code
+  ```
+  package service
+
+  import (
+  	"bytes"
+  	"encoding/json"
+  	"fmt"
+  	"net/http"
+  	"one-api/common"
+  	"one-api/setting/system_setting"
+  	"strings"
+  )
+
+  type WorkerRequest struct {
+  	URL     string            `json:"url"`
+  	Key     string            `json:"key"`
+  	Method  string            `json:"method,omitempty"`
+  	Headers map[string]string `json:"headers,omitempty"`
+  	Body    json.RawMessage   `json:"body,omitempty"`
+  }
+
+  func DoDownloadRequest(originUrl string, reason ...string) (resp *http.Response, err error) {
+  	fetchSetting := system_setting.GetFetchSetting()
+  	if err := common.ValidateURLWithFetchSetting(originUrl, fetchSetting.EnableSSRFProtection, fetchSetting.AllowPrivateIp, fetchSetting.DomainFilterMode, fetchSetting.IpFilterMode, fetchSetting.DomainList, fetchSetting.IpList, fetchSetting.AllowedPorts, fetchSetting.ApplyIPFilterForDomain); err != nil {
+  		return nil, fmt.Errorf("request reject: %v", err)
+  	}
+
+  	common.SysLog(fmt.Sprintf("downloading from origin: %s, reason: %s", common.MaskSensitiveInfo(originUrl), strings.Join(reason, ", ")))
+  	return http.Get(originUrl)
+  }
+  ```
+
+test "rank1438: the same fetch moved onto the application's own client, which carries a redirect policy"
+  lang go
+  file service/download.go
+  reject VYQL-RF-048
+  reject_review code.UrlPolicyNotReappliedOnRedirect
+  code
+  ```
+  package service
+
+  import (
+  	"bytes"
+  	"encoding/json"
+  	"fmt"
+  	"net/http"
+  	"one-api/common"
+  	"one-api/setting/system_setting"
+  	"strings"
+  )
+
+  type WorkerRequest struct {
+  	URL     string            `json:"url"`
+  	Key     string            `json:"key"`
+  	Method  string            `json:"method,omitempty"`
+  	Headers map[string]string `json:"headers,omitempty"`
+  	Body    json.RawMessage   `json:"body,omitempty"`
+  }
+
+  func DoDownloadRequest(originUrl string, reason ...string) (resp *http.Response, err error) {
+  	fetchSetting := system_setting.GetFetchSetting()
+  	if err := common.ValidateURLWithFetchSetting(originUrl, fetchSetting.EnableSSRFProtection, fetchSetting.AllowPrivateIp, fetchSetting.DomainFilterMode, fetchSetting.IpFilterMode, fetchSetting.DomainList, fetchSetting.IpList, fetchSetting.AllowedPorts, fetchSetting.ApplyIPFilterForDomain); err != nil {
+  		return nil, fmt.Errorf("request reject: %v", err)
+  	}
+
+  	common.SysLog(fmt.Sprintf("downloading from origin: %s, reason: %s", common.MaskSensitiveInfo(originUrl), strings.Join(reason, ", ")))
+  	return GetHttpClient().Get(originUrl)
+  }
+  ```
+
+test "rank1438: a redirect hook that re-runs the policy on every hop is the control"
+  lang go
+  file service/http_client.go
+  reject VYQL-RF-048
+  reject_review code.UrlPolicyNotReappliedOnRedirect
+  code
+  ```
+  package service
+
+  import (
+  	"fmt"
+  	"net/http"
+  	"one-api/common"
+  	"one-api/setting/system_setting"
+  	"time"
+  )
+
+  var httpClient *http.Client
+
+  func checkRedirect(req *http.Request, via []*http.Request) error {
+  	fetchSetting := system_setting.GetFetchSetting()
+  	urlStr := req.URL.String()
+  	if err := common.ValidateURLWithFetchSetting(urlStr, fetchSetting.EnableSSRFProtection, fetchSetting.AllowPrivateIp, fetchSetting.DomainFilterMode, fetchSetting.IpFilterMode, fetchSetting.DomainList, fetchSetting.IpList, fetchSetting.AllowedPorts, fetchSetting.ApplyIPFilterForDomain); err != nil {
+  		return fmt.Errorf("redirect to %s blocked: %v", urlStr, err)
+  	}
+  	if len(via) >= 10 {
+  		return fmt.Errorf("stopped after 10 redirects")
+  	}
+  	return nil
+  }
+
+  func InitHttpClient() {
+  	httpClient = &http.Client{
+  		Timeout:       time.Duration(common.RelayTimeout) * time.Second,
+  		CheckRedirect: checkRedirect,
+  	}
+  }
+
+  func GetHttpClient() *http.Client {
+  	return httpClient
+  }
+  ```
+
+test "rank1438: a package-level fetch with no URL policy to lose is a different weakness"
+  lang go
+  file relay/channel/task.go
+  reject VYQL-RF-048
+  reject_review code.UrlPolicyNotReappliedOnRedirect
+  code
+  ```
+  package channel
+
+  import (
+  	"io"
+  	"net/http"
+  )
+
+  func fetchModelList(endpoint string) ([]byte, error) {
+  	resp, err := http.Get(endpoint + "/v1/models")
+  	if err != nil {
+  		return nil, err
+  	}
+  	defer resp.Body.Close()
+  	return io.ReadAll(resp.Body)
+  }
+  ```

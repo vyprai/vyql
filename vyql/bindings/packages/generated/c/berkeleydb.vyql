@@ -1,0 +1,9 @@
+module bindings.c.generated.m301e2b42;
+
+binding deserialization0 {
+  requires {
+    dependency("berkeleydb")
+  }
+  query pattern callExpr where callee.method == "do_parse"
+  emit sink code.Deserialization at args[0]
+}

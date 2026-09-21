@@ -1,0 +1,111 @@
+test "rank1483: event payload placeholders formatted into a shell=True system command"
+  lang python
+  file events.py
+  expect VYQL-INJ-119
+  expect VYQL-VAL-005
+  expect_review code.CommandStringWrapperExecution
+  code
+  ```
+  import datetime
+  import subprocess
+  import threading
+
+
+  class CommandTrigger:
+      def __init__(self, printer):
+          self._printer = printer
+          self._subscriptions = {}
+
+      def eventCallback(self, event, payload):
+          if event not in self._subscriptions:
+              return
+          for command, commandType, debug in self._subscriptions[event]:
+              processedCommand = self._processCommand(command, event, payload)
+              self.executeCommand(processedCommand, commandType, debug=debug)
+
+      def executeCommand(self, command, commandType, debug=False):
+          if commandType == "system":
+              self._executeSystemCommand(command, debug=debug)
+
+      def _executeSystemCommand(self, command, debug=False):
+          def commandExecutioner(cmd):
+              if debug:
+                  self._logger.info(f"Executing system command: {cmd}")
+              # we run this with shell=True since we want to allow
+              # shell-alike handling here...
+              subprocess.check_call(cmd, shell=True)
+
+          def process():
+              commandExecutioner(command)
+
+          t = threading.Thread(target=process)
+          t.daemon = True
+          t.start()
+
+      def _processCommand(self, command, event, payload):
+          params = {
+              "__eventname": event,
+              "__filename": "NO FILE",
+              "__now": datetime.datetime.now().isoformat(),
+          }
+          if isinstance(payload, dict):
+              params.update(payload)
+          return command.format(**params)
+  ```
+
+test "rank1483: event placeholders shell-quoted before the system command is assembled"
+  lang python
+  file events.py
+  reject VYQL-INJ-119
+  reject VYQL-VAL-005
+  reject_review code.CommandStringWrapperExecution
+  code
+  ```
+  import datetime
+  import shlex
+  import subprocess
+  import threading
+
+
+  class SystemEventSubscription:
+      def __init__(self, printer, *commands, debug: bool = False, **kwargs):
+          self.printer = printer
+          self.commands = commands
+          self.debug = debug
+          self.shell = kwargs.get("shell", True)
+          self.cwd = kwargs.get("cwd", None)
+
+      def handle(self, event, payload):
+          params = self._generated_params(event, payload)
+          prepared = self._prepare_commands(params)
+          self._execute(event, prepared)
+
+      def _prepare_commands(self, params):
+          escaped = self._escape_params(params)
+          return [command.format(**escaped) for command in self.commands]
+
+      def _escape_params(self, params):
+          if self.shell:
+              return {key: shlex.quote(str(value)) for key, value in params.items()}
+          return params
+
+      def _generated_params(self, event, payload):
+          params = {
+              "__eventname": event,
+              "__filename": "NO FILE",
+              "__now": datetime.datetime.now().isoformat(),
+          }
+          if isinstance(payload, dict):
+              params.update(payload)
+          return {k: str(v) for k, v in params.items()}
+
+      def _execute(self, event, commands):
+          def process():
+              for cmd in commands:
+                  self._logger.info(f"Received event {event}, executing system command: {cmd}")
+                  subprocess.check_call(cmd, shell=self.shell, cwd=self.cwd)
+
+          t = threading.Thread(target=process)
+          t.daemon = True
+          t.start()
+  ```

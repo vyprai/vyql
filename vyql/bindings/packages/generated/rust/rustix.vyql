@@ -1,0 +1,33 @@
+module bindings.rust.generated.m49bea96b;
+
+binding networkData0 {
+  requires {
+    dependency("rustix")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend1 {
+  requires {
+    dependency("rustix")
+  }
+  query pattern callExpr where callee.method == "close"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding httpInput2 {
+  requires {
+    dependency("rustix")
+  }
+  query pattern callExpr where callee.method == "cookie"
+  emit source code.HttpInput at call.result
+}
+
+binding weakRandomValue3 {
+  requires {
+    dependency("rustix")
+  }
+  query pattern presenceNode where node.path ~= "rustix.random"
+  emit issue code.WeakRandomValue at node
+}

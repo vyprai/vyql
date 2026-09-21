@@ -1,0 +1,256 @@
+# WEBrick logged whatever it is handed: BasicLog#format returned
+# arg.message and arg.to_str verbatim, and every string that reached a
+# logger call went to the log device with its control characters intact
+# (CWE-117). The exploitable flow is HTTP Basic authentication, where a
+# username decoded straight from the Authorization header is interpolated
+# into an error message:
+#
+#   lib/webrick/httpauth/basicauth.rb
+#     userid, password = basic_credentials.unpack("m*")[0].split(":", 2)
+#     unless encpass = @userdb.get_passwd(@realm, userid, @reload_db)
+#       error("%s: the user is not allowed.", userid)
+#
+# and the Authenticator module turns that into a log write:
+#
+#   lib/webrick/httpauth/authenticator.rb
+#     def log(meth, fmt, *args)
+#       msg = format("%s %s: ", @auth_scheme, @realm)
+#       msg << fmt % args
+#       @logger.send(meth, msg)
+#     end
+#
+# The fixed revision wraps both branches of BasicLog#format in AccessLog.escape
+# and removes the older escape from HTTPStatus::Status#initialize, so escaping
+# now happens once, at the log boundary, for plain strings as well as
+# exceptions. The regression test drives a "foo\ebar" username and asserts
+# the log carries no escape sequence.
+#
+# Held, and the flow is blocked at three independent points, each isolated
+# by a probe that holds the other two constant:
+#
+# 1. No source. `req[@request_field]` (authenticator.rb:73) is a subscript
+#    read on the request parameter; `vyql match` on basicauth.rb and on
+#    authenticator.rb reports no source label at all -- the only labels in
+#    basicauth.rb are DynamicCodeLoad on its three `require` lines. A
+#    binding would have to key on the parameter's name.
+# 2. The message assembly loses the taint. `msg << fmt % args` in statement
+#    position propagates nothing to its receiver while the same call in
+#    expression position carries its argument's taint through the result --
+#    the third and fourth test below are that minimal pair. The lowering
+#    models `<<` as a call whose result is the only tainted output, so fixing
+#    it means a receiver-mutation relation for every Ruby String/Array/IO
+#    append, which is not a localized correction.
+# 3. No sink. `@logger.send(meth, msg)` (authenticator.rb:88) labels
+#    nothing: holding a labelled source and expression-position assembly
+#    fixed and varying only the sink spelling reports 1 through the bare
+#    `logger.error` receiver and 0 through `send` -- the third and fifth
+#    test below are that pair. Object#send on a config-injected logger is
+#    not a documented logging API, and widening the receiver-qualified
+#    logger spellings was measured in the first review and reverted: across
+#    the whole tree it fired exactly one finding, filehandler.rb:342's
+#    `@logger.warn("the request refers nondisclosure name
+#    `#{File.basename(res.filename)}'.")`, identically at the vulnerable and
+#    the patched revision (the fix does not touch that file), while adding
+#    19 medium log rows of ordinary `@logger.info("... #{env[:x]} ...")`
+#    operational logging on one 867-file subtree (97 to 116 findings).
+#
+# Fresh 3 x --cache off scans of both revisions report the same 47 findings
+# (47/47/47 and 47/47/47), no VYQL-INJ-009 on either, and nothing at all on
+# basicauth.rb, authenticator.rb or accesslog.rb in either the findings
+# report or the flags view.
+#
+# The neutraliser half is a needle miss, not a token miss. WEBrick's escape
+# is `data.gsub(/[[:cntrl:]\\]+/) {$&.dump[1...-1]}.untaint`
+# (accesslog.rb:153), and logEscape342's needle is `[[:cntrl:]]`, which the
+# character class `[[:cntrl:]\\]` does not contain -- after its first `]`
+# comes a backslash, not a second `]`. A Ruby regex-literal argument *is*
+# exposed as an `args.any.literal` token: `data.gsub(/[[:cntrl:]]+/)
+# {...}` labels core.LogEscape today, as does the same call with a string
+# pattern. The site is labelled, as threat.CharFilter by the generic
+# `call.filter.global` binding, so widening the needle to the POSIX class
+# prefix would label it -- and move no finding anywhere: across the whole
+# clone pool the control-char gsub idiom occurs in three projects -- here,
+# rack, and two shirasagi scraper and sanitiser sites that no logger call
+# reads -- no log finding reaches either revision, and the in-place `gsub!`
+# spelling that carries dominance coverage does not occur here at all.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected;
+# when receiver-mutating `<<` propagates, the fourth test must flip to
+# expect VYQL-INJ-009, and when a logger sink resolves `send`, the fifth
+# must.
+
+test "rank1944: the basic auth username reaches the log unescaped"
+  lang ruby
+  file lib/webrick/httpauth/basicauth.rb
+  reject VYQL-INJ-009
+  code
+  ```
+  module WEBrick
+    module HTTPAuth
+      module Authenticator
+        def check_scheme(req)
+          unless credentials = req[@request_field]
+            error("no credentials in the request.")
+            return nil
+          end
+          match = /^#{@auth_scheme}\s+/i.match(credentials)
+          match.post_match
+        end
+
+        def error(fmt, *args)
+          if @logger.error?
+            log(:error, fmt, *args)
+          end
+        end
+
+        def log(meth, fmt, *args)
+          msg = format("%s %s: ", @auth_scheme, @realm)
+          msg << fmt % args
+          @logger.send(meth, msg)
+        end
+      end
+
+      class BasicAuth
+        include Authenticator
+
+        def authenticate(req, res)
+          unless basic_credentials = check_scheme(req)
+            challenge(req, res)
+          end
+          userid, password = basic_credentials.unpack("m*")[0].split(":", 2)
+          password ||= ""
+          unless encpass = @userdb.get_passwd(@realm, userid, @reload_db)
+            error("%s: the user is not allowed.", userid)
+            challenge(req, res)
+          end
+          req.user = userid
+        end
+
+        def challenge(req, res)
+          raise Unauthorized
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1944: the fixed revision escapes every logged value at the log boundary"
+  lang ruby
+  file lib/webrick/log.rb
+  reject VYQL-INJ-009
+  code
+  ```
+  module WEBrick
+    class BasicLog
+      def error(msg)
+        log(ERROR, "ERROR " << format(msg))
+      end
+
+      def log(level, data)
+        if @log && level <= @level
+          data += "\n" if /\n\Z/ !~ data
+          @log << data
+        end
+      end
+
+      def format(arg)
+        if arg.is_a?(Exception)
+          "#{arg.class}: #{AccessLog.escape(arg.message)}\n\t" <<
+          arg.backtrace.join("\n\t") << "\n"
+        elsif arg.respond_to?(:to_str)
+          AccessLog.escape(arg.to_str)
+        else
+          arg.inspect
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1944: the message assembled in expression position is reported"
+  lang ruby
+  file lib/webrick/httpauth/authenticator.rb
+  expect VYQL-INJ-009
+  code
+  ```
+  module WEBrick
+    module HTTPAuth
+      module Authenticator
+        def log(fmt, *args)
+          msg = "WEBrick's realm: " << fmt % args
+          logger.error(msg)
+        end
+      end
+
+      class BasicAuth
+        include Authenticator
+
+        def authenticate
+          userid = params["authorization"].unpack("m*")[0].split(":", 2)[0]
+          unless @userdb.get_passwd(@realm, userid, true)
+            log("%s: the user is not allowed.", userid)
+          end
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1944: the same append in statement position loses the taint"
+  lang ruby
+  file lib/webrick/httpauth/authenticator.rb
+  reject VYQL-INJ-009
+  code
+  ```
+  module WEBrick
+    module HTTPAuth
+      module Authenticator
+        def log(fmt, *args)
+          msg = "WEBrick's realm: "
+          msg << fmt % args
+          logger.error(msg)
+        end
+      end
+
+      class BasicAuth
+        include Authenticator
+
+        def authenticate
+          userid = params["authorization"].unpack("m*")[0].split(":", 2)[0]
+          unless @userdb.get_passwd(@realm, userid, true)
+            log("%s: the user is not allowed.", userid)
+          end
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1944: the same message through the send-dispatched logger is not"
+  lang ruby
+  file lib/webrick/httpauth/authenticator.rb
+  reject VYQL-INJ-009
+  code
+  ```
+  module WEBrick
+    module HTTPAuth
+      module Authenticator
+        def log(meth, fmt, *args)
+          msg = "WEBrick's realm: " << fmt % args
+          @logger.send(meth, msg)
+        end
+      end
+
+      class BasicAuth
+        include Authenticator
+
+        def authenticate
+          userid = params["authorization"].unpack("m*")[0].split(":", 2)[0]
+          unless @userdb.get_passwd(@realm, userid, true)
+            log(:error, "%s: the user is not allowed.", userid)
+          end
+        end
+      end
+    end
+  end
+  ```

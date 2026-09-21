@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule SchematronLinkHrefUnsafeSchemeDenylist {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_79, CWE_178]
+    id: "VYQL-INJ-169"
+    severity: high
+  }
+  issue code.SchematronLinkHrefUnsafeSchemeDenylist as sink
+}

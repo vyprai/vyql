@@ -1,0 +1,9 @@
+module bindings.php.generated.maaa0f51b;
+
+binding deserialization0 {
+  requires {
+    dependency("maxmind-db/reader")
+  }
+  query pattern callExpr where callee.method == "MaxMindDbReaderDecoder::decode"
+  emit sink code.Deserialization at args[0]
+}

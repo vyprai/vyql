@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule SegmentedKeyDenylistBypassPrototypePollution {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_1321]
+    id: "VYQL-INJ-208"
+    severity: high
+  }
+  issue code.SegmentedKeyDenylistBypassPrototypePollution as sink
+}

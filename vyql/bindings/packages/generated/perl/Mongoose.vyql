@@ -1,0 +1,33 @@
+module bindings.perl.generated.m2e91238a;
+
+binding networkConnect0 {
+  requires {
+    dependency("Mongoose")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect1 {
+  requires {
+    dependency("Mongoose")
+  }
+  query pattern callExpr where callee.method == "connection"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding nosqlQuery2 {
+  requires {
+    dependency("Mongoose")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding databaseRead3 {
+  requires {
+    dependency("Mongoose")
+  }
+  query pattern callExpr where callee.method == "load_schema"
+  emit sink code.DatabaseReadSink at args[0]
+}

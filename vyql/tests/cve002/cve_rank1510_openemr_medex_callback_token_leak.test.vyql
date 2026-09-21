@@ -1,0 +1,99 @@
+# Rank 1510 / CVE-2026-24898: OpenEMR's MedEx callback returned the full
+# login payload to any caller presenting a callback_key (sensitive data
+# exposure). library/MedEx/MedEx.php did
+#   if (!empty($_POST['callback_key'])) {
+#       $MedEx = new MedExApi\MedEx('MedExBank.com');
+#       $response = $MedEx->login('2');
+#       header('Content-type: application/json');
+#       echo json_encode($response);
+#       exit; }
+# and login() in library/MedEx/API.php folds $_POST['callback_key'] into
+# the medex_prefs credentials (ME_username, ME_api_key, line 3360), drives
+# the remote login, and returns the decoded status payload -- session and
+# API tokens included -- which the endpoint echoed wholesale. The fixing commit
+# 8e4de59ab5 carries the change (its message naming the exposure
+# and the four changes): 404 when MedEx is disabled to hide the endpoint,
+# callback_key presence validated, only success/failure status returned
+# (echo json_encode(['success' => true]) or ['error' => $error]), audit
+# logging per the #10334 webhook patterns. .
+#
+# CAUGHT by VYQL-INJ-004. Scanning the fixed revision's directories reports 12 findings
+# at the vulnerable revision and 11 at the fixed revision; the row that disappears is exactly
+# the removed echo: source code.HttpInput at API.php:3360
+# ($_POST['callback_key'] entering login's credential array), sink
+# code.HtmlRender at MedEx.php:42 (echo json_encode($response)), high
+# confidence, taint path through MedEx.login's return, unless clauses
+# unsatisfied. The rule reads the flow as reflected output; the reflected
+# value is the login payload carrying the tokens, so the report sits on
+# the leak statement itself and vanishes at the fixed revision. No definition
+# change shipped. Spec cve_rank1510 records the wholesale echo expecting
+# VYQL-INJ-004 and the status-only response rejecting it.
+
+test "rank1510: the callback echoes the whole login payload"
+  lang php
+  file library/MedEx/MedEx.php
+  expect VYQL-INJ-004
+  code
+  ```
+  <?php
+  require_once(__DIR__ . "/../../interface/globals.php");
+
+  class MedEx {
+      public function login($force = '') {
+          $info = $this->getPreferences();
+          $info['callback_key'] = $_POST['callback_key'];
+          $info = $this->just_login($info);
+          return $info['status'];
+      }
+      public function getPreferences() { return []; }
+      public function just_login($info) { return $info; }
+  }
+
+  if (!empty($_POST['callback_key'])) {
+      $MedEx = new MedEx('MedExBank.com');
+      $response = $MedEx->login('2');
+      header('Content-type: application/json');
+      echo json_encode($response);
+      exit;
+  }
+  ```
+
+test "rank1510: the fixed revision answers with status only"
+  lang php
+  file library/MedEx/MedEx.php
+  reject VYQL-INJ-004
+  code
+  ```
+  <?php
+  require_once(__DIR__ . "/../../interface/globals.php");
+
+  class MedEx {
+      public function login($force = '') {
+          $info = $this->getPreferences();
+          $info['callback_key'] = $_POST['callback_key'];
+          $info = $this->just_login($info);
+          return $info['status'];
+      }
+      public function getPreferences() { return []; }
+      public function just_login($info) { return $info; }
+  }
+
+  $callbackKey = $_POST['callback_key'] ?? '';
+  if ($GLOBALS['medex_enable'] !== '1') {
+      http_response_code(404);
+      echo json_encode(['error' => 'Not found']);
+      exit;
+  }
+  if (empty($callbackKey)) {
+      echo json_encode(['error' => 'Missing callback key']);
+      exit;
+  }
+  $MedEx = new MedEx('MedExBank.com');
+  $response = $MedEx->login('2');
+  if (isset($response['success']) && $response['success']) {
+      echo json_encode(['success' => true]);
+  } else {
+      echo json_encode(['error' => 'Sync failed']);
+  }
+  exit;
+  ```

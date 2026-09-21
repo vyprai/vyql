@@ -1,0 +1,25 @@
+module bindings.groovy.generated.m8e859670;
+
+binding deserialization0 {
+  requires {
+    dependency("com.fasterxml.jackson.dataformat:jackson-dataformat-smile")
+  }
+  query pattern callExpr where callee.method == "createParser"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("com.fasterxml.jackson.dataformat:jackson-dataformat-smile")
+  }
+  query pattern callExpr where callee.method == "nextToken"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("com.fasterxml.jackson.dataformat:jackson-dataformat-smile")
+  }
+  query pattern callExpr where callee.method == "readBinaryValue"
+  emit sink code.Deserialization at args[0]
+}

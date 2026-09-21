@@ -1,0 +1,27 @@
+test "php: incomplete server port validation before connect is SSRF"
+  lang php
+  expect VYQL-RF-005
+  code
+  ```
+  <?php
+  list($host, $port) = explode(":", SERVER, 2);
+  if (is_numeric($port) && ($port < 1024 || $port > 65535)) {
+      auth_error("Connecting to privileged ports is not allowed.");
+  }
+  $connection = connect();
+  ?>
+  ```
+
+test "php: coerced server port validation before connect is clean"
+  lang php
+  reject VYQL-RF-005
+  code
+  ```
+  <?php
+  list($host, $port) = explode(":", SERVER, 2);
+  if (+$port && ($port < 1024 || $port > 65535)) {
+      auth_error("Connecting to privileged ports is not allowed.");
+  }
+  $connection = connect();
+  ?>
+  ```

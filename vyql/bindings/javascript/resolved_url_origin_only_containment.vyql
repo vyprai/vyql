@@ -1,0 +1,50 @@
+module bindings.javascript.resolved_url_origin_only_containment;
+
+// A forwarding target has to be resolved before it can be fetched, and the
+// WHATWG URL API documents exactly one way to do that with a configured
+// base: `new URL(source, base)` resolves the source against the base's
+// href. The same API documents the components of the result, and the two a
+// containment guard can choose between are not interchangeable: `origin` is
+// scheme + host + port and excludes the path, while `href` is the whole
+// URL. A guard that containment-checks the resolved URL through `.origin`
+// therefore confines where the request goes but not where it lands -- a
+// source with an absolute path or leading `..` re-roots the target under
+// the same origin, and every path after the base's prefix is reachable
+// (CWE-22). Reading `.href` for the comparison is the control: it carries
+// the base's path, so prefix containment over it keeps the target inside
+// the configured subtree, and its presence anywhere in the function stops
+// the report.
+//
+// The binding reads three atom facts and judges none of them: the URL
+// constructor is called (the `call:` token is the last segment, so
+// `URLSearchParams` and `URL.createObjectURL` do not match), a binary
+// comparison ties a `.startsWith(` call to an `.origin` member operand --
+// both substrings sit on the same whitespace-stripped `expr:` token, which
+// the frontend derives from the binary-expression node, so the origin read
+// has to stand inside the comparison and a comment cannot supply it -- and
+// no `.href` read exists. The tie is what separates this from the prefix
+// comparisons of ordinary routing: `url.pathname.startsWith("/v1/auth/")`
+// compares a parsed request path against a literal route, and an `.origin`
+// read elsewhere in the handler does not turn routing into containment.
+// All three clauses sit at function scope, which keeps the atoms confined
+// to the function that resolves the URL.
+//
+// Residuals, both in the safe direction. The containment comparison has to
+// appear inside a binary expression for the frontend to emit the `expr:`
+// token; a guard written `if (!base.startsWith(dest.origin))` with no
+// second conjunct emits no token and is not reported. And the control is
+// spelled `.href`; a full-URL comparison through `.toString()` suppresses
+// nothing, so that correctly-fixed form is still reported.
+//
+// The judgement lives in the pack rule; this binding only recognises the
+// atoms.
+
+binding resolvedUrlOriginOnlyContainment {
+  query pattern presenceNode where node.scope == "function"
+    and node.context.language == "javascript"
+    and node.context.call in ["URL"]
+    and node.context.expr contains ".startsWith("
+    and node.context.expr contains ".origin)"
+    and not (node.context.selector contains ".href")
+  emit issue code.ResolvedUrlOriginOnlyContainment at node
+}

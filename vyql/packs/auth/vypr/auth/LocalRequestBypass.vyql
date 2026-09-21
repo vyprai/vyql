@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule LocalRequestBypass {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_266, CWE_285, CWE_862]
+    id: "VYQL-AUTH-170"
+    severity: high
+  }
+  issue code.LocalRequestBypassReview as authz
+}

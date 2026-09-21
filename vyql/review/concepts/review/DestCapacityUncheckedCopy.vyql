@@ -1,0 +1,7 @@
+module code;
+
+review code.DestCapacityUncheckedCopy {
+  category: memory
+  kind: attention
+  text: "review whether the copy can exceed the destination's own capacity; bound it by the capacity the code states for that destination"
+}

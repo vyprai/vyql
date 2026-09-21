@@ -1,0 +1,9 @@
+module bindings.php.generated.mf5244e6a;
+
+binding filePathAccess0 {
+  requires {
+    dependency("laminas/laminas-servicemanager")
+  }
+  query pattern callExpr where callee.method == "ConfigDumperCommand.php::execute"
+  emit sink code.FilePathAccess at args[0]
+}

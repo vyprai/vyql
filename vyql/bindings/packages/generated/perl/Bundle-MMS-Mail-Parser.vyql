@@ -1,0 +1,9 @@
+module bindings.perl.generated.m2189c6b3;
+
+binding deserialization0 {
+  requires {
+    dependency("Bundle-MMS-Mail-Parser")
+  }
+  query pattern callExpr where callee.method == "Bundle::MMS::Mail::Parser"
+  emit sink code.Deserialization at args[0]
+}

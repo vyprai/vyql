@@ -1,0 +1,66 @@
+test "rank332: Casdoor upload helper forwards full file path without traversal guard"
+  lang go
+  expect VYQL-PATH-013
+  expect_review code.UploadFilePathTraversalWrite
+  code
+  ```
+  package object
+
+  import "bytes"
+
+  type Provider struct{}
+
+  func uploadFile(provider *Provider, fullFilePath string, fileBuffer *bytes.Buffer) (string, string, error) {
+      return "", fullFilePath, nil
+  }
+
+  func UploadFileSafe(provider *Provider, fullFilePath string, fileBuffer *bytes.Buffer) (string, string, error) {
+      var fileUrl string
+      var objectKey string
+      var err error
+      for {
+          fileUrl, objectKey, err = uploadFile(provider, fullFilePath, fileBuffer)
+          if err == nil {
+              break
+          }
+      }
+      return fileUrl, objectKey, nil
+  }
+  ```
+
+test "rank332: Casdoor upload helper rejects traversal segments"
+  lang go
+  reject VYQL-PATH-013
+  reject_review code.UploadFilePathTraversalWrite
+  code
+  ```
+  package object
+
+  import (
+      "bytes"
+      "fmt"
+      "strings"
+  )
+
+  type Provider struct{}
+
+  func uploadFile(provider *Provider, fullFilePath string, fileBuffer *bytes.Buffer) (string, string, error) {
+      return "", fullFilePath, nil
+  }
+
+  func UploadFileSafe(provider *Provider, fullFilePath string, fileBuffer *bytes.Buffer) (string, string, error) {
+      if strings.Contains(fullFilePath, "..") {
+          return "", "", fmt.Errorf("the fullFilePath is not allowed")
+      }
+      var fileUrl string
+      var objectKey string
+      var err error
+      for {
+          fileUrl, objectKey, err = uploadFile(provider, fullFilePath, fileBuffer)
+          if err == nil {
+              break
+          }
+      }
+      return fileUrl, objectKey, nil
+  }
+  ```

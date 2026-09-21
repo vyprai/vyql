@@ -1,0 +1,11 @@
+module code;
+
+concept InsecureHeaderConfig : issue {
+  cwe: [CWE_942, CWE_1021, CWE_693]
+  reviewAssumption: "the endpoint is reached by a browser that honours the header"
+  reviewCategory: misconfig
+  reviewCondition: "a response header disables a browser protection or opens the origin allow-list"
+  reviewConfidence: medium
+  reviewEvidence: "header store {pattern} sets a permissive or disabled protection value"
+  vulnerableTo: [access_control.IncorrectAuthorization]
+}

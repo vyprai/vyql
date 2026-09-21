@@ -1,0 +1,107 @@
+# Rank 1813 / CVE-2026-42567 (GHSA-f3cj-j4f6-wq85): Svelte's experimental
+# async SSR serializes `hydratable` state with devalue.uneval, representing
+# each unresolved promise as a numbered placeholder string that a microtask
+# later splices the resolved value into (packages/svelte/src/internal/server/
+# hydratable.js):
+#
+#   const placeholder = `"${uid++}"`;
+#   const p = value
+#     .then((v) => {
+#       entry.serialized = entry.serialized.replace(placeholder, `r(${uneval(v)})`);
+#     })
+#
+# The replacement is passed as a string, and a string replacement is a
+# substitution template: `$&`, `` $` ``, `$'`, `$$` and `$n` are directives
+# evaluated against the subject. The resolved value is application state that
+# routinely embeds user content, so `"$'"` in it splices the whole remainder
+# of the serialized payload into the placeholder's position -- escaping the
+# quoting uneval gave the value and injecting script into the hydration
+# `<script>` the server writes into the page head (CWE-134 in its
+# externally-controlled-substitution-template form; CWE-79 in consequence --
+# the advisory's own title is "prevent XSS on `hydratable` from user
+# contents"). Fix a16ebc67 passes the function form `() => \`r(${uneval(v)})\``
+# in the two playground sandboxes as well, whose `.replace('<!--ssr-head-->',
+# head)` spliced rendered output the same way.
+#
+# Detection reuses the existing format-string pair: the second argument of
+# replace/replaceAll is bound as code.FormatString, and VYQL-INJ-011
+# judges untrusted data reaching it. The discrimination is structural rather
+# than keyed on the fixed revision's layout: the sink sits on the argument node data
+# flows into, and the function form is control flow that carries no data into
+# that position -- renaming placeholder, uneval, serialized and the `r(`
+# wrapper leaves the flag standing (measured). What stays dark on the library
+# tree itself is the in-library instance: taint stops at
+# `devalue.uneval(entry.value, callback)` because no actual argument's taint
+# reaches a callback formal's parameter (the same closure/callee-provenance
+# gap family that blocks the serialize-javascript splice point), and `value`
+# itself originates from `fn()`, a callback parameter the engine does not
+# resolve. The `.then` hop does propagate, so any spelling where the resolved
+# data is tainted at the replacement -- the application-side shape this spec
+# models, and both playground files if their render output carry taint --
+# reports.
+#
+# Measured on the real checkout, three --cache off runs per cell: vulnerable
+# 451 -> 452 with the binding, fixed 451 -> 452, the one added finding being
+# the dev-hydration warning at internal/client/dom/elements/attributes.js:615
+# (an outerHTML.replace whose replacement is `innerHTML && '...'`, constant
+# in value but tainted in syntax), present at both revisions alike; nothing
+# on hydratable.js, for the engine reason above. The playground sandbox
+# directories scan 9 = 9 at both revisions either way. Collateral across ten
+# sibling JavaScript trees (swagger-ui, librechat, lobe-chat, nunjucks,
+# liquidjs, marked, squirrelly, eta, ejs, lodash): VYQL-INJ-011 identical
+# with and without the binding on every tree -- zero added findings.
+
+test "rank1813: promise-resolved user content spliced into a serialized payload as a string replacement"
+  lang javascript
+  file hydratable.js
+  expect VYQL-INJ-011
+  code
+  ```
+  import * as devalue from 'devalue';
+
+  export function render_payload(request) {
+    const entry = { serialized: '' };
+    let uid = 1;
+
+    // we serialize promises as `"${uid}"`, because it's impossible for that
+    // string to occur 'naturally' (since the quote marks would have to be
+    // escaped). Later, when the promise resolves, the placeholder is replaced.
+    const value = Promise.resolve(request.query.content);
+    const placeholder = `"${uid++}"`;
+
+    const p = value.then((v) => {
+      entry.serialized = entry.serialized.replace(placeholder, `r(${devalue.uneval(v)})`);
+    });
+
+    return entry;
+  }
+  ```
+
+test "rank1813: function-form replacement substitutes its return value with no template interpretation"
+  lang javascript
+  file hydratable.js
+  reject VYQL-INJ-011
+  code
+  ```
+  import * as devalue from 'devalue';
+
+  export function render_payload(request) {
+    const entry = { serialized: '' };
+    let uid = 1;
+
+    const value = Promise.resolve(request.query.content);
+    const placeholder = `"${uid++}"`;
+
+    const p = value.then((v) => {
+      entry.serialized = entry.serialized.replace(
+        placeholder,
+        // use the function form here to prevent any string replacement
+        // characters from being interpreted in `v`, as it's potentially
+        // user-controlled and therefore potentially malicious.
+        () => `r(${devalue.uneval(v)})`
+      );
+    });
+
+    return entry;
+  }
+  ```

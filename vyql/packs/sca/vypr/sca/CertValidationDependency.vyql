@@ -1,0 +1,10 @@
+module vypr.sca;
+
+rule CertValidationDependency {
+  meta {
+    cwe: [CWE_295]
+    id: "VYQL-SCA-006"
+    severity: high
+  }
+  issue sbom.CertValidationDependency as p
+}

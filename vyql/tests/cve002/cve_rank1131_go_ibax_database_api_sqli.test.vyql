@@ -1,0 +1,52 @@
+# Rank 1131 / CVE-2022-3798: go-ibax's open-database-info API handlers build
+# raw SQL with fmt.Sprintf from request parameters and run it through GORM
+# Raw() with no parameterization (CWE-89).
+#
+# VYQL-INJ-001 fires on HttpInput reaching SqlExecution through fmt.Sprintf
+# with no SqlParameterization control. The fixed revision removes the handlers
+# entirely. Vulnerable snippet expects the finding.
+#
+# verify_current_expected: current-behavior
+
+test "rank1131: table name and order are interpolated into a raw SQL query"
+  lang go
+  file database.go
+  expect VYQL-INJ-001
+  code
+  ```
+  package api
+
+  import (
+      "fmt"
+      "net/http"
+
+      "github.com/IBAX-io/go-ibax/packages/storage/sqldb"
+  )
+
+  type tableInfoForm struct {
+      Order      string `schema:"order"`
+      Limit      int    `json:"limit"`
+      Page       int    `json:"page"`
+      Table_name string `json:"table_name,omitempty"`
+  }
+
+  func getOpenTablesInfoHandler(w http.ResponseWriter, r *http.Request) {
+      form := &tableInfoForm{}
+      if err := parseForm(r, form); err != nil {
+          errorResponse(w, err, http.StatusBadRequest)
+          return
+      }
+      if form.Order == "" {
+          form.Order = "tablename asc"
+      }
+      q := sqldb.GetDB(nil)
+      query := fmt.Sprintf("SELECT tablename from pg_tables where schemaname ='public' and tablename like %s order by %s offset %d limit %d", "'%"+form.Table_name+"%'", form.Order, (form.Page-1)*form.Limit, form.Limit)
+      rows, err := q.Raw(query).Rows()
+      if err != nil {
+          errorResponse(w, err, http.StatusBadRequest)
+          return
+      }
+      result, _ := sqldb.GetResult(rows)
+      jsonResponse(w, result)
+  }
+  ```

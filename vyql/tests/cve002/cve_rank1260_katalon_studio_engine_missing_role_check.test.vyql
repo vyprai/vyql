@@ -1,0 +1,147 @@
+# The Katalon Studio Engine Plugin's ExecuteKatalonStudioHelper sent an
+# anonymous hudson.remoting.Callable across the Jenkins channel to run Katalon
+# Studio, with a checkRoles override left empty -- nothing ever calls
+# RoleChecker.check, so the callable does not restrict which channel role may
+# enter call(). The fixed revision drops the raw Callable/RoleChecker pair and
+# extends jenkins.security.MasterToSlaveCallable, whose own checkRoles enforces
+# the expected role.
+#
+# Both forms are anonymous classes: `new Callable<Boolean, Exception>() { ... }`
+# sits in expression position as the argument to launcher.getChannel().call(...).
+# The Java frontend now routes the object_creation_expression's trailing
+# class_body through the class-body walk class_declaration already uses and
+# hoists the resulting ClassDef after the expression's own statement, so the
+# overridden call()/checkRoles() methods lower like any named class's members
+# and jenkinsRemotingCallableMissingRoleCheck
+# (VYQL-AUTH-113, the named-class form of which is pinned in
+# jenkins_remoting_callable_missing_role_check.test.vyql) reaches the anonymous
+# form the real vulnerable and patched revisions both use. Measured on the real
+# checkout, three --cache off runs per revision, identical every run: the
+# revision before the fix reports VYQL-AUTH-113 at ExecuteKatalonStudioHelper.java:30
+# (23 findings, the only row the change adds), and the fixed revision reports
+# none (22 findings), the fingerprint sets differing by exactly that row and
+# the pre-existing log-output row whose line moves with the deleted methods.
+
+# verify_current_expected: fixed, 1 -> 0 on the real revision pair.
+
+test "rank1260: raw Callable with an empty checkRoles runs Katalon on any role"
+  lang java
+  file src/main/java/com/katalon/jenkins/plugin/helper/ExecuteKatalonStudioHelper.java
+  expect VYQL-AUTH-113
+  expect_review code.JenkinsRemotingCallableMissingRoleCheck
+  code
+  ```
+  package com.katalon.jenkins.plugin.helper;
+
+  import hudson.EnvVars;
+  import hudson.FilePath;
+  import hudson.Launcher;
+  import hudson.model.TaskListener;
+  import hudson.remoting.Callable;
+  import org.jenkinsci.remoting.RoleChecker;
+
+  import java.util.HashMap;
+  import java.util.Map;
+
+  public class ExecuteKatalonStudioHelper {
+
+      public static boolean executeKatalon(
+              FilePath workspace,
+              EnvVars buildEnvironment,
+              Launcher launcher,
+              TaskListener taskListener,
+              String version,
+              String location,
+              String executeArgs,
+              String x11Display,
+              String xvfbConfiguration) {
+          try {
+              return launcher.getChannel().call(new Callable<Boolean, Exception>() {
+                  @Override
+                  public Boolean call() throws Exception {
+                      if (workspace != null) {
+                          String workspaceLocation = workspace.getRemote();
+                          if (workspaceLocation != null) {
+                              Map<String, String> environmentVariables = new HashMap<>();
+                              environmentVariables.putAll(System.getenv());
+                              return KatalonUtils.executeKatalon(
+                                  version,
+                                  location,
+                                  workspaceLocation,
+                                  executeArgs,
+                                  x11Display,
+                                  xvfbConfiguration,
+                                  environmentVariables);
+                          }
+                      }
+                      return true;
+                  }
+                  @Override
+                  public void checkRoles(RoleChecker roleChecker) throws SecurityException {
+                  }
+              });
+          } catch (Exception e) {
+              return false;
+          }
+      }
+  }
+  ```
+
+test "rank1260: MasterToSlaveCallable enforces the expected role for the same run"
+  lang java
+  file src/main/java/com/katalon/jenkins/plugin/helper/ExecuteKatalonStudioHelper.java
+  reject VYQL-AUTH-113
+  reject_review code.JenkinsRemotingCallableMissingRoleCheck
+  code
+  ```
+  package com.katalon.jenkins.plugin.helper;
+
+  import hudson.EnvVars;
+  import hudson.FilePath;
+  import hudson.Launcher;
+  import hudson.model.TaskListener;
+  import jenkins.security.MasterToSlaveCallable;
+
+  import java.util.HashMap;
+  import java.util.Map;
+
+  public class ExecuteKatalonStudioHelper {
+
+      public static boolean executeKatalon(
+              FilePath workspace,
+              EnvVars buildEnvironment,
+              Launcher launcher,
+              TaskListener taskListener,
+              String version,
+              String location,
+              String executeArgs,
+              String x11Display,
+              String xvfbConfiguration) {
+          try {
+              return launcher.getChannel().call(new MasterToSlaveCallable<Boolean, Exception>() {
+                  @Override
+                  public Boolean call() throws Exception {
+                      if (workspace != null) {
+                          String workspaceLocation = workspace.getRemote();
+                          if (workspaceLocation != null) {
+                              Map<String, String> environmentVariables = new HashMap<>();
+                              environmentVariables.putAll(System.getenv());
+                              return KatalonUtils.executeKatalon(
+                                  version,
+                                  location,
+                                  workspaceLocation,
+                                  executeArgs,
+                                  x11Display,
+                                  xvfbConfiguration,
+                                  environmentVariables);
+                          }
+                      }
+                      return true;
+                  }
+              });
+          } catch (Exception e) {
+              return false;
+          }
+      }
+  }
+  ```

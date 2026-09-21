@@ -1,0 +1,23 @@
+module bindings.go.decodeOverwritesPresetId;
+
+// A Go handler that decodes a request body into a struct in place hands the
+// payload the last word on every field it names: encoding/json, encoding/xml
+// and the yaml/toml decoders all overwrite a struct field the moment the
+// payload carries its key. Presetting a field before the decode therefore does
+// not protect it -- the payload can replace the value -- while assigning the
+// field after the decode does, because the assignment lands once the payload
+// has been read. The exposure that matters is an identifier: a handler that
+// sets UserID (or any identity-bearing field) from the session and then decodes
+// the request over the same struct lets the caller name another record, the
+// mass-assignment route to acting on an account the session does not own.
+//
+// The frontend records the construct as a per-call fact anchored at the decode
+// itself, naming every field the function preset into the decode target
+// beforehand; this binding reports the facts whose preset fields include an
+// identifier-suffixed name. A decode behind a project's own wrapper method is
+// outside the fact's reach: it keys on the stdlib decode verbs, so only a
+// Decode or Unmarshal call at the handler names the construct.
+binding decodeOverwritesPresetId {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "go.decode_overwrites_preset_fields" and node.token endsWith "field:ID"
+  emit issue code.DecodeOverwritesPresetId at node
+}

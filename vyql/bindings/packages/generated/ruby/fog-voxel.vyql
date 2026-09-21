@@ -1,0 +1,25 @@
+module bindings.ruby.generated.m0a76e97f;
+
+binding weakHash0 {
+  requires {
+    dependency("fog-voxel")
+  }
+  query pattern callExpr where callee.method == "create_signature"
+  emit issue code.WeakHash at call
+}
+
+binding networkConnect1 {
+  requires {
+    dependency("fog-voxel")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend2 {
+  requires {
+    dependency("fog-voxel")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit sink code.NetworkSend at args[0]
+}

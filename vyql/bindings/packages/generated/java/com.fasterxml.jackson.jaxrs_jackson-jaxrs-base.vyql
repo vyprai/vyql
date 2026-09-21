@@ -1,0 +1,56 @@
+module bindings.java.generated.m34047661;
+
+binding deserialization0 {
+  requires {
+    dependency("com.fasterxml.jackson.jaxrs:jackson-jaxrs-base")
+  }
+  query pattern callExpr where callee.method == "readFrom"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("com.fasterxml.jackson.jaxrs:jackson-jaxrs-base")
+  }
+  query pattern callExpr where callee.method == "writeTo"
+  emit sink code.Deserialization at args[0]
+}
+
+binding inputValidation2 {
+  requires {
+    dependency("com.fasterxml.jackson.jaxrs:jackson-jaxrs-base")
+  }
+  query pattern callExpr where callee.method == "configure"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation3 {
+  requires {
+    dependency("com.fasterxml.jackson.jaxrs:jackson-jaxrs-base")
+  }
+  query pattern callExpr where callee.method == "enable"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation4 {
+  requires {
+    dependency("com.fasterxml.jackson.jaxrs:jackson-jaxrs-base")
+  }
+  query pattern callExpr where callee.method == "disable"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,36 @@
+module bindings.go.assumedTerminatorWidthByteSliceOffset;
+
+// golang.org/x/sys documents ByteSliceToString as returning "a string form
+// of the text represented by the slice s, with a terminating NUL and any
+// bytes after the NUL removed". The implementation is bytes.IndexByte(s, 0)
+// and a truncation, so when the slice carries no NUL at all the returned
+// string spans the whole slice and there is no terminator byte in it to step
+// past. The sibling BytePtrToString states the assumption outright: "it
+// assumes that the text sequence is terminated at a zero byte; if the zero
+// byte is not present, the program may crash". Advancing a cursor into the
+// source buffer by len(ByteSliceToString(buf)) plus the one-byte terminator
+// width therefore lands one past the buffer exactly when the delimiter the
+// +1 stands for is absent, and the slice expression panics -- the same
+// fixed-delimiter-width assumption the C delimiter scans carry, charged
+// against a length no byte inspection confirmed.
+//
+// Three facts in one Go function body are that shape, and each is
+// body-confined because the Go function context is built from the
+// declaration's own body: the conversion itself, an offset assigned as
+// len(<converted>)+<width>, and a slice taken at a computed position. The
+// spelling matched is the canonical Go idiom; the residuals are documented
+// rather than papered over: a reversed operand order (1 + len(x)) or an
+// inline slice bound (buf[len(x)+1:]) keeps the width arithmetic out of the
+// assign token, a subscript read (buf[len(x)+1]) emits no slice token, and a
+// body inside a closure contributes no tokens to the enclosing declaration.
+//
+// The neutraliser is the delimiter search: the bytes.Index, bytes.LastIndex
+// and bytes.Contains families are the documented way to learn whether the
+// terminator is present before deriving a position from its assumed width,
+// and a body that runs one has replaced the assumption with a measurement.
+// A bounds clamp against len(buf) that never searches for the delimiter
+// still carries the assumption and is not credited.
+binding goAssumedTerminatorWidthByteSliceOffset {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "go" and node.context.callPath in ["unix.ByteSliceToString", "windows.ByteSliceToString"] and containsAny(node.context.assign, ["=len("]) and containsAny(node.context.assign, [")+"]) and containsAny(node.context.slice, [":"]) and not containsAny(node.context.callPath, ["bytes.Index", "bytes.LastIndex", "bytes.Contains"])
+  emit issue code.AssumedLineTerminatorWidthScan at node
+}

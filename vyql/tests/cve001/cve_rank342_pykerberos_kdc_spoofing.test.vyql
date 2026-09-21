@@ -1,0 +1,32 @@
+test "rank342: pykerberos password auth must verify service principal"
+  lang c
+  expect VYQL-AUTH-089
+  expect_review code.KerberosPasswordServiceVerificationMissing
+  code
+  ```
+static krb5_error_code verify_password(krb5_context context, krb5_principal principal, const char *password, krb5_principal server)
+{
+    krb5_creds creds;
+    krb5_get_init_creds_opt gic_options;
+    memset(&creds, 0, sizeof(creds));
+    krb5_get_init_creds_opt_init(&gic_options);
+    return krb5_get_init_creds_password(context, &creds, principal, (char *)password, NULL, NULL, 0, NULL, &gic_options);
+}
+  ```
+
+test "rank342: pykerberos password auth bound to service principal is clean"
+  lang c
+  reject VYQL-AUTH-089
+  reject_review code.KerberosPasswordServiceVerificationMissing
+  code
+  ```
+static krb5_error_code verify_password(krb5_context context, krb5_principal principal, const char *password, const char *service)
+{
+    krb5_creds creds;
+    krb5_get_init_creds_opt gic_options;
+    memset(&creds, 0, sizeof(creds));
+    krb5_get_init_creds_opt_init(&gic_options);
+    krb5_get_init_creds_password(context, &creds, principal, (char *)password, NULL, NULL, 0, (char *)service, &gic_options);
+    return krb5_verify_init_creds(context, &creds, NULL, NULL, NULL, NULL);
+}
+  ```

@@ -1,0 +1,42 @@
+module bindings.python.cffi_callback_native_slice_write;
+
+// cffi's `ffi.callback(c_signature, func)` hands a Python function to C, and
+// the parameters that signature types as pointers arrive as native memory
+// owned by the C caller: their capacity is fixed on the C side and carries no
+// Python-side spelling at all, so Python writes through them without any
+// bounds check of its own. A slice assignment whose extent is `len()` of the
+// value being written is bounded by that value rather than by the
+// destination, so a callback returning more bytes than the C buffer holds
+// writes past it -- while the same slice assignment into a Python-level
+// buffer raises instead, which is why the destination's nativeness is the
+// whole judgement and the registration is the anchor.
+//
+// The registration and the write are never in the same function: the write
+// sits in the nested callback body and `ffi.callback` is called by the
+// enclosing one. A nested function's context does not reach the enclosing
+// scope's calls, but a function's context inherits its nested functions'
+// tokens, so the pair is observable only from the function that performs the
+// registration, and that is where the finding is reported. Within that one
+// function the two clauses are co-membership rather than a relation, so a
+// registration and an unrelated length-sliced copy in the same function also
+// report; the cffi anchor is what keeps that set small, and the copy idiom
+// the anchor does not guard -- a chunked read into a Python buffer -- has no
+// registration in it.
+//
+// The bound is a comparison in the function, in either operand order, which
+// is the idiom used to guard a fixed C buffer; the negation is on the
+// operators rather than on any bound's name, so a guard written against any
+// spelling of the capacity discharges it. A return annotation (`-> int`) is
+// not a comparison and does not.
+//
+// Residuals, all false-negative: the extent must be spelled `len(...)` inside
+// the subscript, so a bound computed a line earlier (`n = len(v);
+// out[0:n] = v`) leaves no token, and a clamp inside the subscript
+// (`out[0 : min(len(v), cap)]`) changes the spelling; any comparison anywhere
+// in the enclosing function, including one unrelated to the write,
+// discharges it; and the `@ffi.def_extern()` spelling of the registration is
+// invisible because the frontend extracts no call node for a decorator.
+binding cffiCallbackNativeSliceWrite {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "python" and containsAny(node.context.callPath, ["ffi.callback"]) and containsAny(node.context.subscript, [":len("]) and not containsAny(node.context.expr, [">", "<"])
+  emit issue code.RawMemoryCopySize at node
+}

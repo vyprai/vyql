@@ -1,0 +1,9 @@
+module bindings.go.generated.m66e7660a;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/neelance/sourcemap")
+  }
+  query pattern callExpr where callee.method == "ReadFrom"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,45 @@
+module bindings.java.groovy_script_parse_sandbox;
+
+// Groovy's `groovy.lang.GroovyShell` documents `parse` as compiling script
+// source and returning the Script ready to run, and compiling is not a pure
+// syntactic operation: classes defined by the source are loaded and linked
+// while it happens, so code written into the script (a constructor, a static
+// initializer) can execute before the caller ever calls `run()`. A shell
+// built for sandboxed execution (script-security's
+// `createBaseCompilerConfiguration` and the sandbox transformers) only
+// intercepts those calls while a sandbox is entered on the thread, so
+// compiling user-supplied script text outside script-security's sandbox
+// scope hands that text unsandboxed execution.
+//
+// The shell's compile entry point is the one-argument `parse` it documents
+// (the GroovyCodeSource / String / Reader overloads), and the subclass
+// overriding it reaches the compiler through `super.parse(source)` -- that
+// delegation is the sink. Parser frameworks that also spell their entry
+// `parse` carry their handler and context arguments on the same call, so the
+// argument count separates the script-compile spell from ordinary parser
+// delegation; receiver typing cannot, because a `super` receiver resolves to
+// no type in the scanner IR and a type predicate then matches every
+// delegation alike. Script text parsed on a locally held shell
+// (`shell.parse(text)`) is the residual this does not read.
+//
+// The neutralising control is script-security's documented sandbox scope --
+// `GroovySandbox.runInSandbox(body, whitelist)` and the `enter()`/`leave()`
+// pair it is defined over. Both wrap the work in a closure passed to the
+// scope call, so the guarded work sits inside an argument lambda of the
+// control call rather than after it; the check is therefore read at function
+// scope from the call path, which credits the whole compiling function and
+// does not depend on the scope call dominating the lambda body.
+
+binding groovyShellSuperParse9211 {
+  query pattern callExpr where callee.path == "super.parse" and args.count == 1
+  emit sink code.CodeEval at args[0]
+}
+
+binding groovySandboxScope9212 {
+  query pattern presenceNode where node.scope == "function" and containsAny(node.context.callPath, ["GroovySandbox.runInSandbox", "GroovySandbox.enter"])
+  emit check core.CodeExecutionValidation at node {
+    covers endpoint {
+      anchor: node
+    }
+  }
+}

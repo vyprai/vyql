@@ -1,0 +1,154 @@
+# GPAC's UTF-8 line converter clamps the converted length against its own
+# conversion buffer but never against the caller-supplied destination size
+# before strcpy, so a converted line longer than the caller's buffer overflows
+# it (CWE-121, CWE-787). gf_text_get_utf8_line in src/filters/load_text.c
+# reads a line with gf_fgets(szLine, lineSize, txt_in) and declares
+# lineSize to be szLine's byte count again in memset(szLine, 0,
+# sizeof(char)*lineSize), converts into the fixed-size local szLineConv,
+# clamps j to GF_ARRAY_LENGTH(szLineConv) - 1 when the conversion overflows
+# that array, and then calls strcpy(szLine, szLineConv) with nothing ever
+# relating j to lineSize. Fix d0ced41651b2 inserts
+# `if (j >= lineSize) { j = lineSize-1; }` immediately before the copy.
+#
+# Detected by the dest_capacity_unchecked fact
+# (ccDestCapacityUncheckedObservations,
+# internal/extract/frontend/treesitter/c.go) through binding
+# destCapacityUncheckedCopy in vyql/bindings/c/dest_capacity_unchecked_copy.vyql,
+# judged by VYQL-MEM-071. The fact pairs the strcpy's destination parameter
+# with the parameter the function itself uses as that destination's byte count
+# in a capacity-taking libc call (here memset; fgets/fread/snprintf/strncpy
+# pair the same way) and reports the copy when no relational comparison in the
+# function mentions that capacity parameter, so the fix's clamp clears it and
+# so does the mirrored operand order. The unconditional VYQL-MEM-002 smell
+# still fires on both forms; this spec pins the rule that discriminates them.
+#
+# Residuals, all false-negative: a clamp on one branch clears every copy in
+# the function, including the UTF-16 branch's own strcpy, which upstream left
+# unclamped; the compacted body keeps comments, so a commented-out capacity
+# check still clears; and a project's own prefixed wrapper around a
+# capacity-taking libc call (gf_fgets) does not pair, so only the standard
+# spellings identify the capacity.
+
+test "rank1139: the converted line is copied out with only the conversion buffer's bound checked"
+  lang c
+  file load_text.c
+  expect VYQL-MEM-071
+  code
+  ```
+  char *gf_text_get_utf8_line(char *szLine, u32 lineSize, FILE *txt_in, s32 unicode_type)
+  {
+      u32 i, j, len;
+      char *sOK;
+      char szLineConv[2048];
+
+      memset(szLine, 0, sizeof(char)*lineSize);
+      sOK = gf_fgets(szLine, lineSize, txt_in);
+      if (!sOK) return NULL;
+      j = 0;
+      len = (u32) strlen(szLine);
+      for (i=0; i<len; i++) {
+          if (j >= GF_ARRAY_LENGTH(szLineConv))
+              break;
+          szLineConv[j] = szLine[i];
+          j++;
+      }
+      if (j >= GF_ARRAY_LENGTH(szLineConv)) {
+          j = GF_ARRAY_LENGTH(szLineConv) -1 ;
+      }
+      szLineConv[j] = 0;
+      strcpy(szLine, szLineConv);
+      return sOK;
+  }
+  ```
+
+test "rank1139: the destination buffer's own size is also checked before the copy"
+  lang c
+  file load_text.c
+  reject VYQL-MEM-071
+  code
+  ```
+  char *gf_text_get_utf8_line(char *szLine, u32 lineSize, FILE *txt_in, s32 unicode_type)
+  {
+      u32 i, j, len;
+      char *sOK;
+      char szLineConv[2048];
+
+      memset(szLine, 0, sizeof(char)*lineSize);
+      sOK = gf_fgets(szLine, lineSize, txt_in);
+      if (!sOK) return NULL;
+      j = 0;
+      len = (u32) strlen(szLine);
+      for (i=0; i<len; i++) {
+          if (j >= GF_ARRAY_LENGTH(szLineConv))
+              break;
+          szLineConv[j] = szLine[i];
+          j++;
+      }
+      if (j >= GF_ARRAY_LENGTH(szLineConv)) {
+          j = GF_ARRAY_LENGTH(szLineConv) -1 ;
+      }
+      if ( j >= lineSize ) {
+          j = lineSize-1 ;
+      }
+      szLineConv[j] = 0;
+      strcpy(szLine, szLineConv);
+      return sOK;
+  }
+  ```
+
+test "rank1139: the mirrored comparison order consults the capacity too"
+  lang c
+  file load_text.c
+  reject VYQL-MEM-071
+  code
+  ```
+  char *gf_text_get_utf8_line(char *szLine, u32 lineSize, FILE *txt_in, s32 unicode_type)
+  {
+      u32 i, j, len;
+      char szLineConv[2048];
+
+      memset(szLine, 0, sizeof(char)*lineSize);
+      gf_fgets(szLine, lineSize, txt_in);
+      j = convert_to_utf8(szLine, szLineConv, sizeof(szLineConv));
+      if (lineSize <= j) {
+          j = lineSize - 1;
+      }
+      szLineConv[j] = 0;
+      strcpy(szLine, szLineConv);
+      return szLine;
+  }
+  ```
+
+test "rank1139: a copy into a local array keeps its own declared bound"
+  lang c
+  file load_text.c
+  reject VYQL-MEM-071
+  code
+  ```
+  void reformat_line(char *szLine, u32 lineSize, FILE *txt_in)
+  {
+      char local[1024];
+
+      memset(szLine, 0, sizeof(char)*lineSize);
+      gf_fgets(szLine, lineSize, txt_in);
+      strcpy(local, szLine);
+      process(local);
+  }
+  ```
+
+test "rank1139: a bounded read pairs the capacity the same way memset does"
+  lang c
+  file load_text.c
+  expect VYQL-MEM-071
+  code
+  ```
+  char *read_line(char *szLine, u32 lineSize, FILE *txt_in)
+  {
+      char converted[4096];
+
+      fgets(szLine, lineSize, txt_in);
+      convert(szLine, converted);
+      strcpy(szLine, converted);
+      return szLine;
+  }
+  ```

@@ -1,0 +1,11 @@
+module code;
+
+concept BufferedErrorPageRequestMetadataXss : issue {
+  cwe: [CWE_79]
+  reviewAssumption: "the request URI or referer header can contain attacker-controlled HTML rendered by the diagnostic response"
+  reviewCategory: xss
+  reviewCondition: "a PHP error or diagnostic page buffers request metadata into HTML and prints it without escaping"
+  reviewConfidence: high
+  reviewEvidence: "buffered error-page context {pattern} appends request URI or referer server variables into an HTML string before printing the buffer"
+  vulnerableTo: [injection.Xss]
+}

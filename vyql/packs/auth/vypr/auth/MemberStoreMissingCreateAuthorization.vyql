@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule MemberStoreMissingCreateAuthorization {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_862, CWE_863]
+    id: "VYQL-AUTH-069"
+    severity: high
+  }
+  issue code.MemberStoreMissingCreateAuthorization as store
+}

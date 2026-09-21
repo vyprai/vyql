@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.mbfdbcc03;
+
+binding deserialization0 {
+  requires {
+    dependency("com.squareup.retrofit2:converter-moshi")
+  }
+  query pattern callExpr where callee.method == "convert"
+  emit sink code.Deserialization at args[0]
+}

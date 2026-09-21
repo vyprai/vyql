@@ -1,0 +1,65 @@
+# Rank 387 / CVE-2013-5957: CiviCRM AJAX location lookups validated request
+# integers through CRM_Utils_Rule helpers that could accept exponent-form numeric
+# strings before those values reached SQL fragments.
+
+test "rank387: CiviCRM integer validator accepts exponent-form numeric strings"
+  lang php
+  expect VYQL-INJ-064
+  expect_review code.CiviCrmScientificNotationNumericValidationBypass
+  code
+  ```
+  <?php
+  class CRM_Utils_Rule {
+      static function integer($value) {
+          if (is_int($value)) {
+              return TRUE;
+          }
+
+          if (($value < 0)) {
+              $negValue = -1 * $value;
+              if (is_int($negValue)) {
+                  return TRUE;
+              }
+          }
+
+          if (is_numeric($value) && preg_match('/^\d+$/', $value)) {
+              return TRUE;
+          }
+
+          return FALSE;
+      }
+  }
+  ```
+
+test "rank387: CiviCRM numeric validators fail closed before regex checks"
+  lang php
+  reject VYQL-INJ-064
+  reject_review code.CiviCrmScientificNotationNumericValidationBypass
+  code
+  ```
+  <?php
+  class CRM_Utils_Rule {
+      static function integer($value) {
+          if (is_int($value)) {
+              return TRUE;
+          }
+
+          if (!is_numeric($value)) {
+              return FALSE;
+          }
+
+          if (preg_match('/^\d+$/', $value)) {
+              return TRUE;
+          }
+
+          if ($value < 0) {
+              $negValue = -1 * $value;
+              if (is_int($negValue)) {
+                  return TRUE;
+              }
+          }
+
+          return FALSE;
+      }
+  }
+  ```

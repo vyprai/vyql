@@ -1,0 +1,7 @@
+module code;
+
+concept LdapQuery : sink {
+  cwe: [CWE_90]
+  enabledBy: [taint.UntrustedData]
+  vulnerableTo: [injection.LdapInjection]
+}

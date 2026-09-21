@@ -1,0 +1,9 @@
+module bindings.perl.generated.m6128ab09;
+
+binding filePathAccess0 {
+  requires {
+    dependency("FuseBead-From-PNG")
+  }
+  query pattern callExpr where callee.method == "process"
+  emit sink code.FilePathAccess at args[0]
+}

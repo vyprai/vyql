@@ -1,0 +1,49 @@
+module bindings.python.generated.m0a55ad42;
+
+binding filePathAccess0 {
+  requires {
+    dependency("imagesize")
+  }
+  query pattern callExpr where callee.method == "get_info"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding urlFetch1 {
+  requires {
+    dependency("imagesize")
+  }
+  query pattern callExpr where callee.method == "get_info"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("imagesize")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding urlFetch3 {
+  requires {
+    dependency("imagesize")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("imagesize")
+  }
+  query pattern callExpr where callee.method == "getDPI"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding urlFetch5 {
+  requires {
+    dependency("imagesize")
+  }
+  query pattern callExpr where callee.method == "getDPI"
+  emit sink code.UrlFetch at args[0]
+}

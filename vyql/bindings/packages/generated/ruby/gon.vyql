@@ -1,0 +1,14 @@
+module bindings.ruby.generated.mbbe8c338;
+
+binding htmlEscape0 {
+  requires {
+    dependency("gon")
+  }
+  query pattern callExpr where callee.method == "Gon::Escaper.escape_unicode"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,49 @@
+module bindings.ruby.generated.me032aebf;
+
+binding httpInput0 {
+  requires {
+    dependency("webrick")
+  }
+  query pattern callExpr where callee.path ~= "HTTPRequest"
+  emit source code.HttpInput at call.result
+}
+
+binding responseHeaderWrite1 {
+  requires {
+    dependency("webrick")
+  }
+  query pattern callExpr where callee.path ~= "HTTPServer"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding networkData2 {
+  requires {
+    dependency("webrick")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend3 {
+  requires {
+    dependency("webrick")
+  }
+  query pattern callExpr where callee.method == "add"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect4 {
+  requires {
+    dependency("webrick")
+  }
+  query pattern callExpr where callee.method == "do_CONNECT"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding httpInput5 {
+  requires {
+    dependency("webrick")
+  }
+  query pattern callExpr where callee.method == "Cookie"
+  emit source code.HttpInput at call.result
+}

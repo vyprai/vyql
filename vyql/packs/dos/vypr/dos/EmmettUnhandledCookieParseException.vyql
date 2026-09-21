@@ -1,0 +1,11 @@
+module vypr.dos;
+
+rule EmmettUnhandledCookieParseException {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_248, CWE_400]
+    id: "VYQL-DOS-020"
+    severity: high
+  }
+  issue code.EmmettUnhandledCookieParseException as s
+}

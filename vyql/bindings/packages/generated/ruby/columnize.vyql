@@ -1,0 +1,17 @@
+module bindings.ruby.generated.m08b165c0;
+
+binding userControlledData0 {
+  requires {
+    dependency("columnize")
+  }
+  query pattern callExpr where callee.method == "parse_columnize_options"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("columnize")
+  }
+  query pattern callExpr where callee.method == "columnize"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule SessionUserInstallWithoutAuthenticationStateCheck {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_613]
+    id: "VYQL-AUTH-161"
+    severity: high
+  }
+  issue code.SessionUserInstallWithoutAuthenticationStateCheck as session
+}

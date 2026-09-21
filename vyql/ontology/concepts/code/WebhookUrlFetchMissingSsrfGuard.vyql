@@ -1,0 +1,11 @@
+module code;
+
+concept WebhookUrlFetchMissingSsrfGuard : issue {
+  cwe: [CWE_918]
+  reviewAssumption: "webhook or callback URLs can be configured by a tenant, user, or database record and the service has access to internal network targets"
+  reviewCategory: request_forgery
+  reviewCondition: "webhook or callback delivery fetches a caller-configured URL without an SSRF-safe dispatcher or URL validation guard"
+  reviewConfidence: high
+  reviewEvidence: "webhook delivery context {pattern} posts to a webhook/callback URL through a general outbound HTTP client without an observed secure dispatcher or URL guard"
+  vulnerableTo: [request_forgery.Ssrf]
+}

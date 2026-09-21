@@ -1,0 +1,99 @@
+# Rank 1133 / CVE-2025-43971: gobgp's BGP OPEN SoftwareVersion capability
+# parser accepted a declared length of zero, so `data[1:c.SoftwareVersionLen]`
+# evaluated as `data[1:0]` — a slice whose literal low bound exceeds its high
+# bound — and panicked, crashing the speaker on one crafted OPEN message
+# (CWE-193). The upstream fix (08a001e) adds `|| softwareVersionLen == 0` as a
+# third disjunct of the existing guard and changes nothing else, so the two
+# revisions differ by exactly that disjunct:
+#
+#   softwareVersionLen := uint8(data[0])
+#   if len(data[1:]) < int(softwareVersionLen) || softwareVersionLen > 64 {
+#       return NewMessageError(...)
+#   }
+#   c.SoftwareVersion = string(data[1:c.SoftwareVersionLen])
+#
+# ATTENTION, engine gap, re-measured at scanner feae1e651. Three
+# `--cache off --max-ram 6GB` scans per revision of the real checkout:
+# 15 findings and 389 review flags on each, byte-identical outputs, and
+# nothing in pkg/packet/bgp/bgp.go at either revision (the nearest labels are
+# ResourceHandle smells in cmd/gobgp). `vyql match` on the file labels no
+# source, sink or control anywhere in DecodeFromBytes.
+#
+# The shape is visible as text but not as a relation. Since the bettercap
+# slice-panic work, goSliceTokens (golang/golang.go:1340) emits per-expression
+# tokens into analysis.function.context, so the vulnerable function carries
+# `slice:data`, `slice:data:2:`, `slice:data:1:` (from both `data[1:]` and the
+# vulnerable expression), `slice:data::c.SoftwareVersionLen` and
+# `binary:softwareVersionLen>64`; the fixed revision adds exactly one token,
+# `binary:softwareVersionLen==0`. The only token-level discriminator between
+# the revisions is the fix's own added comparison, and a binding may not key
+# its reject on it. Note the guard that relates the length to the buffer,
+# `len(data[1:]) < int(softwareVersionLen)`, emits no `binary:` token at all:
+# goAtomToken returns "" for a SliceExpr argument and for the int() call.
+#
+# The generic text proxy also fails on measured precision, inside this same
+# file: a function-scoped presence binding on "a slice with a positive
+# literal low and a name high, and no zero-comparison in the function" fires
+# on PathAttributeAigp.DecodeFromBytes (bgp.go:14033), whose `value[3:length]`
+# is guarded by `length <= 3` — a correct lower-bound exclusion the proxy
+# cannot read — and it cannot distinguish the named-constant high of
+# `data[1:lsNLRIHdrLen]` (bgp.go:5204, the constant 9 behind a len guard)
+# from an attacker-controlled one, because both emit `slice:data::<name>`.
+#
+# The engine route remains the recorded gap: a slice expression still lowers
+# to a bare nir.Const (expr() has no *ast.SliceExpr case), so no node carries
+# the low and high bounds as related values, and relating the high bound's
+# possible range to the literal low is the range analysis ENGINE-GAPS.md
+# records beside the Swift instance — not a mechanical change. Both tests pin
+# the miss against the nearest rule, an unbounded-copy direction that states
+# the inverse relation.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1133: a declared length of zero produces an invalid slice expression"
+  lang go
+  file bgp.go
+  reject VYQL-MEM-002
+  code
+  ```
+  package bgp
+
+  func (c *CapSoftwareVersion) DecodeFromBytes(data []byte) error {
+      c.DefaultParameterCapability.DecodeFromBytes(data)
+      data = data[2:]
+      if len(data) < 2 {
+          return NewMessageError(BGP_ERROR_OPEN_MESSAGE_ERROR, BGP_ERROR_SUB_UNSUPPORTED_CAPABILITY, nil, "Not all CapabilitySoftwareVersion bytes allowed")
+      }
+      softwareVersionLen := uint8(data[0])
+      if len(data[1:]) < int(softwareVersionLen) || softwareVersionLen > 64 {
+          return NewMessageError(BGP_ERROR_OPEN_MESSAGE_ERROR, BGP_ERROR_SUB_UNSUPPORTED_CAPABILITY, nil, "invalid length of software version capablity")
+      }
+      c.SoftwareVersionLen = softwareVersionLen
+      c.SoftwareVersion = string(data[1:c.SoftwareVersionLen])
+      return nil
+  }
+  ```
+
+test "rank1133: a declared length of zero is rejected before the slice expression runs"
+  lang go
+  file bgp.go
+  reject VYQL-MEM-002
+  code
+  ```
+  package bgp
+
+  func (c *CapSoftwareVersion) DecodeFromBytes(data []byte) error {
+      c.DefaultParameterCapability.DecodeFromBytes(data)
+      data = data[2:]
+      if len(data) < 2 {
+          return NewMessageError(BGP_ERROR_OPEN_MESSAGE_ERROR, BGP_ERROR_SUB_UNSUPPORTED_CAPABILITY, nil, "Not all CapabilitySoftwareVersion bytes allowed")
+      }
+      softwareVersionLen := uint8(data[0])
+      if len(data[1:]) < int(softwareVersionLen) || softwareVersionLen > 64 || softwareVersionLen == 0 {
+          return NewMessageError(BGP_ERROR_OPEN_MESSAGE_ERROR, BGP_ERROR_SUB_UNSUPPORTED_CAPABILITY, nil, "invalid length of software version capablity")
+      }
+      c.SoftwareVersionLen = softwareVersionLen
+      c.SoftwareVersion = string(data[1:c.SoftwareVersionLen])
+      return nil
+  }
+  ```

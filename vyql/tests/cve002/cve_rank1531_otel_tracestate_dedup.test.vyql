@@ -1,0 +1,207 @@
+# Rank 1531 / CVE-2025-27513: OpenTelemetry .NET's tracestate extraction
+# replaced the exact HashSet key-set deduplication with a hand-rolled
+# approximate one, and malformed tracestate lists passed validation
+# (W3C Trace Context violation, improper input validation, CWE-20/CWE-346;
+# PR #6161 reverts the performance refactor from #5749).
+# TryExtractTracestate in src/OpenTelemetry.Api/Context/Propagation/
+# TraceContextPropagator.cs keeps a three-characters-per-key lookup buffer
+# and runs a fast path first: `var duplicationCheckLength =
+# Math.Min(key.Length, 3);` compares only the first three characters of
+# each key, which conflates distinct keys sharing a prefix. The full check
+# that is supposed to rescue a fast-path hit is itself broken: the skip
+# loop's `bufferToCompare.Slice(commaIndex)` discards its result (a no-op),
+# the re-scan `while ((existingIndex = bufferToCompare.IndexOf(key)) > -1)`
+# restarts from zero on every `continue` so a key occurring mid-value
+# before the real duplicate position spins, and the trailing-character
+# read `bufferToCompare[existingIndex + key.Length]` runs past the written
+# span when the key sits at its end. The fixing commit 1b555c1201
+# ("Revert TraceContextPropagator performance refactor from 5749")
+# restores the exact form: `var keySet = new HashSet<string>();` with
+# `if (!keySet.Add(key)) return false;` and the 32-member cap checked
+# against keySet.Count.
+#
+# ## What fires, both revisions
+#
+# Three --cache off runs per revision report identical output: scanning
+# TraceContextPropagator.cs gives one finding, VYQL-NUM-005
+# (code.UncheckedEncodedLengthArithmetic) anchored at the function
+# signature line in both revisions; scanning the whole
+# src/OpenTelemetry.Api project gives two VYQL-NUM-005 findings plus,
+# under `-flags only`, six core.ResourceRelease flags on unrelated Dispose
+# methods -- byte-identical between the vulnerable parent and the fixed
+# commit. `vyql match` on the vulnerable file reports no source and no
+# sink label at all, so there is nothing for a rule to judge: the
+# zero is real in every view, not a -flags-only misread.
+#
+# ## Why no binding converts it
+#
+# The check exists and runs -- its defect is that an approximate
+# comparison (three-character prefix plus a broken fallback) replaced the
+# exact one. Nothing in the concept set can ask "is this uniqueness check
+# exact over the whole key it validates" (approximation-strength
+# vocabulary), and the shape is otherwise invisible: `Math.Min(x.Length,
+# k)` clamping a prefix length appears once in this repository (the
+# vulnerable line) and seven times across roughly 134k C# files in eight
+# unrelated trees (azure-sdk-for-net, aspnetcore, Umbraco CMS, YAFNET and
+# four smaller ones), none of the seven feeding a comparison -- so
+# collateral would be near zero, but the blocker is not precision. A
+# binding keyed on the Min-clamped prefix fails the documentation test
+# (no library documents "deduplicate by three-character prefix"; the
+# idiom is this incident's own), and a rule keyed on "prefix comparison
+# without an exact fallback" would fire on a textbook simplification but
+# not on this code, because the real vulnerable form does run a full
+# check -- the fallback itself is where the defects sit. Keying on the
+# fallback's own spellings (the discarded Slice, the non-advancing
+# IndexOf) encodes the fixing diff's counterpart layout and detects this
+# revision rather than the weakness. The same present-but-incomplete
+# family as ranks 1522 (bracket-blind hosts) and 1565 (three-character
+# scheme strip).
+#
+# Both blocks below reject VYQL-VAL-016: the hand-rolled fast-path form
+# and the exact HashSet form are equally unreported. When
+# deduplication-exactness vocabulary lands, the fast-path form must flip
+# to expect.
+
+test "rank1531: duplicate keys run a prefix fast path over a broken full check"
+  lang csharp
+  file src/OpenTelemetry.Api/Context/Propagation/TraceContextPropagator.cs
+  reject VYQL-VAL-016
+  code
+  ```
+  using System;
+  using System.Collections.Generic;
+
+  public static class TraceContextPropagator
+  {
+      public static bool ExtractTracestate(string tracestateString)
+      {
+          var traceStateChars = new char[128];
+          var keyLookupChars = new char[96]; // three chars for each of 32 keys
+          Span<char> traceStateBuffer = traceStateChars;
+          Span<char> keyLookupBuffer = keyLookupChars;
+          int keys = 0;
+          int charsWritten = 0;
+
+          var tracestateCollection = tracestateString.Split(',');
+          for (int i = 0; i < tracestateCollection.Length; ++i)
+          {
+              var listMember = tracestateCollection[i].Trim();
+              if (listMember.Length == 0)
+                  continue;
+              if (keys >= 32)
+                  return false;
+
+              var key = listMember.Substring(0, listMember.IndexOf('='));
+
+              var duplicationCheckLength = Math.Min(key.Length, 3);
+
+              if (keys > 0)
+              {
+                  // Fast path check of first three chars for potential duplicated keys
+                  var potentialMatchingKeyPosition = 1;
+                  var found = false;
+                  for (int j = 0; j < keys * 3; j += 3)
+                  {
+                      if (keyLookupBuffer.Slice(j, duplicationCheckLength).SequenceEqual(key.AsSpan(0, duplicationCheckLength)))
+                      {
+                          found = true;
+                          break;
+                      }
+
+                      potentialMatchingKeyPosition++;
+                  }
+
+                  // If the fast check has found a possible duplicate, we need to do a full check
+                  if (found)
+                  {
+                      var bufferToCompare = traceStateBuffer.Slice(0, charsWritten);
+
+                      // We know which key is the first possible duplicate, so skip to that key
+                      // by slicing to the position after the appropriate comma.
+                      for (int j = 1; j < potentialMatchingKeyPosition; j++)
+                      {
+                          var commaIndex = bufferToCompare.IndexOf(',');
+
+                          if (commaIndex > -1)
+                          {
+                              bufferToCompare.Slice(commaIndex);
+                          }
+                      }
+
+                      int existingIndex = -1;
+                      while ((existingIndex = bufferToCompare.IndexOf(key.AsSpan())) > -1)
+                      {
+                          if ((existingIndex > 0 && bufferToCompare[existingIndex - 1] != ',') || bufferToCompare[existingIndex + key.Length] != '=')
+                          {
+                              continue; // this is not a key
+                          }
+
+                          return false; // test_tracestate_duplicated_keys
+                      }
+                  }
+              }
+
+              // Store up to the first three characters of the key for use in the duplicate lookup fast path
+              var startKeyLookupIndex = keys > 0 ? keys * 3 : 0;
+              key.AsSpan(0, duplicationCheckLength).CopyTo(keyLookupBuffer.Slice(startKeyLookupIndex));
+
+              listMember.CopyTo(0, traceStateChars, charsWritten, listMember.Length);
+              charsWritten += listMember.Length;
+              keys++;
+          }
+
+          return true;
+      }
+  }
+  ```
+
+test "rank1531: the fixed revision restores exact key deduplication"
+  lang csharp
+  file src/OpenTelemetry.Api/Context/Propagation/TraceContextPropagator.cs
+  reject VYQL-VAL-016
+  code
+  ```
+  using System;
+  using System.Collections.Generic;
+
+  public static class TraceContextPropagator
+  {
+      public static bool ExtractTracestate(string tracestateString)
+      {
+          var keySet = new HashSet<string>();
+          var result = new System.Text.StringBuilder();
+          var tracestateCollection = tracestateString.Split(',');
+
+          for (int i = 0; i < tracestateCollection.Length; ++i)
+          {
+              var tracestate = tracestateCollection[i].AsSpan();
+              int begin = 0;
+              while (begin < tracestate.Length)
+              {
+                  int length = tracestate.Slice(begin).IndexOf(',');
+                  ReadOnlySpan<char> listMember;
+                  if (length != -1)
+                  {
+                      listMember = tracestate.Slice(begin, length).Trim();
+                      begin += length + 1;
+                  }
+                  else
+                  {
+                      listMember = tracestate.Slice(begin).Trim();
+                      begin = tracestate.Length;
+                  }
+
+                  if (keySet.Count >= 32)
+                      break;
+
+                  int equalsIndex = listMember.IndexOf('=');
+                  var key = listMember.Slice(0, equalsIndex).ToString();
+                  if (!keySet.Add(key))
+                      continue;
+
+                  result.Append(listMember.ToString()).Append(',');
+              }
+          }
+      }
+  }
+  ```

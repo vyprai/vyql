@@ -1,0 +1,89 @@
+# Rank 533 / CVE-2022-2995: CRI-O set the container process primary
+# GID but failed to include that same GID in the supplemental groups list.
+
+test "rank533: CRI-O omits primary gid from supplemental groups"
+  lang go
+  file container_create.go
+  expect VYQL-CFG-019
+  expect_review code.ContainerPrimaryGidMissingSupplementalGroup
+  code
+  ```
+  package server
+
+  type Int64Value struct {
+      Value int64
+  }
+
+  type LinuxContainerSecurityContext struct {
+      RunAsGroup        *Int64Value
+      SupplementalGroups []int64
+  }
+
+  type Generator struct{}
+
+  func (g *Generator) SetProcessUID(uid uint32) {}
+  func (g *Generator) SetProcessGID(gid uint32) {}
+  func (g *Generator) AddProcessAdditionalGid(gid uint32) {}
+
+  func setupContainerUser(specgen *Generator, sc *LinuxContainerSecurityContext, uid uint32, gid uint32, addGroups []uint32) error {
+      specgen.SetProcessUID(uid)
+      specgen.SetProcessGID(gid)
+      if sc.RunAsGroup != nil {
+          specgen.SetProcessGID(uint32(sc.RunAsGroup.Value))
+      }
+
+      for _, group := range addGroups {
+          specgen.AddProcessAdditionalGid(group)
+      }
+
+      groups := sc.SupplementalGroups
+      for _, group := range groups {
+          specgen.AddProcessAdditionalGid(uint32(group))
+      }
+      return nil
+  }
+  ```
+
+test "rank533: CRI-O adds resolved primary gid to supplemental groups"
+  lang go
+  file container_create.go
+  reject VYQL-CFG-019
+  reject_review code.ContainerPrimaryGidMissingSupplementalGroup
+  code
+  ```
+  package server
+
+  type Int64Value struct {
+      Value int64
+  }
+
+  type LinuxContainerSecurityContext struct {
+      RunAsGroup        *Int64Value
+      SupplementalGroups []int64
+  }
+
+  type Generator struct{}
+
+  func (g *Generator) SetProcessUID(uid uint32) {}
+  func (g *Generator) SetProcessGID(gid uint32) {}
+  func (g *Generator) AddProcessAdditionalGid(gid uint32) {}
+
+  func setupContainerUser(specgen *Generator, sc *LinuxContainerSecurityContext, uid uint32, gid uint32, addGroups []uint32) error {
+      specgen.SetProcessUID(uid)
+      if sc.RunAsGroup != nil {
+          gid = uint32(sc.RunAsGroup.Value)
+      }
+      specgen.SetProcessGID(gid)
+      specgen.AddProcessAdditionalGid(gid)
+
+      for _, group := range addGroups {
+          specgen.AddProcessAdditionalGid(group)
+      }
+
+      groups := sc.SupplementalGroups
+      for _, group := range groups {
+          specgen.AddProcessAdditionalGid(uint32(group))
+      }
+      return nil
+  }
+  ```

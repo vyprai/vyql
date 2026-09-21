@@ -1,0 +1,148 @@
+# Rank 1191 / CVE-2022-25885: HummusJS's Node addon crashes the process when a
+# PDF is written to a JS-side response object that does not behave the way the
+# addon expects (CWE-690, GHSA-frp9-2v6r-gj97, `hummus.PDFStreamForResponse(null)`
+# per galkahana/HummusJS#439's own repro and crash trace).
+# ObjectByteWriterWithPosition::Write (src/ObjectByteWriterWithPosition.cpp)
+# looks up the response object's "write" method, invokes it through V8 with
+# func->Call(...), and chains .ToLocalChecked() straight onto the result.
+# V8's own MaybeLocal contract states that Call() returns an empty Maybe when
+# the invoked JS throws or the call otherwise fails, and that ToLocalChecked()
+# aborts the process rather than returning when the Maybe is empty -- so any
+# JS-side exception during that "write" call (trivially reachable by passing a
+# response object whose write() throws, or whose absence makes an earlier step
+# behave unexpectedly) takes down the whole process rather than surfacing as a
+# catchable error. Fix a9bf2520ab keeps the Call() but stops chaining
+# ToLocalChecked() onto it directly: it captures the MaybeLocal, wraps the call
+# in a TryCatch, and only proceeds past `if (!maybe.ToLocal(&result))` --
+# rethrowing and returning 0 on the empty case instead of crashing.
+#
+# FIXED. code.UncheckedNullableResultDeref (VYQL-MEM-018, CWE-476) already
+# exists and already fires on member-assignment-then-deref shapes in C; no cpp
+# binding fed it at all. Reused the concept instead of minting a new one: its
+# own review text -- "nullable factory or callback result is dereferenced
+# before an observed null guard" -- describes this exact idiom, since Call()
+# is precisely a callback invocation whose result the V8 documentation
+# describes as nullable-on-failure. Added binding uncheckedV8CallResult162 in
+# vyql/bindings/cpp/m4e783366.vyql: any call whose dotted path contains the
+# consecutive segments Call.ToLocalChecked -- i.e. .Call(...) chained straight
+# into .ToLocalChecked() with no intervening check -- reported as
+# code.UncheckedNullableResultDeref. This is exactly V8's own documented
+# hazard (Function::Call can return an empty MaybeLocal; ToLocalChecked()
+# on an empty Maybe crashes the process by design) and not specific to this
+# project's API: anyone embedding V8 and reading MaybeLocal's own header
+# comments would write the same rule. Path matching is dotted-segment aware,
+# so this requires the literal method name Call immediately before
+# ToLocalChecked and does not fire on the unrelated .Get(...).ToLocalChecked()
+# two lines above the vulnerable line in the same function, nor on any of the
+# 246 other ToLocalChecked() call sites across HummusJS's Node-binding layer
+# that are not chained onto a Call().
+#
+# Verified on the real checkout at both revisions (timeout 180, --max-ram 4GB,
+# --cache off): the vulnerable revision reports 16 VYQL-MEM-018 findings,
+# including ObjectByteWriterWithPosition.cpp:56 (the vulnerable line); the
+# fixed revision reports 15, with that line gone and every other finding
+# unchanged -- including the sibling func->Call(...).ToLocalChecked() in
+# the same file's GetCurrentPosition (line 83, shifted to 91 by the fixed
+# revision's insertions), which it leaves unpatched and the binding
+# correctly keeps flagging. The other 14 real, unpatched instances of the
+# identical idiom
+# across ObjectByteReader.cpp, ObjectByteReaderWithPosition.cpp,
+# ObjectByteWriter.cpp, PDFDateDriver.cpp and PDFWriterDriver.cpp are the same
+# genuine crash-on-throw pattern, not noise: this CVE's fix only ever touched
+# the one call site a user happened to report.
+
+test "rank1191: Call() result is force-unwrapped with no Maybe check"
+  lang cpp
+  file src/ObjectByteWriterWithPosition.cpp
+  expect VYQL-MEM-018
+  code
+  ```
+  IOBasicTypes::LongBufferSizeType ObjectByteWriterWithPosition::Write(const IOBasicTypes::Byte* inBuffer,IOBasicTypes::LongBufferSizeType inBufferSize)
+  {
+  	CREATE_ISOLATE_CONTEXT;
+  	CREATE_ESCAPABLE_SCOPE;
+
+      Local<Object> anArray = NEW_ARRAY((int)inBufferSize);
+      for(int i=0;i<(int)inBufferSize;++i)
+          anArray->Set(GET_CURRENT_CONTEXT, NEW_NUMBER(i),NEW_NUMBER(inBuffer[i]));
+
+  	Local<Value> value = OBJECT_FROM_PERSISTENT(mObject)->Get(GET_CURRENT_CONTEXT, NEW_STRING("write")).ToLocalChecked();
+      if(value->IsUndefined() || !value->IsFunction())
+      {
+  		THROW_EXCEPTION("write is not a function, it should be you know...");
+          return 0;
+      }
+      Local<Function> func = Local<Function>::Cast(value);
+
+      Local<Value> args[1];
+      args[0] = anArray;
+
+  	Local<Value> result = func->Call(GET_CURRENT_CONTEXT,  OBJECT_FROM_PERSISTENT(mObject), 1, args).ToLocalChecked();
+      if(result.IsEmpty())
+      {
+  		THROW_EXCEPTION("wrong return value. it's empty. return the number of written characters");
+  		return 0;
+      }
+      else if(result->IsNumber())
+      {
+          return TO_UINT32(result)->Value();
+      }
+      else
+      {
+  		THROW_EXCEPTION("wrong return value. write should return the number of written characters");
+  		return 0;
+      }
+  }
+  ```
+
+test "rank1191: fix checks the MaybeLocal before using the Call() result"
+  lang cpp
+  file src/ObjectByteWriterWithPosition.cpp
+  reject VYQL-MEM-018
+  code
+  ```
+  IOBasicTypes::LongBufferSizeType ObjectByteWriterWithPosition::Write(const IOBasicTypes::Byte* inBuffer,IOBasicTypes::LongBufferSizeType inBufferSize)
+  {
+  	CREATE_ISOLATE_CONTEXT;
+  	CREATE_ESCAPABLE_SCOPE;
+
+      Local<Object> anArray = NEW_ARRAY((int)inBufferSize);
+      for(int i=0;i<(int)inBufferSize;++i)
+          anArray->Set(GET_CURRENT_CONTEXT, NEW_NUMBER(i),NEW_NUMBER(inBuffer[i]));
+
+  	Local<Value> value = OBJECT_FROM_PERSISTENT(mObject)->Get(GET_CURRENT_CONTEXT, NEW_STRING("write")).ToLocalChecked();
+      if(value->IsUndefined() || !value->IsFunction())
+      {
+  		THROW_EXCEPTION("write is not a function, it should be you know...");
+          return 0;
+      }
+      Local<Function> func = Local<Function>::Cast(value);
+
+      Local<Value> args[1];
+      args[0] = anArray;
+      MaybeLocal<Value> maybe;
+      TryCatch try_catch(Isolate::GetCurrent());
+
+      maybe = func->Call(GET_CURRENT_CONTEXT,  OBJECT_FROM_PERSISTENT(mObject), 1, args);
+      Local <Value> result;
+
+      if (!maybe.ToLocal(&result)) {
+         try_catch.ReThrow();
+         return 0;
+      }
+      if(result.IsEmpty())
+      {
+          THROW_EXCEPTION("wrong return value. it's empty. return the number of written characters");
+          return 0;
+      }
+      else if(result->IsNumber())
+      {
+          return TO_UINT32(result)->Value();
+      }
+      else
+      {
+          THROW_EXCEPTION("wrong return value. write should return the number of written characters");
+          return 0;
+      }
+  }
+  ```

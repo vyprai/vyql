@@ -1,0 +1,17 @@
+module bindings.scala.generated.mb07a9ff9;
+
+binding deserialization0 {
+  requires {
+    dependency("com.sun.jersey:jersey-json")
+  }
+  query pattern callExpr where callee.method == "createJSONUnmarshaller"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("com.sun.jersey:jersey-json")
+  }
+  query pattern callExpr where callee.method == "createUnmarshaller"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule HostExpandedUrlSanitizedBeforeExpansionSsti {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_94, CWE_1336]
+    id: "VYQL-INJ-118"
+    severity: critical
+  }
+  issue code.HostExpandedUrlSanitizedBeforeExpansionSsti as sink
+}

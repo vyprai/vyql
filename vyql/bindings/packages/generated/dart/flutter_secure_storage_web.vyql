@@ -1,0 +1,121 @@
+module bindings.dart.generated.m90979562;
+
+binding secretValue0 {
+  requires {
+    dependency("flutter_secure_storage_web")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("flutter_secure_storage_web")
+  }
+  query pattern callExpr where callee.method == "readAll"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue2 {
+  requires {
+    dependency("flutter_secure_storage_web")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue3 {
+  requires {
+    dependency("flutter_secure_storage_web")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue4 {
+  requires {
+    dependency("flutter_secure_storage_web")
+  }
+  query pattern callExpr where callee.method == "deleteAll"
+  emit source code.SecretValue at call.result
+}
+
+binding weakCipher5 {
+  requires {
+    dependency("flutter_secure_storage_web")
+  }
+  query pattern callExpr where callee.method == "_getEncryptionKey"
+  emit issue code.WeakCipher at call
+}
+
+binding weakCipher6 {
+  requires {
+    dependency("flutter_secure_storage_web")
+  }
+  query pattern callExpr where callee.method == "_getWrapKey"
+  emit issue code.WeakCipher at call
+}
+
+binding weakCipher7 {
+  requires {
+    dependency("flutter_secure_storage_web")
+  }
+  query pattern callExpr where callee.method == "_decryptValue"
+  emit issue code.WeakCipher at call
+}
+
+binding weakCipher8 {
+  requires {
+    dependency("flutter_secure_storage_web")
+  }
+  query pattern callExpr where callee.method == "_crypto"
+  emit issue code.WeakCipher at call
+}
+
+binding secretValue9 {
+  requires {
+    dependency("flutter_secure_storage_web")
+  }
+  query pattern callExpr where callee.method == "encryptionKey"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue10 {
+  requires {
+    dependency("flutter_secure_storage_web")
+  }
+  query pattern callExpr where callee.method == "jwk"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue11 {
+  requires {
+    dependency("flutter_secure_storage_web")
+  }
+  query pattern callExpr where callee.method == "wrapKey"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue12 {
+  requires {
+    dependency("flutter_secure_storage_web")
+  }
+  query pattern callExpr where callee.method == "encryptedContent"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue13 {
+  requires {
+    dependency("flutter_secure_storage_web")
+  }
+  query pattern callExpr where callee.method == "decryptedContent"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue14 {
+  requires {
+    dependency("flutter_secure_storage_web")
+  }
+  query pattern callExpr where callee.method == "plainText"
+  emit source code.SecretValue at call.result
+}

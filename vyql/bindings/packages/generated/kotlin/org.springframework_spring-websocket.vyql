@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.mecf4b9fc;
+
+binding userControlledData0 {
+  requires {
+    dependency("org.springframework:spring-websocket")
+  }
+  query pattern callExpr where callee.method == "getPayload"
+  emit source core.UserControlledData at call.result
+}

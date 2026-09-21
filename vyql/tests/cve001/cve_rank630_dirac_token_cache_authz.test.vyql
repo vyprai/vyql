@@ -1,0 +1,106 @@
+# Rank 630 / CVE-2024-24825: DIRAC TokenManager returned a cached token before
+# checking whether the caller was authorized to obtain that user's/group's token.
+test "rank630: token cache hit returns before authorization check"
+  lang python
+  file TokenManagerHandler.py
+  expect VYQL-AUTH-039
+  code
+  ```
+  from DIRAC.FrameworkSystem.Utilities.TokenManagementUtilities import (
+      getCachedKey,
+      getCachedToken,
+      DEFAULT_RT_EXPIRATION_TIME,
+      DEFAULT_AT_EXPIRATION_TIME,
+  )
+
+  class TokenManagerHandler:
+      def export_getToken(
+          self,
+          username=None,
+          userGroup=None,
+          scope=None,
+          audience=None,
+          identityProvider=None,
+          requiredTimeLeft=0,
+      ):
+          result = getIdProviderClient(userGroup, identityProvider)
+          if not result["OK"]:
+              return result
+          idpObj = result["Value"]
+
+          cachedKey = getCachedKey(idpObj, username, userGroup, scope, audience)
+          result = getCachedToken(self.__tokensCache, cachedKey, requiredTimeLeft)
+          if result["OK"]:
+              return result
+
+          if not username:
+              result = self.__checkProperties("", "")
+              if not result["OK"]:
+                  return result
+              scope = cachedKey[1]
+              audience = cachedKey[2]
+              result = idpObj.fetchToken(grant_type="client_credentials", scope=scope, audience=audience)
+              if not result["OK"]:
+                  return result
+              token = result["Value"]
+              self.__tokensCache.add(
+                  cachedKey,
+                  result["Value"].get_claim("exp", "access_token") or DEFAULT_AT_EXPIRATION_TIME,
+                  token,
+              )
+              return result
+
+          result = Registry.getDNForUsername(username)
+          for dn in result["Value"]:
+              result = self.__checkProperties(dn, userGroup)
+              if result["OK"]:
+                  result = idpObj.refreshToken(tokens.get("refresh_token"), group=userGroup, scope=scope)
+                  if result["OK"]:
+                      self.__tokensCache.add(
+                          cachedKey,
+                          result["Value"].get_claim("exp", "refresh_token") or DEFAULT_RT_EXPIRATION_TIME,
+                          result["Value"],
+                      )
+                      return result
+  ```
+
+test "rank630: token endpoint resolves defaults but does not return cached tokens"
+  lang python
+  file TokenManagerHandler.py
+  reject VYQL-AUTH-039
+  code
+  ```
+  from DIRAC.FrameworkSystem.Utilities.TokenManagementUtilities import getCachedKey
+
+  class TokenManagerHandler:
+      def export_getToken(
+          self,
+          username=None,
+          userGroup=None,
+          scope=None,
+          audience=None,
+          identityProvider=None,
+          requiredTimeLeft=0,
+      ):
+          result = getIdProviderClient(userGroup, identityProvider)
+          if not result["OK"]:
+              return result
+          idpObj = result["Value"]
+
+          # getCachedKey is just used here to resolve the default scopes
+          _, scope, *_ = getCachedKey(idpObj, username, userGroup, scope, audience)
+
+          if not username:
+              result = self.__checkProperties("", "")
+              if not result["OK"]:
+                  return result
+              return idpObj.fetchToken(grant_type="client_credentials", scope=scope, audience=audience)
+
+          result = Registry.getDNForUsername(username)
+          for dn in result["Value"]:
+              result = self.__checkProperties(dn, userGroup)
+              if result["OK"]:
+                  result = idpObj.refreshToken(tokens.get("refresh_token"), group=userGroup, scope=scope)
+                  if result["OK"]:
+                      return result
+  ```

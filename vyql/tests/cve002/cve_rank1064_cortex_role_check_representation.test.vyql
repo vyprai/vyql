@@ -1,0 +1,76 @@
+# Rank 1064 / CVE-2018-20226: Cortex lets an organisation administrator create
+# a user holding the superadmin role, because the guard compares the role
+# object's source name to the wire name (CWE-178, CWE-863).
+#
+# ATTENTION, engine gap ahead of a vocabulary gap. The real controller does
+# not parse under the Scala grammar: a class header carrying a constructor
+# annotation together with an implicit val class parameter
+# (class UserCtrl @Inject() (... implicit val ec: ExecutionContext)) puts the
+# whole class body in one ERROR node, and the unicode lambda/generator arrows
+# and a multi-line parenthesised for-guard break the body again once that is
+# bypassed. Fragment recovery inside the ERROR node then decides what survives
+# to the graph, and an unrelated one-token change re-deals the fragments: at
+# the vulnerable revision UserCtrl.scala lines 43-146 hold no nodes at all, so
+# the guard and the user creation are invisible, while at the fixed revision
+# the guard is visible and the changePassword call 100 lines lower is mangled
+# into object literals. The only finding that differs between the two
+# revisions of the repository is that artifact (VYQL-AUTH-001 on the guarded
+# changePassword action, 70 vs 69 findings), not this weakness.
+#
+# The snippets below avoid the three grammar breakers so both revisions are
+# visible to the scanner, and pin the vocabulary half of the miss: the two
+# guards differ only in whether the argument reads toString or name, and no
+# rule fires on either form. VYQL-AUTH-032 is the nearest existing rule for
+# the CWE pair (a comparison that over-matches) and cannot reach Scala;
+# VYQL-AUTH-001 is the rule that does fire on Scala sensitive operations and
+# does not regard user creation as one.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1064: the role guard compares the object's source name"
+  lang scala
+  file app/org/thp/cortex/controllers/UserCtrl.scala
+  reject VYQL-AUTH-032
+  reject VYQL-AUTH-001
+  code
+  ```
+  package org.thp.cortex.controllers
+
+  import org.thp.cortex.models.{ OrganizationStatus, Roles }
+
+  class UserCtrl(userSrv: UserSrv, organizationSrv: OrganizationSrv, authenticated: Authenticated) {
+    def create: Action[Fields] = authenticated(Roles.orgAdmin, Roles.superAdmin).async(fieldsBodyParser) { implicit request =>
+      (for {
+        userOrganizationId <- userSrv.getOrganizationId(request.userId)
+        organizationId = request.body.getString("organization").getOrElse(userOrganizationId)
+        organization <- organizationSrv.get(organizationId)
+        if organization.status() == OrganizationStatus.Active && (userOrganizationId == organizationId && !request.body.getStrings("roles").getOrElse(Nil).contains(Roles.superAdmin.toString))
+        user <- userSrv.create(request.body.set("organization", organizationId))
+      } yield renderer.toOutput(CREATED, user))
+    }
+  }
+  ```
+
+test "rank1064: the same guard comparing the role's own name"
+  lang scala
+  file app/org/thp/cortex/controllers/UserCtrl.scala
+  reject VYQL-AUTH-032
+  reject VYQL-AUTH-001
+  code
+  ```
+  package org.thp.cortex.controllers
+
+  import org.thp.cortex.models.{ OrganizationStatus, Roles }
+
+  class UserCtrl(userSrv: UserSrv, organizationSrv: OrganizationSrv, authenticated: Authenticated) {
+    def create: Action[Fields] = authenticated(Roles.orgAdmin, Roles.superAdmin).async(fieldsBodyParser) { implicit request =>
+      (for {
+        userOrganizationId <- userSrv.getOrganizationId(request.userId)
+        organizationId = request.body.getString("organization").getOrElse(userOrganizationId)
+        organization <- organizationSrv.get(organizationId)
+        if organization.status() == OrganizationStatus.Active && (userOrganizationId == organizationId && !request.body.getStrings("roles").getOrElse(Nil).contains(Roles.superAdmin.name))
+        user <- userSrv.create(request.body.set("organization", organizationId))
+      } yield renderer.toOutput(CREATED, user))
+    }
+  }
+  ```

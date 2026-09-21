@@ -1,0 +1,9 @@
+module bindings.java.generated.m8e3f814b;
+
+binding deserialization0 {
+  requires {
+    dependency("nz.net.ultraq.thymeleaf:thymeleaf-layout-dialect")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

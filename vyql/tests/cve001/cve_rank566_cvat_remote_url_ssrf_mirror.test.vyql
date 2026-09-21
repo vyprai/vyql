@@ -1,0 +1,38 @@
+# Rank 566 / CVE-2022-31188: openvinotoolkit/cvat is a mirror of the CVAT
+# remote data source URL validation issue covered by rank 565.
+
+test "cve rank566 cvat mirror: remote URL downloader needs URL allowlist validation"
+  lang python
+  expect VYQL-RF-001
+  code
+  ```
+  import requests
+
+  def _download_data(urls, upload_dir):
+      local_files = {}
+      for url in urls:
+          response = requests.get(url, stream=True)
+          if response.status_code == 200:
+              local_files[url] = True
+      return list(local_files.keys())
+  ```
+
+test "cve rank566 cvat mirror: URL validation suppresses remote URL downloader SSRF"
+  lang python
+  reject VYQL-RF-001
+  code
+  ```
+  import requests
+
+  def _validate_url(url):
+      return True
+
+  def _download_data(urls, upload_dir):
+      local_files = {}
+      for url in urls:
+          _validate_url(url)
+          response = requests.get(url, stream=True)
+          if response.status_code == 200:
+              local_files[url] = True
+      return list(local_files.keys())
+  ```

@@ -1,0 +1,11 @@
+module code;
+
+concept XmlLeadByteNameValidationMissing : issue {
+  cwe: [CWE_20, CWE_125]
+  reviewAssumption: "attacker-controlled XML input can contain invalid multibyte lead-byte sequences that reach these tokenizer paths"
+  reviewCategory: input_validation
+  reviewCondition: "XML tokenizer lead-byte name parsing checks name character classes without first rejecting invalid encoded characters"
+  reviewConfidence: high
+  reviewEvidence: "XML tokenizer macro context {pattern} checks IS_NAME_CHAR and IS_NMSTRT_CHAR for BT_LEAD bytes without an IS_INVALID_CHAR guard"
+  vulnerableTo: [validation.ImproperInputValidation, memory.OobRead]
+}

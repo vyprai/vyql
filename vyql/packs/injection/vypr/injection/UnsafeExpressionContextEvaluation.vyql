@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule UnsafeExpressionContextEvaluation {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_917, CWE_94]
+    id: "VYQL-INJ-279"
+    severity: critical
+  }
+  issue code.UnsafeExpressionContextEvaluation as sink
+}

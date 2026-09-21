@@ -1,0 +1,19 @@
+module bindings.php.upload_extension_regex_family_quantifier;
+
+// A file-screen regex that alternates extensions after a literal dot and
+// anchors them at the end of the name is a deny list of executable
+// extensions: only the names it matches are refused. When the PHP-family
+// entry of that alternation quantifies a letter (`php*`, which in regex
+// means `ph` followed by any number of `p`s) instead of a wildcard
+// (`php.*`), the entry cannot match a variant extension such as `.php4`,
+// `.php7` or `.phps`, so files carrying those names pass the screen even
+// though the list names the family. The escaped dot, the closing `$`
+// anchor and the neighbouring extension spellings all live in the same
+// literal as the faulty entry, which is what separates a screen regex
+// from a filename glob: in glob syntax `php*` is the correct spelling
+// and denies the whole family. The `literal:` route reads string-literal
+// nodes, so a commented-out copy of the faulty entry does not satisfy it.
+binding uploadExtensionRegexFamilyQuantifier {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.context.literal contains "php*" and node.context.literal contains "\\." and node.context.literal contains "$/" and containsAny(node.context.literal, ["phtml", "phar", "php3", "php4", "php5", "php7", "phps", "pht", "html", "inc", "py", "pl", "sh", "exe", "cgi", "asp", "jsp"])
+  emit issue code.IncompleteDangerousUploadExtensionBlocklist at node
+}

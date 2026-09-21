@@ -1,0 +1,11 @@
+module code;
+
+concept DirectoryCreateExistingPathUnchecked : issue {
+  cwe: [CWE_22, CWE_59]
+  reviewAssumption: "the joined component names an entry the caller does not control, as in archive, upload or backup restoration, so an attacker can arrange a directory or symlink at the destination"
+  reviewCategory: path
+  reviewCondition: "a directory is created at a joined destination path while the result that reports the path already existed is discarded"
+  reviewConfidence: medium
+  reviewEvidence: "directory creation primitive {pattern} builds its path by joining a base with another component and neither tests nor stores its already-exists result"
+  vulnerableTo: [path.PathTraversal, path.LinkFollowing]
+}

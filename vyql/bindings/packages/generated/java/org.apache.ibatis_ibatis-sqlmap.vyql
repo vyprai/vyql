@@ -1,0 +1,9 @@
+module bindings.java.generated.m7abda7ae;
+
+binding sqlExecution0 {
+  requires {
+    dependency("org.apache.ibatis:ibatis-sqlmap")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.SqlExecution at args[0]
+}

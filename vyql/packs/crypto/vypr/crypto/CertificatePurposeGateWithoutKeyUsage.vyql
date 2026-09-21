@@ -1,0 +1,11 @@
+module vypr.crypto;
+
+rule CertificatePurposeGateWithoutKeyUsage {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_295]
+    id: "VYQL-CRY-059"
+    severity: medium
+  }
+  issue code.CertificatePurposeGateWithoutKeyUsage as gate
+}

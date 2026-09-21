@@ -1,0 +1,152 @@
+# Rank 1727 / CVE-2017-15365 (CWE-284, CWE-862): MariaDB's event scheduler
+# dropped a completed event under a temporarily raised master_access and began
+# wsrep Total Order Isolation itself — WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB,
+# NULL, NULL) in Event_job_data::execute (sql/event_data_objects.cc) — so the
+# DROP EVENT DDL replicates cluster-wide before Events::drop_event, the
+# executor that runs check_access(EVENT_ACL) and its own TOI begin, had a
+# chance to reject it. The fixed revision (0b5a5258ab, MW-416 "DDL replication moved
+# after acl checking") removes the caller-side TOI begin and leaves
+# replication to the executor, which all three Events DDL executors
+# (create_event, update_event, drop_event) perform only after check_access.
+#
+# A caller that begins TOI isolation itself and then delegates to one of
+# those executors is the reportable shape: labelled code.ProtocolStateReview
+# (VYQL-AUTH-082) through a function-scope presence binding on the documented
+# wsrep TOI begin macro plus the Events executor call. A caller that leaves
+# replication to the executor, and a file that merely defines the macro, do
+# not match.
+#
+# verify_current_expected: fixed
+
+test "rank1727: event scheduler begins wsrep TOI replication before the event DDL executor runs its ACL check"
+  lang cpp
+  expect VYQL-AUTH-082
+  expect_review code.ProtocolStateReview
+  code
+  ```
+  typedef unsigned long ulong;
+  #define SUPER_ACL 0x1
+  #define SQLCOM_CREATE_PROCEDURE_ 5
+  #define SQLCOM_DROP_EVENT_ 32
+  #define WSREP_MYSQL_DB "mysql"
+  struct THD; struct LEX; struct LEX_STRING;
+  struct Lex { int sql_command; };
+  struct Security_ctx { ulong master_access; };
+  struct Thd { Lex *lex; Security_ctx *security_ctx; int wsrep_on; };
+
+  #define WSREP_ON 1
+  #define WSREP(thd) (WSREP_ON && thd->wsrep_on)
+  extern int wsrep_to_isolation_begin(void *thd, const char *db, const char *table, void *table_list);
+  extern int wsrep_to_isolation_end(void *thd);
+  #define WSREP_TO_ISOLATION_BEGIN(db_, table_, table_list_)                   \
+    if (WSREP_ON && WSREP(thd) && wsrep_to_isolation_begin(thd, db_, table_, table_list_)) \
+      goto error;
+  #define WSREP_TO_ISOLATION_END                                              \
+    if (WSREP_ON && (WSREP(thd))) wsrep_to_isolation_end(thd);
+
+  namespace Events {
+  bool drop_event(THD *thd, LEX_STRING dbname, LEX_STRING name, bool if_exists);
+  }
+
+  int event_job_execute(THD *thd, LEX_STRING dbname, LEX_STRING name, bool drop)
+  {
+    int ret = 0;
+    ulong saved_master_access;
+    Thd *t = (Thd *) thd;
+
+    if (!drop)
+      return 0;
+
+    saved_master_access = t->security_ctx->master_access;
+    t->security_ctx->master_access |= SUPER_ACL;
+
+    if (WSREP(t))
+    {
+      t->lex->sql_command = SQLCOM_DROP_EVENT_;
+      WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL);
+    }
+
+    ret = Events::drop_event(thd, dbname, name, 0);
+
+    WSREP_TO_ISOLATION_END;
+
+    t->security_ctx->master_access = saved_master_access;
+    return ret;
+
+  error:
+    t->security_ctx->master_access = saved_master_access;
+    return 1;
+  }
+  ```
+
+test "rank1727: event scheduler leaves replication to the executor after its ACL check"
+  lang cpp
+  reject VYQL-AUTH-082
+  reject_review code.ProtocolStateReview
+  code
+  ```
+  typedef unsigned long ulong;
+  #define SUPER_ACL 0x1
+  #define SQLCOM_CREATE_PROCEDURE_ 5
+  #define SQLCOM_DROP_EVENT_ 32
+  #define WSREP_MYSQL_DB "mysql"
+  struct THD; struct LEX; struct LEX_STRING;
+  struct Lex { int sql_command; };
+  struct Security_ctx { ulong master_access; };
+  struct Thd { Lex *lex; Security_ctx *security_ctx; int wsrep_on; };
+
+  #define WSREP_ON 1
+  #define WSREP(thd) (WSREP_ON && thd->wsrep_on)
+  extern int wsrep_to_isolation_begin(void *thd, const char *db, const char *table, void *table_list);
+  extern int wsrep_to_isolation_end(void *thd);
+  #define WSREP_TO_ISOLATION_BEGIN(db_, table_, table_list_)                   \
+    if (WSREP_ON && WSREP(thd) && wsrep_to_isolation_begin(thd, db_, table_, table_list_)) \
+      goto error;
+  #define WSREP_TO_ISOLATION_END                                              \
+    if (WSREP_ON && (WSREP(thd))) wsrep_to_isolation_end(thd);
+
+  namespace Events {
+  bool drop_event(THD *thd, LEX_STRING dbname, LEX_STRING name, bool if_exists);
+  }
+
+  int event_job_execute(THD *thd, LEX_STRING dbname, LEX_STRING name, bool drop)
+  {
+    int ret = 0;
+    const int sql_command_save = 0;
+    Thd *t = (Thd *) thd;
+
+    if (!drop)
+      return 0;
+
+    const bool sql_command_set = WSREP(t);
+
+    if (sql_command_set)
+      t->lex->sql_command = SQLCOM_DROP_EVENT_;
+
+    ret = Events::drop_event(thd, dbname, name, 0);
+
+    if (sql_command_set)
+    {
+      WSREP_TO_ISOLATION_END;
+      t->lex->sql_command = sql_command_save;
+    }
+
+    return ret;
+  }
+  ```
+
+test "rank1727: the TOI macro definition alone does not mark unrelated functions"
+  lang cpp
+  reject VYQL-AUTH-082
+  reject_review code.ProtocolStateReview
+  code
+  ```
+  #define WSREP_TO_ISOLATION_BEGIN(db_, table_, table_list_)                   \
+    if (wsrep_to_isolation_begin(thd, db_, table_, table_list_)) goto error;
+  extern int wsrep_to_isolation_begin(void *thd, const char *db, const char *table, void *table_list);
+
+  int unrelated_helper(int x)
+  {
+    return x + 1;
+  }
+  ```

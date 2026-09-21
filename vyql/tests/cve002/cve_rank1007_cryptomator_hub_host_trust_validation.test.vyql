@@ -1,0 +1,101 @@
+# Rank 1007 / CVE-2026-32317: Cryptomator for Android Hub host trust bypass.
+# The vault.cryptomator config file is attacker-tamperable (it is synced from
+# the cloud). When the key loading strategy is HUB, UnlockVaultPresenter loaded
+# the Hub key using the apiBaseUrl, authEndpoint and tokenEndpoint taken from
+# that config with no host authenticity check, so an attacker could mix a
+# legitimate auth endpoint with a malicious API endpoint and exfiltrate the
+# access token (MITM on Hub key loading; CWE-346 origin validation, CWE-923).
+# The fixed revision (PR #626, "Implement Hub Host trust validation") gates
+# unlock behind isConsistentHubConfig (token and auth authorities match), an
+# allowed-hosts set, a trusted .cryptomator.cloud https check, an HTTP refusal,
+# and an explicit user host-trust confirmation dialog.
+#
+# ATTENTION, no precise generic detection. The trust boundary is domain
+# knowledge the scanner cannot infer: endpoints taken from a persisted config
+# are normally trusted, and only here is the config an attacker-controlled
+# synced file. A generic rule for "a network endpoint from config is used
+# without a host authenticity check" would fire on ordinary code everywhere,
+# since reading an endpoint from configuration and calling it is how most
+# applications work. The specific safe control (auth and token authorities must
+# match, plus an allow-list of trusted hosts) is particular to Hub key loading
+# and does not generalize to a documentation-derivable binding or rule.
+#
+# verify_current_expected: attention-precision-cost
+
+test "rank1007: Hub unlock builds OAuth endpoints from the unverified config with no host check"
+  lang kotlin
+  file UnlockVaultPresenter.kt
+  reject VYQL-RF-001
+  code
+  ```
+  class UnlockVaultPresenter {
+    fun onUnverifiedVaultConfigRetrieved(unverifiedVaultConfig: Optional<UnverifiedVaultConfig>, vault: Vault) {
+      if (unverifiedVaultConfig.isPresent && unverifiedVaultConfig.get().keyLoadingStrategy() == KeyLoadingStrategy.HUB) {
+        when (intent.vaultAction()) {
+          UnlockVaultIntent.VaultAction.UNLOCK -> {
+            val unverifiedHubVaultConfig = unverifiedVaultConfig.get() as UnverifiedHubVaultConfig
+            if (hubAuthService == null) {
+              hubAuthService = AuthorizationService(context())
+            }
+            view?.showProgress(ProgressModel.GENERIC)
+            unlockHubVault(unverifiedHubVaultConfig, vault)
+          }
+          else -> {}
+        }
+      }
+    }
+
+    private fun unlockHubVault(unverifiedVaultConfig: UnverifiedHubVaultConfig, vault: Vault) {
+      val authIntent = buildHubAuthIntent(unverifiedVaultConfig)
+      requestActivityResult(ActivityResultCallbacks.hubAuthenticationUnlock(vault, unverifiedVaultConfig), authIntent)
+    }
+
+    private fun buildHubAuthIntent(unverifiedVaultConfig: UnverifiedHubVaultConfig): Intent? {
+      val serviceConfig = AuthorizationServiceConfiguration(Uri.parse(unverifiedVaultConfig.authEndpoint.toString()), Uri.parse(unverifiedVaultConfig.tokenEndpoint.toString()))
+      val authRequestBuilder = AuthorizationRequest.Builder(
+        serviceConfig,
+        unverifiedVaultConfig.clientId,
+        ResponseTypeValues.CODE,
+        Uri.parse(CryptoConstants.HUB_REDIRECT_URL)
+      )
+      return hubAuthService?.getAuthorizationRequestIntent(authRequestBuilder.build())
+    }
+  }
+  ```
+
+test "rank1007: fix gates Hub unlock behind host consistency, allow-list and trust dialog"
+  lang kotlin
+  file UnlockVaultPresenter.kt
+  reject VYQL-RF-001
+  code
+  ```
+  class UnlockVaultPresenter {
+    fun onUnverifiedVaultConfigRetrieved(unverifiedVaultConfig: Optional<UnverifiedVaultConfig>, vault: Vault) {
+      if (unverifiedVaultConfig.isPresent && unverifiedVaultConfig.get().keyLoadingStrategy() == KeyLoadingStrategy.HUB) {
+        val unverifiedHubVaultConfig = unverifiedVaultConfig.get() as UnverifiedHubVaultConfig
+        if (!isConsistentHubConfig(unverifiedHubVaultConfig)) {
+          Toast.makeText(context(), R.string.error_hub_not_trustworthy, Toast.LENGTH_LONG).show()
+        } else if (configContainsAllowedHosts(unverifiedHubVaultConfig)) {
+          allowedHubHosts(unverifiedHubVaultConfig, vault)
+        } else if (isCryptomatorCloud(unverifiedHubVaultConfig) && !isHttpHost(unverifiedHubVaultConfig)) {
+          allowedHubHosts(unverifiedHubVaultConfig, vault)
+        } else if (isHttpHost(unverifiedHubVaultConfig) && !isLocalhost(unverifiedHubVaultConfig)) {
+          Toast.makeText(context(), R.string.error_hub_not_trustworthy, Toast.LENGTH_LONG).show()
+        } else if (sharedPreferencesHandler.allowUnknownHubHosts()) {
+          view?.showDialog(HubCheckHostAuthenticityDialog.newInstance(arrayOf(unverifiedHubVaultConfig.apiBaseUrl.authority, unverifiedHubVaultConfig.authEndpoint.authority), unverifiedHubVaultConfig, vault))
+        } else {
+          Toast.makeText(context(), R.string.error_hub_not_trustworthy, Toast.LENGTH_LONG).show()
+        }
+      }
+    }
+
+    fun allowedHubHosts(unverifiedHubVaultConfig: UnverifiedHubVaultConfig, vault: Vault) {
+      val authIntent = buildHubAuthIntent(unverifiedHubVaultConfig)
+      requestActivityResult(ActivityResultCallbacks.hubAuthenticationUnlock(vault, unverifiedHubVaultConfig), authIntent)
+    }
+
+    private fun isConsistentHubConfig(c: UnverifiedHubVaultConfig): Boolean {
+      return getAuthority(c.tokenEndpoint) == getAuthority(c.authEndpoint)
+    }
+  }
+  ```

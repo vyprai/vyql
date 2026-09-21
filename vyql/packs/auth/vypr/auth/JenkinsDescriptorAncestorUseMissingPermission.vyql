@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule JenkinsDescriptorAncestorUseMissingPermission {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_200, CWE_862]
+    id: "VYQL-AUTH-172"
+    severity: high
+  }
+  issue code.JenkinsDescriptorAncestorUseMissingPermission as authz
+}

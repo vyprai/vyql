@@ -1,0 +1,271 @@
+# Rank 1473 / CVE-2023-37896 projectdiscovery/nuclei: the payload loader confines
+# a template's `payloads:` file reference to the template's own directory, and
+# does it by string prefix over paths it never resolved
+# (v2/pkg/protocols/common/generators/load.go, loadPayloads):
+#
+#   if sandbox {
+#       pt = filepath.Clean(pt)
+#       templatePathDir := filepath.Dir(templatePath)
+#       if !(templatePathDir != "/" && strings.HasPrefix(pt, templatePathDir)) &&
+#           !strings.HasPrefix(pt, templateDirectory) {
+#           return nil, errors.New("denied payload file path specified")
+#       }
+#   }
+#
+# filepath.Clean and filepath.Dir are documented as purely lexical: neither
+# consults the filesystem and neither turns a relative path into an absolute
+# one. So when the caller hands loadPayloads a relative template path -- which
+# is what an SDK embedder does -- filepath.Dir("template.yaml") is ".", the
+# guard's base directory is a single dot, and strings.HasPrefix("../../../etc/
+# passwd", ".") is true. Every path starting with a dot segment satisfies the
+# containment check and the payload file is read from anywhere on disk (CWE-22).
+# The advisory records the same diagnosis: "relative paths not being converted
+# to absolute paths before doing the check for sandbox flag".
+#
+# The fixed revision resolves the base before splitting it:
+#
+#   templateAbsPath, err := filepath.Abs(templatePath)
+#   if err != nil { return nil, errors.Wrap(err, "could not get absolute path") }
+#   templatePathDir := filepath.Dir(templateAbsPath)
+#
+# and renames the option, so the deny path is now the default (-lfa opts out)
+# rather than something -sandbox opts into.
+#
+# Pool row correction. The row's SHA 53bcc18ec725edcf753446bfa9dc0ede549bd943 is
+# the "Merge branch 'dev'" release merge for v2.9.9 -- 59 files, 24 commits,
+# dependabot bumps and README rewrites -- not the fixing change. GHSA-2xx4-jj5v-6mff cites
+# no commit at all; it references pull request
+# 3927, whose commit is e5154d362af900e83b30fb79028bfab1a7f0c648, "fixing payload
+# load". That commit carries the filepath.Abs change, the -sandbox -> -lfa/-lna
+# split and the payload-loader tests. Repoint the row at e5154d3.
+#
+# This repository is projectdiscovery/nuclei, the scanner engine, not
+# projectdiscovery/nuclei-templates: the weakness is in this repository's own Go
+# source and the diff is a change to a guard, not an addition under templates/.
+#
+# FIXED by widening an existing concept to Go rather than minting one.
+# code.UncanonicalizedPathContainmentCheck (VYQL-PATH-062) names this
+# weakness class -- "a path containment check compares a candidate against its
+# base directory without canonicalizing either" -- with Python and
+# Java bindings; it had none for Go. code.CanonicalPathStringPrefixContainment
+# (VYQL-PATH-040) is the neighbouring but different mistake, where the operands
+# *are* canonical and only the containment operator is wrong; here the operator's
+# operands are what is never resolved. core.PathCanonicalization is the
+# neutralising control the review expects, so no new concept, no new
+# rule and no new sink row are needed.
+#
+# Diagnosis: `vyql match` on the vulnerable loadPayloads labels nothing -- source,
+# sink and control all empty -- and a scan of the vulnerable file reports nothing,
+# so no vocabulary for the guard exists. The Go binding
+# goUncanonicalizedPathPrefixContainment in
+# vyql/bindings/go/uncanonicalizedPathPrefixContainment.vyql. It is a
+# function-scope presence predicate because that is what the Go frontend can
+# express: golang.go's goFunctionTokens emits per-function call_path and call_arg
+# tokens and no per-call shape, so there is no way to ask at the HasPrefix call
+# site whether its own base operand is resolved.
+#
+# Three conditions carry the precision, and each is measured:
+#
+#   * a lexical cleaner (filepath.Clean / path.Clean), a composition or split
+#     (Join / Dir) and strings.HasPrefix all in one function. Requiring Join or
+#     Dir alongside Clean is what took the sweep below from 27 rows to 6: without
+#     it, every mount-table lookup, inotify path filter and pool-source check
+#     that prefix-tests a cleaned path reports.
+#   * no strings.HasPrefix argument in the function is a string literal. A prefix
+#     test against a literal is a syntactic marker test -- a leading ".", a "~/"
+#     home shorthand, a URL scheme -- not a comparison against a base directory
+#     computed at run time. This is the single most valuable clause: on the
+#     enumerated sweep below it is what takes the binding from 64 rows to 6, and
+#     on nuclei itself it removes four (v2/cmd/tmc/main.go's "~/" expansion,
+#     nucleicloud/utils.go's dotfile skip, catalog/disk/path.go's "cves" legacy
+#     route, protocols/file/file.go's extension normalisation). It is not
+#     complete, and the reason is worth recording: "call_arg:" is in
+#     flagASTRoutingValuePrefixes, so the clause does not read the function's own
+#     token blob at all -- flagScopeCallArgHit (bindings_match.go:1198) walks
+#     code.Call nodes in scope and reads each call's argument nodes. Two Go
+#     functions that differ only in whether the base came from filepath.Dir or
+#     filepath.Join, both carrying an identical strings.HasPrefix(name, ".")
+#     and both carrying call_arg:strings.HasPrefix:"." in goFunctionTokens as
+#     dumped from the frontend, resolve differently: the literal is visible on
+#     one and not the other. So a few literal-marker prefix tests still report,
+#     lxd's cmdFilePull.run among them. The failure is in the reporting
+#     direction, never the silencing one.
+#   * no resolver in the same function: filepath.Abs, filepath.EvalSymlinks,
+#     filepath.Rel, filepath.IsAbs, os.Readlink, securejoin.SecureJoin,
+#     fs.ValidPath. This is the half that discriminates the revisions, and it keys on
+#     stdlib APIs rather than on the commit's own words: renaming templateAbsPath,
+#     templatePathDir, loadPayloads and sandbox throughout both revisions leaves
+#     the vulnerable form at 1 and the patched form at 0.
+#
+# Measured (timeout 180, --max-ram 6GB, --cache off, three runs each). The whole
+# nuclei checkout at e5154d3^ reports 195 findings including exactly one
+# VYQL-PATH-062, at v2/pkg/protocols/common/generators/load.go:14, the vulnerable
+# loadPayloads; at e5154d3 it reports 194 and no VYQL-PATH-062. Identical on all
+# three runs at both revisions; every other rule's count is unchanged. Bounded to
+# v2/pkg/protocols/common/generators alone: 2 findings / 3 flags vulnerable
+# against 1 finding / 2 flags patched, the difference being this row.
+#
+# Collateral, enumerated rather than sampled: the reachable set across the 1395
+# sibling clones under /tmp/cve-work/rank*/ is every Go file containing both
+# strings.HasPrefix and a path.Clean -- 199 files out of 56656 Go files, spanning
+# lxd, moby, neuvector, argo-cd, mattermost, waypoint, nhost, nats-server,
+# navidrome, nginx-ui, golang.org/x/net and their vendor trees. Scanned as one
+# tree, the binding reports 6 rows in 5 files (64 without the literal-argument
+# clause, 27 without the Join/Dir clause). Three are the same weakness the
+# fix repairs: mattermost's ServePluginPublicRequest (path.Clean of the request
+# URL, path.Join of the plugin prefix, HasPrefix containment) and argo-cd's
+# generateManifestGeneric and GetParametersAnnouncement, both
+# filepath.Clean(filepath.Join(workDir, metadata.AppRelPath)) followed by
+# HasPrefix(appPath, workDir) with nothing resolved. Two are the shape without
+# the exposure: neuvector's Unzip terminates its prefix with the separator, which
+# is the correct lexical form, and kustomize's FunctionFilter.scope prefixes for
+# resource scoping rather than for a security boundary. One is the token-cap
+# artifact in lxd noted above. Neither OWASP corpus contains Go, so neither can
+# move; Java stays +1.00 and Python +0.90.
+
+test "rank1473: payload path confined by string prefix against an unresolved base directory"
+  lang go
+  file v2/pkg/protocols/common/generators/load.go
+  expect VYQL-PATH-062
+  expect_review code.UncanonicalizedPathContainmentCheck
+  code
+  ```
+  package generators
+
+  import (
+  	"path/filepath"
+  	"strings"
+
+  	"github.com/pkg/errors"
+  )
+
+  func (generator *PayloadGenerator) loadPayloads(payloads map[string]interface{}, templatePath, templateDirectory string, sandbox bool) (map[string][]string, error) {
+  	loadedPayloads := make(map[string][]string)
+
+  	for name, payload := range payloads {
+  		switch pt := payload.(type) {
+  		case string:
+  			elements := strings.Split(pt, "\n")
+  			if len(elements) >= 2 {
+  				loadedPayloads[name] = elements
+  			} else {
+  				if sandbox {
+  					pt = filepath.Clean(pt)
+  					templatePathDir := filepath.Dir(templatePath)
+  					if !(templatePathDir != "/" && strings.HasPrefix(pt, templatePathDir)) && !strings.HasPrefix(pt, templateDirectory) {
+  						return nil, errors.New("denied payload file path specified")
+  					}
+  				}
+  				lines, err := generator.loadPayloadsFromFile(pt)
+  				if err != nil {
+  					return nil, errors.Wrap(err, "could not load payloads")
+  				}
+  				loadedPayloads[name] = lines
+  			}
+  		}
+  	}
+  	return loadedPayloads, nil
+  }
+  ```
+
+test "rank1473: resolving the template path to an absolute one before splitting it closes the escape"
+  lang go
+  file v2/pkg/protocols/common/generators/load.go
+  reject VYQL-PATH-062
+  reject_review code.UncanonicalizedPathContainmentCheck
+  code
+  ```
+  package generators
+
+  import (
+  	"path/filepath"
+  	"strings"
+
+  	"github.com/pkg/errors"
+  )
+
+  func (generator *PayloadGenerator) loadPayloads(payloads map[string]interface{}, templatePath, templateDirectory string, allowLocalFileAccess bool) (map[string][]string, error) {
+  	loadedPayloads := make(map[string][]string)
+
+  	for name, payload := range payloads {
+  		switch pt := payload.(type) {
+  		case string:
+  			elements := strings.Split(pt, "\n")
+  			if len(elements) >= 2 {
+  				loadedPayloads[name] = elements
+  			} else {
+  				if !allowLocalFileAccess {
+  					pt = filepath.Clean(pt)
+  					templateAbsPath, err := filepath.Abs(templatePath)
+  					if err != nil {
+  						return nil, errors.Wrap(err, "could not get absolute path")
+  					}
+  					templatePathDir := filepath.Dir(templateAbsPath)
+  					if !(templatePathDir != "/" && strings.HasPrefix(pt, templatePathDir)) && !strings.HasPrefix(pt, templateDirectory) {
+  						return nil, errors.New("denied payload file path specified")
+  					}
+  				}
+  				lines, err := generator.loadPayloadsFromFile(pt)
+  				if err != nil {
+  					return nil, errors.Wrap(err, "could not load payloads")
+  				}
+  				loadedPayloads[name] = lines
+  			}
+  		}
+  	}
+  	return loadedPayloads, nil
+  }
+  ```
+
+test "rank1473: filepath.Rel is a containment answer, not a prefix guess"
+  lang go
+  file internal/assets/serve.go
+  reject VYQL-PATH-062
+  reject_review code.UncanonicalizedPathContainmentCheck
+  code
+  ```
+  package assets
+
+  import (
+  	"errors"
+  	"os"
+  	"path/filepath"
+  	"strings"
+  )
+
+  func Open(root string, name string) (*os.File, error) {
+  	candidate := filepath.Clean(filepath.Join(root, name))
+  	rel, err := filepath.Rel(root, candidate)
+  	if err != nil {
+  		return nil, err
+  	}
+  	if strings.HasPrefix(rel, "..") {
+  		return nil, errors.New("outside asset root")
+  	}
+  	return os.Open(candidate)
+  }
+  ```
+
+test "rank1473: prefix-testing a path against a literal marker is not a containment check"
+  lang go
+  file v2/internal/installer/template.go
+  reject VYQL-PATH-062
+  reject_review code.UncanonicalizedPathContainmentCheck
+  code
+  ```
+  package installer
+
+  import (
+  	"path/filepath"
+  	"strings"
+  )
+
+  func metaFilePath(templatePath string, uri string) string {
+  	root := filepath.Dir(templatePath)
+  	name := filepath.Clean(uri)
+  	if strings.HasPrefix(name, ".") {
+  		return ""
+  	}
+  	return filepath.Join(root, name)
+  }
+  ```

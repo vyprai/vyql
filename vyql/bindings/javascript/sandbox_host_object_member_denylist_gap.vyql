@@ -1,0 +1,47 @@
+module bindings.javascript.sandbox_host_object_member_denylist_gap;
+
+// `node:vm` is not an isolation boundary, so a module that runs author-supplied
+// script through `runInNewContext` / `runInThisContext` / `vm.runInContext` is
+// left with exactly one control: which host values the context carries, and what
+// each of them exposes. A module that reaches for `Reflect.get` inside a `Proxy`
+// has chosen to forward the wrapped object wholesale and subtract from it -- the
+// trap returns `undefined` for a fixed list of property names and the real
+// member for everything else. That is a denylist over a live object graph, and
+// it is complete only if the list names every documented member of the wrapped
+// API that hands back a more privileged object.
+//
+// Playwright is the case where the graph is short and the documentation
+// enumerates it. `Page.context()` returns a `BrowserContext`, `.browser()`
+// returns a `Browser`, and `Browser.browserType()` returns a `BrowserType` --
+// whose reference page lists five ways to get a browser process:
+// `launch()`, `launchServer()`, `launchPersistentContext()`, `connect()` and
+// `connectOverCDP()`. `launch({ executablePath })` runs an arbitrary binary, so a
+// sandbox that exposes a `Page` and denies only part of that list has denied
+// nothing: the omitted member reaches the same `BrowserType`.
+//
+// The binding therefore asks for a module that both runs script in a `node:vm`
+// context and denies the two members that identify the traversal -- the
+// `browserType` accessor and `launch` itself -- while naming neither
+// `launchServer` nor `connect`. Every name is Playwright's own, readable from its
+// `BrowserType` reference by someone who has never seen a sandbox escape; none
+// is a spelling a fix chose.
+//
+// Module scope rather than function scope, because the denied names are a
+// module-level `Set` and the trap that consumes them is a two-line membership
+// test: a function-scope query sees the test and none of the names. That makes
+// the names readable as raw module text, comments included, so each is matched
+// in the quotes a list entry carries -- a comment explaining that
+// `browser.browserType().launch(...)` is the escape route is prose about the
+// weakness, not a denylist entry, and prose mentioning `connect` does not clear
+// the flag. The residual is in the false-negative direction only: a module that
+// spells `"connect"` as a quoted literal for an unrelated reason is not reported.
+binding sandboxHostObjectMemberDenylistOmitsBrowserProcessEntryPoints {
+  query pattern presenceNode where node.scope == "module"
+    and node.context.language == "javascript"
+    and containsAny(node.context.callPath, ["runInNewContext", "runInThisContext", "vm.runInContext"])
+    and node.context.callPath contains "Reflect.get"
+    and containsAny(node.context.literal, ["\"browserType\"", "'browserType'", "`browserType`"])
+    and containsAny(node.context.literal, ["\"launch\"", "'launch'", "`launch`"])
+    and not containsAny(node.context.literal, ["\"launchServer\"", "'launchServer'", "`launchServer`", "\"connect\"", "'connect'", "`connect`"])
+  emit issue code.SandboxHostObjectMemberDenylistGap at node
+}

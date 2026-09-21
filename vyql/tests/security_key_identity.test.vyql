@@ -1,0 +1,33 @@
+# Security key identity checks: shortened key identifiers reaching trust-key operations.
+
+test "python: shortened apt key id reaches key receive"
+  lang python
+  expect VYQL-CRY-005
+  expect_review code.ShortSecurityIdentifier
+  code
+  ```
+  def import_key(module, keyserver, key_id):
+      cmd = "apt-key adv --keyserver %s --recv %s" % (keyserver, key_id)
+      module.run_command(cmd)
+
+  def main(module):
+      key_id = module.params['id']
+      key_id = key_id.upper()[-8:]
+      import_key(module, "pool.sks-keyservers.net", key_id)
+  ```
+
+test "python: full apt key id receive is clean"
+  lang python
+  reject VYQL-CRY-005
+  reject_review code.ShortSecurityIdentifier
+  code
+  ```
+  def import_key(module, keyserver, key_id):
+      cmd = "apt-key adv --keyserver %s --recv %s" % (keyserver, key_id)
+      module.run_command(cmd)
+
+  def main(module):
+      key_id = module.params['id']
+      key_id = key_id.upper()
+      import_key(module, "pool.sks-keyservers.net", key_id)
+  ```

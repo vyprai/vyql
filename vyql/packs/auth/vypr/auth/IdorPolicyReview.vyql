@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule IdorPolicyReview {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_639]
+    id: "VYQL-AUTH-081"
+    severity: high
+  }
+  issue code.IdorPolicyReview as sink
+}

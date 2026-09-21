@@ -1,0 +1,8 @@
+module code;
+
+review code.PathSanitizerWithoutRootContainment {
+  category: path
+  expected: [core.PathAccessCheck, core.PathCanonicalization]
+  kind: attention
+  text: "review a path sanitizer that rewrites its input without checking the result stays under its base directory"
+}

@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m622e80c4;
+
+binding deserialization0 {
+  requires {
+    dependency("com.fasterxml.jackson.jaxrs:jackson-jaxrs-json-provider")
+  }
+  query pattern callExpr where callee.method == "forReading"
+  emit sink code.Deserialization at args[0]
+}

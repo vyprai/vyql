@@ -1,0 +1,30 @@
+module bindings.python.streaming_parser_callback_accumulation_without_bound;
+
+// A streaming parser that reports its parse through window callbacks hands the
+// consumer a (data, start, end) triple per fragment and no limit of its own:
+// python-multipart's QuerystringParser and MultipartParser both document
+// max_size as defaulting to infinity, so a consumer that wants a bound has to
+// apply it where the fragments arrive. A callback that slices its window and
+// appends the fragment into state is the accumulation itself -- every fragment
+// of the chunk is materialised before the callback returns, so a cap the
+// consumer keeps anywhere else (a drain loop after the write call, a check in
+// the registering function) runs after the growth it was meant to bound. The
+// anchor is the window contract rather than any one library's callback names:
+// the data[start:end] slice on an on_* method or nested handler, and the
+// append or extend that grows the state. The discriminator is a bound inside
+// the same body -- any ordering comparison suppresses, so a counter compared
+// against a limit, a len() against a ceiling, or any other spelling of a bound
+// applied at the fragment clears the finding, while a bound kept outside the
+// callback does not. Residuals, both recall-direction: an accumulation grown
+// with += on a byte accumulator rather than an append or extend stays
+// unflagged, and a consumer that bounds by passing the parser its own
+// documented max_size argument leaves the callbacks comparison-free and stays
+// flagged.
+binding streamingParserCallbackAccumulationWithoutBound {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "python"
+    and node.context.functionName startsWith "on_"
+    and node.context.subscript in ["data[start:end]"]
+    and node.context.call in ["append", "extend"]
+    and not (containsAny(node.context.expr, [">", "<"]))
+  emit issue code.UnboundedResourceOperation at node
+}

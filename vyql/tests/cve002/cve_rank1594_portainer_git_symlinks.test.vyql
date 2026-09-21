@@ -1,0 +1,182 @@
+# Rank 1594 / CVE-2026-44881: Portainer materialized Git repository
+# entries with mode 0o120000 as real OS symlinks when cloning
+# Git-backed stacks (only .gitmodules was exempted), and its
+# GET /api/stacks/{id}/file endpoint read the entry point with
+# os.ReadFile -- which follows symlinks -- so a repository whose
+# docker-compose.yml was a symlink to an arbitrary path returned
+# that file's contents verbatim to any stack-creating user
+# (arbitrary file read through materialized symlinks,
+# CWE-59/CWE-22; BE-12768). The clone in api/git/git.go used
+# git.PlainCloneContext with a plain destination path, letting
+# every blob entry of mode 120000 become a host symlink. The row
+# is corrected in place: the row held aae5e533c6 (the 2.39.2
+# version bump -- the nocommit flag holds); the fixing commit is
+# 8be327f0, "fix(git): forbid the usage of symlinks BE-12768
+# (#2532)": a noSymlinkFS wrapper over the billy filesystem whose
+# Symlink() returns gittypes.ErrSymlinkDetected -- go-git clones
+# into a filesystem that cannot create symlinks at all, with the
+# storer rebuilt on the same root.
+#
+# The plain clone is now reported. A git clone of a repository
+# whose content is not the cloner's own is the same extraction the
+# archive-symlink family already covers: go-git's checkout writes
+# every tree entry the repository declares, mode-120000 entries as
+# symlinks, so the clone is an extraction that reproduces link
+# entries verbatim into the destination. The binding reads the
+# qualified clone call -- go-git's own unqualified forwarders are
+# not caller sites -- and credits every documented way to keep the
+# materialisation off the host: an in-memory worktree (go-billy's
+# memfs), a wrapper or mode test that names symlinks, or a
+# resolution probe on the result.
+#
+# The read side stays ordinary: the os.ReadFile in the endpoint is
+# an unguarded path read either way, and both the plain-clone and
+# the wrapper forms still reject under the traversal rule -- the
+# read alone reports nothing; the wrapper fixes the clone, not the
+# read.
+
+test "rank1594: the clone materializes repository symlinks"
+  lang go
+  file api/git/git.go
+  expect VYQL-PATH-007
+  reject VYQL-PATH-001
+  code
+  ```
+  package git
+
+  import (
+      "context"
+      "os"
+      "path/filepath"
+
+      "github.com/go-git/go-git/v5"
+      "github.com/go-git/go-git/v5/plumbing"
+  )
+
+  type cloneOption struct {
+      repositoryUrl string
+      referenceName string
+  }
+
+  func (c *gitClient) download(ctx context.Context, dst string, opt cloneOption) error {
+      gitOptions := git.CloneOptions{
+          URL: opt.repositoryUrl,
+          Tags: git.NoTags,
+      }
+
+      if opt.referenceName != "" {
+          gitOptions.ReferenceName = plumbing.ReferenceName(opt.referenceName)
+      }
+
+      _, err := git.PlainCloneContext(ctx, dst, false, &gitOptions)
+
+      if err != nil {
+          return err
+      }
+
+      if !c.preserveGitDirectory {
+          err := os.RemoveAll(filepath.Join(dst, ".git"))
+          if err != nil {
+              return err
+          }
+      }
+
+      return nil
+  }
+
+  func (c *gitClient) ReadEntryPoint(dst string, entryPoint string) ([]byte, error) {
+      return os.ReadFile(dst + string(os.PathSeparator) + entryPoint)
+  }
+  ```
+
+test "rank1594: the fixed revision clones into a filesystem without symlinks"
+  lang go
+  file api/git/git.go
+  reject VYQL-PATH-007
+  reject VYQL-PATH-001
+  code
+  ```
+  package git
+
+  import (
+      "context"
+      "os"
+
+      gittypes "github.com/portainer/portainer/api/git/types"
+      "github.com/portainer/portainer/api/filesystem"
+
+      "github.com/go-git/go-billy/v5"
+      "github.com/go-git/go-billy/v5/osfs"
+      "github.com/go-git/go-git/v5"
+      "github.com/go-git/go-git/v5/plumbing/cache"
+      gogitfs "github.com/go-git/go-git/v5/storage/filesystem"
+  )
+
+  // noSymlinkFS wraps a billy.Filesystem and rejects symlink creation to prevent
+  // symlink traversal attacks from untrusted git repositories
+  type noSymlinkFS struct {
+      billy.Filesystem
+  }
+
+  func (fs noSymlinkFS) Symlink(_, _ string) error {
+      return gittypes.ErrSymlinkDetected
+  }
+
+  // NewNoSymlinkFS wraps fs and rejects any symlink creation
+  func NewNoSymlinkFS(fs billy.Filesystem) billy.Filesystem {
+      return noSymlinkFS{fs}
+  }
+
+  func (c *gitClient) Download(ctx context.Context, dst string, opt *git.CloneOptions) error {
+      wt := NewNoSymlinkFS(osfs.New(dst))
+      dot := osfs.New(filesystem.JoinPaths(dst, ".git"))
+      storer := gogitfs.NewStorage(dot, cache.NewObjectLRU(0))
+
+      _, err := git.CloneContext(ctx, storer, wt, opt)
+      if err != nil {
+          return err
+      }
+
+      if c.preserveGitDirectory {
+          return nil
+      }
+
+      return os.RemoveAll(filesystem.JoinPaths(dst, ".git"))
+  }
+
+  func (c *gitClient) ReadEntryPoint(dst string, entryPoint string) ([]byte, error) {
+      return os.ReadFile(dst + string(os.PathSeparator) + entryPoint)
+  }
+  ```
+
+test "rank1594: an in-memory worktree cannot materialize a host link"
+  lang go
+  file internal/providers/git/git.go
+  reject VYQL-PATH-007
+  code
+  ```
+  package git
+
+  import (
+      "context"
+
+      "github.com/go-git/go-billy/v5/memfs"
+      "github.com/go-git/go-git/v5"
+      "github.com/go-git/go-git/v5/plumbing"
+      "github.com/go-git/go-git/v5/storage/memory"
+  )
+
+  func clone(ctx context.Context, url string, branch string) error {
+      opts := &git.CloneOptions{
+          URL:           url,
+          Tags:          git.NoTags,
+          ReferenceName: plumbing.NewBranchReferenceName(branch),
+      }
+
+      storer := memory.NewStorage()
+      fs := memfs.New()
+
+      _, err := git.CloneContext(ctx, storer, fs, opts)
+      return err
+  }
+  ```

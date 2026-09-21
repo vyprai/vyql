@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule RequestScopePolicyReview {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_863]
+    id: "VYQL-AUTH-173"
+    severity: high
+  }
+  issue code.RequestScopePolicyReview as authz
+}

@@ -1,0 +1,149 @@
+# Rank 1454 / CVE-2018-7160: Node's inspector WebSocket server completed the
+# debugger handshake for any request that is a GET carrying a
+# Sec-WebSocket-Key, without ever looking at the request's Host header
+# (CWE-346/CWE-352). src/inspector_socket.cc's message_complete_cb wrote the
+# "HTTP/1.1 101 Switching Protocols ... Sec-WebSocket-Accept: " response and
+# hands the connection to the inspector as soon as parser->method is
+# HTTP_GET, parser->upgrade is set and state->ws_key is non-empty. Because
+# the WebSocket handshake is not subject to the same-origin policy, a page on
+# an attacker-controlled name whose DNS rebinds to 127.0.0.1 reaches the
+# loopback-bound inspector port and gets full debugger control of the process.
+#
+# The fixed revision (e3950d1a40, "inspector: check Host header") keeps every parsed
+# header in a map and adds IsAllowedHost(HeaderValue(state, "Host")) to
+# message_complete_cb's first branch, allowing only an empty host, an IP
+# literal, localhost or localhost6.
+#
+# FIXED at the binding layer only. The language-neutral concept
+# code.WebSocketUpgradeMissingOriginCheck and its rule VYQL-RF-031
+# exist -- rank 815 minted them for a JavaScript HMR socket and rank 1169
+# widened them to Python -- so this rank widens the same concept to C++
+# rather than minting a sibling. The binding is written from RFC 6455 alone:
+# a function that emits the server side of the handshake (the
+# "Sec-WebSocket-Accept: " response header it has to generate) and never
+# names the Origin or Host request header anywhere in its body.
+#
+# Two properties of the needle are measured rather than assumed. The
+# response-header spelling with the colon ("Sec-WebSocket-Accept: ") is what
+# separates a server completing a handshake from a client verifying one: on
+# libzmq's ws_engine.cpp and cpp-httplib's httplib.cpp the bare header name
+# also appears inside client_handshake / read_websocket_upgrade_response,
+# which have no origin to validate, and including the colon dropped both
+# (2 -> 1 on each file). And the discriminator is the header name, not the
+# fix's own vocabulary: renaming IsAllowedHost and HeaderValue in the patched
+# form leaves the finding suppressed, because what the binding reads is the
+# literal "Host" the lookup passes.
+#
+# C++ context routing measured for this rank: literal: is function-confined
+# (a sibling function carrying state->headers["Host"] does not silence the
+# vulnerable one) and comment-proof (a "// TODO: validate the Host header and
+# the Origin header here" comment inside the vulnerable function leaves the
+# finding at 1), because ccStructuredContextTokens walks only the function's
+# own body and string_literal nodes come from the AST, not the raw text.
+#
+# Measured on the real checkout, src/ subtree, three --cache off runs each:
+# 501 findings at e3950d1a40^ including exactly one VYQL-RF-031 at
+# inspector_socket.cc:474 (message_complete_cb), 500 and zero VYQL-RF-031 at
+# e3950d1a40. Reachable set enumerated by grep across ~100 corpus clones: 15
+# C/C++ files carry the accept header at all, 4 of them C++; the binding
+# reports the two hand-rolled C++ server handshakes among them (libzmq
+# ws_engine_t::server_handshake, cpp-httplib Server::process_request), both
+# of which do complete a browser-reachable upgrade with no Origin check, and
+# none of the client-side handshake readers. The one further row in node's own
+# tree is test/cctest/test_inspector_socket.cc:304, a test helper holding the
+# expected handshake response as a fixture; it stands at both revisions and so
+# costs no discrimination.
+
+test "rank1454: the inspector handshake completes without reading the Host header"
+  lang cpp
+  file src/inspector_socket.cc
+  expect VYQL-RF-031
+  expect_review code.WebSocketUpgradeMissingOriginCheck
+  code
+  ```
+  #include <map>
+  #include <string>
+
+  struct http_parsing_state_s {
+    std::string ws_key;
+    std::string path;
+    std::string current_header;
+    std::map<std::string, std::string> headers;
+  };
+
+  static int message_complete_cb(http_parser* parser) {
+    InspectorSocket* inspector = static_cast<InspectorSocket*>(parser->data);
+    struct http_parsing_state_s* state = inspector->http_parsing_state;
+    if (parser->method != HTTP_GET) {
+      handshake_failed(inspector);
+    } else if (state->ws_key.empty()) {
+      handshake_failed(inspector);
+    } else {
+      char accept_string[ACCEPT_KEY_LENGTH];
+      generate_accept_string(state->ws_key, &accept_string);
+      const char accept_ws_prefix[] = "HTTP/1.1 101 Switching Protocols\r\n"
+                                      "Upgrade: websocket\r\n"
+                                      "Connection: Upgrade\r\n"
+                                      "Sec-WebSocket-Accept: ";
+      const char accept_ws_suffix[] = "\r\n\r\n";
+      std::string reply(accept_ws_prefix, sizeof(accept_ws_prefix) - 1);
+      reply.append(accept_string, sizeof(accept_string));
+      reply.append(accept_ws_suffix, sizeof(accept_ws_suffix) - 1);
+      if (write_to_client(inspector, &reply[0], reply.size()) >= 0) {
+        handshake_complete(inspector);
+        inspector->http_parsing_state->done = true;
+      } else {
+        close_and_report_handshake_failure(inspector);
+      }
+    }
+    return 0;
+  }
+  ```
+
+test "rank1454: the handshake rejects a request whose Host header is not allowed"
+  lang cpp
+  file src/inspector_socket.cc
+  reject VYQL-RF-031
+  reject_review code.WebSocketUpgradeMissingOriginCheck
+  code
+  ```
+  #include <map>
+  #include <string>
+
+  struct http_parsing_state_s {
+    std::string ws_key;
+    std::string path;
+    std::string current_header;
+    std::map<std::string, std::string> headers;
+  };
+
+  static int message_complete_cb(http_parser* parser) {
+    InspectorSocket* inspector = static_cast<InspectorSocket*>(parser->data);
+    struct http_parsing_state_s* state = inspector->http_parsing_state;
+    state->ws_key = HeaderValue(state, "Sec-WebSocket-Key");
+    if (!IsAllowedHost(HeaderValue(state, "Host")) ||
+        parser->method != HTTP_GET) {
+      handshake_failed(inspector);
+    } else if (state->ws_key.empty()) {
+      handshake_failed(inspector);
+    } else {
+      char accept_string[ACCEPT_KEY_LENGTH];
+      generate_accept_string(state->ws_key, &accept_string);
+      const char accept_ws_prefix[] = "HTTP/1.1 101 Switching Protocols\r\n"
+                                      "Upgrade: websocket\r\n"
+                                      "Connection: Upgrade\r\n"
+                                      "Sec-WebSocket-Accept: ";
+      const char accept_ws_suffix[] = "\r\n\r\n";
+      std::string reply(accept_ws_prefix, sizeof(accept_ws_prefix) - 1);
+      reply.append(accept_string, sizeof(accept_string));
+      reply.append(accept_ws_suffix, sizeof(accept_ws_suffix) - 1);
+      if (write_to_client(inspector, &reply[0], reply.size()) >= 0) {
+        handshake_complete(inspector);
+        inspector->http_parsing_state->done = true;
+      } else {
+        close_and_report_handshake_failure(inspector);
+      }
+    }
+    return 0;
+  }
+  ```

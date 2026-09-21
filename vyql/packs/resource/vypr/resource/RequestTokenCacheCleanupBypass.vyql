@@ -1,0 +1,10 @@
+module vypr.resource;
+
+rule RequestTokenCacheCleanupBypass {
+  meta {
+    cwe: [CWE_772]
+    id: "VYQL-RES-003"
+    severity: high
+  }
+  issue code.RequestTokenCacheCleanupBypass as cache
+}

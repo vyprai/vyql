@@ -1,0 +1,9 @@
+module bindings.c.generated.m2c34e39d;
+
+binding deserialization0 {
+  requires {
+    dependency("qtlottie")
+  }
+  query pattern callExpr where callee.method == "QLottieBase::parse"
+  emit sink code.Deserialization at args[0]
+}

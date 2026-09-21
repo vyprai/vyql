@@ -1,0 +1,32 @@
+module bindings.c.format_truncation_unchecked;
+
+// The C standard's formatted-output length contract: snprintf(3) and
+// vsnprintf(3) return the number of characters the output would have
+// needed, not the number written, so a return value at or above the bound
+// the call received means the output was truncated. A function that
+// captures that return value and then reuses it as a byte count -- a call
+// argument, alone or in arithmetic with another running count -- or as the
+// destination pointer's offset, without ever comparing it against the
+// bound, steps outside the destination whenever the format expands past
+// it.
+//
+// The fact is emitted by the C frontend (ccFormatTruncationUncheckedReuse-
+// Observations, internal/extract/frontend/treesitter/c.go) from the syntax
+// tree: the capture, the reuse and the guard scan all run over the
+// compacted function body, so prose and identifiers unrelated to the
+// pairing cannot satisfy them. The reuse must name the captured variable
+// itself, which is what keeps the fact off most capture sites, and the
+// guard is semantic rather than a spelling: any relational comparison of
+// the captured variable against an operand mentioning sizeof, against the
+// call's own size argument, or against an all-caps limit constant, in
+// either operand order, clears the fact.
+//
+// Residuals, all false-negative: the comparison is not required to
+// dominate the reuse, so a check in one branch vouches for a sibling
+// branch's reuse; the compacted body keeps comments, so a commented-out
+// check still clears; and an inline declaration fuses with its type once
+// whitespace is stripped, so only the assignment form is recognised.
+binding formatTruncationUnchecked {
+  query pattern presenceNode where node.kind == "any" and node.analysis == "format_length.truncation_unchecked"
+  emit issue code.MissingFormatTruncationCheck at node
+}

@@ -1,0 +1,17 @@
+module bindings.ruby.generated.m1ddd4c05;
+
+binding sqlExecution0 {
+  requires {
+    dependency("activerecord-import")
+  }
+  query pattern callExpr where callee.method == "bulk_import"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution1 {
+  requires {
+    dependency("activerecord-import")
+  }
+  query pattern callExpr where callee.method == "insert_many"
+  emit sink code.SqlExecution at args[0]
+}

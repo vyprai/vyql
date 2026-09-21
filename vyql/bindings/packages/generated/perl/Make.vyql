@@ -1,0 +1,65 @@
+module bindings.perl.generated.m2c6e877b;
+
+binding commandExecution0 {
+  requires {
+    dependency("Make")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution1 {
+  requires {
+    dependency("Make")
+  }
+  query pattern callExpr where callee.method == "shell"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("Make")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("Make")
+  }
+  query pattern callExpr where callee.method == "parse_makefile"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData4 {
+  requires {
+    dependency("Make")
+  }
+  query pattern callExpr where callee.method == "parse_cmdline"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData5 {
+  requires {
+    dependency("Make")
+  }
+  query pattern callExpr where callee.method == "parse_args"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData6 {
+  requires {
+    dependency("Make")
+  }
+  query pattern callExpr where callee.method == "tokenize"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData7 {
+  requires {
+    dependency("Make")
+  }
+  query pattern callExpr where callee.method == "evaluate_macro"
+  emit source core.UserControlledData at call.result
+}

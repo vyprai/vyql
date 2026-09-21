@@ -1,0 +1,49 @@
+module bindings.elixir.generated.m3f2c2607;
+
+binding networkSend0 {
+  requires {
+    dependency("facebook")
+  }
+  query pattern callExpr where callee.method == "publish"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding secretValue1 {
+  requires {
+    dependency("facebook")
+  }
+  query pattern callExpr where callee.method == "set_app_secret"
+  emit source code.SecretValue at call.result
+}
+
+binding networkData2 {
+  requires {
+    dependency("facebook")
+  }
+  query pattern callExpr where callee.method == "get_object"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData3 {
+  requires {
+    dependency("facebook")
+  }
+  query pattern callExpr where callee.method == "get_object_edge"
+  emit source code.NetworkData at call.result
+}
+
+binding secretValue4 {
+  requires {
+    dependency("facebook")
+  }
+  query pattern callExpr where callee.method == "access_token"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue5 {
+  requires {
+    dependency("facebook")
+  }
+  query pattern callExpr where callee.method == "long_lived_access_token"
+  emit source code.SecretValue at call.result
+}

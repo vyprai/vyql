@@ -1,0 +1,8 @@
+module code;
+
+review code.EcdsaNonceBitLengthTimingLeak {
+  category: crypto
+  expected: [core.InputValidation]
+  kind: attention
+  text: "review ECDSA signing for fixed-bit-length nonce scalar multiplication before using k in generator multiplication and inversion"
+}

@@ -1,0 +1,179 @@
+# Ray's dashboard head serves the Jobs API -- POST /api/jobs/ taking a
+# caller-supplied `entrypoint` shell command that a supervisor actor later
+# hands to subprocess.Popen(entrypoint, shell=True) -- from one aiohttp
+# application, assembled in HttpServerDashboardHead.run():
+#
+#     app = aiohttp.web.Application(
+#         client_max_size=ray_constants.DASHBOARD_CLIENT_MAX_SIZE,
+#         middlewares=[
+#             self.metrics_middleware,
+#             self.path_clean_middleware,
+#             self.browsers_no_post_put_middleware,
+#             self.cache_control_static_middleware,
+#         ],
+#     )
+#     app.add_routes(routes=routes.bound_routes())
+#     app.add_routes(routes=SubprocessRouteTable.bound_routes())
+#
+# Every module's routes land on that one application, and the chain named
+# four middlewares without one that decides who may call. The advisory is
+# disputed by the vendor and lists no patched version; its single commit
+# reference adds ray/util/check_open_ports.py, a CLI that asks a port-check
+# service whether the cluster's listening ports are reachable from the
+# internet, and does not touch the dashboard at all. The repository did
+# ship the remediation two years later, in the dashboard head rather than
+# in any handler: a token-auth middleware added to the same chain.
+#
+# Detection reads the place the library puts chain-wide request processing.
+# aiohttp's own documentation describes middleware as the coroutine that runs
+# in front of every handler and names the permission check as what it is for
+# ("displaying 403 Forbidden page or raising HTTPForbidden exception if the
+# user does not have permissions"), with the chain passed to the keyword-only
+# `middlewares` parameter at construction. So the binding asks the narrower
+# question a function's own tokens can answer: this function constructs
+# `web.Application`, passes a `middlewares` chain, binds routes with
+# `add_routes`, and nothing in the chain or the keyword names authentication.
+# It does not fire on the handler, which the remediation never touched, and
+# it does not fire on an application built without a `middlewares` keyword at
+# all (http_server_agent.py and the runtime-env agent both call bare
+# `web.Application()`), because a function that names no chain is not
+# declaring a chain that omits the check.
+#
+# Measured on the real checkout at the remediation's parent and at the
+# remediation: python/ray/dashboard scans 301 findings with exactly one
+# VYQL-AUTH-079 before and 300 with none after, three runs each, identical
+# every time; every other row in the diff is a line-number shift from the
+# added middleware. The Jobs API module itself is byte-identical across the
+# pair (md5 on job_head.py, job_manager.py, job_agent.py), which is why a
+# handler-scoped reading of this weakness cannot discriminate and this one
+# reads the application. No other clone in the corpus constructs an aiohttp
+# application with a `middlewares` chain: the four `web.Application(` sites
+# in ray's own production code are this one, two bare constructors, and one
+# built with only `client_max_size`, and the one aiohttp call in the other
+# Python clones (vllm's round-robin proxy) is also a bare constructor.
+
+test "rank1652: the dashboard head installs a middleware chain that names no authentication"
+  lang python
+  file http_server_head.py
+  expect VYQL-AUTH-079
+  code
+  ```
+  import aiohttp.web
+
+  from ray.dashboard import routes
+  from ray.dashboard.subprocesses import SubprocessRouteTable
+
+
+  class HttpServerDashboardHead:
+      async def run(self, dashboard_head_modules):
+          for m in dashboard_head_modules:
+              routes.DashboardHeadRouteTable.bind(m)
+
+          app = aiohttp.web.Application(
+              client_max_size=100 * 1024 * 1024,
+              middlewares=[
+                  self.metrics_middleware,
+                  self.path_clean_middleware,
+                  self.browsers_no_post_put_middleware,
+                  self.cache_control_static_middleware,
+              ],
+          )
+          app.add_routes(routes=routes.bound_routes())
+          app.add_routes(routes=SubprocessRouteTable.bound_routes())
+
+          self.runner = aiohttp.web.AppRunner(app)
+  ```
+
+test "rank1652: the dashboard head adds a token-auth middleware to the chain"
+  lang python
+  file http_server_head.py
+  reject VYQL-AUTH-079
+  code
+  ```
+  import aiohttp.web
+
+  from ray.dashboard import routes
+  from ray.dashboard.subprocesses import SubprocessRouteTable
+
+
+  class HttpServerDashboardHead:
+      @aiohttp.web.middleware
+      async def auth_middleware(self, request, handler):
+          if not auth_utils.is_token_auth_enabled():
+              return await handler(request)
+
+          auth_header = request.headers.get("Authorization", "")
+          if not auth_header:
+              return aiohttp.web.Response(
+                  status=401, text="Unauthorized: Missing authentication token"
+              )
+          if not auth_utils.validate_request_token(auth_header):
+              return aiohttp.web.Response(
+                  status=403, text="Forbidden: Invalid authentication token"
+              )
+          return await handler(request)
+
+      async def run(self, dashboard_head_modules):
+          for m in dashboard_head_modules:
+              routes.DashboardHeadRouteTable.bind(m)
+
+          app = aiohttp.web.Application(
+              client_max_size=100 * 1024 * 1024,
+              middlewares=[
+                  self.metrics_middleware,
+                  self.auth_middleware,
+                  self.path_clean_middleware,
+                  self.browsers_no_post_put_middleware,
+                  self.cache_control_static_middleware,
+              ],
+          )
+          app.add_routes(routes=routes.bound_routes())
+          app.add_routes(routes=SubprocessRouteTable.bound_routes())
+
+          self.runner = aiohttp.web.AppRunner(app)
+  ```
+
+test "rank1652: an application built with no middleware keyword declares no chain"
+  lang python
+  file http_server_agent.py
+  reject VYQL-AUTH-079
+  code
+  ```
+  import aiohttp.web
+
+  from ray.dashboard import routes
+
+
+  class HttpServerAgent:
+      async def run(self, dashboard_agent_modules):
+          for m in dashboard_agent_modules:
+              routes.DashboardAgentRouteTable.bind(m)
+
+          app = aiohttp.web.Application()
+          app.add_routes(routes=routes.bound_routes())
+
+          self.runner = aiohttp.web.AppRunner(app)
+  ```
+
+test "rank1652: a chain that names its authentication gate is read by a human"
+  lang python
+  file http_server_head.py
+  reject VYQL-AUTH-079
+  code
+  ```
+  import aiohttp.web
+
+  from ray.dashboard import routes
+
+
+  class HttpServerDashboardHead:
+      async def run(self, dashboard_head_modules):
+          app = aiohttp.web.Application(
+              middlewares=[
+                  self.request_id_middleware,
+                  self.session_middleware,
+              ],
+          )
+          app.add_routes(routes=routes.bound_routes())
+          self.runner = aiohttp.web.AppRunner(app)
+  ```

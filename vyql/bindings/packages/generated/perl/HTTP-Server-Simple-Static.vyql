@@ -1,0 +1,9 @@
+module bindings.perl.generated.m38e4cd35;
+
+binding filePathAccess0 {
+  requires {
+    dependency("HTTP-Server-Simple-Static")
+  }
+  query pattern callExpr where callee.method == "serve_static"
+  emit sink code.FilePathAccess at args[0]
+}

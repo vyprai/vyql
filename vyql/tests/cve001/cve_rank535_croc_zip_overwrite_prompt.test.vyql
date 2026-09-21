@@ -1,0 +1,112 @@
+# Rank 535 / CVE-2023-43616: croc manually extracted zip entries by
+# joining f.Name into the destination path and truncating existing files
+# without prompting before overwrite.
+
+test "rank535: croc zip extraction truncates existing destination entry without prompt"
+  lang go
+  file utils.go
+  expect VYQL-PATH-014
+  expect_review code.ManualZipEntryFileWrite
+  code
+  ```
+  package utils
+
+  import (
+      "archive/zip"
+      "io"
+      "log"
+      "os"
+      "path/filepath"
+  )
+
+  func UnzipDirectory(destination string, source string) error {
+      archive, err := zip.OpenReader(source)
+      if err != nil {
+          log.Fatalln(err)
+      }
+      defer archive.Close()
+
+      for _, f := range archive.File {
+          filePath := filepath.Join(destination, f.Name)
+          if f.FileInfo().IsDir() {
+              os.MkdirAll(filePath, os.ModePerm)
+              continue
+          }
+          if err := os.MkdirAll(filepath.Dir(filePath), os.ModePerm); err != nil {
+              log.Fatalln(err)
+          }
+          dstFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+          if err != nil {
+              log.Fatalln(err)
+          }
+          fileInArchive, err := f.Open()
+          if err != nil {
+              log.Fatalln(err)
+          }
+          if _, err := io.Copy(dstFile, fileInArchive); err != nil {
+              log.Fatalln(err)
+          }
+      }
+      return nil
+  }
+  ```
+
+test "rank535: croc prompts before overwriting extracted zip entry"
+  lang go
+  file utils.go
+  reject VYQL-PATH-014
+  reject_review code.ManualZipEntryFileWrite
+  code
+  ```
+  package utils
+
+  import (
+      "archive/zip"
+      "fmt"
+      "io"
+      "log"
+      "os"
+      "path/filepath"
+      "strings"
+  )
+
+  func GetInput(prompt string) string { return "" }
+
+  func UnzipDirectory(destination string, source string) error {
+      archive, err := zip.OpenReader(source)
+      if err != nil {
+          log.Fatalln(err)
+      }
+      defer archive.Close()
+
+      for _, f := range archive.File {
+          filePath := filepath.Join(destination, f.Name)
+          if f.FileInfo().IsDir() {
+              os.MkdirAll(filePath, os.ModePerm)
+              continue
+          }
+          if err := os.MkdirAll(filepath.Dir(filePath), os.ModePerm); err != nil {
+              log.Fatalln(err)
+          }
+          if _, err := os.Stat(filePath); err == nil {
+              prompt := fmt.Sprintf("\nOverwrite '%s'? (y/N) ", filePath)
+              choice := strings.ToLower(GetInput(prompt))
+              if choice != "y" && choice != "yes" {
+                  continue
+              }
+          }
+          dstFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+          if err != nil {
+              log.Fatalln(err)
+          }
+          fileInArchive, err := f.Open()
+          if err != nil {
+              log.Fatalln(err)
+          }
+          if _, err := io.Copy(dstFile, fileInArchive); err != nil {
+              log.Fatalln(err)
+          }
+      }
+      return nil
+  }
+  ```

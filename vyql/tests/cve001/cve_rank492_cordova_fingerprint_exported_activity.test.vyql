@@ -1,0 +1,34 @@
+# Rank 492 / CVE-2021-43849: cordova-plugin-fingerprint-aio exported
+# BiometricActivity, allowing other apps to invoke it and crash the host app.
+
+test "rank492: Cordova plugin exports biometric activity"
+  lang config
+  file plugin.xml
+  expect VYQL-MOB-003
+  code
+  ```
+  <?xml version="1.0" encoding="UTF-8"?>
+  <plugin xmlns:android="http://schemas.android.com/apk/res/android" id="cordova-plugin-fingerprint-aio">
+    <config-file target="AndroidManifest.xml" parent="application">
+      <activity android:name="de.niklasmerz.cordova.biometric.BiometricActivity"
+                android:theme="@style/TransparentTheme"
+                android:exported="true"/>
+    </config-file>
+  </plugin>
+  ```
+
+test "rank492: Cordova plugin keeps biometric activity private"
+  lang config
+  file plugin.xml
+  reject VYQL-MOB-003
+  code
+  ```
+  <?xml version="1.0" encoding="UTF-8"?>
+  <plugin xmlns:android="http://schemas.android.com/apk/res/android" id="cordova-plugin-fingerprint-aio">
+    <config-file target="AndroidManifest.xml" parent="application">
+      <activity android:name="de.niklasmerz.cordova.biometric.BiometricActivity"
+                android:theme="@style/TransparentTheme"
+                android:exported="false"/>
+    </config-file>
+  </plugin>
+  ```

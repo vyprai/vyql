@@ -1,0 +1,33 @@
+# Rank 438 / CVE-2021-3810: code-server carried an ansi-regex derived
+# constructed pattern with an ambiguous quantified branch. The fix separates
+# semicolon-prefixed chunks from alphanumeric chunks before compiling RegExp.
+
+test "rank438: code-server constructed ansi regex has ambiguous quantified branch"
+  lang javascript
+  expect VYQL-DOS-003
+  expect_review code.CatastrophicRegex
+  code
+  ```
+  const pattern = [
+    "[\\u001B\\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[-a-zA-Z\\d\\/#&.:=?%@~_]*)*)?\\u0007)",
+    "(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PR-TZcf-ntqry=><~]))",
+  ].join("|")
+  const re = new RegExp(pattern, "g")
+
+  export const stripAnsi = (line) => line.replace(re, "")
+  ```
+
+test "rank438: code-server constructed ansi regex separates ambiguous branch"
+  lang javascript
+  reject VYQL-DOS-003
+  reject_review code.CatastrophicRegex
+  code
+  ```
+  const pattern = [
+    "[\\u001B\\u009B][[\\]()#;?]*(?:(?:(?:(?:;[-a-zA-Z\\d\\/#&.:=?%@~_]+)*|[a-zA-Z\\d]+(?:;[-a-zA-Z\\d\\/#&.:=?%@~_]*)*)?\\u0007)",
+    "(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PR-TZcf-ntqry=><~]))",
+  ].join("|")
+  const re = new RegExp(pattern, "g")
+
+  export const stripAnsi = (line) => line.replace(re, "")
+  ```

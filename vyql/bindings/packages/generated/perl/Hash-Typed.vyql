@@ -1,0 +1,9 @@
+module bindings.perl.generated.m1159649e;
+
+binding deserialization0 {
+  requires {
+    dependency("Hash-Typed")
+  }
+  query pattern callExpr where callee.method == "PARSE"
+  emit sink code.Deserialization at args[0]
+}

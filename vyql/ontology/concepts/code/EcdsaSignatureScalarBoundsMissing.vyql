@@ -1,0 +1,11 @@
+module code;
+
+concept EcdsaSignatureScalarBoundsMissing : issue {
+  cwe: [CWE_347]
+  reviewAssumption: "an attacker can provide malformed signatures with out-of-range r or s values"
+  reviewCategory: crypto
+  reviewCondition: "ECDSA verification uses signature r/s scalars without checking that both are in the valid range [1, n)"
+  reviewConfidence: high
+  reviewEvidence: "ECDSA verify context {pattern} computes s inverse and point multiplication before observed r/s bounds checks"
+  vulnerableTo: [crypto.ImproperSignatureCheck]
+}

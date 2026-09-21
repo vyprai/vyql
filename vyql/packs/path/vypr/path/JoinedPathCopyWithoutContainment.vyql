@@ -1,0 +1,11 @@
+module vypr.path;
+
+rule JoinedPathCopyWithoutContainment {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_22, CWE_73]
+    id: "VYQL-PATH-085"
+    severity: high
+  }
+  issue code.JoinedPathCopyWithoutContainment as sink
+}

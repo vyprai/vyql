@@ -1,0 +1,17 @@
+module bindings.c.generated.m0f68b8eb;
+
+binding codeEval0 {
+  requires {
+    dependency("sol2")
+  }
+  query pattern callExpr where callee.method == "script_file"
+  emit sink code.CodeEval at args[0]
+}
+
+binding codeEval1 {
+  requires {
+    dependency("sol2")
+  }
+  query pattern callExpr where callee.method == "basic_insert_dump_writer"
+  emit sink code.CodeEval at args[0]
+}

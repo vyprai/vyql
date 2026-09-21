@@ -1,0 +1,10 @@
+module vypr.mobile;
+
+rule WebViewInjection {
+  meta {
+    cwe: [CWE_749]
+    id: "VYQL-MOB-001"
+    severity: high
+  }
+  taint core.UserControlledData -> code.WebViewLoad
+}

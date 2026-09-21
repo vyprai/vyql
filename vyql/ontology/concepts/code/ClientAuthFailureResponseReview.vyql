@@ -1,0 +1,11 @@
+module code;
+
+concept ClientAuthFailureResponseReview : issue {
+  cwe: [CWE_287]
+  reviewAssumption: "privileged UI callbacks trust the shared helper to stop unauthorized response handling"
+  reviewCategory: auth
+  reviewCondition: "client-side request helper invokes success callbacks after an observed authorization failure response"
+  reviewConfidence: medium
+  reviewEvidence: "AJAX response handler {pattern} checks a request object instead of the response status before calling the success callback"
+  vulnerableTo: [authentication.ImproperAuthentication]
+}

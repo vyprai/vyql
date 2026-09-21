@@ -1,0 +1,11 @@
+module code;
+
+concept AssertOnlyLengthCopy : issue {
+  cwe: [CWE_120, CWE_787]
+  reviewAssumption: "a caller can hand the copy more than the asserted amount, which a build that defines NDEBUG does not reject"
+  reviewCategory: memory
+  reviewCondition: "a copy takes a count the function bounds only inside assert(), so the bound is documented and, under NDEBUG, never enforced"
+  reviewConfidence: medium
+  reviewEvidence: "copy context {pattern} is sized by a count whose only relational bound sits inside an assert, which NDEBUG compiles away"
+  vulnerableTo: [memory.OobWrite]
+}

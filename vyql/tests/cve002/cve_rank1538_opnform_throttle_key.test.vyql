@@ -1,0 +1,308 @@
+# Rank 1538 / CVE-2025-11436: OpnForm's login throttling keyed on the
+# client-supplied IP, so rotating the X-Forwarded-For header defeated
+# the brute-force limiter entirely (improper rate limiting,
+# CWE-307/CWE-348; GHSA-v7mp-273w-5h6j; PR #900 "Security patches").
+# The login path in api/app/Http/Controllers/Auth/LoginController.php
+# uses Laravel's AuthenticatesUsers trait unmodified, so the limiter
+# identity is the framework default -- sha1 of the lowercased email
+# joined with the request IP -- and the IP comes from headers the
+# client controls whenever the deployment honors a forwarded header,
+# so each guess arrives under a fresh key and no lockout accumulates.
+# Pool commit 36dad12ac1 is the fixing commit (COMMIT_MISMATCH on the
+# row is advisory-side only: the commit is the patch): it adds a
+# throttleKey override deriving the key from the lowercased email
+# input (or 'unknown') -- the credential, not the network vantage.
+# The commit message also claims maxAttempts and decayMinutes
+# additions that the diff does not contain. No pool correction.
+#
+# ## What fires, both revisions
+#
+# Three --cache off runs per revision (timeout 180, --max-ram 6GB),
+# full findings view plus the `-flags only` view. The vulnerable file
+# reports 0 findings and 0 flags, 3/3 runs. The fixed file reports 1
+# finding, 3/3 runs: VYQL-CRY-001 on code.WeakHash at
+# LoginController.php:127, the sha1() the fix itself introduces for a
+# non-cryptographic throttle key -- fix-direction noise. The whole
+# api/ tree reports 173/173/173 findings at the parent and 178/178/178
+# at the fix, deterministic in both directions; the fingerprint diff
+# is 12 rows removed / 17 added, every one of them line-number churn
+# on the files the security patch touches (WorkspaceController,
+# FormSubmissionController, FormResource, the new test files) or a
+# row on the fix's own added code. No row names LoginController.php
+# at the parent. vyql match on the
+# parent file labels only the $request parameters code.HttpInput and
+# the User::where() argument code.SqlExecution: nothing on the
+# throttling decision is labelled, because the derivation
+# sha1(email|ip) lives in the framework trait under vendor/, which is
+# not part of the checkout.
+#
+# ## Why nothing ships
+#
+# Four measured links, each independent:
+#
+# * No PHP rate-limit vocabulary exists. No binding under
+#   vyql/bindings/php/ or the generated php packages emits
+#   code.RateLimitRequiredOp, code.RateLimitCheck or any rate-limit
+#   concept, so VYQL-AUTH-105 has zero PHP coverage; the laravel_ui
+#   generated bindings label AuthenticatesUsers::login itself, a
+#   vendor symbol absent from application checkouts. The
+#   ProxyClientIpSpoofingBypass family (VYQL-AUTH-012, CWE-348)
+#   requires an explicit leftmost X-Forwarded-For read in application
+#   code; this repository performs none -- it never calls ->ip() on
+#   the login path at all.
+# * The only discriminating shape is an absence, and it reports the
+#   framework's documented default. A probe binding over the class
+#   context -- uses AuthenticatesUsers and no throttleKey/maxAttempts/
+#   decayMinutes identifier -- flips 1 -> 0 on LoginController between
+#   the real revisions. Measured collateral: it also fires on
+#   AppSumoAuthController.php at both revisions of this repository,
+#   and on BookStack, crater and librenms login controllers in the
+#   corpus clones; i-educar alone survives, by declaring
+#   `protected int $maxAttempts = 2;`. Four stock Laravel login
+#   controllers flagged per one advisory, and every default Laravel
+#   scaffolding on earth matches -- the framework documents the
+#   override as optional customisation.
+# * The enabling condition is not in the repository. The app's own
+#   TrustProxies middleware declares `protected $proxies;` (null): no
+#   proxy is trusted, so within the code as shipped $request->ip() is
+#   the transport peer and is not client-rotatable. The deployment
+#   honours forwarded headers through infrastructure configuration,
+#   which the scanner never sees. A rule keying on the absence of the
+#   override flags code whose own configuration says it is not
+#   exposed.
+# * Taint cannot separate the revisions either. The fixed key derives
+#   from $request->input('email') -- client-supplied request data,
+#   same as the IP it replaces -- so "throttle key derived from client
+#   input" is true of both. The discriminator is semantic: a header
+#   the attacker mints for free versus the credential under attack,
+#   and no concept expresses it. The one in-repo ip-keyed limiter
+#   (RouteServiceProvider's Limit::perMinute(60)->by($request->user()
+#   ?->id ?: $request->ip())) is untouched by the fix and present at
+#   both revisions, so keying on it scores identically before and
+#   after.
+#
+# Held as a double miss. Nothing is mishandled on the extraction
+# side, so no engine gap is filed: the missing fact is the
+# provenance judgement. When throttle-identity vocabulary lands, the
+# trait-default form below must flip to expect.
+
+test "rank1538: the login controller runs the trait's default ip-keyed throttle"
+  lang php
+  file api/app/Http/Controllers/Auth/LoginController.php
+  reject VYQL-AUTH-105
+  reject VYQL-AUTH-079
+  code
+  ```
+  <?php
+
+  namespace App\Http\Controllers\Auth;
+
+  use App\Exceptions\VerifyEmailException;
+  use App\Http\Controllers\Controller;
+  use Illuminate\Contracts\Auth\MustVerifyEmail;
+  use Illuminate\Foundation\Auth\AuthenticatesUsers;
+  use Illuminate\Http\Request;
+  use Illuminate\Validation\ValidationException;
+
+  class LoginController extends Controller
+  {
+      use AuthenticatesUsers;
+
+      public function __construct()
+      {
+          $this->middleware('guest')->except('logout');
+      }
+
+      protected function attemptLogin(Request $request)
+      {
+          // Only set custom TTL if remember me is checked
+          $guard = $this->guard();
+
+          if ($request->remember) {
+              $guard->setTTL(config('jwt.remember_ttl'));
+          }
+
+          $token = $guard->attempt($this->credentials($request));
+
+          if (! $token) {
+              return false;
+          }
+
+          $user = $this->guard()->user();
+          if ($user instanceof MustVerifyEmail && ! $user->hasVerifiedEmail()) {
+              return false;
+          }
+
+          if ($user->is_blocked) {
+              $this->guard()->logout();
+              return false;
+          }
+
+          $guard->setToken($token);
+
+          return true;
+      }
+
+      protected function credentials(Request $request)
+      {
+          return [
+              $this->username() => strtolower($request->get($this->username())),
+              'password' => $request->password,
+          ];
+      }
+
+      protected function sendLoginResponse(Request $request)
+      {
+          $this->clearLoginAttempts($request);
+
+          $token = (string) $this->guard()->getToken();
+          $expiration = $this->guard()->getPayload()->get('exp');
+
+          return response()->json([
+              'token' => $token,
+              'token_type' => 'bearer',
+              'expires_in' => $expiration - time(),
+          ]);
+      }
+
+      protected function sendFailedLoginResponse(Request $request)
+      {
+          $user = $this->guard()->user();
+          if ($user instanceof MustVerifyEmail && ! $user->hasVerifiedEmail()) {
+              throw VerifyEmailException::forUser($user);
+          }
+
+          $user = \App\Models\User::where($this->username(), strtolower($request->get($this->username())))->first();
+
+          if ($user && $user->is_blocked) {
+              throw ValidationException::withMessages([
+                  $this->username() => ['Your account has been blocked. Please contact support.'],
+              ]);
+          }
+
+          throw ValidationException::withMessages([
+              $this->username() => [trans('auth.failed')],
+          ]);
+      }
+
+      public function logout(Request $request)
+      {
+          $this->guard()->logout();
+      }
+  }
+  ```
+
+test "rank1538: the fixed revision keys the limiter on the credential"
+  lang php
+  file api/app/Http/Controllers/Auth/LoginController.php
+  reject VYQL-AUTH-105
+  reject VYQL-AUTH-079
+  code
+  ```
+  <?php
+
+  namespace App\Http\Controllers\Auth;
+
+  use App\Exceptions\VerifyEmailException;
+  use App\Http\Controllers\Controller;
+  use Illuminate\Contracts\Auth\MustVerifyEmail;
+  use Illuminate\Foundation\Auth\AuthenticatesUsers;
+  use Illuminate\Http\Request;
+  use Illuminate\Validation\ValidationException;
+
+  class LoginController extends Controller
+  {
+      use AuthenticatesUsers;
+
+      public function __construct()
+      {
+          $this->middleware('guest')->except('logout');
+      }
+
+      protected function attemptLogin(Request $request)
+      {
+          // Only set custom TTL if remember me is checked
+          $guard = $this->guard();
+
+          if ($request->remember) {
+              $guard->setTTL(config('jwt.remember_ttl'));
+          }
+
+          $token = $guard->attempt($this->credentials($request));
+
+          if (! $token) {
+              return false;
+          }
+
+          $user = $this->guard()->user();
+          if ($user instanceof MustVerifyEmail && ! $user->hasVerifiedEmail()) {
+              return false;
+          }
+
+          if ($user->is_blocked) {
+              $this->guard()->logout();
+              return false;
+          }
+
+          $guard->setToken($token);
+
+          return true;
+      }
+
+      protected function credentials(Request $request)
+      {
+          return [
+              $this->username() => strtolower($request->get($this->username())),
+              'password' => $request->password,
+          ];
+      }
+
+      protected function sendLoginResponse(Request $request)
+      {
+          $this->clearLoginAttempts($request);
+
+          $token = (string) $this->guard()->getToken();
+          $expiration = $this->guard()->getPayload()->get('exp');
+
+          return response()->json([
+              'token' => $token,
+              'token_type' => 'bearer',
+              'expires_in' => $expiration - time(),
+          ]);
+      }
+
+      protected function sendFailedLoginResponse(Request $request)
+      {
+          $user = $this->guard()->user();
+          if ($user instanceof MustVerifyEmail && ! $user->hasVerifiedEmail()) {
+              throw VerifyEmailException::forUser($user);
+          }
+
+          $user = \App\Models\User::where($this->username(), strtolower($request->get($this->username())))->first();
+
+          if ($user && $user->is_blocked) {
+              throw ValidationException::withMessages([
+                  $this->username() => ['Your account has been blocked. Please contact support.'],
+              ]);
+          }
+
+          throw ValidationException::withMessages([
+              $this->username() => [trans('auth.failed')],
+          ]);
+      }
+
+      /**
+       * Customize throttling to be per-credential (email) instead of IP-based, to avoid X-Forwarded-For spoofing bypasses.
+       */
+      protected function throttleKey(Request $request)
+      {
+          $email = strtolower((string) $request->input($this->username()));
+          return 'login:' . sha1($email !== '' ? $email : 'unknown');
+      }
+
+      public function logout(Request $request)
+      {
+          $this->guard()->logout();
+      }
+  }
+  ```

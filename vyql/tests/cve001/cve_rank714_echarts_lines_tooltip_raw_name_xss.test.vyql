@@ -1,0 +1,56 @@
+test "rank714: chart tooltip returns raw item name before markup escaping"
+  lang javascript
+  expect VYQL-INJ-157
+  expect_review code.UnescapedChartTooltipDataName
+  code
+  ```
+  class LinesSeriesModel {
+    formatTooltip(dataIndex, multipleSeries, dataType) {
+      const data = this.getData();
+      const itemModel = data.getItemModel(dataIndex);
+      const name = itemModel.get('name');
+      if (name) {
+        return name;
+      }
+      const fromName = itemModel.get('fromName');
+      const toName = itemModel.get('toName');
+      const nameArr = [];
+      fromName != null && nameArr.push(fromName);
+      toName != null && nameArr.push(toName);
+
+      return createTooltipMarkup('nameValue', {
+        name: nameArr.join(' > ')
+      });
+    }
+  }
+  ```
+
+test "rank714: chart tooltip passes item name through tooltip markup"
+  lang javascript
+  reject VYQL-INJ-157
+  reject_review code.UnescapedChartTooltipDataName
+  code
+  ```
+  class LinesSeriesModel {
+    formatTooltip(dataIndex, multipleSeries, dataType) {
+      const data = this.getData();
+      const value = this.getRawValue(dataIndex);
+      const itemModel = data.getItemModel(dataIndex);
+      let itemName = itemModel.get('name');
+      if (!itemName) {
+        const fromName = itemModel.get('fromName');
+        const toName = itemModel.get('toName');
+        const nameArr = [];
+        fromName != null && nameArr.push(fromName);
+        toName != null && nameArr.push(toName);
+        itemName = nameArr.join(' > ');
+      }
+
+      return createTooltipMarkup('nameValue', {
+        name: itemName,
+        value,
+        noValue: value == null || isNaN(value)
+      });
+    }
+  }
+  ```

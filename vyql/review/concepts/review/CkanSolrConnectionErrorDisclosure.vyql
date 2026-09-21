@@ -1,0 +1,8 @@
+module code;
+
+review code.CkanSolrConnectionErrorDisclosure {
+  category: secret
+  expected: [core.SecretRedaction]
+  kind: attention
+  text: "review CKAN Solr search error handling for generic connection failures before API serialization"
+}

@@ -1,0 +1,30 @@
+# Rank 673 / CVE-2018-1000088: Doorkeeper default ERB views passed dynamic
+# client metadata into raw translated HTML before switching to content_tag.
+
+test "rank673: Rails ERB raw translation interpolates dynamic HTML"
+  lang ruby
+  profile library
+  file new.html.erb
+  expect VYQL-INJ-148
+  code
+  ```
+  <main>
+    <p class="h4">
+      <%= raw t('.prompt', client_name: "<strong class=\"text-info\">#{ @pre_auth.client.name }</strong>") %>
+    </p>
+  </main>
+  ```
+
+test "rank673: Rails ERB raw translation builds dynamic tag with content_tag"
+  lang ruby
+  profile library
+  file new.html.erb
+  reject VYQL-INJ-148
+  code
+  ```
+  <main>
+    <p class="h4">
+      <%= raw t('.prompt', client_name: content_tag(:strong, class: 'text-info') { @pre_auth.client.name }) %>
+    </p>
+  </main>
+  ```

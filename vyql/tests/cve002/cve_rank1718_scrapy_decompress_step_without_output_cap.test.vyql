@@ -1,0 +1,193 @@
+# Rank 1718 / CVE-2025-6176: Scrapy's HTTP response decompression helpers
+# capped the total decompressed size only after each decompression step had
+# run unbounded. _inflate fed a 64 KiB input chunk to
+# decompressor.decompress(input_chunk) with no max_length, so a deflate bomb
+# expanded the whole chunk inside that one call -- gigabytes of output
+# materialised in memory before decompressed_size is ever compared against
+# max_size -- and the brotli path's _brotli_decompress helper called
+# decompressor.process(data) / decompressor.decompress(data) with no
+# output_buffer_limit, same shape. The total-size check existed at both
+# revisions; what it lacks is a bound on the step itself. The fixed revision passes
+# max_length=_CHUNK_SIZE to every zlib decompress call and
+# output_buffer_limit=_CHUNK_SIZE to every brotli process call, so the cap is
+# enforced per 64 KiB of output rather than after the fact (the zstd and gzip
+# paths read through chunk-bounded stream readers and needed no
+# change). The response body arrives from the network, so the compressed
+# bytes are peer-controlled: a decompression bomb against any scraper whose
+# target serves a crafted response (CWE-400/CWE-409).
+#
+# The anchor is the streaming decompression step whose documented signature
+# carries the output cap -- zlib/lzma/bz2's Decompress.decompress(max_length),
+# brotli's Decompressor.process(output_buffer_limit) -- and the discriminator
+# is the documented cap keyword itself: any max_length / output_buffer_limit /
+# max_output_size identifier in the same function suppresses, because the
+# finding is about the step being unbounded rather than about which construct
+# applies the bound. The brotli-proper spelling of the vulnerable helper
+# (decompressor.process) is not anchored: in this codebase the process call
+# sits in a helper whose only distinguishing token is its own name, and a
+# name-keyed anchor is the fixing commit's vocabulary rather than the
+# library's.
+
+test "rank1718: python scrapy deflate decompression step runs without a per-step output cap"
+  lang python
+  file _compression.py
+  expect VYQL-DOS-042
+  expect_review code.UnboundedResourceOperation
+  code
+  ```
+  import zlib
+  from io import BytesIO
+
+  _CHUNK_SIZE = 65536  # 64 KiB
+
+
+  class _DecompressionMaxSizeExceeded(ValueError):
+      pass
+
+
+  def _inflate(data: bytes, *, max_size: int = 0) -> bytes:
+      decompressor = zlib.decompressobj()
+      raw_decompressor = zlib.decompressobj(wbits=-15)
+      input_stream = BytesIO(data)
+      output_stream = BytesIO()
+      output_chunk = b"."
+      decompressed_size = 0
+      while output_chunk:
+          input_chunk = input_stream.read(_CHUNK_SIZE)
+          try:
+              output_chunk = decompressor.decompress(input_chunk)
+          except zlib.error:
+              if decompressor != raw_decompressor:
+                  # ugly hack to work with raw deflate content that may
+                  # be sent by microsoft servers.
+                  decompressor = raw_decompressor
+                  output_chunk = decompressor.decompress(input_chunk)
+              else:
+                  raise
+          decompressed_size += len(output_chunk)
+          if max_size and decompressed_size > max_size:
+              raise _DecompressionMaxSizeExceeded(
+                  f"The number of bytes decompressed so far "
+                  f"({decompressed_size} B) exceed the specified maximum "
+                  f"({max_size} B)."
+              )
+          output_stream.write(output_chunk)
+      output_stream.seek(0)
+      return output_stream.read()
+  ```
+
+test "rank1718: python scrapy deflate decompression step is bounded by max_length"
+  lang python
+  file _compression.py
+  reject VYQL-DOS-042
+  reject_review code.UnboundedResourceOperation
+  code
+  ```
+  import zlib
+  from io import BytesIO
+
+  _CHUNK_SIZE = 65536  # 64 KiB
+
+
+  class _DecompressionMaxSizeExceeded(ValueError):
+      def __init__(self, decompressed_size: int, max_size: int) -> None:
+          self.decompressed_size = decompressed_size
+          self.max_size = max_size
+
+
+  def _check_max_size(decompressed_size: int, max_size: int) -> None:
+      if max_size and decompressed_size > max_size:
+          raise _DecompressionMaxSizeExceeded(decompressed_size, max_size)
+
+
+  def _inflate(data: bytes, *, max_size: int = 0) -> bytes:
+      decompressor = zlib.decompressobj()
+      try:
+          first_chunk = decompressor.decompress(data, max_length=_CHUNK_SIZE)
+      except zlib.error:
+          # to work with raw deflate content that may be sent by microsoft servers.
+          decompressor = zlib.decompressobj(wbits=-15)
+          first_chunk = decompressor.decompress(data, max_length=_CHUNK_SIZE)
+      decompressed_size = len(first_chunk)
+      _check_max_size(decompressed_size, max_size)
+      output_stream = BytesIO()
+      output_stream.write(first_chunk)
+      while decompressor.unconsumed_tail:
+          output_chunk = decompressor.decompress(
+              decompressor.unconsumed_tail, max_length=_CHUNK_SIZE
+          )
+          decompressed_size += len(output_chunk)
+          _check_max_size(decompressed_size, max_size)
+          output_stream.write(output_chunk)
+      if tail := decompressor.flush():
+          decompressed_size += len(tail)
+          _check_max_size(decompressed_size, max_size)
+          output_stream.write(tail)
+      return output_stream.getvalue()
+  ```
+
+test "rank1718: python scrapy brotlipy decompression helper runs without an output cap"
+  lang python
+  file _compression.py
+  expect VYQL-DOS-042
+  expect_review code.UnboundedResourceOperation
+  code
+  ```
+  from io import BytesIO
+
+  _CHUNK_SIZE = 65536  # 64 KiB
+
+
+  def _brotli_decompress(decompressor, data):
+      return decompressor.decompress(data)
+
+
+  def _unbrotli(data: bytes, *, max_size: int = 0) -> bytes:
+      decompressor = brotli.Decompressor()
+      input_stream = BytesIO(data)
+      output_stream = BytesIO()
+      output_chunk = b"."
+      decompressed_size = 0
+      while output_chunk:
+          input_chunk = input_stream.read(_CHUNK_SIZE)
+          output_chunk = _brotli_decompress(decompressor, input_chunk)
+          decompressed_size += len(output_chunk)
+          if max_size and decompressed_size > max_size:
+              raise _DecompressionMaxSizeExceeded(
+                  f"The number of bytes decompressed so far "
+                  f"({decompressed_size} B) exceed the specified maximum "
+                  f"({max_size} B)."
+              )
+          output_stream.write(output_chunk)
+      output_stream.seek(0)
+      return output_stream.read()
+  ```
+
+test "rank1718: python scrapy brotli decompression step is bounded by output_buffer_limit"
+  lang python
+  file _compression.py
+  reject VYQL-DOS-042
+  reject_review code.UnboundedResourceOperation
+  code
+  ```
+  from io import BytesIO
+
+  _CHUNK_SIZE = 65536  # 64 KiB
+
+
+  def _unbrotli(data: bytes, *, max_size: int = 0) -> bytes:
+      decompressor = brotli.Decompressor()
+      first_chunk = decompressor.process(data, output_buffer_limit=_CHUNK_SIZE)
+      decompressed_size = len(first_chunk)
+      _check_max_size(decompressed_size, max_size)
+      output_stream = BytesIO()
+      output_stream.write(first_chunk)
+      while not decompressor.is_finished():
+          output_chunk = decompressor.process(b"", output_buffer_limit=_CHUNK_SIZE)
+          if not output_chunk:
+              break
+          decompressed_size += len(output_chunk)
+          _check_max_size(decompressed_size, max_size)
+          output_stream.write(output_chunk)
+      return output_stream.getvalue()
+  ```

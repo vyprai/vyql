@@ -1,0 +1,41 @@
+module bindings.rust.generated.m7c060ca7;
+
+binding userControlledData0 {
+  requires {
+    dependency("futures-io")
+  }
+  query pattern callExpr where callee.method == "poll_read"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("futures-io")
+  }
+  query pattern callExpr where callee.method == "poll_read_vectored"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("futures-io")
+  }
+  query pattern callExpr where callee.method == "poll_fill_buf"
+  emit source core.UserControlledData at call.result
+}
+
+binding networkSend3 {
+  requires {
+    dependency("futures-io")
+  }
+  query pattern callExpr where callee.method == "poll_write"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend4 {
+  requires {
+    dependency("futures-io")
+  }
+  query pattern callExpr where callee.method == "poll_write_vectored"
+  emit sink code.NetworkSend at args[0]
+}

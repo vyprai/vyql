@@ -1,0 +1,11 @@
+module code;
+
+concept StreamResetWithoutRateControl : issue {
+  cwe: [CWE_400, CWE_770]
+  reviewAssumption: "a remote peer can drive the multiplexed connection into stream errors as fast as it can send frames"
+  reviewCategory: resource
+  reviewCondition: "the session writes a stream reset frame and tears the stream down on a path the peer can trigger, without charging the connection's rate control"
+  reviewConfidence: medium
+  reviewEvidence: "stream teardown context {pattern} writes a reset frame and removes the stream with no observed rate charge"
+  vulnerableTo: [dos.UncontrolledResourceConsumption]
+}

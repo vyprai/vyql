@@ -1,0 +1,9 @@
+module bindings.objc.generated.m57d286f5;
+
+binding codeEval0 {
+  requires {
+    dependency("Bond")
+  }
+  query pattern callExpr where callee.method == "setArgument:atIndex:"
+  emit sink code.CodeEval at args[0]
+}

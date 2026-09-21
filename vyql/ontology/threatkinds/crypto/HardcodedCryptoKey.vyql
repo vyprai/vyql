@@ -1,0 +1,6 @@
+module crypto;
+
+threat HardcodedCryptoKey {
+  cwe: [CWE_321]
+  desc: "Use of a hard-coded cryptographic key"
+}

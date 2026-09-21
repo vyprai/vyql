@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m10fd1e0d;
+
+binding deserialization0 {
+  requires {
+    dependency("clone-deep")
+  }
+  query pattern callExpr where callee.method == "cloneDeep"
+  emit sink code.Deserialization at args[0]
+}

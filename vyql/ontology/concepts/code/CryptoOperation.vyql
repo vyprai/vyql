@@ -1,0 +1,6 @@
+module code;
+
+concept CryptoOperation : issue {
+  cwe: [CWE_327]
+  vulnerableTo: [crypto.WeakCrypto]
+}

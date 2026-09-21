@@ -1,0 +1,25 @@
+module bindings.elixir.generated.mc72452f1;
+
+binding networkSend0 {
+  requires {
+    dependency("ex_aws_cloudwatch")
+  }
+  query pattern callExpr where callee.method == "put_dashboard"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("ex_aws_cloudwatch")
+  }
+  query pattern callExpr where callee.method == "put_metric_alarm"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend2 {
+  requires {
+    dependency("ex_aws_cloudwatch")
+  }
+  query pattern callExpr where callee.method == "put_metric_data"
+  emit sink code.NetworkSend at args[0]
+}

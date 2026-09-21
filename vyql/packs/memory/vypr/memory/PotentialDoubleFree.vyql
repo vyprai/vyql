@@ -1,0 +1,11 @@
+module vypr.memory;
+
+rule PotentialDoubleFree {
+  meta {
+    confidenceFloor: low
+    cwe: [CWE_415]
+    id: "VYQL-MEM-008"
+    severity: high
+  }
+  query concept as first where first.concept == code.PointerFree reaches concept as second where second.concept == code.PointerFree select second
+}

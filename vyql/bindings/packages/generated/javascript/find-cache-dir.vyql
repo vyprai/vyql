@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m68ee8f55;
+
+binding filePathAccess0 {
+  requires {
+    dependency("find-cache-dir")
+  }
+  query pattern callExpr where callee.method == "findCacheDirectory"
+  emit sink code.FilePathAccess at args[0]
+}

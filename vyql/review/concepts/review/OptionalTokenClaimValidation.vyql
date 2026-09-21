@@ -1,0 +1,8 @@
+module code;
+
+review code.OptionalTokenClaimValidation {
+  category: auth
+  expected: [core.AuthenticationCheck]
+  kind: attention
+  text: "review token claim validation so a token that omits the claim fails closed rather than skipping the comparison"
+}

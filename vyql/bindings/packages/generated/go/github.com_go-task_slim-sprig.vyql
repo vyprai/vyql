@@ -1,0 +1,61 @@
+module bindings.go.generated.m417c0eb3;
+
+binding weakHash0 {
+  requires {
+    dependency("github.com/go-task/slim-sprig")
+  }
+  query pattern callExpr where callee.method == "sha1sum"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash1 {
+  requires {
+    dependency("github.com/go-task/slim-sprig")
+  }
+  query pattern callExpr where callee.method == "adler32sum"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash2 {
+  requires {
+    dependency("github.com/go-task/slim-sprig")
+  }
+  query pattern callExpr where callee.method == "derivePassword"
+  emit issue code.WeakHash at call
+}
+
+binding regexCompile3 {
+  requires {
+    dependency("github.com/go-task/slim-sprig")
+  }
+  query pattern callExpr where callee.method == "regexMatch"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}
+
+binding regexCompile4 {
+  requires {
+    dependency("github.com/go-task/slim-sprig")
+  }
+  query pattern callExpr where callee.method == "regexFindAll"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}
+
+binding regexCompile5 {
+  requires {
+    dependency("github.com/go-task/slim-sprig")
+  }
+  query pattern callExpr where callee.method == "regexFind"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}
+
+binding regexCompile6 {
+  requires {
+    dependency("github.com/go-task/slim-sprig")
+  }
+  query pattern callExpr where callee.method == "regexReplaceAll"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}

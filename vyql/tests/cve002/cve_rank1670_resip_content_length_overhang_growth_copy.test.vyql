@@ -1,0 +1,339 @@
+# Rank 1670 / CVE-2018-12584: resiprocate's connection-based SIP transports
+# accumulate a partially received body in a heap buffer and treat the
+# Content-Length header as the body's exact size. ConnectionBase::preparseNewBytes
+# (resip/stack/ConnectionBase.cxx), in its PartialBody state, adds the bytes just
+# read to the fill position and then decides the body is complete with an exact
+# equality:
+#
+#   contentLength = mMessage->const_header(h_ContentLength).value();
+#   mBufferPos += bytesRead;
+#   if (mBufferPos == contentLength) { ...body complete... }
+#   else if (mBufferPos == mBufferSize)
+#   {
+#      size_t newSize = resipMin(mBufferSize*3/2, contentLength);
+#      char* newBuffer = new char[newSize];
+#      memcpy(newBuffer, mBuffer, mBufferSize);      // ConnectionBase.cxx:534 at the parent
+#      mBufferSize = newSize;
+#   }
+#
+# Content-Length is validated only against an upper bound (messageSizeMax), and
+# the growth branch sizes the new buffer from that same attacker-declared value.
+# A read that carries the rest of the body plus the start of the next message
+# makes mBufferPos overshoot contentLength, so the equality fails, the buffer-full
+# branch runs, and the copy writes mBufferSize bytes into a buffer allocated with
+# min(mBufferSize*3/2, contentLength) < mBufferSize — a heap overwrite (the
+# upstream message: "the stack could crash if a TCP based sender sends a
+# Content-Length smaller than the actual SIP body transmitted"). The fixing commit
+# 2cb291191c93c7c4e371e22cb89805a5b31d6608 changes the guard to
+# `mBufferPos >= contentLength`, carries the over-long tail into a fresh buffer,
+# and documents the growth branch's precondition with
+# `assert(contentLength >= mBufferSize)`. The growth-branch memcpy itself is
+# untouched at both revisions: what changes is whether that branch is reachable with a
+# completed body. Verified at the parent (the equality guard and the
+# min-with-contentLength allocation are present) and at the fixed revision (the >= guard,
+# the overhang copy and the assert are present).
+#
+# Re-measured at the current tip, both directions.
+#
+# 1. The extraction blocker the first pass pinned is gone. ccConv.stmt now lowers
+# a labelled statement (c.go:1137), so preparseNewBytes' whole `start:` switch is
+# in the graph: `vyql match` on the real file labels the growth arithmetic
+# (code.ComputedSizeValue, code.IntegerSizeArithmetic at :523) and the copy
+# (code.RawMemoryCopySize at :534), where the first pass measured zero labels
+# between :135 and :590. The last two snippets below are that extraction fix's
+# minimal pair, kept as its regression test: the same switch and copy, with and
+# without the label, both reporting.
+#
+# 2. The capacity correlation is still missing, in the allocation form, and the
+# sibling capacity facts shipped since do not reach it. Nothing in
+# analysis.copy.dest_capacity_unchecked (caller-handed parameter, cursor pair),
+# self_sized_declared_array, unbounded_call_sized_stack_array or the converted
+# buffer fact is emitted anywhere in resip/stack (vyql match: zero), and no
+# VYQL-MEM-071/076/077/078 row appears in the scan, because this function states
+# its capacity in none of the ways those facts read: no caller hands a byte count
+# over, no declared array fixes the destination's size, no walk decrements a
+# same-object counter as the destination advances, and no conversion temporary
+# hides the buffer. The one place the capacity is stated is the allocation's own
+# size expression, and no fact reads an allocation size at all — `new char[newSize]`
+# carries no label, and resipMin carries none either.
+#
+# What the scanner reports on the defect is therefore unchanged and still
+# inverted: VYQL-MEM-016 fires on the growth memcpy at both revisions — :534 at
+# the parent, :564 at the fix, byte-for-byte the same statement — and the fix
+# adds one more at :493 on the safe overhang copy it introduces. Whole
+# resip/stack subtree (435 C/C++ files), three --cache off runs per side, each
+# side's three runs identical: 1496 findings / 1706 rule-location rows at the
+# parent against 1497 / 1707 at the fix, and every row that differs is either a
+# line shift inside ConnectionBase.cxx or that added :493. The patched revision
+# scores higher.
+#
+# Why a fourth fact is not justified today, measured rather than assumed. The
+# unrestricted structural form — an allocation whose size is a local a call
+# assigned, followed by a copy of a different length — was enumerated over 33
+# C/C++ trees of the corpus clones: 9 sites, of which 8 are safe (a calloc whose
+# element count the copy multiplies out, a strlen-sized buffer copied one byte
+# shorter, a sizeof-sum allocation copied for one of its two terms, and copies
+# into a different buffer entirely). Tightening to "the copy length's own
+# identifier appears inside the size call's arguments" leaves 3 sites: this one,
+# a sizeof-sum, and a strnlen — and the discriminator between them is the
+# callee's arithmetic (min reaches below its operand; a sum and a bounded strlen
+# do not). Expressing that needs either a name list of min-like helpers, whose
+# only entry that catches this code is the project's own private template
+# resipMin — a binding nobody would write from documentation they do not have —
+# or the general correlation the engine lacks: whether an allocation's size
+# expression can evaluate below the length of the copy into it. The general
+# textual form is measured worthless as a signal: 184 sites across the same 33
+# trees where a copy's length differs from the allocation it lands in, and the
+# ordinary safe idiom (allocate len + 1, copy len) is nearly all of them. Not
+# mechanical: a new frontend fact for allocation sizes plus a new
+# arithmetic relation between two expressions, not a localized correction to a
+# known extraction path.
+#
+# The first two snippets hold the real PartialBody shape at both revisions with
+# the label and the switch kept; they assert VYQL-MEM-016 at both, which pins
+# the inverted discrimination, and reject VYQL-MEM-071, the shipped
+# destination-capacity judgment this form would join. When an allocation-side
+# capacity fact lands — joined to that binding or minted beside it — the
+# vulnerable snippet must flip to expect it and the asserted form must stay
+# rejected: the two differ only in the >= guard and the assert relating
+# contentLength to mBufferSize.
+#
+# verify_current_expected: attention, engine gap
+
+test "rank1670: the body-complete guard is an exact equality, so an over-long read falls into the growth branch sized from the declared Content-Length"
+  lang cpp
+  file ConnectionBase.cxx
+  expect VYQL-MEM-016
+  reject VYQL-MEM-071
+  code
+  ```
+  #include <stddef.h>
+  #include <string.h>
+
+  template<class T> T resipMin(T a, T b) { return a < b ? a : b; }
+
+  #define UInt32 unsigned int
+  struct HeaderValue { unsigned int value() const; };
+  struct SipMessage {
+     HeaderValue const_header(int) const;
+     void addBuffer(char*);
+     void setBody(char*, unsigned int);
+  };
+  enum ConnState { NewMessage, ReadingHeaders, PartialBody };
+
+  struct ConnectionBase {
+     ConnState mConnState;
+     char *mBuffer;
+     size_t mBufferPos;
+     size_t mBufferSize;
+     SipMessage *mMessage;
+
+     static const int h_ContentLength = 20;
+
+     // ConnectionBase::preparseNewBytes, case PartialBody, at the fix's parent
+     // (resip/stack/ConnectionBase.cxx:454-537). The `start:` label is real:
+     // the NewMessage state jumps back to it when a read carried a following
+     // message's first bytes.
+     bool preparseNewBytes(int bytesRead)
+     {
+     start:
+        switch (mConnState)
+        {
+        case PartialBody:
+        {
+           size_t contentLength = 0;
+           contentLength = mMessage->const_header(h_ContentLength).value();
+
+           mBufferPos += bytesRead;
+           if (mBufferPos == contentLength)
+           {
+              mMessage->addBuffer(mBuffer);
+              mMessage->setBody(mBuffer, (UInt32)contentLength);
+              mBuffer = 0;
+              mConnState = NewMessage;
+           }
+           else if (mBufferPos == mBufferSize)
+           {
+              size_t newSize = resipMin(mBufferSize*3/2, contentLength);
+              char* newBuffer = new char[newSize];
+              memcpy(newBuffer, mBuffer, mBufferSize);
+              mBufferSize = newSize;
+              delete [] mBuffer;
+              mBuffer = newBuffer;
+           }
+           break;
+        }
+        default:
+           break;
+        }
+        return true;
+     }
+  };
+  ```
+
+test "rank1670: the fixed revision accepts an over-long read, carries the tail into a fresh buffer, and asserts the growth branch's precondition"
+  lang cpp
+  file ConnectionBase_fixed.cxx
+  expect VYQL-MEM-016
+  reject VYQL-MEM-071
+  code
+  ```
+  #include <stddef.h>
+  #include <string.h>
+  #include <assert.h>
+
+  template<class T> T resipMin(T a, T b) { return a < b ? a : b; }
+
+  #define UInt32 unsigned int
+  struct HeaderValue { unsigned int value() const; };
+  struct SipMessage {
+     HeaderValue const_header(int) const;
+     void addBuffer(char*);
+     void setBody(char*, unsigned int);
+  };
+  enum ConnState { NewMessage, ReadingHeaders, PartialBody };
+
+  struct ConnectionBase {
+     ConnState mConnState;
+     char *mBuffer;
+     size_t mBufferPos;
+     size_t mBufferSize;
+     SipMessage *mMessage;
+
+     static const int h_ContentLength = 20;
+     static const int ChunkSize = 2048;
+     char* allocateBuffer(int size);
+
+     // Patched form (resip/stack/ConnectionBase.cxx:474-566 at the fix). The
+     // growth-branch memcpy is byte-for-byte the pre-fix code; only its
+     // reachability changed, and the assert is what now relates contentLength
+     // to mBufferSize.
+     bool preparseNewBytes(int bytesRead)
+     {
+     start:
+        switch (mConnState)
+        {
+        case PartialBody:
+        {
+           size_t contentLength = 0;
+           contentLength = mMessage->const_header(h_ContentLength).value();
+
+           mBufferPos += bytesRead;
+           if (mBufferPos >= contentLength)
+           {
+              int overHang = mBufferPos - (int)contentLength;
+              char *overHangStart = mBuffer + contentLength;
+
+              mMessage->addBuffer(mBuffer);
+              mMessage->setBody(mBuffer, (UInt32)contentLength);
+              mConnState = NewMessage;
+              mBuffer = 0;
+
+              if (overHang > 0)
+              {
+                 size_t size = overHang * 3 / 2;
+                 if (size < (size_t)ChunkSize)
+                 {
+                    size = ChunkSize;
+                 }
+                 char* newBuffer = allocateBuffer((int)size);
+                 memcpy(newBuffer, overHangStart, overHang);
+                 mBuffer = newBuffer;
+                 mBufferPos = 0;
+                 mBufferSize = size;
+
+                 bytesRead = overHang;
+              }
+           }
+           else if (mBufferPos == mBufferSize)
+           {
+              assert(contentLength >= mBufferSize);
+              size_t newSize = resipMin(mBufferSize*3/2, contentLength);
+              char* newBuffer = new char[newSize];
+              memcpy(newBuffer, mBuffer, mBufferSize);
+              mBufferSize = newSize;
+              delete [] mBuffer;
+              mBuffer = newBuffer;
+           }
+           break;
+        }
+        default:
+           break;
+        }
+        return true;
+     }
+  };
+  ```
+
+test "rank1670: a copy inside a labelled switch is in the graph"
+  lang cpp
+  file labelled_switch.cxx
+  expect VYQL-MEM-016
+  code
+  ```
+  #include <stddef.h>
+  #include <string.h>
+
+  struct Conn {
+     int st;
+     char *mBuffer;
+     size_t mBufferPos;
+     size_t mBufferSize;
+
+     bool grow(int bytesRead)
+     {
+     start:
+        switch (st)
+        {
+        case 0:
+           mBufferPos += bytesRead;
+           break;
+        case 1:
+        {
+           size_t newSize = mBufferSize*3/2;
+           char *newBuffer = new char[newSize];
+           memcpy(newBuffer, mBuffer, mBufferSize);
+           mBufferSize = newSize;
+           break;
+        }
+        }
+        return true;
+     }
+  };
+  ```
+
+test "rank1670: the same switch and copy with no label reports identically"
+  lang cpp
+  file unlabelled_switch.cxx
+  expect VYQL-MEM-016
+  code
+  ```
+  #include <stddef.h>
+  #include <string.h>
+
+  struct Conn {
+     int st;
+     char *mBuffer;
+     size_t mBufferPos;
+     size_t mBufferSize;
+
+     bool grow(int bytesRead)
+     {
+        switch (st)
+        {
+        case 0:
+           mBufferPos += bytesRead;
+           break;
+        case 1:
+        {
+           size_t newSize = mBufferSize*3/2;
+           char *newBuffer = new char[newSize];
+           memcpy(newBuffer, mBuffer, mBufferSize);
+           mBufferSize = newSize;
+           break;
+        }
+        }
+        return true;
+     }
+  };
+  ```

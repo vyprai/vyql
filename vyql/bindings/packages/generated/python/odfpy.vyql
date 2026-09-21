@@ -1,0 +1,9 @@
+module bindings.python.generated.m06caf24a;
+
+binding deserialization0 {
+  requires {
+    dependency("odfpy")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

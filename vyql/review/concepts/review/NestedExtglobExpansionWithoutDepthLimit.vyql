@@ -1,0 +1,7 @@
+module code;
+
+review code.NestedExtglobExpansionWithoutDepthLimit {
+  category: resource
+  kind: attention
+  text: "bound extended-glob nesting depth before expanding each group into a quantified regular-expression branch, and coalesce nested groups whose types allow it"
+}

@@ -1,0 +1,202 @@
+# Rank 1701 / CVE-2023-48795 ("Terrapin", CWE-354): the SSH transport's
+# integrity protection covers each packet with the running sequence number of
+# its direction, and both endpoints keep counting from the start of the
+# connection. Because that counter is never anchored anywhere, an active
+# attacker who deletes packets from the front of the handshake -- before the
+# first keys are installed, while the channel is still plaintext -- shifts both
+# sides' counters by the same amount and every later MAC still verifies. The
+# transcript both sides hash for the session key is likewise only a suffix of
+# what is sent. The mitigation OpenSSH specified and the advisory demands
+# ("strict kex", kex-strict-{s,c}-v00@openssh.com) has two halves that only work
+# together: during the initial key exchange only KEXINIT, the DH
+# request/reply and NEWKEYS are accepted in that order -- injected IGNORE,
+# DEBUG or DISCONNECT messages abort the exchange -- and the sequence number is
+# reset to zero when the first NEWKEYS installs the keys, so a deleted prefix
+# does not leaves the counters aligned.
+#
+# russh before the fixed revision (russh/src/client/mod.rs and russh/src/server/mod.rs,
+# `reply`) ran the key-exchange state machine with no such control: any
+# message type reached `client_parse`/`server_parse` while
+# `common.encrypted.is_none()`, the NEWKEYS arm installed the keys without
+# touching the counter, and the sequence number lived only in SSHBuffer
+# (russh/src/sshbuffer.rs, `seqn`), invisible to the exchange. The fixed revision threads
+# the counter into `reply` (`seqn: &mut Wrapping<u32>`), rejects any message
+# that breaks the KEXINIT -> DH -> NEWKEYS order while unencrypted, drops
+# IGNORE/UNIMPLEMENTED/DEBUG during the exchange, and resets `*seqn` to zero at
+# every NEWKEYS (initial and rekey, via `maybe_reset_seqn` in the encrypted
+# readers).
+#
+# The discriminator is the protocol's own vocabulary, not the change's: RFC 4253
+# names the messages (KEXINIT, NEWKEYS) and calls the counter the "sequence
+# number"; every implementation spells it seq/seqn/seqnr/sequence_number
+# (russh `seqn`, OpenSSH `sequencenr`, libssh `recv_seq`, AsyncSSH `seq`). A
+# function that moves the exchange through NEWKEYS and never touches the
+# sequence counter has no anchor for the integrity check, which is the
+# vulnerability. The patched form consults and resets it in the same function,
+# so the missing-control reading needs no cross-procedural fact.
+
+test "rank1701: rust ssh key exchange installs NEWKEYS with the sequence counter never anchored"
+  lang rust
+  file russh/src/client/mod.rs
+  expect VYQL-AUTH-082
+  expect_review code.ProtocolStateReview
+  code
+  ```
+  async fn reply<H: Handler>(
+      mut session: Session,
+      mut handler: H,
+      buf: &[u8],
+  ) -> Result<(H, Session), H::Error> {
+      match session.common.kex.take() {
+          Some(Kex::Init(kexinit)) => {
+              if kexinit.algo.is_some()
+                  || buf.first() == Some(&msg::KEXINIT)
+                  || session.common.encrypted.is_none()
+              {
+                  let done = kexinit.client_parse(
+                      session.common.config.as_ref(),
+                      &mut *session.common.cipher.local_to_remote,
+                      buf,
+                      &mut session.common.write_buffer,
+                  )?;
+                  session.common.kex = Some(Kex::DhDone(done));
+                  session.flush()?;
+              }
+              Ok((handler, session))
+          }
+          Some(Kex::DhDone(mut kexdhdone)) => {
+              if kexdhdone.names.ignore_guessed {
+                  kexdhdone.names.ignore_guessed = false;
+                  session.common.kex = Some(Kex::DhDone(kexdhdone));
+                  Ok((handler, session))
+              } else if buf.first() == Some(&msg::KEX_ECDH_REPLY) {
+                  let (kex, h) = kexdhdone.server_key_check(false, handler, buf).await?;
+                  handler = h;
+                  session.common.kex = Some(Kex::Keys(kex));
+                  session
+                      .common
+                      .cipher
+                      .local_to_remote
+                      .write(&[msg::NEWKEYS], &mut session.common.write_buffer);
+                  session.flush()?;
+                  Ok((handler, session))
+              } else {
+                  error!("Wrong packet received");
+                  Err(crate::Error::Inconsistent.into())
+              }
+          }
+          Some(Kex::Keys(newkeys)) => {
+              debug!("newkeys received");
+              if buf.first() != Some(&msg::NEWKEYS) {
+                  return Err(crate::Error::Kex.into());
+              }
+              session
+                  .common
+                  .encrypted(initial_encrypted_state(&session), newkeys);
+              Ok((handler, session))
+          }
+          Some(kex) => {
+              session.common.kex = Some(kex);
+              Ok((handler, session))
+          }
+          None => session.client_read_encrypted(handler, buf).await,
+      }
+  }
+  ```
+
+test "rank1701: rust ssh key exchange rejects out-of-order messages and resets the counter at NEWKEYS"
+  lang rust
+  file russh/src/client/mod.rs
+  reject VYQL-AUTH-082
+  reject_review code.ProtocolStateReview
+  code
+  ```
+  async fn reply<H: Handler>(
+      mut session: Session,
+      mut handler: H,
+      seqn: &mut Wrapping<u32>,
+      buf: &[u8],
+  ) -> Result<(H, Session), H::Error> {
+      if let Some(message_type) = buf.first() {
+          if session.common.strict_kex && session.common.encrypted.is_none() {
+              let seqno = seqn.0 - 1; // was incremented after read()
+              if let Some(expected) = STRICT_KEX_MSG_ORDER.get(seqno as usize) {
+                  if message_type != expected {
+                      return Err(strict_kex_violation(*message_type, seqno as usize).into());
+                  }
+              }
+          }
+
+          if [msg::IGNORE, msg::UNIMPLEMENTED, msg::DEBUG].contains(message_type) {
+              return Ok((handler, session));
+          }
+      }
+
+      match session.common.kex.take() {
+          Some(Kex::Init(kexinit)) => {
+              if kexinit.algo.is_some()
+                  || buf.first() == Some(&msg::KEXINIT)
+                  || session.common.encrypted.is_none()
+              {
+                  let done = kexinit.client_parse(
+                      session.common.config.as_ref(),
+                      &mut *session.common.cipher.local_to_remote,
+                      buf,
+                      &mut session.common.write_buffer,
+                  )?;
+
+                  // seqno has already been incremented after read()
+                  if done.names.strict_kex && seqn.0 != 1 {
+                      return Err(strict_kex_violation(msg::KEXINIT, seqn.0 as usize - 1).into());
+                  }
+
+                  session.common.kex = Some(Kex::DhDone(done));
+                  session.flush()?;
+                  session.common.maybe_reset_seqn();
+              }
+              Ok((handler, session))
+          }
+          Some(Kex::DhDone(mut kexdhdone)) => {
+              if kexdhdone.names.ignore_guessed {
+                  kexdhdone.names.ignore_guessed = false;
+                  session.common.kex = Some(Kex::DhDone(kexdhdone));
+                  Ok((handler, session))
+              } else if buf.first() == Some(&msg::KEX_ECDH_REPLY) {
+                  let (kex, h) = kexdhdone.server_key_check(false, handler, buf).await?;
+                  handler = h;
+                  session.common.strict_kex = session.common.strict_kex || kex.names.strict_kex;
+                  session.common.kex = Some(Kex::Keys(kex));
+                  session
+                      .common
+                      .cipher
+                      .local_to_remote
+                      .write(&[msg::NEWKEYS], &mut session.common.write_buffer);
+                  session.flush()?;
+                  session.common.maybe_reset_seqn();
+                  Ok((handler, session))
+              } else {
+                  error!("Wrong packet received");
+                  Err(crate::Error::Inconsistent.into())
+              }
+          }
+          Some(Kex::Keys(newkeys)) => {
+              debug!("newkeys received");
+              if buf.first() != Some(&msg::NEWKEYS) {
+                  return Err(crate::Error::Kex.into());
+              }
+              session
+                  .common
+                  .encrypted(initial_encrypted_state(&session), newkeys);
+              if session.common.strict_kex {
+                  *seqn = Wrapping(0);
+              }
+              Ok((handler, session))
+          }
+          Some(kex) => {
+              session.common.kex = Some(kex);
+              Ok((handler, session))
+          }
+          None => session.client_read_encrypted(handler, seqn, buf).await,
+      }
+  }
+  ```

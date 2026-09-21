@@ -1,0 +1,11 @@
+module code;
+
+concept BbcodeUrlTagProtocolXss : issue {
+  cwe: [CWE_79]
+  reviewAssumption: "attacker-controlled markup content can contain javascript:, data:, or other browser-interpreted URL schemes"
+  reviewCategory: xss
+  reviewCondition: "BBCode or UBB URL/image tags render href/src attributes without a safe protocol allowlist"
+  reviewConfidence: high
+  reviewEvidence: "markup parser context {pattern} rewrites url/img tags into href/src attributes without an observed http/https protocol restriction"
+  vulnerableTo: [injection.Xss]
+}

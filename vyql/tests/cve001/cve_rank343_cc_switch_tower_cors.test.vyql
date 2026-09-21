@@ -1,0 +1,36 @@
+test "rank343: cc-switch proxy allows any CORS origin"
+  lang rust
+  expect VYQL-CFG-003
+  expect_review code.PermissiveCors
+  code
+  ```
+  use axum::Router;
+  use tower_http::cors::{Any, CorsLayer};
+
+  impl ProxyServer {
+      fn build_router(&self) -> Router {
+          let cors = CorsLayer::new()
+              .allow_origin(Any)
+              .allow_methods(Any)
+              .allow_headers(Any);
+
+          Router::new()
+              .layer(cors)
+      }
+  }
+  ```
+
+test "rank343: cc-switch proxy removes wildcard CORS layer"
+  lang rust
+  reject VYQL-CFG-003
+  reject_review code.PermissiveCors
+  code
+  ```
+  use axum::Router;
+
+  impl ProxyServer {
+      fn build_router(&self) -> Router {
+          Router::new()
+      }
+  }
+  ```

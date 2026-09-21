@@ -1,0 +1,7 @@
+module code;
+
+review code.LoadedDataControlsCodeExecutionOptIn {
+  category: command
+  kind: attention
+  text: "review loading calls whose code-execution opt-in flag is read from the loaded artifact's own data instead of the caller's explicit choice"
+}

@@ -1,0 +1,81 @@
+# Rank 1563 / CVE-2025-2945: pgAdmin's Query Tool evaluated a
+# request-supplied setting string, so a crafted query-tool request
+# executed arbitrary Python (remote code execution, CWE-94; issue
+# #8603). The loop in web/pgadmin/tools/sqleditor/__init__.py did
+# `if key == 'query_commited': query_commited = (eval(value) if
+# isinstance(value, str) else value)` -- value arrives from the
+# request's data JSON -- and the cloud deployment provider
+# (web/pgacloud/providers/google.py) had the same shape on
+# `eval(args.high_availability)`. The fixing commit 75be0bc22d
+# (the message names the CVE, "Fixed a remote code
+# execution issue in the Query Tool and Cloud Deployment
+# (CVE-2025-2945). #8603"): both evals are replaced by explicit
+# boolean parsing (`value.lower() in ('true', '1') if
+# isinstance(value, str) else value`), evaluating nothing. No pool
+# correction.
+#
+# CAUGHT by VYQL-INJ-003. The python code rule covers the shape end
+# to end: source code.HttpInput by python.input at the request data
+# (__init__.py:2140) -> sink code.CodeEval at the eval call
+# (:2159), `unless core.CodeExecutionValidation` unsatisfied --
+# CRITICAL severity, high confidence. Measured on the real code:
+# scanning sqleditor/__init__.py at the vulnerable revision reports the
+# INJ-003 CRITICAL row on exactly the eval line, and the fixed revision revision
+# reports ZERO INJ-003 findings -- the boolean-parse replacement
+# removes the sink and the finding with it. (The cloud provider's
+# google.py eval reports nothing at either revision -- its args come
+# from CLI configuration, which no binding labels as a source; the
+# fix there is the same shape.) The file's other 45 findings at both
+# revisions are unchanged heuristics. No definition change shipped,
+# no benchmark impact. Spec cve_rank1563 records the request-driven
+# eval expecting VYQL-INJ-003 and the boolean-parse form rejecting
+# it.
+
+test "rank1563: the query tool evaluates a request-supplied string"
+  lang python
+  file web/pgadmin/tools/sqleditor/__init__.py
+  expect VYQL-INJ-003
+  code
+  ```
+  from flask import request
+
+
+  def set_connection_status(conn_id):
+      data = request.get_json()
+      if data is None:
+          return
+
+      query_commited = None
+      for key, value in data.items():
+          if key == 'query_commited':
+              query_commited = (
+                  eval(value) if isinstance(value, str) else value
+              )
+
+      return query_commited
+  ```
+
+test "rank1563: the fixed revision parses the boolean without evaluating"
+  lang python
+  file web/pgadmin/tools/sqleditor/__init__.py
+  reject VYQL-INJ-003
+  code
+  ```
+  from flask import request
+
+
+  def set_connection_status(conn_id):
+      data = request.get_json()
+      if data is None:
+          return
+
+      query_commited = None
+      for key, value in data.items():
+          if key == 'query_commited':
+              query_commited = (
+                  value.lower() in ('true', '1') if isinstance(
+                      value, str) else value
+              )
+
+      return query_commited
+  ```

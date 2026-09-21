@@ -1,0 +1,11 @@
+module vypr.deserialization;
+
+rule CodeceptionRunProcessDeserializationGadget {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_502]
+    id: "VYQL-DESER-013"
+    severity: critical
+  }
+  issue code.CodeceptionRunProcessDeserializationGadget as gadget
+}

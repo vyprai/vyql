@@ -1,0 +1,33 @@
+module bindings.swift.generated.m3f105c19;
+
+binding userControlledData0 {
+  requires {
+    dependency("github.com/hummingbird-project/hummingbird")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit source core.UserControlledData at call.result
+}
+
+binding httpInput1 {
+  requires {
+    dependency("github.com/hummingbird-project/hummingbird")
+  }
+  query pattern callExpr where callee.method == "collateBody"
+  emit source code.HttpInput at call.result
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("github.com/hummingbird-project/hummingbird")
+  }
+  query pattern callExpr where callee.method == "loadFile"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding fileUse3 {
+  requires {
+    dependency("github.com/hummingbird-project/hummingbird")
+  }
+  query pattern callExpr where callee.method == "writeFile"
+  emit sink code.FileUseSink at args[0]
+}

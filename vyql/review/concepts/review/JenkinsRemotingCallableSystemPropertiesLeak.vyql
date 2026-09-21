@@ -1,0 +1,8 @@
+module code;
+
+review code.JenkinsRemotingCallableSystemPropertiesLeak {
+  category: secret
+  expected: [core.AuthorizationCheck]
+  kind: attention
+  text: "review Jenkins remoting callables that return System.getProperties for MasterToSlaveCallable or equivalent role restriction"
+}

@@ -1,0 +1,8 @@
+# Rank 177 / CVE-2021-40828: AWS IoT SDK vulnerable awscrt dependency.
+
+test "rank177: certificate-validation dependency is a CVE anchor"
+  expect VYQL-SCA-006
+  graph
+  ```
+  node dep sbom.CertValidationDependency
+  ```

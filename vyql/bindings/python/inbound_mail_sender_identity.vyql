@@ -1,0 +1,32 @@
+module bindings.python.inbound_mail_sender_identity;
+
+// An IMAP or POP3 poller that reads the sender out of a fetched message's From
+// header. RFC 5322 From is asserted by whoever submitted the message, so on its
+// own it identifies nobody: RFC 8601's Authentication-Results field, written by
+// the receiving MTA out of an SPF, DKIM or DMARC evaluation, is what carries a
+// verdict about the claim.
+//
+// Both routes are documented reads of that header -- email.utils.parseaddr /
+// getaddresses over the field value, and Message.__getitem__ with the field name
+// -- paired with imaplib/poplib retrieval so the message is inbound rather than
+// one being composed.
+//
+// The controls are named for the mechanism, not for any one implementation of it:
+// an spf/dkim/dmarc config attribute read in the handler, a call into a verifier
+// (dkim.verify, spf.check2, authheaders.authenticate_message, a helper named for
+// the header), or the header name itself appearing as a string in the module.
+// `selector` and `callPath` are function-confined here and carry no comment text;
+// `literal` routes over the module, which is what lets the third clause see a
+// verifier that the handler reaches through a sibling function. The cost of that
+// reach is that prose naming the header -- a docstring, not a comment, which
+// produces no literal -- suppresses the finding for the module.
+
+binding unverifiedMailSenderIdentityParsedAddress871 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "python" and containsAny(node.context.callPath, ["imaplib.IMAP4", "poplib.POP3"]) and containsAny(node.context.callPath, ["parseaddr", "getaddresses"]) and not containsAny(node.context.selector, ["spf", "dkim", "dmarc", "authentication_results"]) and not containsAny(node.context.callPath, ["spf", "dkim", "dmarc", "authentication_results", "authenticate_message"]) and not containsAny(node.context.literal, ["authentication-results"])
+  emit issue code.UnverifiedMailSenderIdentity at node
+}
+
+binding unverifiedMailSenderIdentityHeaderRead872 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "python" and containsAny(node.context.callPath, ["imaplib.IMAP4", "poplib.POP3"]) and containsAny(node.context.subscript, ["[\"From\"]", "['From']"]) and not containsAny(node.context.selector, ["spf", "dkim", "dmarc", "authentication_results"]) and not containsAny(node.context.callPath, ["spf", "dkim", "dmarc", "authentication_results", "authenticate_message"]) and not containsAny(node.context.literal, ["authentication-results"])
+  emit issue code.UnverifiedMailSenderIdentity at node
+}

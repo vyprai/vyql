@@ -1,0 +1,36 @@
+module bindings.php.symfony_path_join_copy_without_containment;
+
+// Symfony's `Path::join()` is documented as joining "two or more path strings
+// into a canonical path", and canonicalization resolves `..` segments
+// lexically. Joining an unchecked component under a base directory therefore
+// produces a path that simply leaves that directory -- `Path::join($base,
+// '../../elsewhere')` is `/elsewhere` -- and nothing about the join keeps the
+// result inside. The class documents the companion check too:
+// `Path::isBasePath($base, $path)` canonicalizes both arguments and tests
+// that one is a prefix of the other, which is the containment the join does
+// not provide.
+//
+// This labels a function that feeds joined paths into a copy -- the
+// `Filesystem::copy()` service call, a `copy()`-named helper of the project's
+// own, or the plain builtin -- while no call in the function contains or
+// reduces the path first. That is the shape a traversal takes when the
+// component comes from package metadata, an archive entry or any other
+// source the join cannot vouch for: the stored path is `<resolved base>/<the
+// component>`, so `..` in the component decides where the bytes are read
+// from and where they land.
+//
+// The containment forms accepted as neutralising are the documented ones:
+// `Path::isBasePath()` on the resolved paths, `Path::canonicalize()` before
+// use, `basename()` on the component, and `realpath()`. Any of them in the
+// function means the resolved path was checked or reduced, which is what the
+// review flag asks about.
+//
+// Residual, stated rather than hidden: the containment test is by call name,
+// so a project that hand-rolls a dot-segment rejection with `str_contains()`
+// or a `preg_split()` over segments is not recognised and the flag stands --
+// the reduction has to go through one of the documented path APIs to be
+// visible from the caller's context.
+binding symfonyPathJoinCopyWithoutContainment {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.callPath contains "Path.join" and containsAny(node.context.call, ["copy", "Copy"]) and not containsAny(node.context.callPath, ["isBasePath", "canonicalize", "basename", "realpath"])
+  emit issue code.JoinedPathCopyWithoutContainment at node
+}

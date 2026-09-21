@@ -1,0 +1,41 @@
+# Rank 407 / CVE-2025-15558: Docker CLI for Windows searched the legacy
+# ProgramData plugin directory, which standard users can create and populate.
+
+test "rank407: Docker CLI searches ProgramData for Windows CLI plugins"
+  lang go
+  file manager_windows.go
+  expect VYQL-PATH-020
+  expect_review code.DockerCliProgramDataPluginSearchPath
+  code
+  ```
+  package manager
+
+  import (
+    "os"
+    "path/filepath"
+  )
+
+  var defaultSystemPluginDirs = []string{
+    filepath.Join(os.Getenv("ProgramData"), "Docker", "cli-plugins"),
+    filepath.Join(os.Getenv("ProgramFiles"), "Docker", "cli-plugins"),
+  }
+  ```
+
+test "rank407: Docker CLI only searches ProgramFiles for Windows CLI plugins"
+  lang go
+  file manager_windows.go
+  reject VYQL-PATH-020
+  reject_review code.DockerCliProgramDataPluginSearchPath
+  code
+  ```
+  package manager
+
+  import (
+    "os"
+    "path/filepath"
+  )
+
+  var defaultSystemPluginDirs = []string{
+    filepath.Join(os.Getenv("ProgramFiles"), "Docker", "cli-plugins"),
+  }
+  ```

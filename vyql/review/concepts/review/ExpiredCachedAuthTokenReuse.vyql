@@ -1,0 +1,8 @@
+module code;
+
+review code.ExpiredCachedAuthTokenReuse {
+  category: auth
+  expected: [core.AuthenticationCheck]
+  kind: attention
+  text: "review authentication token cache expiry comparisons so cached token material is not reused after expiration"
+}

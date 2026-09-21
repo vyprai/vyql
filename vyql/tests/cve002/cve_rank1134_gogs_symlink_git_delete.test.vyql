@@ -1,0 +1,84 @@
+# Rank 1134 / CVE-2024-56731: Gogs' web editor blocks `.git` in the request
+# path text but never checks whether the resolved filesystem entry is a
+# symlink, so a working-tree symlink into `.git` lets a low-privileged user
+# delete or overwrite repository metadata (CWE-552).
+#
+# ATTENTION: pinned double miss, both revisions reject VYQL-PATH-012. The
+# remediation's only change inside the guarded functions is a call to
+# osutil.IsSymlink, a project-local helper added by the same commit: its
+# os.Lstat body lives in another file and contributes no fact to the calling
+# function's context, so a binding negating the standard-library link-anchor
+# family (Lstat, EvalSymlinks, Readlink, ModeSymlink, O_NOFOLLOW) cannot see
+# the guard, while negating the helper's name keys on the fix's own
+# vocabulary. The shipped symlink-guard rules cover other shapes and
+# languages: VYQL-PATH-082 (recursive directory delete) binds Java only,
+# VYQL-PATH-083 (symlink resolved without base containment) and
+# VYQL-PATH-088 (payload path write without no-follow) bind Rust only. The
+# taint route reports elsewhere in this file (VYQL-PATH-001 on NewUpload's
+# os.Create) but never reaches the editor CRUD functions: the tree path
+# travels through a struct field assigned in a context middleware, and a Go
+# field store joins no taint into the object.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1134: the delete path is checked as a string, never as a resolved filesystem entry"
+  lang go
+  file repo_editor.go
+  reject VYQL-PATH-012
+  code
+  ```
+  package database
+
+  import (
+      "fmt"
+      "os"
+      "path"
+  )
+
+  func (r *Repository) DeleteRepoFile(doer *User, opts DeleteRepoFileOptions) (err error) {
+      if isRepositoryGitPath(opts.TreePath) {
+          return fmt.Errorf("bad tree path %q", opts.TreePath)
+      }
+
+      localPath := r.LocalCopyPath()
+      if err = os.Remove(path.Join(localPath, opts.TreePath)); err != nil {
+          return fmt.Errorf("remove file %q: %v", opts.TreePath, err)
+      }
+      return nil
+  }
+  ```
+
+test "rank1134: the resolved filesystem entry is checked for a symlink before removal"
+  lang go
+  file repo_editor.go
+  reject VYQL-PATH-012
+  code
+  ```
+  package database
+
+  import (
+      "fmt"
+      "os"
+      "path"
+
+      "gogs.io/gogs/internal/osutil"
+  )
+
+  func (r *Repository) DeleteRepoFile(doer *User, opts DeleteRepoFileOptions) (err error) {
+      if isRepositoryGitPath(opts.TreePath) {
+          return fmt.Errorf("bad tree path %q", opts.TreePath)
+      }
+
+      localPath := r.LocalCopyPath()
+      filePath := path.Join(localPath, opts.TreePath)
+
+      if osutil.IsSymlink(filePath) {
+          return fmt.Errorf("cannot delete symbolic link: %s", opts.TreePath)
+      }
+
+      if err = os.Remove(filePath); err != nil {
+          return fmt.Errorf("remove file %q: %v", opts.TreePath, err)
+      }
+      return nil
+  }
+  ```

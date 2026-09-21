@@ -1,0 +1,47 @@
+test "rank700: freedomrss search builds PostgreSQL filters with pg_escape_string"
+  lang php
+  expect VYQL-INJ-154
+  expect_review code.PgEscapeStringSqlFilterInjection
+  code
+  ```
+  <?php
+  function freedomrss_search(Action & $action)
+  {
+      $str = GetHttpVars("str", "");
+      $sys = GetHttpVars("sys", 0);
+      $user = GetHttpVars("user", $action->user->id);
+      $filter[0] = "(title ~* '" . pg_escape_string($str) . "')";
+      if ($sys == 1) $filter[2] = "(owner = " . pg_escape_string($user) . " or gui_sysrss = 'yes')";
+      else $filter[2] = "(owner = " . pg_escape_string($user) . ")";
+      $search = new SearchDoc("", "SEARCH");
+      foreach ($filter as $currentFilter) {
+          $search->addFilter($currentFilter);
+      }
+      $search->search();
+  }
+  ?>
+  ```
+
+test "rank700: freedomrss search uses PostgreSQL literal escaping"
+  lang php
+  reject VYQL-INJ-154
+  reject_review code.PgEscapeStringSqlFilterInjection
+  code
+  ```
+  <?php
+  function freedomrss_search(Action & $action)
+  {
+      $str = GetHttpVars("str", "");
+      $sys = GetHttpVars("sys", 0);
+      $user = GetHttpVars("user", $action->user->id);
+      $filter[0] = "(title ~* " . pg_escape_literal($str) . ")";
+      if ($sys == 1) $filter[2] = "(owner = " . pg_escape_literal($user) . " or gui_sysrss = 'yes')";
+      else $filter[2] = "(owner = " . pg_escape_literal($user) . ")";
+      $search = new SearchDoc("", "SEARCH");
+      foreach ($filter as $currentFilter) {
+          $search->addFilter($currentFilter);
+      }
+      $search->search();
+  }
+  ?>
+  ```

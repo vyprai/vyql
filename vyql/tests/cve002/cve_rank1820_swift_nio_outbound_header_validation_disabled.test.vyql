@@ -1,0 +1,257 @@
+# Rank 1820 / CVE-2022-3215 (GHSA-7fj7-39wj-c64f): SwiftNIO's HTTP/1.1
+# encoder wrote outbound header fields to the wire verbatim. writeHead in
+# Sources/NIOHTTP1/HTTPEncoder.swift did `buffer.write(headers: headers)` and
+# nothing anywhere in the pipeline policed the bytes, so a field value carrying
+# CR or LF terminated the header block early and injected a second message:
+# response splitting toward the browser (CWE-113), request smuggling against
+# the upstream (CWE-444). The advisory's shape is not the NIOSSL certificate
+# one -- the change diff is entirely in NIOHTTP1.
+#
+# Fix a16e2f54 adds NIOHTTPRequestHeadersValidator and
+# NIOHTTPResponseHeadersValidator, channel handlers that reject a field name
+# or value containing CR, LF, NUL or any other ASCII control character (HTAB
+# allowed) per RFC 9110, installs them in configureHTTPServerPipeline and
+# addHTTPClientHandlers with the switch defaulting to on, and compiles the
+# llhttp C target with LLHTTP_STRICT_MODE for the inbound side. The commit
+# message documents the opt-out: "For projects that are running the
+# validation themselves, this can be easily disabled."
+#
+# The binding widens code.HttpHeaderValidationDisabled to Swift, the shape
+# VYQL-INJ-247 judges for Netty's validateHeaders(false) on the Java
+# side. Nothing is tainted and there is no path to trace -- the weakness is a
+# control switched off at configuration, the same shape
+# code.CertValidationDisabled occupies for TLS. The pre-fix tree has no
+# switch to pass at all (the control did not exist), so no binding can fire
+# on it; the durable, documentation-answerable fact the fixed revision introduces is the
+# switch itself, and a consumer passing false re-creates this CVE's condition
+# exactly -- the fixed revision's own regression tests assert that with
+# withOutboundHeaderValidation: false a value containing \r reaches the wire
+# byte for byte, Tests/NIOHTTP1Tests/HTTPHeaderValidationTests.swift:540 and
+# :516, which are the shapes the cases below are modelled on.
+#
+# Swift appends a call's argument labels to the call node's path as dotted
+# segments (swift.go, call_expression: `path += "." + strings.Join(labels,
+// ".")`), so `callee.path ~= "withOutboundHeaderValidation"` holds exactly
+# when that labelled argument is passed, whatever the receiver and whatever
+# precedes it. That label is what does the discriminating, not the false
+# literal's position: configureHTTPServerPipeline also takes
+# withPipeliningAssistance and withErrorHandling booleans, and a false passed
+# to either of those with validation left at its default is the test file's
+# own line 495, pinned as a reject case below. The residual, documented in
+# the binding, is a call that passes false to one of those and a computed
+# value to the validation label itself.
+#
+# Engine gap, closed alongside: the real code's opt-out calls are whole
+# statements headed by `try`, and swift.go's statement switch had no case
+# for try_expression or await_expression -- its default returned nil, so
+# `try f(x)` at statement position produced no IR at all while the same
+# statement without `try` lowered normally. Measured at the vulnerable revision: a
+# FuncDef whose body is a single `try g(a: false)` extracted with an empty
+# body; the same call in return or assignment position carries a label. The
+# minimal pair is the first expect case against the third one: the same
+# statement with and without the `try` keyword, one reported and one not.
+# The frontend now lowers a statement-position try/await through its
+# operand's own statement handling, so the idiom is visible to every
+# binding, not just this one.
+#
+# Measured bounded (timeout 180, --max-ram 6GB, --cache off), counts the
+# union of three runs per revision, run from inside the worktree. swift-nio
+# at a16e2f54^: 351 findings, 0 VYQL-INJ-247 -- the parameter does not exist
+# at that revision, in Sources or Tests. At a16e2f54: 353 findings, exactly
+# 2 VYQL-INJ-247, the disable-path regression tests at
+# Tests/NIOHTTP1Tests/HTTPHeaderValidationTests.swift:516 and :540, and none
+# anywhere under Sources/, where every call passes the defaulted or computed
+# value. The whole delta between revisions is those two rows. Collateral of
+# the frontend fix, measured as full finding-set diffs: swift-nio +2
+# VYQL-LIFE-001 on real `self._lock.lock()` calls inside `try await` blocks
+# (NIOAsyncWriter.swift:467, NIOThrowingAsyncSequenceProducer.swift:437),
+# identical at both revisions; swift-crypto +8 VYQL-CRY-001 on real
+# `Insecure.SHA1` constructions under Tests/; swift-corelibs-foundation
+# 2744 -> 2744 and starscream 0 -> 0, no movement. Across the other Swift
+# trees under /tmp/cve-work/rank*/ (swift-crypto-fixed, swift-asn1) the
+# high-and-above counts are unchanged; grep finds the two argument labels
+# only in this repository's own tests.
+
+test "rank1820: a server pipeline configured with outbound header validation switched off"
+  lang swift
+  file Tests/NIOHTTP1Tests/ServerPipelineSetup.swift
+  expect VYQL-INJ-247
+  code
+  ```
+  import NIOCore
+  import NIOHTTP1
+
+  final class ServerPipelineSetup {
+      let channel: EmbeddedChannel
+
+      init() {
+          self.channel = EmbeddedChannel()
+      }
+
+      func disableValidation() throws {
+          channel.pipeline.syncOperations.configureHTTPServerPipeline(withErrorHandling: false, withOutboundHeaderValidation: false)
+          channel.primeForResponse()
+      }
+  }
+  ```
+
+test "rank1820: a client pipeline configured with outbound header validation switched off"
+  lang swift
+  file Tests/NIOHTTP1Tests/ClientPipelineSetup.swift
+  expect VYQL-INJ-247
+  code
+  ```
+  import NIOCore
+  import NIOHTTP1
+
+  final class ClientPipelineSetup {
+      let channel: EmbeddedChannel
+
+      init() {
+          self.channel = EmbeddedChannel()
+      }
+
+      func disableValidation() throws {
+          channel.pipeline.syncOperations.addHTTPClientHandlers(enableOutboundHeaderValidation: false)
+      }
+  }
+  ```
+
+test "rank1820: the same server opt-out written as a whole try statement, the form the fixed revision's own regression test uses"
+  lang swift
+  file Tests/NIOHTTP1Tests/ServerPipelineSetupTry.swift
+  expect VYQL-INJ-247
+  code
+  ```
+  import NIOCore
+  import NIOHTTP1
+
+  final class ServerPipelineSetupTry {
+      let channel: EmbeddedChannel
+
+      init() {
+          self.channel = EmbeddedChannel()
+      }
+
+      func disableValidation() throws {
+          try channel.pipeline.syncOperations.configureHTTPServerPipeline(withErrorHandling: false, withOutboundHeaderValidation: false)
+          try channel.primeForResponse()
+      }
+  }
+  ```
+
+test "rank1820: the same client opt-out written as a whole try statement, the form the fixed revision's own regression test uses"
+  lang swift
+  file Tests/NIOHTTP1Tests/ClientPipelineSetupTry.swift
+  expect VYQL-INJ-247
+  code
+  ```
+  import NIOCore
+  import NIOHTTP1
+
+  final class ClientPipelineSetupTry {
+      let channel: EmbeddedChannel
+
+      init() {
+          self.channel = EmbeddedChannel()
+      }
+
+      func disableValidation() throws {
+          try channel.pipeline.syncOperations.addHTTPClientHandlers(enableOutboundHeaderValidation: false)
+      }
+  }
+  ```
+
+test "rank1820: a false passed to error handling with header validation left at its default is not read as the validation switch"
+  lang swift
+  file Tests/NIOHTTP1Tests/ErrorHandlingOnly.swift
+  reject VYQL-INJ-247
+  code
+  ```
+  import NIOCore
+  import NIOHTTP1
+
+  final class ErrorHandlingOnly {
+      let channel: EmbeddedChannel
+
+      init() {
+          self.channel = EmbeddedChannel()
+      }
+
+      func configure() throws {
+          try channel.pipeline.syncOperations.configureHTTPServerPipeline(withErrorHandling: false)
+      }
+  }
+  ```
+
+test "rank1820: the server pipeline left at its validating default, the patched form the fixed revision ships"
+  lang swift
+  file Sources/App/ServerBootstrap.swift
+  reject VYQL-INJ-247
+  code
+  ```
+  import NIOCore
+  import NIOHTTP1
+
+  final class ServerBootstrap {
+      let channel: Channel
+
+      init(channel: Channel) {
+          self.channel = channel
+      }
+
+      func configure() -> EventLoopFuture<Void> {
+          return channel.pipeline.configureHTTPServerPipeline()
+      }
+  }
+  ```
+
+test "rank1820: the server pipeline with outbound header validation explicitly enabled"
+  lang swift
+  file Sources/App/ServerBootstrapExplicit.swift
+  reject VYQL-INJ-247
+  code
+  ```
+  import NIOCore
+  import NIOHTTP1
+
+  final class ServerBootstrapExplicit {
+      let channel: Channel
+
+      init(channel: Channel) {
+          self.channel = channel
+      }
+
+      func configure() -> EventLoopFuture<Void> {
+          return channel.pipeline.configureHTTPServerPipeline(
+              position: .last,
+              withPipeliningAssistance: true,
+              withServerUpgrade: nil,
+              withErrorHandling: true,
+              withOutboundHeaderValidation: true
+          )
+      }
+  }
+  ```
+
+test "rank1820: the client pipeline with outbound header validation explicitly enabled"
+  lang swift
+  file Sources/App/ClientBootstrap.swift
+  reject VYQL-INJ-247
+  code
+  ```
+  import NIOCore
+  import NIOHTTP1
+
+  final class ClientBootstrap {
+      let channel: Channel
+
+      init(channel: Channel) {
+          self.channel = channel
+      }
+
+      func configure() -> EventLoopFuture<Void> {
+          return channel.pipeline.addHTTPClientHandlers(enableOutboundHeaderValidation: true)
+      }
+  }
+  ```

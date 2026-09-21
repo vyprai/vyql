@@ -1,0 +1,118 @@
+# Rank 1551 / CVE-2024-27298: Parse Server's Postgres adapter escaped
+# quotation marks inside user-supplied $regex query values one at a time,
+# so a regex carrying a second quote closed the string literal early and
+# injected SQL into the Postgres query (SQL injection through an
+# incomplete escape, CWE-89; GHSA-6927-3vr9-xf2, fixed in
+# 6.5.3/7.0.0-alpha.20; the pool row's nocommit flag reflects
+# advisory-side absence). literalizeRegexPart in src/Adapters/Storage/
+# Postgres/PostgresStorageAdapter.js chained `.replace(/([^'])'/,
+# "$1''")` with no global flag, so only the first quote in the value
+# doubled; the spec added at the fixed revision shows the payload
+# `A'B';SELECT PG_SLEEP(3);--` sailing through the escape. Pool commit
+# cbefe770a7 is the real fix (COMMIT_OK by diff -- "fix: Improve
+# PostgreSQL injection detection"): the replace gains the global flag
+# `(/([^'])'/g, "$1''")` so every quote in the value is escaped. The
+# anchored spellings in the same helper legitimately match once.
+#
+# Both blocks assert reject: no rule observes replace-completeness.
+# The escaper's own defect is regex-flag semantics -- whether the
+# substitution covers every occurrence -- and jsContextRegex
+# (internal/extract/frontend/treesitter/javascript.go) strips a regex
+# literal's closing delimiter and flags when building the regex token,
+# so no structured token carries the one fact that separates the
+# revisions. A prototype that appends the delimiter and flags to the
+# regex token, with a binding for a pattern whose last character is the
+# delimiter, a backreference-doubling replacement, and no global flag
+# on that pattern, discriminates 1 -> 0 on this exact function text in
+# isolation -- but the real file never reaches it:
+# PostgresStorageAdapter.js is Flow-typed (`// @flow`, `import type`,
+# parameter annotations), and the JavaScript grammar parses it into 418
+# ERROR nodes, so no analysis.function.context exists for anything past
+# line 1500 of 2669 (literalizeRegexPart sits at 2632); the TypeScript
+# grammar parses the same file with zero errors. Module scope cannot
+# substitute: its 512-token context cap truncates before the file's
+# tail. Routing `// @flow` files to the TypeScript grammar is a
+# corpus-wide extraction change, not a localized correction, so it goes
+# to ENGINE-GAPS.md rather than this rank.
+#
+# Measured at the recheck tip (3x --cache off, timeout 180, --max-ram
+# 6GB): the Postgres adapter directory reports the identical 7 findings
+# at cbefe770a7^ and cbefe770a7 (5 VYQL-PATH-001, 1 VYQL-INJ-023, 1
+# VYQL-INJ-013, all on PostgresConfigParser.js and PostgresClient.js,
+# none on PostgresStorageAdapter.js); the full vulnerable checkout
+# reports 552/552/553 findings. When the flags become observable and a
+# Flow-typed file parses, the single-shot block must flip to expect.
+
+test "rank1551: the regex quote escape stops at the first match"
+  lang javascript
+  file src/Adapters/Storage/Postgres/PostgresStorageAdapter.js
+  reject VYQL-INJ-001
+  code
+  ```
+  function createLiteralRegex(remaining) {
+    return remaining
+      .split('')
+      .map(c => {
+        const regex = RegExp('[0-9 ]|\\p{L}', 'u');
+        if (c.match(regex) !== null) {
+          return c;
+        }
+        return c === `'` ? `''` : `\\${c}`;
+      })
+      .join('');
+  }
+
+  function literalizeRegexPart(s) {
+    const matcher1 = /\\Q((?!\\E).*)\\E$/;
+    const result1 = s.match(matcher1);
+    if (result1 && result1.length > 1 && result1.index > -1) {
+      const prefix = s.substring(0, result1.index);
+      const remaining = result1[1];
+      return literalizeRegexPart(prefix) + createLiteralRegex(remaining);
+    }
+    return s
+      .replace(/([^\\])(\\E)/, '$1')
+      .replace(/([^\\])(\\Q)/, '$1')
+      .replace(/^\\E/, '')
+      .replace(/^\\Q/, '')
+      .replace(/([^'])'/, `$1''`)
+      .replace(/^'([^'])/, `''$1`);
+  }
+  ```
+
+test "rank1551: the fixed revision escapes every quote in the value"
+  lang javascript
+  file src/Adapters/Storage/Postgres/PostgresStorageAdapter.js
+  reject VYQL-INJ-001
+  code
+  ```
+  function createLiteralRegex(remaining) {
+    return remaining
+      .split('')
+      .map(c => {
+        const regex = RegExp('[0-9 ]|\\p{L}', 'u');
+        if (c.match(regex) !== null) {
+          return c;
+        }
+        return c === `'` ? `''` : `\\${c}`;
+      })
+      .join('');
+  }
+
+  function literalizeRegexPart(s) {
+    const matcher1 = /\\Q((?!\\E).*)\\E$/;
+    const result1 = s.match(matcher1);
+    if (result1 && result1.length > 1 && result1.index > -1) {
+      const prefix = s.substring(0, result1.index);
+      const remaining = result1[1];
+      return literalizeRegexPart(prefix) + createLiteralRegex(remaining);
+    }
+    return s
+      .replace(/([^\\])(\\E)/, '$1')
+      .replace(/([^\\])(\\Q)/, '$1')
+      .replace(/^\\E/, '')
+      .replace(/^\\Q/, '')
+      .replace(/([^'])'/g, `$1''`)
+      .replace(/^'([^'])/, `''$1`);
+  }
+  ```

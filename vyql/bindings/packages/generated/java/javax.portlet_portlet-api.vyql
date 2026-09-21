@@ -1,0 +1,34 @@
+module bindings.java.generated.m563eb794;
+
+binding httpInput0 {
+  requires {
+    dependency("javax.portlet:portlet-api")
+  }
+  query pattern callExpr where callee.method == "getReader"
+  emit source code.HttpInput at call.result
+}
+
+binding redirectTarget1 {
+  requires {
+    dependency("javax.portlet:portlet-api")
+  }
+  query pattern callExpr where callee.method == "sendRedirect"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}
+
+binding htmlRender2 {
+  requires {
+    dependency("javax.portlet:portlet-api")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender3 {
+  requires {
+    dependency("javax.portlet:portlet-api")
+  }
+  query pattern callExpr where callee.method == "append"
+  emit sink code.HtmlRender at args[0]
+}

@@ -1,0 +1,29 @@
+module bindings.dart.generated.m4b533710;
+
+binding storedDataRead0 {
+  requires {
+    dependency("supabase_flutter")
+  }
+  query pattern callExpr where callee.method == "SupabaseAuth.recoverSession"
+  emit source code.StoredDataRead at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("supabase_flutter")
+  }
+  query pattern callExpr where callee.method == "SupabaseAuth.onAuthStateChange"
+  emit source code.SecretValue at call.result
+}
+
+binding authenticationCheck2 {
+  requires {
+    dependency("supabase_flutter")
+  }
+  query pattern callExpr where callee.method == "Supabase.initialize"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

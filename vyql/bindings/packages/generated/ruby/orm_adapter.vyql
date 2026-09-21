@@ -1,0 +1,49 @@
+module bindings.ruby.generated.ma860ad40;
+
+binding databaseRead0 {
+  requires {
+    dependency("orm_adapter")
+  }
+  query pattern callExpr where callee.method == "get!"
+  emit sink code.DatabaseReadSink at args[0]
+}
+
+binding databaseRead1 {
+  requires {
+    dependency("orm_adapter")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.DatabaseReadSink at args[0]
+}
+
+binding databaseRead2 {
+  requires {
+    dependency("orm_adapter")
+  }
+  query pattern callExpr where callee.method == "find_first"
+  emit sink code.DatabaseReadSink at args[0]
+}
+
+binding databaseRead3 {
+  requires {
+    dependency("orm_adapter")
+  }
+  query pattern callExpr where callee.method == "find_all"
+  emit sink code.DatabaseReadSink at args[0]
+}
+
+binding sqlExecution4 {
+  requires {
+    dependency("orm_adapter")
+  }
+  query pattern callExpr where callee.method == "create!"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution5 {
+  requires {
+    dependency("orm_adapter")
+  }
+  query pattern callExpr where callee.method == "destroy"
+  emit sink code.SqlExecution at args[0]
+}

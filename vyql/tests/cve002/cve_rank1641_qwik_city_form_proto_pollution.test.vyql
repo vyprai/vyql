@@ -1,0 +1,233 @@
+# Rank 1641 / CVE-2026-25150: Qwik City's form parser wrote every
+# FormData entry name it handed into nested objects, so a form field
+# named `__proto__.polluted` (or `constructor.polluted`,
+# `prototype[]`, …) set properties on Object.prototype for the server
+# process (prototype pollution, CWE-1321). formToObj in
+# packages/qwik-city/src/middleware/request-handler/request-event.ts
+# walked `[...formData.entries()]` with two nested `.reduce` calls,
+# splitting each name on '.' and assigning `object[key] = value` -- the
+# key segment reaches the prototype machinery unchecked. The fixing
+# commit 5f65bae2bc carries the change ("refactor: form parsing", a
+# fork merge; read as `git diff <first-parent> <merge>` because the
+# combined diff is empty): a new `isDangerousKey` predicate rejects
+# `__proto__`/`constructor`/`prototype` at every path position and
+# bracket key, the root and nested containers become
+# `Object.create(null)`, and the walk is rewritten as a plain `for…of`
+# loop.
+#
+# ATTENTION, prototype pollution through special property names (the
+# family of ranks 1518, 1584 and 1613), in the one instance whose sink
+# and source both exist and whose chain dies inside the engine. The
+# sink is bound: the `object[key] = …` writes lower to
+# `__js_dynamic_property_write` and `vyql match` reports
+# `code.ProtoPollute @ request-event.ts:414`. The source is not:
+# `request.formData()` carries no label, because the Fetch-API
+# body-reader binding (vyql/bindings/javascript/
+# next_route_handler_request_body.vyql) is gated on
+# `dependency("next")` and qwik-city is not next.
+#
+# Re-measured, 3 x --cache off per side, shipped definitions, the whole
+# of packages/qwik-city/src: the vulnerable revision reports 178
+# findings / 16 VYQL-INJ-013 and none on the parser; the fixed revision
+# reports 179 / 19 with three on the rewritten formToObj
+# (request-event.ts:438/445/448), sourced from `request.headers` at
+# :58 -- an already-labelled input. The remediated walk therefore
+# out-reports the vulnerable one with no probe involved, because a
+# `for…of` iteration propagates taint to the destructured element while
+# a `.reduce` callback does not.
+#
+# The engine blocker is one construct, measured to need two changes:
+# `.reduce` is absent from `elementCallbackMethods`
+# (internal/extract/lowering/lowering.go:216), and the element sits at
+# callback parameter 1, a position the machinery does not model. A
+# table entry alone routes the receiver's taint into the accumulator
+# and the vulnerable chain still reports nothing (measured); adding a
+# receiver -> parameter-1 edge beside the entry completes it -- the
+# vulnerable tree then gains exactly one finding,
+# `request-event.ts:381 (request.formData) -> :414`, 3/3 runs, 178 ->
+# 179 findings and 16 -> 17 VYQL-INJ-013. That edge is a new dataflow
+# relation in shared lowering, so it is not a mechanical fix.
+#
+# The destructuring-parameter half an earlier review pinned on this
+# path is no longer a blocker: `patternParamBindings`
+# (internal/extract/frontend/treesitter/javascript.go) binds the names
+# an `([a, b])` element parameter introduces, and a reduce callback
+# with a destructured element reports once the element edge exists
+# (the fifth block below). Only the reduce edge is missing.
+#
+# Nothing ships, because no subset of the three pieces is safe: ungating
+# the body-reader source alone makes this spec's second block fail
+# ("rule VYQL-INJ-013 fired but should not have") and re-sources the
+# three fixed-tree rows to request.formData() itself; with the source
+# ungated AND the reduce edge in place the fixed tree still reports 3
+# on formToObj against the vulnerable tree's 1, because the fix's
+# `isDangerousKey` is a sibling function whose comparison never reaches
+# formToObj's `prototype_key_guard` context, so the shipped
+# protoKeyGuardedDynamicPropertyWrite control cannot emit
+# core.PrototypePollutionGuard there -- the delegated-check
+# attribution gap recorded for ranks 1372 and 1994. The source ungating,
+# the reduce element edge and the guard attribution must land together.
+#
+# Flip conditions: when the reduce element edge lands, blocks one, four
+# and five must flip to expect; block two must stay reject, which also
+# needs the sibling-guard attribution. Block three is the live minimal
+# pair on shipped vocabulary (`request.headers` is the source): the
+# same walk through `.map` reports, the `.reduce` twins do not.
+
+test "rank1641: the form parser walks entry names through nested reduces"
+  lang javascript
+  file packages/qwik-city/src/middleware/request-handler/request-event.ts
+  reject VYQL-INJ-013
+  code
+  ```
+  const parseRequest = async ({ request }: any, sharedMap: Map<string, any>) => {
+    const type = request.headers.get('content-type')?.split(/[;,]/, 1)[0].trim() ?? '';
+    if (type === 'application/x-www-form-urlencoded' || type === 'multipart/form-data') {
+      const formData = await request.formData();
+      sharedMap.set('q-data-form', formData);
+      return formToObj(formData);
+    }
+    return undefined;
+  };
+
+  const formToObj = (formData: FormData): Record<string, any> => {
+    const values = [...formData.entries()].reduce<any>((values, [name, value]) => {
+      name.split('.').reduce((object: any, key: string, index: number, keys: any) => {
+        // Bracket notation for arrays, notably for multi selects
+        if (key.endsWith('[]')) {
+          const arrayKey = key.slice(0, -2);
+          object[arrayKey] = object[arrayKey] || [];
+          return (object[arrayKey] = [...object[arrayKey], value]);
+        }
+
+        // If it is not last index, return nested object or array
+        if (index < keys.length - 1) {
+          return (object[key] = object[key] || (Number.isNaN(+keys[index + 1]) ? {} : []));
+        }
+
+        return (object[key] = value);
+      }, values);
+
+      // Return modified values
+      return values;
+    }, {});
+
+    // Return values object
+    return values;
+  };
+  ```
+
+test "rank1641: the fixed revision filters the dangerous segments"
+  lang javascript
+  file packages/qwik-city/src/middleware/request-handler/request-event.ts
+  reject VYQL-INJ-013
+  code
+  ```
+  const parseRequest = async ({ request }: any, sharedMap: Map<string, any>) => {
+    const type = request.headers.get('content-type')?.split(/[;,]/, 1)[0].trim() ?? '';
+    if (type === 'application/x-www-form-urlencoded' || type === 'multipart/form-data') {
+      const formData = await request.formData();
+      sharedMap.set('q-data-form', formData);
+      return formToObj(formData);
+    }
+    return undefined;
+  };
+
+  const isDangerousKey = (k: string) => k === '__proto__' || k === 'constructor' || k === 'prototype';
+
+  const formToObj = (formData: FormData): Record<string, any> => {
+    const values = Object.create(null);
+
+    for (const [name, value] of formData) {
+      const keys = name.split('.');
+      let hasDangerousKey = false;
+
+      for (let i = 0; i < keys.length; i++) {
+        if (isDangerousKey(keys[i])) {
+          hasDangerousKey = true;
+          break;
+        }
+      }
+
+      if (hasDangerousKey) {
+        continue;
+      }
+
+      let object = values;
+      for (let i = 0; i < keys.length; i++) {
+        const key = keys[i];
+
+        // Bracket notation for arrays, notably for multi selects
+        if (key.endsWith('[]')) {
+          const arrayKey = key.slice(0, -2);
+          if (isDangerousKey(arrayKey)) {
+            break;
+          }
+          object[arrayKey] = object[arrayKey] || [];
+          object[arrayKey].push(value);
+          break;
+        }
+
+        // If it is not last index, return nested object or array
+        if (i < keys.length - 1) {
+          object = object[key] =
+            object[key] || (Number.isNaN(+keys[i + 1]) ? Object.create(null) : []);
+        } else {
+          object[key] = value;
+        }
+      }
+    }
+
+    return values;
+  };
+  ```
+
+test "rank1641: the same walk through map reports"
+  lang javascript
+  file packages/qwik-city/src/middleware/request-handler/form-walk.ts
+  expect VYQL-INJ-013
+  code
+  ```
+  export function walkMap(request: Request): any {
+    const out: any = {};
+    request.headers.get('x').split('.').map((key: string) => {
+      out[key] = 1;
+    });
+    return out;
+  }
+  ```
+
+test "rank1641: the same walk through reduce does not"
+  lang javascript
+  file packages/qwik-city/src/middleware/request-handler/form-walk.ts
+  reject VYQL-INJ-013
+  code
+  ```
+  export function walkReduce(request: Request): any {
+    const out: any = {};
+    request.headers.get('x').split('.').reduce((object: any, key: string) => {
+      out[key] = 1;
+      return object;
+    }, out);
+    return out;
+  }
+  ```
+
+test "rank1641: the reduce walk whose element arrives destructured does not either"
+  lang javascript
+  file packages/qwik-city/src/middleware/request-handler/form-walk.ts
+  reject VYQL-INJ-013
+  code
+  ```
+  export function walkReduceDestructured(request: Request): any {
+    const out: any = {};
+    request.headers
+      .get('x')
+      .split('.')
+      .reduce((acc: any, [key, val]: any) => {
+        out[key] = val;
+        return acc;
+      }, out);
+    return out;
+  }
+  ```

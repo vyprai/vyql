@@ -1,0 +1,104 @@
+# Rank 131 / CVE-2008-1897: Asterisk IAX2 full-frame call binding (pruiz fork).
+# chan_iax2.c match() accepts a frame as an existing call on the source call
+# number alone; the fix threads a full_frame flag through find_callno and
+# requires the destination call number to match before a full frame is bound.
+
+test "rank131: c full-frame call lookup without destination binding reports the frame-binding rule"
+  lang c
+  expect VYQL-AUTH-087
+  expect_review code.ProtocolFrameBindingReview
+  code
+  ```
+  struct sockaddr_in {
+      struct { unsigned int s_addr; } sin_addr;
+      unsigned short sin_port;
+  };
+  struct chan_iax2_pvt {
+      struct sockaddr_in addr;
+      unsigned short peercallno;
+      unsigned short callno;
+  };
+
+  static int match(struct sockaddr_in *sin, unsigned short callno,
+                   unsigned short dcallno, const struct chan_iax2_pvt *cur)
+  {
+      if ((cur->addr.sin_addr.s_addr == sin->sin_addr.s_addr) &&
+          (cur->addr.sin_port == sin->sin_port)) {
+          /* This is the main host */
+          if ((cur->peercallno == callno) ||
+              ((dcallno == cur->callno) && !cur->peercallno)) {
+              /* That's us.  Be sure we keep track of the peer call number */
+              return 1;
+          }
+      }
+      return 0;
+  }
+  ```
+
+test "rank131: c full-frame call lookup requiring the destination number is clean"
+  lang c
+  reject VYQL-AUTH-087
+  reject_review code.ProtocolFrameBindingReview
+  code
+  ```
+  struct sockaddr_in {
+      struct { unsigned int s_addr; } sin_addr;
+      unsigned short sin_port;
+  };
+  struct chan_iax2_pvt {
+      struct sockaddr_in addr;
+      unsigned short peercallno;
+      unsigned short callno;
+  };
+
+  static int match(struct sockaddr_in *sin, unsigned short callno,
+                   unsigned short dcallno, const struct chan_iax2_pvt *cur,
+                   int full_frame)
+  {
+      if ((cur->addr.sin_addr.s_addr == sin->sin_addr.s_addr) &&
+          (cur->addr.sin_port == sin->sin_port)) {
+          /* This is the main host */
+          if ( (cur->peercallno == 0 || cur->peercallno == callno) &&
+               (full_frame ? dcallno == cur->callno : 1) ) {
+              /* That's us.  Be sure we keep track of the peer call number */
+              return 1;
+          }
+      }
+      return 0;
+  }
+  ```
+
+test "rank131: an if-return guard on the destination number is clean without a ternary"
+  lang c
+  reject VYQL-AUTH-087
+  reject_review code.ProtocolFrameBindingReview
+  code
+  ```
+  struct sockaddr_in {
+      struct { unsigned int s_addr; } sin_addr;
+      unsigned short sin_port;
+  };
+  struct chan_iax2_pvt {
+      struct sockaddr_in addr;
+      unsigned short peercallno;
+      unsigned short callno;
+  };
+
+  static int match(struct sockaddr_in *sin, unsigned short callno,
+                   unsigned short dcallno, const struct chan_iax2_pvt *cur,
+                   int full_frame)
+  {
+      if ((cur->addr.sin_addr.s_addr == sin->sin_addr.s_addr) &&
+          (cur->addr.sin_port == sin->sin_port)) {
+          /* This is the main host */
+          if (full_frame && dcallno != cur->callno) {
+              return 0;
+          }
+          if (cur->peercallno == 0 || cur->peercallno == callno) {
+              /* That's us.  Be sure we keep track of the peer call number */
+              return 1;
+          }
+      }
+      return 0;
+  }
+  ```

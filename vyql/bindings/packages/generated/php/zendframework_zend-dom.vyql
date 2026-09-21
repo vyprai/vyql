@@ -1,0 +1,33 @@
+module bindings.php.generated.m9ac0a306;
+
+binding deserialization0 {
+  requires {
+    dependency("zendframework/zend-dom")
+  }
+  query pattern callExpr where callee.method == "setDocumentXml"
+  emit sink code.Deserialization at args[0]
+}
+
+binding expressionEval1 {
+  requires {
+    dependency("zendframework/zend-dom")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.ExpressionEval at args[0]
+}
+
+binding expressionEval2 {
+  requires {
+    dependency("zendframework/zend-dom")
+  }
+  query pattern callExpr where callee.method == "queryXpath"
+  emit sink code.ExpressionEval at args[0]
+}
+
+binding expressionEval3 {
+  requires {
+    dependency("zendframework/zend-dom")
+  }
+  query pattern callExpr where callee.method == "queryWithErrorException"
+  emit sink code.ExpressionEval at args[0]
+}

@@ -1,0 +1,17 @@
+module bindings.php.generated.m08df6a57;
+
+binding codeEval0 {
+  requires {
+    dependency("codeception/aspect-mock")
+  }
+  query pattern callExpr where callee.method == "func"
+  emit sink code.CodeEval at args[0]
+}
+
+binding codeEval1 {
+  requires {
+    dependency("codeception/aspect-mock")
+  }
+  query pattern callExpr where callee.method == "registerFunc"
+  emit sink code.CodeEval at args[0]
+}

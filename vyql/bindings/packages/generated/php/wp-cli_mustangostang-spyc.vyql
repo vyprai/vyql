@@ -1,0 +1,49 @@
+module bindings.php.generated.mb5e6b3c0;
+
+binding deserialization0 {
+  requires {
+    dependency("wp-cli/mustangostang-spyc")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("wp-cli/mustangostang-spyc")
+  }
+  query pattern callExpr where callee.method == "loadFile"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("wp-cli/mustangostang-spyc")
+  }
+  query pattern callExpr where callee.method == "YAMLLoad"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("wp-cli/mustangostang-spyc")
+  }
+  query pattern callExpr where callee.method == "YAMLLoadString"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("wp-cli/mustangostang-spyc")
+  }
+  query pattern callExpr where callee.method == "spyc_load"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("wp-cli/mustangostang-spyc")
+  }
+  query pattern callExpr where callee.method == "spyc_load_file"
+  emit sink code.Deserialization at args[0]
+}

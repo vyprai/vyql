@@ -1,0 +1,175 @@
+# Rank 1522 / CVE-2026-39361: OpenObserve's enrichment-table ingestion
+# accepts a URL from the request body, fetches it with a background job, and
+# guards the fetch with validate_enrichment_url in src/handler/http/request/
+# enrichment_table/mod.rs -- a guard whose host spelling is not the host
+# spelling the fetcher connects to (server-side request forgery, CWE-918;
+# PR #11162). The guard takes the host from url::Url::parse(...).host_str()
+# and parses it straight into std::net::IpAddr, but a bracketed IPv6 literal
+# like [::1] or [::ffff:169.254.169.254] does not parse as an IpAddr with
+# its brackets, so the ip branch never ran for exactly the hosts the guard
+# exists to block; the string-equality localhost check missed the same
+# bracketed spellings, and the native-v6 branch caught only loopback and
+# fc00::/7, leaving fe80::/10 link-local and ipv4-mapped private ranges
+# open. The fixing commit d1a5d8f65b ("fix: enhance URL validation to block
+# private and loopback IP addresses") strips the host with
+# trim_start_matches('[').trim_end_matches(']') before parsing, maps
+# to_ipv4_mapped() addresses onto the v4 path so ::ffff:10.0.0.1 takes the
+# predicate checks, blocks native ULA, link-local and loopback in the v6
+# branch, and replaces the hand-listed octets with is_loopback()/
+# is_private()/is_link_local()/is_unspecified().
+#
+# ## What fires, both revisions
+#
+# Three --cache off runs per revision over src report 326 findings at or
+# above high each, identically on the vulnerable parent f66b7627 and the
+# fixed d1a5d8f6; the full view holds 927 rows, of which zero are
+# request-forgery rules. Over the enrichment handler and its background
+# fetcher the count is zero at both revisions in every view, -flags only
+# included: the handler labels two entry parameters and nothing else, the
+# octet subscripts of the guard itself carry the only labels in the file
+# (IndexAccess / IndexAccessSink), and url_processor.rs labels no fetch at
+# all -- client.get(url).send() at :865/:1131 and client.head(url).send()
+# at :796/:987 produce no code.UrlFetch, because the Rust sink binding
+# matches only the fully-qualified free-function path: `reqwest::get(url)`
+# takes the label (a three-form repro confirms it) while a call on a
+# locally built Client value does not. That coverage split is real across
+# the tree: one qualified fetch site against twenty-one method-form ones.
+#
+# ## Why no binding converts it
+#
+# A reverted probe binding the method form (client.get / client.head ->
+# code.UrlFetch) lights the fetch up and adds exactly three VYQL-RF-001
+# rows -- url_processor.rs:755 -> :796, download_utils.rs:23 -> :25,
+# github/client.rs:67 -> :82 -- but identically on both revisions (927 ->
+# 930 each): every row pairs a helper's own parameter, which the library
+# entry assumption already treats as untrusted, with a fetch inside that
+# same helper, so the rows sit on the background fetcher and never see the
+# guard the fixing commit strengthened. The handler-to-fetcher flow runs
+# through a database round trip the taint engine does not connect, and no
+# Rust binding emits core.AllowlistValidation at all, so the rule's
+# `unless coveredBy` clauses could not separate a guarded fetch from an
+# open one in this language even with both ends labelled. Shipping the
+# method-form sink binding is generic -- the reqwest documentation's own
+# primary example is client.get(url) on a Client value -- but it converts
+# nothing here and adds three rows that fire on the patched code exactly
+# as on the vulnerable code, so it stays for a rank it decides.
+#
+# What would decide this pair is host-normalisation vocabulary: a question
+# of the shape "does the checked host spelling cover every form the URL
+# parser accepts" (brackets, mapped v6, decimal octets, short forms).
+# Nothing in the concept set asks it, and the only discriminators visible
+# in the tokens are the fixing commit's own spellings -- the bracket strip
+# and to_ipv4_mapped -- so a binding keyed on them detects this
+# application rather than the weakness. The same present-but-incomplete
+# family as ranks 1551, 1564 and 1565.
+#
+# Both blocks below reject VYQL-RF-001: the bracket-blind guard and the
+# stripped-and-mapped guard are equally unreported. When host-normalisation
+# vocabulary lands, the bracket-blind form must flip to expect.
+
+test "rank1522: the host check cannot see bracketed literals"
+  lang rust
+  file src/handler/http/request/enrichment_table/mod.rs
+  reject VYQL-RF-001
+  code
+  ```
+  fn validate_enrichment_url(url: &str) -> Result<(), String> {
+      if url.trim().is_empty() {
+          return Err("URL cannot be empty".to_string());
+      }
+
+      if !url.starts_with("http://") && !url.starts_with("https://") {
+          return Err("URL must start with http:// or https://".to_string());
+      }
+
+      let parsed_url = url::Url::parse(url).map_err(|e| format!("Invalid URL: {}", e))?;
+
+      let host = parsed_url
+          .host_str()
+          .ok_or_else(|| "URL must have a valid host".to_string())?;
+
+      // Block localhost
+      if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+          return Err("Cannot access localhost URLs".to_string());
+      }
+
+      // Block private IP ranges
+      if let Ok(ip) = host.parse::<std::net::IpAddr>() {
+          match ip {
+              std::net::IpAddr::V4(v4) => {
+                  let octets = v4.octets();
+                  if octets[0] == 10
+                      || (octets[0] == 172 && (16..=31).contains(&octets[1]))
+                      || (octets[0] == 192 && octets[1] == 168)
+                      || (octets[0] == 169 && octets[1] == 254)
+                  {
+                      return Err("Cannot access private IP addresses".to_string());
+                  }
+              }
+              std::net::IpAddr::V6(v6) => {
+                  if v6.is_loopback() || v6.segments()[0] & 0xfe00 == 0xfc00 {
+                      return Err("Cannot access private IP addresses".to_string());
+                  }
+              }
+          }
+      }
+
+      Ok(())
+  }
+  ```
+
+test "rank1522: the fixed revision strips brackets and maps v6 before checking"
+  lang rust
+  file src/handler/http/request/enrichment_table/mod.rs
+  reject VYQL-RF-001
+  code
+  ```
+  fn validate_enrichment_url(url: &str) -> Result<(), String> {
+      if url.trim().is_empty() {
+          return Err("URL cannot be empty".to_string());
+      }
+
+      if !url.starts_with("http://") && !url.starts_with("https://") {
+          return Err("URL must start with http:// or https://".to_string());
+      }
+
+      let parsed_url = url::Url::parse(url).map_err(|e| format!("Invalid URL: {}", e))?;
+
+      let host = parsed_url
+          .host_str()
+          .ok_or_else(|| "URL must have a valid host".to_string())?;
+
+      // Block localhost
+      let host = host.trim_start_matches('[').trim_end_matches(']');
+      if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+          return Err("Cannot access localhost URLs".to_string());
+      }
+
+      // Block private IP ranges
+      if let Ok(ip) = host.parse::<std::net::IpAddr>() {
+          let v4 = match ip {
+              std::net::IpAddr::V4(v4) => Some(v4),
+              std::net::IpAddr::V6(v6) => match v6.to_ipv4_mapped() {
+                  Some(v4) => Some(v4),
+                  None => {
+                      let seg0 = v6.segments()[0];
+                      if v6.is_loopback()
+                          || (seg0 & 0xfe00 == 0xfc00)
+                          || (seg0 & 0xffc0 == 0xfe80)
+                      {
+                          return Err("Cannot access private IP addresses".to_string());
+                      }
+                      None
+                  }
+              },
+          };
+          if let Some(ip) = v4
+              && (ip.is_loopback() || ip.is_private() || ip.is_link_local() || ip.is_unspecified())
+          {
+              return Err("Cannot access private IP addresses".to_string());
+          }
+      }
+
+      Ok(())
+  }
+  ```

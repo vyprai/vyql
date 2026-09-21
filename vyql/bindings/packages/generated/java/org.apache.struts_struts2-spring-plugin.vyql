@@ -1,0 +1,9 @@
+module bindings.java.generated.m91cb31f7;
+
+binding filePathAccess0 {
+  requires {
+    dependency("org.apache.struts:struts2-spring-plugin")
+  }
+  query pattern callExpr where callee.method == "setApplicationContextPath"
+  emit sink code.FilePathAccess at args[0]
+}

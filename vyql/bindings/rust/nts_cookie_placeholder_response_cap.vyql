@@ -1,0 +1,35 @@
+module bindings.rust.nts_cookie_placeholder_response_cap;
+
+// An NTS server (RFC 8915) answers a time request by replacing the cookies the
+// client spent. The client asks for replacements with NTS Cookie Placeholder
+// extension fields: each placeholder is a near-empty field that the server
+// turns into a freshly encrypted cookie carrying the negotiated key material.
+// Section 5.7 of the RFC bounds that exchange from both ends -- a client keeps
+// at most eight cookies, and a server "SHOULD NOT" return more than the client
+// can hold -- because the placeholder is cheap to send and the cookie is
+// expensive to make and much larger on the wire.
+//
+// A response builder that walks the request's extension fields and emits one
+// cookie per placeholder, with nothing limiting how far it walks, hands the
+// count to the peer: a single packet full of placeholders costs the server one
+// AEAD seal per placeholder and produces a response many times the size of the
+// request. That is both CPU amplification and reflection amplification, and it
+// is reachable before any rate limit that keys on packets rather than bytes.
+//
+// The bound is what distinguishes the two forms, and in Rust it is an iterator
+// adaptor: `Iterator::take` (or a `truncate`/`resize` on the collected vector,
+// or a `min` against a named ceiling) applied anywhere on the pipeline that
+// feeds the cookie minting. Any of them appearing in the same function is
+// enough to suppress the finding, because the finding is about the count being
+// unbounded rather than about which construct bounds it. A named maximum for
+// the cookie count reaching the pipeline suppresses it for the same reason.
+//
+// The minting call names below are the spellings an NTS keyset exposes for
+// "seal a cookie for this client"; the match arm is the extension-field variant
+// the wire format defines. Both are protocol vocabulary rather than any one
+// implementation's, and the collecting call is what makes the per-element work
+// end up in the response.
+binding ntsCookiePlaceholderResponseWithoutCap {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and containsAny(node.context.matchArm, ["NtsCookiePlaceholder", "CookiePlaceholder", "PlaceholderCookie"]) and containsAny(node.context.call, ["encode_cookie", "encrypt_cookie", "seal_cookie", "make_cookie", "new_cookie", "generate_cookie", "issue_cookie", "create_cookie"]) and containsAny(node.context.call, ["collect", "extend", "push", "insert"]) and not (containsAny(node.context.call, ["take", "truncate", "resize", "min"])) and not (containsAny(node.context.callArg, ["MAX_COOKIES", "MAX_COOKIE", "MAX_NUM_COOKIES", "COOKIE_LIMIT", "MAX_EXTENSION_FIELDS"]))
+  emit issue code.UnboundedResourceOperation at node
+}

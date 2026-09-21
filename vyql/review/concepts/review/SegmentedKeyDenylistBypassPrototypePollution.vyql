@@ -1,0 +1,8 @@
+module code;
+
+review code.SegmentedKeyDenylistBypassPrototypePollution {
+  category: prototype_pollution
+  expected: [core.PrototypePollutionGuard]
+  kind: attention
+  text: "review key denylists for delimiter-separated segments, not just the whole key, before the key is forwarded to something that treats it as a nested object path"
+}

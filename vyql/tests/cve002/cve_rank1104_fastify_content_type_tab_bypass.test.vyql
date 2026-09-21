@@ -1,0 +1,183 @@
+# Rank 1104 / CVE-2026-25223: Fastify decides which content-type parser runs
+# and which per-content-type body schema applies with two different readings of
+# the same Content-Type header, and the two disagree on whether a tab ends the
+# media type: the parser lookup treats `;`, space and tab as the boundary after
+# a registered prefix, while the schema lookup splits on `[ ;]` only, so
+# `application/json\t...` parses the body as JSON without the
+# application/json schema and reaches the route unvalidated (CWE-436).
+#
+# The weakness is interior to the framework, and the application code around
+# it is correct: a route that declares a body schema is doing the right thing
+# while being exactly the code the bypass defeats. The reportable signal for a
+# project is the dependency: a fastify pin below 5.7.2, the release the
+# advisory names as first fixed. The dependency route reports and
+# discriminates -- a consumer pinning ^5.7.1 gets VYQL-SCA-001 naming
+# CVE-2026-25223, and the ^5.7.2 pin is clean.
+#
+# The library-interior pair records the residual: no rule judges either
+# revision of the framework's own code, because the delimiter disagreement is
+# a relation between two functions reading one header, not a pattern over one
+# function. VYQL-VAL-033 carries CWE-436 but recognises the archive
+# extended-header shape, so it does not fire here.
+#
+# verify_current_expected: fixed
+
+test "rank1104: a consumer pinning fastify below the first fixed release is reported"
+  lang javascript
+  file server.js
+  code
+  ```
+  'use strict'
+
+  const fastify = require('fastify')({ logger: true })
+
+  const app = fastify()
+
+  app.post('/profile', {
+    schema: {
+      body: {
+        type: 'object',
+        properties: { name: { type: 'string' } },
+        required: ['name'],
+        additionalProperties: false
+      }
+    }
+  }, async (request, reply) => {
+    return { ok: true, name: request.body.name }
+  })
+
+  app.listen({ port: 3000 })
+  ```
+  file package.json
+  code
+  ```
+  {
+    "name": "profile-service",
+    "version": "1.0.0",
+    "dependencies": {
+      "fastify": "^5.7.1"
+    }
+  }
+  ```
+  expect VYQL-SCA-001
+  expect_evidence VYQL-SCA-001 CVE-2026-25223
+
+test "rank1104: a consumer at the first fixed release is clean"
+  lang javascript
+  file server.js
+  code
+  ```
+  'use strict'
+
+  const fastify = require('fastify')({ logger: true })
+
+  const app = fastify()
+
+  app.post('/profile', {
+    schema: {
+      body: {
+        type: 'object',
+        properties: { name: { type: 'string' } },
+        required: ['name'],
+        additionalProperties: false
+      }
+    }
+  }, async (request, reply) => {
+    return { ok: true, name: request.body.name }
+  })
+
+  app.listen({ port: 3000 })
+  ```
+  file package.json
+  code
+  ```
+  {
+    "name": "profile-service",
+    "version": "1.0.0",
+    "dependencies": {
+      "fastify": "^5.7.2"
+    }
+  }
+  ```
+  reject VYQL-SCA-001
+
+# The library pair. Same framework, same header; only whether the parser
+# lookup and the schema lookup read the header through one normalizer
+# differs. The vulnerable revision carries the two disagreeing readings; the
+# fixed revision routes both decisions through a single ContentType class
+# that rejects an invalid header before either lookup runs. Neither reports.
+
+test "rank1104: the parser lookup's prefix match treats a tab as a boundary"
+  lang javascript
+  file lib/content-type-parser.js
+  reject VYQL-VAL-033
+  code
+  ```
+  ContentTypeParser.prototype.getParser = function (contentType) {
+    let parser = this.customParsers.get(contentType)
+    if (parser !== undefined) return parser
+    parser = this.cache.get(contentType)
+    if (parser !== undefined) return parser
+
+    const caseInsensitiveContentType = contentType.toLowerCase()
+    for (let i = 0; i !== this.parserList.length; ++i) {
+      const parserListItem = this.parserList[i]
+      if (
+        caseInsensitiveContentType.slice(0, parserListItem.length) === parserListItem &&
+        (
+          caseInsensitiveContentType.length === parserListItem.length ||
+          caseInsensitiveContentType.charCodeAt(parserListItem.length) === 59 /* `;` */ ||
+          caseInsensitiveContentType.charCodeAt(parserListItem.length) === 32 /* ` ` */ ||
+          caseInsensitiveContentType.charCodeAt(parserListItem.length) === 9  /* `\t` */
+        )
+      ) {
+        parser = this.customParsers.get(parserListItem)
+        this.cache.set(contentType, parser)
+        return parser
+      }
+    }
+
+    return this.customParsers.get('')
+  }
+  ```
+
+test "rank1104: the schema lookup's split does not treat a tab as a boundary"
+  lang javascript
+  file lib/validation.js
+  reject VYQL-VAL-033
+  code
+  ```
+  function getEssenceMediaType (header) {
+    if (!header) return ''
+    return header.split(/[ ;]/, 1)[0].trim().toLowerCase()
+  }
+
+  function validate (context, request) {
+    const contentType = getEssenceMediaType(request.headers['content-type'])
+    const contentSchema = context[bodySchema][contentType]
+    if (contentSchema !== undefined) {
+      return contentSchema(request.body)
+    }
+    return true
+  }
+  ```
+
+test "rank1104: a single normalizer decides the parser and rejects a bad header before either lookup runs"
+  lang javascript
+  file lib/handle-request.js
+  reject VYQL-VAL-033
+  code
+  ```
+  const ContentType = require('./content-type')
+  const { FST_ERR_CTP_INVALID_MEDIA_TYPE } = require('./errors')
+
+  function handleRequest (err, request, reply) {
+    const ctHeader = request.headers['content-type']
+    const contentType = new ContentType(ctHeader)
+    if (contentType.isValid === false) {
+      reply.status(415).send(new FST_ERR_CTP_INVALID_MEDIA_TYPE())
+      return
+    }
+    request[kRouteContext].contentTypeParser.run(contentType.toString(), handler, request, reply)
+  }
+  ```

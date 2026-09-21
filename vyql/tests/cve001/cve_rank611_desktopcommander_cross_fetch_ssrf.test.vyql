@@ -1,0 +1,38 @@
+test "rank611 desktopcommandermcp: read_file URL fetch lacks SSRF validation"
+  lang javascript
+  profile library
+  expect VYQL-RF-001
+  code
+  ```
+  import fetch from "cross-fetch";
+
+  export async function readFileFromUrl(url) {
+    const response = await fetch(url, { signal: controller.signal });
+    return response.text();
+  }
+  ```
+
+test "rank611 desktopcommandermcp: read_file URL fetch validates destination"
+  lang javascript
+  profile library
+  reject VYQL-RF-001
+  code
+  ```
+  import fetch from "cross-fetch";
+
+  function validateFetchUrl(rawUrl) {
+    const parsed = new URL(rawUrl);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      throw new Error("bad scheme");
+    }
+    if (parsed.hostname === "localhost" || parsed.hostname === "169.254.169.254") {
+      throw new Error("blocked host");
+    }
+  }
+
+  export async function readFileFromUrl(url) {
+    validateFetchUrl(url);
+    const response = await fetch(url, { signal: controller.signal, redirect: "error" });
+    return response.text();
+  }
+  ```

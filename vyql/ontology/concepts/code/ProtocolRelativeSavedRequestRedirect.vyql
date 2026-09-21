@@ -1,0 +1,11 @@
+module code;
+
+concept ProtocolRelativeSavedRequestRedirect : issue {
+  cwe: [CWE_601]
+  reviewAssumption: "the saved request URI can be attacker-controlled before authentication and is later passed to sendRedirect or equivalent redirect handling"
+  reviewCategory: request_forgery
+  reviewCondition: "saved request redirect reconstruction can return a protocol-relative URL beginning with double slash"
+  reviewConfidence: high
+  reviewEvidence: "saved-request URL context {pattern} returns a StringBuilder built from the saved request URI without stripping extra leading slashes"
+  vulnerableTo: [request_forgery.OpenRedirect]
+}

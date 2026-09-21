@@ -1,0 +1,21 @@
+module bindings.ruby.generated.m71618453;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("sorcery")
+  }
+  query pattern callExpr where callee.method == "authenticate"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding weakHash1 {
+  requires {
+    dependency("sorcery")
+  }
+  query pattern callExpr where callee.method == "encrypt"
+  emit issue code.WeakHash at call
+}

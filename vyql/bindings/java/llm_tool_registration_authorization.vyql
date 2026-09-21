@@ -1,0 +1,22 @@
+module bindings.java.llm_tool_registration_authorization;
+
+// LangChain4j lets an application hand the model a tool registry: a class that
+// builds dev.langchain4j.agent.tool.ToolSpecification values and pairs each one
+// with a dev.langchain4j.service.tool.ToolExecutor. Whatever sits in that
+// registry is callable by whichever tool the model picks, and the model picks it
+// from prompt text the caller wrote, so the registry is the place the caller's
+// privilege has to be enforced. A registry whose executors run account, role or
+// permission administration and which holds no authorization check at all
+// therefore offers those operations to every caller of the chat endpoint.
+//
+// The suppressing names cover both ways an application answers "may this caller
+// use this tool": a framework call that asks the current subject directly
+// (Shiro's isPermitted/hasRole, Spring Security's hasAuthority/getAuthentication),
+// and the equally common form where the class loads the caller's permission set
+// once and tests membership per tool, which shows up as a permission-named
+// lookup rather than a framework call. A method annotation that declares the
+// requirement suppresses it too.
+binding llmToolRegistrationMissingAuthorization {
+  query pattern presenceNode where node.scope == "class" and node.context.identifier contains "ToolSpecification" and node.context.identifier contains "ToolExecutor" and containsAny(node.context.callPath, ["saveUser", "createUser", "addUser", "deleteUser", "removeUser", "updateUser", "setPassword", "changePassword", "resetPassword", "grantRole", "addRole", "setRole", "revokeRole", "addUserRole", "setPermission", "setPermissions", "makeAdmin"]) and not (containsAny(node.context.callPath, ["isPermitted", "hasPermission", "checkPermission", "getPermission", "loadPermission", "UserPermissions", "userPermissions", "requirePermission", "hasAuthority", "getAuthorities", "getAuthentication", "SecurityContextHolder", "getSubject", "hasRole", "hasAnyRole", "checkRole", "isAuthenticated", "isAuthorized"])) and not (containsAny(node.context.annotation, ["RequiresPermissions", "RequiresRoles", "RequiresAuthentication", "RequiresUser", "PreAuthorize", "PostAuthorize", "Secured", "RolesAllowed"]))
+  emit issue code.LlmToolRegistrationMissingAuthorization at node
+}

@@ -1,0 +1,172 @@
+# Rank 1655 / CVE-2018-20177: rdesktop's unicode input helper scaled a
+# length read straight off the RDP wire to size its conversion buffer.
+# process_redirect() read a raw uint32 with in_uint32_le(s, len) and passed
+# it to rdp_in_unistr(s, len, ...), which allocated xmalloc(in_len * 2),
+# set the iconv output bound from the same product, and consumed in_len
+# bytes from the stream cursor. A malicious server could send a length that
+# is negative as an int or overflows the doubling, and iconv then reads and
+# writes past the allocation and the stream buffer (CWE-190 scaling into
+# CWE-125/787 corruption). The fixed revision 4dca546d adds a range check against
+# RD_UINT32_MAX / 2 plus a s_check_rem remaining-bytes check at the top of
+# the helper.
+#
+# Detection reuses code.UncheckedEncodedLengthArithmetic (VYQL-NUM-005),
+# widening the concept to C. The taint route is unavailable here: the wire
+# reads are stream.h macros (in_uint32_le), so the engine never lowers a
+# definition for the length variable and no source label can reach the
+# multiplication. The shipped route is the presence shape instead: a
+# function that allocates from a scaled length and hands the buffer to
+# iconv, with no comparison against a maximum anywhere in the body. The
+# guard vocabulary is the one integerOverflowGuard211 ships for the
+# same judgement (limits.h constants) plus the generic MAX_LEN spelling
+# that bounds libgit2's ntlm conversion, so the binding answers to limits.h
+# and to the conversion API rather than to this fix.
+#
+# Measured. rdp.c reports the helper before theix and nothing after it;
+# the whole tree moves 4 -> 3 because the clipboard converters in xclip.c
+# carry the same scaled-allocation-into-iconv shape and stay unguarded.
+# Across the other clones the shape is rare: iconv with an allocation
+# appears in six functions, and the two that bound their conversion
+# (libgit2's ntlm unicode_iconv.c via NTLM_UNICODE_MAX_LEN, libgd's
+# gdkanji.c, which converts into a caller buffer) report nothing, while the
+# four unchecked ones (libgphoto2 st2205 and topfield, libxml2 os400
+# transcode and libxmlmain) are the same CWE-190 shape on device- and
+# argv-supplied lengths.
+
+test "rank1655: unicode helper scales the wire length for its conversion buffer with no range check"
+  lang c
+  file rdp.c
+  expect VYQL-NUM-005
+  code
+  ```
+  #include <stdint.h>
+  #include <stdlib.h>
+  #include <iconv.h>
+
+  struct stream {
+  	uint8_t *p;
+  	uint8_t *end;
+  };
+
+  typedef struct stream STREAM;
+
+  #define in_uint32_le(s, v) { v = *(uint32 *)((s)->p); (s)->p += 4; }
+
+  static char *g_redirect_server;
+  static uint32 g_redirect_server_len;
+  static iconv_t icv_utf16_to_local;
+
+  void
+  rdp_in_unistr(STREAM s, int in_len, char **string, uint32 *str_size)
+  {
+  	size_t ibl, obl;
+  	char *pin, *pout;
+
+  	if (*string == NULL)
+  	{
+  		*string = xmalloc(in_len * 2);
+  		*str_size = in_len * 2;
+  	}
+
+  	ibl = in_len;
+  	obl = *str_size - 1;
+  	pin = (char *) s.p;
+  	pout = *string;
+
+  	if (iconv(icv_utf16_to_local, (char **) &pin, &ibl, &pout, &obl) == (size_t) - 1)
+  		abort();
+
+  	s.p += in_len;
+
+  	*pout = 0;
+  }
+
+  void
+  process_redirect(STREAM s, uint32 flags)
+  {
+  	uint32 len;
+
+  	if (flags & 0x01)
+  	{
+  		in_uint32_le(s, len);
+  		rdp_in_unistr(s, len, &g_redirect_server, &g_redirect_server_len);
+  	}
+  }
+  ```
+
+test "rank1655: fix bounds the wire length before scaling it"
+  lang c
+  file rdp.c
+  reject VYQL-NUM-005
+  code
+  ```
+  #include <stdint.h>
+  #include <stdlib.h>
+  #include <iconv.h>
+
+  struct stream {
+  	uint8_t *p;
+  	uint8_t *end;
+  };
+
+  typedef struct stream STREAM;
+
+  #define in_uint32_le(s, v) { v = *(uint32 *)((s)->p); (s)->p += 4; }
+  #define s_check_rem(s, n) ((s)->p + n <= (s)->end)
+
+  #define RD_UINT32_MAX 0xffffffff
+
+  static char *g_redirect_server;
+  static uint32 g_redirect_server_len;
+  static iconv_t icv_utf16_to_local;
+
+  void
+  rdp_in_unistr(STREAM s, int in_len, char **string, uint32 *str_size)
+  {
+  	size_t ibl, obl;
+  	char *pin, *pout;
+
+  	struct stream packet = *s;
+
+  	if ((in_len < 0) || ((uint32)in_len >= (RD_UINT32_MAX / 2)))
+  	{
+  		logger(Protocol, Error, "rdp_in_unistr(), length of unicode data is out of bounds.");
+  		abort();
+  	}
+
+  	if (!s_check_rem(s, in_len))
+  	{
+  		rdp_protocol_error("rdp_in_unistr(), consume of unicode data from stream would overrun", &packet);
+  	}
+
+  	if (*string == NULL)
+  	{
+  		*string = xmalloc(in_len * 2);
+  		*str_size = in_len * 2;
+  	}
+
+  	ibl = in_len;
+  	obl = *str_size - 1;
+  	pin = (char *) s.p;
+  	pout = *string;
+
+  	if (iconv(icv_utf16_to_local, (char **) &pin, &ibl, &pout, &obl) == (size_t) - 1)
+  		abort();
+
+  	s.p += in_len;
+
+  	*pout = 0;
+  }
+
+  void
+  process_redirect(STREAM s, uint32 flags)
+  {
+  	uint32 len;
+
+  	if (flags & 0x01)
+  	{
+  		in_uint32_le(s, len);
+  		rdp_in_unistr(s, len, &g_redirect_server, &g_redirect_server_len);
+  	}
+  }
+  ```

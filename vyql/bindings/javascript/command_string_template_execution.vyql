@@ -1,0 +1,23 @@
+module bindings.javascript.commandStringTemplateExecution;
+
+// node:child_process documents execSync(command) as spawning a shell and
+// handing it ONE command string, while execFileSync/spawn take an argv array
+// with no shell in between — the argv-array spellings are the documented way
+// to pass a value that may carry shell metacharacters. A function that calls
+// an execSync spelling while building some string by template interpolation is
+// the function-scoped approximation of "the command string is formatted, not
+// constant": JavaScript emits no call-argument tokens, so the formatted
+// template cannot be tied to the call itself, and the presence route over the
+// function's literal tokens is the closest expressible form. The negation on
+// the execFile/spawn family keeps a function that already uses the argv-array
+// APIs unflagged, which is also the documented remediation.
+//
+// This widens code.CommandStringWrapperExecution / VYQL-INJ-119 to the
+// interpolated-template spelling, beside the command/cmd identifier spelling
+// commandStringWrapperExecution251 already covers; the review condition
+// (caller- or request-controlled fragments in the formatted string) stays the
+// rule's judgement, not the binding's.
+binding jsExecSyncFormattedCommandString {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and containsAny(node.context.callPath, ["child_process.execSync", "execSync", "cp.execSync"]) and node.context.literal contains "${" and not (containsAny(node.context.callPath, ["execFile", "execFileSync", "spawn", "spawnSync"]))
+  emit issue code.CommandStringWrapperExecution at node
+}

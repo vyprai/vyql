@@ -1,0 +1,53 @@
+module bindings.java.generated.me48c3402;
+
+binding weakHash0 {
+  requires {
+    dependency("org.springframework.security:spring-security-crypto")
+  }
+  query pattern callExpr where callee.method == "PasswordEncoder.encode"
+  emit issue code.WeakHash at call
+}
+
+binding authenticationCheck1 {
+  requires {
+    dependency("org.springframework.security:spring-security-crypto")
+  }
+  query pattern callExpr where callee.method == "PasswordEncoder.matches"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding weakCipher2 {
+  requires {
+    dependency("org.springframework.security:spring-security-crypto")
+  }
+  query pattern callExpr where callee.method == "BytesEncryptor.encrypt"
+  emit issue code.WeakCipher at call
+}
+
+binding secretValue3 {
+  requires {
+    dependency("org.springframework.security:spring-security-crypto")
+  }
+  query pattern callExpr where callee.method == "BytesEncryptor.decrypt"
+  emit source code.SecretValue at call.result
+}
+
+binding weakCipher4 {
+  requires {
+    dependency("org.springframework.security:spring-security-crypto")
+  }
+  query pattern callExpr where callee.method == "TextEncryptor.encrypt"
+  emit issue code.WeakCipher at call
+}
+
+binding secretValue5 {
+  requires {
+    dependency("org.springframework.security:spring-security-crypto")
+  }
+  query pattern callExpr where callee.method == "TextEncryptor.decrypt"
+  emit source code.SecretValue at call.result
+}

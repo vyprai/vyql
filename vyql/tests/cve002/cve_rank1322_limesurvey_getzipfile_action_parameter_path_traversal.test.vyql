@@ -1,0 +1,223 @@
+# Rank 1322 / CVE-2020-11455: LimeSurvey's admin file manager exposes
+# `getZipFile` as a routed subaction whose method signature is
+#
+#   public function getZipFile($path) {
+#       $filename = basename($path);
+#       if (is_file($path) || true) { ... @readfile($path); unlink($path); }
+#   }
+#
+# (application/controllers/admin/LimeSurveyFileManager.php:398 on the
+# vulnerable parent of daf50ebb16). `LimeSurveyFileManager extends
+# Survey_Common_Action extends CAction`, and `Survey_Common_Action::runWithParams`
+# picks the method named by the `sa` request parameter and hands it to Yii's
+# `CAction::runWithParamsInternal`, which fills the method's parameters by name
+# from the request. `$path` is therefore raw request text, and it reaches
+# `readfile` and `unlink` unmodified -- `basename` is applied only to the
+# separate `$filename` used in the Content-Disposition header, never to the
+# value the file helpers receive -- so any absolute or `../`-bearing path is
+# read out and then deleted. Fix daf50ebb16 removes the parameter entirely:
+# `downloadFiles` stashes the generated temp-file path in `$_SESSION['__path']`,
+# `getZipFile()` takes no arguments and reads it back from the session, and the
+# `|| true` that had neutered the `is_file($path)` guard is dropped.
+#
+# CAUGHT by VYQL-PATH-001. A plain `vyql scan` of the vulnerable parent
+# commit reports the CVE's exact pair -- `code.ExternalEntryInput by
+# library.param-source@syntactic` at LimeSurveyFileManager.php:398 (the
+# `getZipFile($path)` signature) into `code.FilePathAccess` at :414
+# (`readfile`) and :417 (`unlink`), taint path
+# `LimeSurveyFileManager.getZipFile#param#$path -> Arg`, with `unless path
+# coveredBy core.PathCanonicalization` correctly unsatisfied because
+# `basename` only covers the sibling `$filename` the header uses. The same
+# parameter also feeds `header()` at :411 as VYQL-INJ-010. On the fix commit
+# the parameter is gone and all three clear.
+#
+# The reason is the profile this checkout resolves, not a binding. Profile
+# detection scores the repository: `web` and every other application
+# archetype score 0, because the root manifests name none of their
+# fingerprints (`composer.json` declares only `require-dev`; `package.json`
+# has no dependencies), while `library` scores 2 through
+# `project.has("manifest:publishable")` -- the composer manifests vendored
+# inside the application tree (`application/extensions/bootstrap`,
+# `application/third_party/phpmailer`, `application/third_party/tcpdf`) each
+# declare `"type": "library"`, and the fact walk skips only `node_modules` and
+# `vendor`, neither of which this repository has. So the parameter-entrypoint
+# source family the library profile turns on is active for this checkout by
+# the scanner's own detection, and the earlier reading -- that the family is
+# gated off for an application -- does not describe what a scan of this
+# repository does. Forcing `--profile web` (424 findings on
+# `application/controllers/admin`, no `library.param-source` label anywhere)
+# is the only way to suppress it, and nothing on the disk asks for that.
+#
+# Measured (timeout 180, --cache off, --max-ram 6GB, three runs each):
+# `application/controllers` (63 PHP files) resolves `analysis profile:
+# Library / SDK (library)` on every run and reports 554 findings on the
+# vulnerable parent with the two :398 -> :414/:417 pairs present in all
+# three, and 556 on the fix commit with zero findings sourced at :398 in all
+# three. `application/controllers/admin` reports 509 findings under the
+# auto-detected library profile and 424 under a forced `--profile web`. The
+# whole checkout (21991 files) and `application/` (2063 PHP files) both stop
+# at the 6GB memory ceiling (5.8 GiB and 5.7 GiB resident), so the largest
+# subtree that completes inside the bound is what the numbers above use.
+#
+# The patched revision still reports VYQL-PATH-001 at :414 through
+# `code.StoredDataRead` on the `$_SESSION['__path']` read, which is why the
+# reject below models the patch's carrier as a server-generated property
+# rather than the literal session read: a value stashed in a session and read
+# back is a second-order source in its own right, and nothing at the read
+# says this particular write was server-built.
+#
+# The parameter-entry class tokens this rank originally waited for exist now
+# (`class_name:`/`class_base:` on the parameter entry), but they are not what
+# catches this, and `class_base` carries the direct base clause only, so a
+# Yii-generic binding on `CAction` still cannot reach a class behind an
+# application's own intermediate base such as `Survey_Common_Action`.
+#
+# verify_current_expected: caught-by-rule VYQL-PATH-001 under the
+# auto-detected library profile; the parameter entrypoint is the source, and
+# the patched revision clears both findings.
+
+test "rank1322: a routed action method's path parameter reaches readfile and unlink unmodified"
+  lang php
+  file LimeSurveyFileManager.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+
+  class LimeSurveyFileManager extends Survey_Common_Action
+  {
+      public function getZipFile($path) {
+          $filename = basename($path);
+
+          if (is_file($path) || true) {
+              header("Expires: 0");
+              header("Cache-Control: must-revalidate");
+              header("Content-Type: application/force-download");
+              header("Content-Disposition: attachment; filename=$filename");
+              header("Content-Description: File Transfer");
+
+              @readfile($path);
+
+              unlink($path);
+          }
+      }
+  }
+  ```
+
+test "rank1322: the same action method is reported once its parameter is an entrypoint"
+  lang php
+  file LimeSurveyFileManager.php
+  profile library
+  expect VYQL-PATH-001
+  code
+  ```
+  <?php
+
+  class LimeSurveyFileManager extends Survey_Common_Action
+  {
+      public function getZipFile($path) {
+          $filename = basename($path);
+
+          if (is_file($path) || true) {
+              header("Expires: 0");
+              header("Cache-Control: must-revalidate");
+              header("Content-Type: application/force-download");
+              header("Content-Disposition: attachment; filename=$filename");
+              header("Content-Description: File Transfer");
+
+              @readfile($path);
+
+              unlink($path);
+          }
+      }
+  }
+  ```
+
+test "rank1322: the same body is reported when the path arrives through a labelled request read"
+  lang php
+  file LimeSurveyFileManager.php
+  expect VYQL-PATH-001
+  code
+  ```
+  <?php
+
+  class LimeSurveyFileManager extends Survey_Common_Action
+  {
+      public function getZipFile() {
+          $path = $_GET['path'];
+          $filename = basename($path);
+
+          if (is_file($path) || true) {
+              header("Expires: 0");
+              header("Cache-Control: must-revalidate");
+              header("Content-Type: application/force-download");
+              header("Content-Disposition: attachment; filename=$filename");
+              header("Content-Description: File Transfer");
+
+              @readfile($path);
+
+              unlink($path);
+          }
+      }
+  }
+  ```
+
+# The patched action handed the generated path to getZipFile() through
+# $_SESSION['__path']. That carrier is now itself a labelled source: a PHP
+# $_SESSION read emits code.StoredDataRead, the concept Perl's Session,
+# Apache-Session and Spring Session already use for session reads, and the
+# same second-order model PHP's own code.DatabaseRead bindings implement. So
+# the session-carrying form reports a second-order path flow, and it can no
+# longer serve as this rank's safe case -- which is correct, because a store
+# written from request data and read back as trusted is exactly CWE-501, and
+# the scanner cannot see from the read that this particular write was
+# canonicalised. What the fix actually guarantees, and what the reject below
+# still asserts, is that no request-derived value reaches the file helpers:
+# the routed $path parameter is gone and the path is built on the server.
+
+test "rank1322: the patched action takes no parameter and its path is server-generated"
+  lang php
+  file LimeSurveyFileManager.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+
+  class LimeSurveyFileManager extends Survey_Common_Action
+  {
+      public $zipPath;
+
+      public function downloadFiles() {
+          App()->loadLibrary('admin.pclzip');
+
+          $folder = basename(Yii::app()->request->getPost('folder', 'global'));
+
+          $tempdir = Yii::app()->getConfig('tempdir');
+          $randomizedFileName = $folder.'_'.substr(md5(time()),3,13).'.zip';
+          $zipfile = $tempdir.DIRECTORY_SEPARATOR.$randomizedFileName;
+
+          $this->zipPath = $zipfile;
+      }
+
+      /**
+       * @return void
+       */
+      public function getZipFile()
+      {
+          $path = $this->zipPath;
+          $filename = basename($path);
+
+          if (is_file($path)) {
+              header("Expires: 0");
+              header("Cache-Control: must-revalidate");
+              header("Content-Type: application/force-download");
+              header("Content-Disposition: attachment; filename=$filename");
+              header("Content-Description: File Transfer");
+
+              @readfile($path);
+
+              unlink($path);
+          }
+      }
+  }
+  ```

@@ -1,0 +1,6 @@
+module core;
+
+review core.CertificateValidation {
+  category: crypto
+  kind: check
+}

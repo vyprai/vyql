@@ -1,0 +1,8 @@
+module profiles;
+
+profile electron {
+  detect: [any(dependency("electron"), dependency("electron-builder"), file("electron.js"), file("main.js"))]
+  entrypoints: [core.UserControlledData, code.HttpInput, code.IntentInput, code.ExternalApiResponse, code.StoredDataRead, code.PatternOptionInput, code.SecretValue, code.EnvVariable, code.CliArgument, code.StdinInput, code.ComputedSizeValue, code.ArchiveEntryName]
+  priority: 90
+  title: "Desktop app (Electron)"
+}

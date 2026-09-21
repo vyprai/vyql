@@ -1,0 +1,12 @@
+# Rank 48 / CVE-2024-36811: Aimeos reused upload-controlled media URLs as
+# storage paths before the fix derived the destination from the uploaded file.
+
+test "rank48: uploaded media path reaches unsafe upload"
+  expect VYQL-INJ-015
+  graph
+  ```
+  node src core.UserControlledData
+  node sink code.UnsafeUpload
+  edge FLOWS src -> sink
+  ```
+

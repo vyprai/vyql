@@ -1,0 +1,17 @@
+module bindings.perl.generated.m78ab396a;
+
+binding filePathAccess0 {
+  requires {
+    dependency("ReleaseAction")
+  }
+  query pattern callExpr where callee.method == "chdir"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding codeEval1 {
+  requires {
+    dependency("ReleaseAction")
+  }
+  query pattern callExpr where callee.method == "on_release"
+  emit sink code.CodeEval at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.swift.generated.md31292cf;
+
+binding weakRandomValue0 {
+  requires {
+    dependency("github.com/bitmark-inc/tweetnacl-swiftwrap")
+  }
+  query pattern callExpr where callee.method == "secureRandomData"
+  emit issue code.WeakRandomValue at call
+}

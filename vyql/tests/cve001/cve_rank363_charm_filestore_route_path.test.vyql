@@ -1,0 +1,159 @@
+# Rank 363 / CVE-2022-29180: Charm file handlers used route wildcard paths
+# directly for file-store put/get/delete operations before canonicalizing them.
+
+test "rank363: charm file handlers forward route paths to file store"
+  lang go
+  expect VYQL-PATH-015
+  expect_review code.CharmRouteFileStorePathAccess
+  code
+  ```
+  package server
+
+  import (
+      "io"
+      "io/fs"
+      "net/http"
+      "strconv"
+
+      "github.com/goware/urlx/pattern"
+  )
+
+  type charmUser struct {
+      CharmID string
+  }
+
+  type fileStore interface {
+      Put(string, string, io.Reader, fs.FileMode) error
+      Get(string, string) (io.ReadCloser, error)
+      Delete(string, string) error
+  }
+
+  type config struct {
+      FileStore fileStore
+  }
+
+  type HTTPServer struct {
+      cfg config
+  }
+
+  func (s *HTTPServer) charmUserFromRequest(w http.ResponseWriter, r *http.Request) charmUser {
+      return charmUser{CharmID: "user"}
+  }
+
+  func (s *HTTPServer) handlePostFile(w http.ResponseWriter, r *http.Request) {
+      u := s.charmUserFromRequest(w, r)
+      path := pattern.Path(r.Context())
+      ms := r.URL.Query().Get("mode")
+      m, err := strconv.ParseUint(ms, 10, 32)
+      if err != nil {
+          return
+      }
+      f, _, err := r.FormFile("data")
+      if err != nil {
+          return
+      }
+      defer f.Close()
+      err = s.cfg.FileStore.Put(u.CharmID, path, f, fs.FileMode(m))
+      if err != nil {
+          return
+      }
+  }
+
+  func (s *HTTPServer) handleGetFile(w http.ResponseWriter, r *http.Request) {
+      u := s.charmUserFromRequest(w, r)
+      path := pattern.Path(r.Context())
+      f, err := s.cfg.FileStore.Get(u.CharmID, path)
+      if err != nil {
+          return
+      }
+      defer f.Close()
+  }
+
+  func (s *HTTPServer) handleDeleteFile(w http.ResponseWriter, r *http.Request) {
+      u := s.charmUserFromRequest(w, r)
+      path := pattern.Path(r.Context())
+      err := s.cfg.FileStore.Delete(u.CharmID, path)
+      if err != nil {
+          return
+      }
+  }
+  ```
+
+test "rank363: charm file handlers clean route paths before file store access"
+  lang go
+  reject VYQL-PATH-015
+  reject_review code.CharmRouteFileStorePathAccess
+  code
+  ```
+  package server
+
+  import (
+      "io"
+      "io/fs"
+      "net/http"
+      "path/filepath"
+      "strconv"
+
+      "github.com/goware/urlx/pattern"
+  )
+
+  type charmUser struct {
+      CharmID string
+  }
+
+  type fileStore interface {
+      Put(string, string, io.Reader, fs.FileMode) error
+      Get(string, string) (io.ReadCloser, error)
+      Delete(string, string) error
+  }
+
+  type config struct {
+      FileStore fileStore
+  }
+
+  type HTTPServer struct {
+      cfg config
+  }
+
+  func (s *HTTPServer) charmUserFromRequest(w http.ResponseWriter, r *http.Request) charmUser {
+      return charmUser{CharmID: "user"}
+  }
+
+  func (s *HTTPServer) handlePostFile(w http.ResponseWriter, r *http.Request) {
+      u := s.charmUserFromRequest(w, r)
+      path := filepath.Clean(pattern.Path(r.Context()))
+      ms := r.URL.Query().Get("mode")
+      m, err := strconv.ParseUint(ms, 10, 32)
+      if err != nil {
+          return
+      }
+      f, _, err := r.FormFile("data")
+      if err != nil {
+          return
+      }
+      defer f.Close()
+      err = s.cfg.FileStore.Put(u.CharmID, path, f, fs.FileMode(m))
+      if err != nil {
+          return
+      }
+  }
+
+  func (s *HTTPServer) handleGetFile(w http.ResponseWriter, r *http.Request) {
+      u := s.charmUserFromRequest(w, r)
+      path := filepath.Clean(pattern.Path(r.Context()))
+      f, err := s.cfg.FileStore.Get(u.CharmID, path)
+      if err != nil {
+          return
+      }
+      defer f.Close()
+  }
+
+  func (s *HTTPServer) handleDeleteFile(w http.ResponseWriter, r *http.Request) {
+      u := s.charmUserFromRequest(w, r)
+      path := filepath.Clean(pattern.Path(r.Context()))
+      err := s.cfg.FileStore.Delete(u.CharmID, path)
+      if err != nil {
+          return
+      }
+  }
+  ```

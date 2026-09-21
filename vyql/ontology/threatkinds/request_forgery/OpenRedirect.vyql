@@ -1,0 +1,6 @@
+module request_forgery;
+
+threat OpenRedirect {
+  cwe: [CWE_601]
+  desc: "Untrusted data controlling a redirect target"
+}

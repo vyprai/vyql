@@ -1,0 +1,59 @@
+module bindings.php.generated.m95a22b16;
+
+binding sessionId0 {
+  requires {
+    dependency("zendframework/zend-session")
+  }
+  query pattern callExpr where callee.method == "sessionExists"
+  emit issue code.SessionId at call
+  emit sink code.SessionIdSink at call
+}
+
+binding sessionId1 {
+  requires {
+    dependency("zendframework/zend-session")
+  }
+  query pattern callExpr where callee.method == "start"
+  emit issue code.SessionId at call
+  emit sink code.SessionIdSink at call
+}
+
+binding sessionId2 {
+  requires {
+    dependency("zendframework/zend-session")
+  }
+  query pattern callExpr where callee.method == "getId"
+  emit issue code.SessionId at call
+  emit sink code.SessionIdSink at call
+}
+
+binding sessionId3 {
+  requires {
+    dependency("zendframework/zend-session")
+  }
+  query pattern callExpr where callee.method == "regenerateId"
+  emit issue code.SessionId at call
+  emit sink code.SessionIdSink at call
+}
+
+binding sessionId4 {
+  requires {
+    dependency("zendframework/zend-session")
+  }
+  query pattern callExpr where callee.method == "getName"
+  emit issue code.SessionId at call
+  emit sink code.SessionIdSink at call
+}
+
+binding inputValidation5 {
+  requires {
+    dependency("zendframework/zend-session")
+  }
+  query pattern callExpr where callee.method == "session_set_save_handler"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

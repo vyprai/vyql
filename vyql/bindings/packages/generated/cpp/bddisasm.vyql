@@ -1,0 +1,33 @@
+module bindings.cpp.generated.m3561ada8;
+
+binding deserialization0 {
+  requires {
+    dependency("bddisasm")
+  }
+  query pattern callExpr where callee.method == "nd_decode"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("bddisasm")
+  }
+  query pattern callExpr where callee.method == "nd_decode_ex"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("bddisasm")
+  }
+  query pattern callExpr where callee.method == "nd_decode_ex2"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("bddisasm")
+  }
+  query pattern callExpr where callee.method == "nd_decode_with_context"
+  emit sink code.Deserialization at args[0]
+}

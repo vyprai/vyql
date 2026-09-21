@@ -1,0 +1,65 @@
+test "rank262: bower tar extraction symlink filter uses stale callback shape"
+  lang javascript
+  expect VYQL-PATH-007
+  expect_review code.ArchiveSymlinkFilterBypass
+  code
+  ```
+  var tar = require('tar-fs');
+
+  function extractTar(archive, dst) {
+    stream.pipe(
+      tar.extract(dst, {
+        ignore: isSymlink,
+        dmode: 0555,
+        fmode: 0444
+      })
+    );
+  }
+
+  function extractTarGz(archive, dst) {
+    stream.pipe(zlib.createGunzip()).pipe(
+      tar.extract(dst, {
+        ignore: isSymlink,
+        dmode: 0555,
+        fmode: 0444
+      })
+    );
+  }
+
+  function isSymlink(entry) {
+    return entry.type === 'SymbolicLink';
+  }
+  ```
+
+test "rank262: bower tar extraction symlink filter uses tar-fs header metadata"
+  lang javascript
+  reject VYQL-PATH-007
+  reject_review code.ArchiveSymlinkFilterBypass
+  code
+  ```
+  var tar = require('tar-fs');
+
+  function extractTar(archive, dst) {
+    stream.pipe(
+      tar.extract(dst, {
+        ignore: isSymlink,
+        dmode: 0555,
+        fmode: 0444
+      })
+    );
+  }
+
+  function extractTarGz(archive, dst) {
+    stream.pipe(zlib.createGunzip()).pipe(
+      tar.extract(dst, {
+        ignore: isSymlink,
+        dmode: 0555,
+        fmode: 0444
+      })
+    );
+  }
+
+  function isSymlink(_, entry) {
+    return entry.type === 'symlink';
+  }
+  ```

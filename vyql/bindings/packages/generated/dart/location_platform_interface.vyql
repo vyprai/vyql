@@ -1,0 +1,81 @@
+module bindings.dart.generated.m36994602;
+
+binding storedDataRead0 {
+  requires {
+    dependency("location_platform_interface")
+  }
+  query pattern callExpr where callee.method == "getLocation"
+  emit source code.StoredDataRead at call.result
+}
+
+binding authorizationCheck1 {
+  requires {
+    dependency("location_platform_interface")
+  }
+  query pattern callExpr where callee.method == "requestPermission"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck2 {
+  requires {
+    dependency("location_platform_interface")
+  }
+  query pattern callExpr where callee.method == "hasPermission"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck3 {
+  requires {
+    dependency("location_platform_interface")
+  }
+  query pattern callExpr where callee.method == "serviceEnabled"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck4 {
+  requires {
+    dependency("location_platform_interface")
+  }
+  query pattern callExpr where callee.method == "requestService"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck5 {
+  requires {
+    dependency("location_platform_interface")
+  }
+  query pattern callExpr where callee.method == "isBackgroundModeEnabled"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck6 {
+  requires {
+    dependency("location_platform_interface")
+  }
+  query pattern callExpr where callee.method == "enableBackgroundMode"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

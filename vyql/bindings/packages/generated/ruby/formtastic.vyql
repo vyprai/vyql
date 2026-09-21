@@ -1,0 +1,14 @@
+module bindings.ruby.generated.m8393b746;
+
+binding htmlEscape0 {
+  requires {
+    dependency("formtastic")
+  }
+  query pattern callExpr where callee.method == "escape_html_entities"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

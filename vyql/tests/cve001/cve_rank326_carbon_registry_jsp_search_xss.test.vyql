@@ -1,0 +1,37 @@
+# Rank 326 / CVE-2022-4520: WSO2 carbon-registry advanced search JSP
+# reflected unescaped request parameters through JSP scriptlet expressions.
+
+test "rank326: JSP scriptlet advanced-search values are reflected XSS"
+  lang config
+  file advancedSearchForm-ajaxprocessor.jsp
+  expect VYQL-INJ-004
+  code
+  ```
+  <%
+    leftPropertyValue = request.getParameter("leftPropertyValue");
+    rightOp = request.getParameter("rightOp");
+    mediaType = request.getParameter("mediaType");
+  %>
+  <input type="hidden" value="<%=rightOp%>" id="hiddenOpRight"/>
+  <input type="text" name="leftPropertyValue" value="<%=leftPropertyValue%>"/>
+  <input id="#_mediaType" name="mediaType" type="text" value="<%=mediaType%>" />
+  ```
+
+test "rank326: Encode.forHtml patch marker suppresses JSP scriptlet XSS"
+  lang config
+  file advancedSearchForm-ajaxprocessor.jsp
+  reject VYQL-INJ-004
+  code
+  ```
+  <%
+    leftPropertyValue = request.getParameter("leftPropertyValue");
+    rightOp = request.getParameter("rightOp");
+    mediaType = request.getParameter("mediaType");
+    leftPropertyValue = Encode.forHtml(leftPropertyValue);
+    rightOp = Encode.forHtml(rightOp);
+    mediaType = Encode.forHtml(mediaType);
+  %>
+  <input type="hidden" value="<%=rightOp%>" id="hiddenOpRight"/>
+  <input type="text" name="leftPropertyValue" value="<%=leftPropertyValue%>"/>
+  <input id="#_mediaType" name="mediaType" type="text" value="<%=mediaType%>" />
+  ```

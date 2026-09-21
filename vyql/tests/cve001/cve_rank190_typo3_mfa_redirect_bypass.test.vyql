@@ -1,0 +1,59 @@
+test "rank190: TYPO3 MFA redirect is gated by inverted backend-route requirement"
+  lang php
+  expect VYQL-AUTH-004
+  code
+  ```
+  <?php
+
+  class BackendUserAuthenticator
+  {
+      public function process($request, $handler): ResponseInterface
+      {
+          $route = $request->getAttribute('route');
+          $mfaRequested = $route->getOption('_identifier') === 'auth_mfa';
+          try {
+              $GLOBALS['BE_USER']->start($request);
+          } catch (MfaRequiredException $mfaRequiredException) {
+              if (!$mfaRequested && !$this->isLoggedInBackendUserRequired($route)) {
+                  return $this->redirectToMfaEndpoint(
+                      'auth_mfa',
+                      $GLOBALS['BE_USER'],
+                      $request,
+                      ['identifier' => $mfaRequiredException->getProvider()->getIdentifier()]
+                  );
+              }
+          }
+          return $handler->handle($request);
+      }
+  }
+  ```
+
+test "rank190: TYPO3 MFA redirect is required on protected backend routes"
+  lang php
+  reject VYQL-AUTH-004
+  code
+  ```
+  <?php
+
+  class BackendUserAuthenticator
+  {
+      public function process($request, $handler): ResponseInterface
+      {
+          $route = $request->getAttribute('route');
+          $mfaRequested = $route->getOption('_identifier') === 'auth_mfa';
+          try {
+              $GLOBALS['BE_USER']->start($request);
+          } catch (MfaRequiredException $mfaRequiredException) {
+              if (!$mfaRequested && $this->isLoggedInBackendUserRequired($route)) {
+                  return $this->redirectToMfaEndpoint(
+                      'auth_mfa',
+                      $GLOBALS['BE_USER'],
+                      $request,
+                      ['identifier' => $mfaRequiredException->getProvider()->getIdentifier()]
+                  );
+              }
+          }
+          return $handler->handle($request);
+      }
+  }
+  ```

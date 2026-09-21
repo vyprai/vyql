@@ -1,0 +1,45 @@
+module bindings.java.output_stream_slice_write_bounds;
+
+// java.io.OutputStream's array-slice transfer contract puts its bounds
+// obligation in writing: write(byte[] b, int off, int len) throws
+// IndexOutOfBoundsException "if off is negative, len is negative, or len is
+// greater than b.length - off" -- and the same three conditions are restated
+// by InputStream.read, Reader.read and Writer.write for their array-slice
+// overloads. An implementation that compares off + len at int width cannot
+// discharge that contract: a pair large enough to wrap passes as a negative
+// sum, which is exactly where java.io.FileOutputStream's own check stood
+// before the wrap was rejected explicitly, and the bytes then leave at an
+// offset the array never had.
+//
+// The shape labelled here is the delegating override that has taken that
+// contract over only partway. It is a write on an array of bytes or chars
+// with the slice arguments (three or more parameters), it hands the raw off
+// and len to another write -- super.write, or a wrapped stream's write --
+// and its own body makes a comparison, so it is in the validation business
+// at this call rather than forwarding blind. What it never does is mention
+// the array's length: no condition in the method bounds off or len against
+// b.length, in the overflow-safe spelling or any other. A pass-through
+// override with no comparison of its own is not reported: it forwards the
+// contract whole, and the stream it forwards to owns the checks -- the
+// finding for a wrapping check belongs to that stream's write, not to the
+// transparent wrapper.
+//
+// Whether the pair is attacker-chosen is the rule's question, not this
+// binding's. Robocode's host hands these objects to robots it does not
+// trust, a log framework's wrapper answers to whoever opened the stream:
+// the label says the bounds contract was partially claimed and never
+// completed, and the review weighs who can choose the pair.
+//
+// Two deliberate residuals. A comparison in the overflow-prone spelling
+// (off + len > b.length) mentions the length and is not reported, although
+// that spelling is itself the narrow-width variant -- the Go binding for the
+// same concept labels exactly that arithmetic where the frontend can see the
+// widths, and chasing every Java spelling of the sum would key on variable
+// names rather than the contract. And a bounds check extracted into a helper
+// leaves no .length in the override, so a delegated check cannot clear the
+// label -- the known function-local visibility limit for controls, in the
+// false-positive direction.
+binding outputStreamSliceWriteBounds9450 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName == "write" and node.context.paramType in ["byte", "char"] and node.context.paramIndex == "2" and node.context.call == "write" and containsAny(node.context.binaryShape, ["<", ">", "==", "!="]) and not (node.context.selector contains ".length")
+  emit issue code.OffsetLengthBoundsOverflow at node
+}

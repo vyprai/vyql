@@ -1,0 +1,200 @@
+# Rank 1546 / CVE-2026-41649: Outline's rate limiter keyed its
+# buckets on a user id taken from an unsigned JWT decode, so any
+# client forged a token with a fresh payload.id and received a fresh
+# bucket, defeating the limits entirely (rate-limiting bypass through
+# unverified claims, CWE-347/CWE-307; PR #12114).
+# getRateLimiterIdentifier in server/middlewares/rateLimiter.ts did
+# `const payload = getJWTPayload(token); if (payload.id) { return
+# `user:${payload.id}:${ctx.ip}`; }` under the comment "JWT is not
+# validated here which would require a DB request, just decoded to
+# extract the user ID" -- the identifier trusts the token's
+# unverified body. getJWTPayload (server/utils/jwt.ts) is
+# `payload = JWT.decode(token)` from jsonwebtoken, the documented
+# unsigned decode. Pool commit 1b91a295e1 is the real fix (COMMIT_OK,
+# "fix: Use verified JWT for rate limiting"): the identifier resolves
+# the user through getUserForJWT(token) -- decode, type/expiry checks,
+# User.findByPk, then JWT.verify(token, user.jwtSecret) -- with
+# RateLimiter.getCachedUserIdForToken caching the sha256-keyed
+# token->user mapping in Redis, and API-key or OAuth tokens falling
+# back to the client IP. No pool correction.
+#
+# ## What fires, both revisions
+#
+# Three --cache off runs per revision and per scope (timeout 180,
+# --max-ram 6GB), full findings view. rateLimiter.ts alone reports 0
+# findings at both revisions, 3/3 runs each. The middlewares+utils
+# scope reports 6 findings at the parent and 7 at the fix, all
+# pre-existing rows on other files (three RF-002 opens on
+# passport.ts, SEC-001 on environment.ts, INJ-009 and INJ-001
+# elsewhere); the fix's extra row is an INJ-001 through the newly
+# wired getUserForJWT call. The whole server/ tree reports
+# 209/209/209 findings at or above high at the parent and
+# 210/210/210 at the fix; the fingerprint diff is one INJ-001
+# dropped and two added, every one of them line-number churn on
+# auth.ts or a row on the fix's own added Redis cache code (sink at
+# utils/RateLimiter.ts:85). Zero rows name rateLimiter.ts at either
+# revision. vyql match on jwt.ts labels only an assumption on
+# allowedTypes.includes; nothing labels JWT.decode or JWT.verify, and
+# match on rateLimiter.ts labels only the ctx.set response-header
+# writes.
+#
+# ## Why nothing ships
+#
+# The decode is bindable API vocabulary, and the taint does cross
+# the helper boundary -- the 1st-pass wall is half gone. A probe
+# binding emitting source code.UnverifiedCredential (the existing
+# concept whose documented role is exactly credential material the
+# protocol has not verified) at the JWT.decode result, plus a probe
+# consume-key sink and rule, fires once on the parent: the path runs
+# JWT.decode -> getJWTPayload ret -> payload.id -> the key template
+# -> limiter.consume's argument. Measured with the probes in tree
+# and code.UnverifiedCredential added to the api and generic
+# profiles' entrypoints: 1 finding at 1b91a295e1^.
+#
+# The same probe fires at the fix, 1 -> 1, for two independent
+# reasons, each measured:
+#
+# * The fixed key inherits decode taint through the verified
+#   helper's return object. getUserForJWT returns `{ user, service:
+#   payload.service }`; the service element carries the decode
+#   taint into the returned collection, and the caller's `user.id`
+#   read picks it back up -- the engine's Attr read on a returned
+#   object is property-insensitive, so a verified, DB-resolved
+#   field and an unverified claim field are indistinguishable once
+#   one function returns both.
+# * The verification cannot be credited. A probe check binding on
+#   JWT.verify is visible at jwt.ts:88 (inside getUserForJWT, whose
+#   body the taint path passes through) but the rule's `unless path
+#   coveredBy` reports it as "nearest on a sibling path": a control
+#   inside a callee is not attributed to the interprocedural path
+#   it guards -- the same helper-boundary wall the rank-1542
+#   recheck named, now measured on the control side in JS.
+#
+# Fixing either means engine work that is not mechanical:
+# field-sensitive attribute reads through merged object returns
+# change taint semantics solver-wide, and crediting a callee's
+# verification on a caller's path is new control attribution across
+# interprocedural summary edges. Neither is a localized correction
+# to a known construct.
+#
+# Two further walls, recorded so the next pass does not re-derive
+# them:
+#
+# * No shipped profile lists code.UnverifiedCredential in its
+#   entrypoints, so any source emitting it is inert under every
+#   profile: the label appears in vyql match, but scan seeds no
+#   taint until the profile names it (measured: the probe rule
+#   fires only after the entrypoints edit; forced --profile web,
+#   which lacks it, stays silent). VYQL-AUTH-152, the one shipped
+#   rule consuming code.UnverifiedCredential, is inert under every
+#   shipped profile for the same reason.
+# * The presence route still cannot ask the question: every
+#   API-level fact in the vulnerable function (JWT.decode,
+#   limiter.consume) sits one project-local helper away, and the
+#   1st pass's finding stands -- no in-function token expresses
+#   claim provenance.
+#
+# Held as a double miss. The recheck's engine-side blockers are
+# reported for the gaps file (property-insensitive Attr merge on
+# returned objects; in-callee verification uncredited on
+# interprocedural paths). When claim-provenance vocabulary and its
+# clearing control land, the unsigned-decode form below must flip
+# to expect.
+
+test "rank1546: the limit bucket is keyed by an unsigned claim"
+  lang javascript
+  file server/middlewares/rateLimiter.ts
+  reject VYQL-AUTH-105
+  reject VYQL-AUTH-079
+  code
+  ```
+  import { ApiKey, OAuthAuthentication } from "@server/models";
+  import { getJWTPayload } from "@server/utils/jwt";
+  import RateLimiter from "@server/utils/RateLimiter";
+  import { parseAuthentication } from "./authentication";
+
+  function getRateLimiterIdentifier(ctx): string {
+    try {
+      const { token } = parseAuthentication(ctx);
+      if (token && !ApiKey.match(token) && !OAuthAuthentication.match(token)) {
+        // Note: JWT is not validated here which would require a DB request,
+        // just decoded to extract the user ID for separating rate limits by user
+        // on shared networks.
+        const payload = getJWTPayload(token);
+        if (payload.id) {
+          return `user:${payload.id}:${ctx.ip}`;
+        }
+      }
+    } catch {
+      // Fall through to IP-based rate limiting
+    }
+    return ctx.ip;
+  }
+
+  export function defaultRateLimiter() {
+    return async function rateLimiterMiddleware(ctx, next) {
+      const fullPath = `${ctx.mountPath ?? ""}${ctx.path}`;
+      const identifier = getRateLimiterIdentifier(ctx);
+
+      const key = RateLimiter.hasRateLimiter(fullPath)
+        ? `${fullPath}:${identifier}`
+        : identifier;
+      const limiter = RateLimiter.getRateLimiter(fullPath);
+
+      await limiter.consume(key);
+      return next();
+    };
+  }
+  ```
+
+test "rank1546: the fixed revision keys on the verified user"
+  lang javascript
+  file server/middlewares/rateLimiter.ts
+  reject VYQL-AUTH-105
+  reject VYQL-AUTH-079
+  code
+  ```
+  import { ApiKey, OAuthAuthentication } from "@server/models";
+  import { getUserForJWT } from "@server/utils/jwt";
+  import RateLimiter from "@server/utils/RateLimiter";
+  import { parseAuthentication } from "./authentication";
+
+  async function getRateLimiterIdentifier(ctx): Promise<string> {
+    try {
+      const { token } = parseAuthentication(ctx);
+      if (!token) {
+        return ctx.ip;
+      }
+
+      if (ApiKey.match(token) || OAuthAuthentication.match(token)) {
+        return ctx.ip;
+      }
+
+      let userId = await RateLimiter.getCachedUserIdForToken(token);
+      if (!userId) {
+        const { user } = await getUserForJWT(token);
+        userId = user.id;
+        void RateLimiter.cacheUserForToken(token, userId);
+      }
+      return userId;
+    } catch {
+      // Fall through to IP-based rate limiting
+    }
+    return ctx.ip;
+  }
+
+  export function defaultRateLimiter() {
+    return async function rateLimiterMiddleware(ctx, next) {
+      const fullPath = `${ctx.mountPath ?? ""}${ctx.path}`;
+      const identifier = await getRateLimiterIdentifier(ctx);
+
+      const key = RateLimiter.hasRateLimiter(fullPath)
+        ? `${fullPath}:${identifier}`
+        : identifier;
+      const limiter = RateLimiter.getRateLimiter(fullPath);
+
+      await limiter.consume(key);
+      return next();
+    };
+  }
+  ```

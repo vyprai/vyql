@@ -1,0 +1,11 @@
+module code;
+
+concept UnqualifiedNativeLibraryLoad : issue {
+  cwe: [CWE_427]
+  reviewAssumption: "a directory that precedes the system directory in the platform module search order is writable by a lower-privileged account"
+  reviewCategory: path
+  reviewCondition: "a native module is loaded by unqualified name with no restriction on the search order"
+  reviewConfidence: high
+  reviewEvidence: "native module load {pattern} names a bare module file and passes no search-path restriction"
+  vulnerableTo: [path.UncontrolledSearchPath]
+}

@@ -1,0 +1,6 @@
+module injection;
+
+threat PrototypePollution {
+  cwe: [CWE_1321]
+  desc: "Untrusted object recursively merged, polluting Object.prototype"
+}

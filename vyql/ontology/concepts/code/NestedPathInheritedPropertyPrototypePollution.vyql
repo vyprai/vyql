@@ -1,0 +1,11 @@
+module code;
+
+concept NestedPathInheritedPropertyPrototypePollution : issue {
+  cwe: [CWE_1321]
+  reviewAssumption: "a caller can provide path segments such as __proto__ or constructor.prototype"
+  reviewCategory: prototype_pollution
+  reviewCondition: "nested path assignment creates missing child objects from inherited path properties without checking that the current segment is an own property"
+  reviewConfidence: high
+  reviewEvidence: "nested path setter context {pattern} traverses path segments, creates missing child objects, and writes dynamic properties without an own-property guard"
+  vulnerableTo: [injection.PrototypePollution]
+}

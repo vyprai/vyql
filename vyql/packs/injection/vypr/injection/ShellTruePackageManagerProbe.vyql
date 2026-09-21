@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule ShellTruePackageManagerProbe {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_78]
+    id: "VYQL-INJ-129"
+    severity: high
+  }
+  issue code.ShellTruePackageManagerProbe as sink
+}

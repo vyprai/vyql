@@ -1,0 +1,34 @@
+# Trust-boundary violation (CWE-501): user input written into a trust context.
+
+test "js: req body -> securityContext claim is a trust-boundary violation"
+  lang javascript
+  expect VYQL-CFG-014
+  code
+  ```
+  function h(req, res) {
+    const x = req.body.tenant;
+    req.securityContext.claims.tenant = x;
+  }
+  ```
+
+test "js: req body -> session property is a trust-boundary violation"
+  lang javascript
+  expect VYQL-CFG-014
+  code
+  ```
+  function h(req, res) {
+    const x = req.body.role;
+    req.session.role = x;
+  }
+  ```
+
+test "js: constant session write is clean (no FP)"
+  lang javascript
+  reject VYQL-CFG-014
+  code
+  ```
+  function h(req, res) {
+    req.session = req.session || {};
+    req.session.role = "guest";
+  }
+  ```

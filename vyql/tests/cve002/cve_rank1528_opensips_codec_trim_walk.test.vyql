@@ -1,0 +1,228 @@
+# OpenSIPS' codec-stripping path trimmed trailing spaces off the last
+# SDP payload by walking a pointer backwards off the start of the
+# parsed value, so a crafted codec parameter whose value was all
+# spaces (or empty) read whatever preceded the buffer (out-of-bounds
+# read, CWE-125; GHSA-3ghx-j39m-cw4f, Enable Security's 2021/2022
+# audit). stream_process in modules/sipmsgops/codecs.c already had
+# the bounded spelling eight lines above --
+# `while (found.s > lmp->u.value && *(found.s - 1) == ' ')` -- and
+# then, under `if (cur == lmp->u.value + lmp->len)`, walked
+# `tmp = found.s; while (*(--tmp) == ' ')` with no floor at all: the
+# pre-decrement runs and dereferences before anything compares the
+# cursor against the base it came from. The fixing commit dd051f8ed5
+# ("[sipmsgops] fix codec_delete_XX() parsing", one line) bounds it:
+# `while (tmp>lmp->u.value && *(--tmp) == ' ')`. No pool correction.
+#
+# ## What fires, both revisions
+#
+# Three --cache off runs per revision over modules/sipmsgops/codecs.c
+# report **20 findings each, deterministically, identically on the
+# vulnerable parent a1406ad8 and the fixed dd051f8ed5**: 10 VYQL-MEM-010,
+# 7 VYQL-MEM-016 RawMemoryCopySize (codecs.c:138/221/579/582/621/637/658),
+# 2 VYQL-MEM-006 NullableDeref (codecs.c:369 and 570) and 1 VYQL-MEM-020
+# (codecs.c:386), byte-identical by rule and line. The full findings view
+# was read, not the `-flags` only view. **Nothing sits on line 562**, the
+# loop that
+# is the defect: the scanner reports the guarded memcpy sizes and the
+# forward-shift deref at 570, and nothing about the unbounded walk --
+# the "findings in the function are not coverage" shape, twice
+# independently recorded on mbedtls. A minimal repro holding only the
+# guarded unbounded walk reports **0 findings**. The 1st pass's zero
+# was real.
+#
+# ## Why nothing ships
+#
+# `vyql graph` on the repro shows the loop condition never enters the
+# IR at all: c.go's `case "while_statement", "for_statement",
+# "do_statement"` (internal/extract/frontend/treesitter/c.go:1075)
+# lowers `nir.Loop{Body: c.collectBlocks(n)}` and drops the condition
+# expression entirely, so `while (*(--tmp) == ' ')` yields no node --
+# no `__deref`, no `__unary`, no `__binop.eq`. Only the body's
+# `found.s--` survives, as a CollectionElement. A binding therefore has
+# no node to label, and the construct this rank needs is unreachable
+# from the data.
+#
+# The discriminant itself is loop-carried: which base the backwards
+# step must stay above. Measured across every C/C++ checkout in the
+# campaign's clone set (58 loop conditions dereferencing a
+# pre-decremented pointer, after de-duplicating a project's
+# vulnerable/fixed/HEAD copies), the *floorless* spelling is the
+# majority idiom -- 49 of 58 -- and is safe by a contract the code
+# cannot express: krb5's mkstemp `while(*--trv == 'X')` (the template
+# is known to hold X's), libxml2's leading-zero strip
+# `while(*(--ptr) == '0')` present at both revisions of its own rank,
+# openssl's `while(*--p == '0')` and `while(max && *--rp == 0)`,
+# zephyr's `while(*--buf == '0')`, utf8cpp's vendored `utf8::prior`
+# `while(utf8::internal::is_trail(*(--it)))` in assimp and icinga2,
+# ICU's `while(U8_IS_TRAIL(*--p))`, subversion's
+# `while(svn_ctype_isspace(*--end))`, LibRaw's `while(*--cp == ' ')`
+# and `while(isdigit(*--jext))`, upx's `while(0==*--uptr)`, klib's
+# `while(*--search == string[i])`, hermes' `while(!*--xc)`, ceph's
+# `while(*(--npath) != '/')` -- roughly 14 distinct projects firing per
+# 1 true positive. Only 9 of 58 spell the floor, from 5 projects
+# (asterisk, barebox, grpc's upb, vim, and the fixed opensips line
+# itself). A shape-only rule is unshippable, and narrowing it onto this
+# buffer's own spelling is a repro-shaped patch. The walk-base relation
+# is the not-mechanical engine gap the ledger already carries for the
+# family (1896 names this rank's sub-shape).
+#
+# No definition change shipped. No ENGINE-GAPS.md entry beyond the
+# native-parser bounds family already filed at 1896; this rank adds the
+# root fact that C loop conditions are not lowered at all, which is the
+# reason no node exists to hang a walk-bound fact on.
+#
+# ## Recheck measurements (knowledge base tip 11984e0e1)
+#
+# Baseline 3x3 over codecs.c: 20/20/20 vulnerable, 20/20/20 fixed,
+# identical rule and line sets. `vyql match` on the vulnerable file
+# lists no label at any line in 554-566. `vyql graph` on the minimal
+# repro: no node for the loop condition. Clone-set sweep for loop
+# conditions dereferencing a pre-decremented pointer: 58 hits, 49
+# floorless from 14 projects, 9 floored from 5. Narrow spec passing
+# with -v. Rank stays ATTENTION.
+
+test "rank1528: the last-payload trim walks back with no floor"
+  lang c
+  file modules/sipmsgops/codecs.c
+  reject VYQL-MEM-006
+  code
+  ```
+  struct lump {
+      union {
+          char value[64];
+      } u;
+      int len;
+  };
+
+  struct str_field {
+      char *s;
+      int len;
+  };
+
+  int trim_last_payload(struct lump *lmp, struct str_field found, char *cur)
+  {
+      /* take the previous whitespaces as well */
+      while (found.s > lmp->u.value && *(found.s - 1) == ' ') {
+          found.s--;
+          found.len++;
+      }
+
+      /* when trimming the very last payload, avoid trailing ws */
+      if (cur == lmp->u.value + lmp->len) {
+          char *tmp = found.s;
+          while (*(--tmp) == ' ') {
+              found.s--;
+              found.len++;
+          }
+      }
+
+      lmp->len -= found.len;
+      return found.len;
+  }
+  ```
+
+test "rank1528: the fixed revision bounds the walk to the value start"
+  lang c
+  file modules/sipmsgops/codecs.c
+  reject VYQL-MEM-006
+  code
+  ```
+  struct lump {
+      union {
+          char value[64];
+      } u;
+      int len;
+  };
+
+  struct str_field {
+      char *s;
+      int len;
+  };
+
+  int trim_last_payload(struct lump *lmp, struct str_field found, char *cur)
+  {
+      /* take the previous whitespaces as well */
+      while (found.s > lmp->u.value && *(found.s - 1) == ' ') {
+          found.s--;
+          found.len++;
+      }
+
+      /* when trimming the very last payload, avoid trailing ws */
+      if (cur == lmp->u.value + lmp->len) {
+          char *tmp = found.s;
+          while (tmp > lmp->u.value && *(--tmp) == ' ') {
+              found.s--;
+              found.len++;
+          }
+      }
+
+      lmp->len -= found.len;
+      return found.len;
+  }
+  ```
+
+test "rank1528: the walk alone, with no bounded sibling in scope"
+  lang c
+  file modules/sipmsgops/codecs.c
+  reject VYQL-MEM-006
+  code
+  ```
+  struct lump {
+      union {
+          char value[64];
+      } u;
+      int len;
+  };
+
+  struct str_field {
+      char *s;
+      int len;
+  };
+
+  int trim_last_payload(struct lump *lmp, struct str_field found, char *cur)
+  {
+      if (cur == lmp->u.value + lmp->len) {
+          char *tmp = found.s;
+          while (*(--tmp) == ' ') {
+              found.s--;
+              found.len++;
+          }
+      }
+
+      lmp->len -= found.len;
+      return found.len;
+  }
+  ```
+
+test "rank1528: the bounded spelling alone must stay rejected"
+  lang c
+  file modules/sipmsgops/codecs.c
+  reject VYQL-MEM-006
+  code
+  ```
+  struct lump {
+      union {
+          char value[64];
+      } u;
+      int len;
+  };
+
+  struct str_field {
+      char *s;
+      int len;
+  };
+
+  int trim_last_payload(struct lump *lmp, struct str_field found, char *cur)
+  {
+      if (cur == lmp->u.value + lmp->len) {
+          char *tmp = found.s;
+          while (tmp > lmp->u.value && *(--tmp) == ' ') {
+              found.s--;
+              found.len++;
+          }
+      }
+
+      lmp->len -= found.len;
+      return found.len;
+  }
+  ```

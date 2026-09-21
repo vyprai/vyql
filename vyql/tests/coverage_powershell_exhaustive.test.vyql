@@ -1,0 +1,199 @@
+# PowerShell language-gap narrowing: exhaustive coverage for adapter-claimed cmdlets.
+
+test "powershell exhaustive: param value reaches code evaluation cmdlets"
+  lang powershell
+  expect VYQL-INJ-003
+  code
+  ```
+  param($Payload)
+  Invoke-Expression $Payload
+  iex $Payload
+  Invoke-Command $Payload
+  ```
+
+test "powershell exhaustive: constant code evaluation cmdlets are clean"
+  lang powershell
+  reject VYQL-INJ-003
+  code
+  ```
+  Invoke-Expression "Write-Output safe"
+  iex "Write-Output safe"
+  ```
+
+test "powershell exhaustive: env value reaches process execution cmdlets"
+  lang powershell
+  expect VYQL-INJ-002
+  code
+  ```
+  $Cmd = $env:QUERY_STRING
+  Start-Process $Cmd
+  cmd /c $Cmd
+  cmd.exe /c $Cmd
+  powershell -Command $Cmd
+  ```
+
+test "powershell exhaustive: constant process execution is clean"
+  lang powershell
+  reject VYQL-INJ-002
+  code
+  ```
+  Start-Process "notepad.exe"
+  cmd /c "echo safe"
+  powershell -Command "Write-Output safe"
+  ```
+
+test "powershell exhaustive: web request cmdlets fetch tainted URLs"
+  lang powershell
+  expect VYQL-RF-001
+  code
+  ```
+  param($Url)
+  Invoke-WebRequest $Url
+  Invoke-RestMethod $Url
+  iwr $Url
+  wget $Url
+  curl $Url
+  ```
+
+test "powershell exhaustive: constant web request URLs are clean for SSRF"
+  lang powershell
+  reject VYQL-RF-001
+  code
+  ```
+  Invoke-WebRequest "https://api.example.com"
+  Invoke-RestMethod "https://api.example.com"
+  ```
+
+test "powershell exhaustive: cleartext web request URLs are reported"
+  lang powershell
+  expect VYQL-CFG-006
+  code
+  ```
+  Invoke-WebRequest "http://example.com"
+  Invoke-RestMethod "http://example.com"
+  iwr "http://example.com"
+  wget "http://example.com"
+  curl "http://example.com"
+  ```
+
+test "powershell exhaustive: localhost and HTTPS URLs are clean for cleartext"
+  lang powershell
+  reject VYQL-CFG-006
+  code
+  ```
+  Invoke-WebRequest "http://127.0.0.1:8080/health"
+  Invoke-RestMethod "https://example.com"
+  ```
+
+test "powershell exhaustive: Select-String compiles tainted regex patterns"
+  lang powershell
+  expect VYQL-DOS-001
+  code
+  ```
+  param($Pattern)
+  Select-String -Pattern $Pattern -Path data.txt
+  ```
+
+test "powershell exhaustive: constant Select-String pattern is clean"
+  lang powershell
+  reject VYQL-DOS-001
+  code
+  ```
+  Select-String -Pattern "^[a-z]+$" -Path data.txt
+  ```
+
+test "powershell exhaustive: Invoke-Sqlcmd executes tainted query"
+  lang powershell
+  expect VYQL-INJ-001
+  code
+  ```
+  param($Query)
+  Invoke-Sqlcmd -Query $Query
+  ```
+
+test "powershell exhaustive: constant Invoke-Sqlcmd query is clean"
+  lang powershell
+  reject VYQL-INJ-001
+  code
+  ```
+  Invoke-Sqlcmd -Query "select 1"
+  ```
+
+test "powershell exhaustive: Import-Clixml deserializes tainted path"
+  lang powershell
+  expect VYQL-DESER-001
+  code
+  ```
+  param($Path)
+  Import-Clixml $Path
+  ```
+
+test "powershell exhaustive: constant Import-Clixml path is clean"
+  lang powershell
+  reject VYQL-DESER-001
+  code
+  ```
+  Import-Clixml "./safe.xml"
+  ```
+
+test "powershell exhaustive: Select-Xml parses tainted XML path"
+  lang powershell
+  expect VYQL-DESER-002
+  code
+  ```
+  param($Path)
+  Select-Xml -Path $Path -XPath "/root/item"
+  ```
+
+test "powershell exhaustive: constant Select-Xml path is clean"
+  lang powershell
+  reject VYQL-DESER-002
+  code
+  ```
+  Select-Xml -Path "./safe.xml" -XPath "/root/item"
+  ```
+
+test "powershell exhaustive: file cmdlets access tainted paths"
+  lang powershell
+  expect VYQL-PATH-001
+  code
+  ```
+  param($Path)
+  Get-Content $Path
+  Set-Content $Path "x"
+  Add-Content $Path "x"
+  Out-File $Path
+  Remove-Item $Path
+  Copy-Item $Path ./out
+  Move-Item $Path ./out
+  Rename-Item $Path renamed.txt
+  New-Item $Path
+  Test-Path $Path
+  ```
+
+test "powershell exhaustive: constant file cmdlet paths are clean"
+  lang powershell
+  reject VYQL-PATH-001
+  code
+  ```
+  Get-Content "./safe.txt"
+  Copy-Item "./safe.txt" "./out.txt"
+  Test-Path "./safe.txt"
+  ```
+
+test "powershell exhaustive: Import-Module loads tainted module names"
+  lang powershell
+  expect VYQL-INJ-023
+  code
+  ```
+  param($ModuleName)
+  Import-Module $ModuleName
+  ```
+
+test "powershell exhaustive: constant Import-Module is clean"
+  lang powershell
+  reject VYQL-INJ-023
+  code
+  ```
+  Import-Module Microsoft.PowerShell.Management
+  ```

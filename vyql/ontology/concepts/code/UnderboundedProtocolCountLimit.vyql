@@ -1,0 +1,11 @@
+module code;
+
+concept UnderboundedProtocolCountLimit : issue {
+  cwe: [CWE_20, CWE_400]
+  reviewAssumption: "a remote peer or block can legally contain more items than the parser limit accepts"
+  reviewCategory: resource
+  reviewCondition: "protocol parser count validation is below the consensus or message-format upper bound"
+  reviewConfidence: medium
+  reviewEvidence: "wire parser context {pattern} rejects count-derived input using an under-sized limit"
+  vulnerableTo: [validation.ImproperInputValidation, dos.UncontrolledResourceConsumption]
+}

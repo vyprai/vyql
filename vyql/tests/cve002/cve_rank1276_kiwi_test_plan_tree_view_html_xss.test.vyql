@@ -1,0 +1,77 @@
+test "rank1276: TestPlan.tree_view_html interpolates a raw plan name into markup"
+  lang python
+  file models.py
+  expect VYQL-INJ-122
+  expect_review code.UnescapedHtmlPresenter
+  code
+  ```
+  class TestPlan(TreeNode, UrlMixin):
+      def tree_view_html(self):
+          tree_nodes = self.get_descendants(include_self=True)
+          result = ""
+
+          for test_plan in tree_nodes:
+              active_class = ""
+              if test_plan.pk == self.pk:
+                  active_class = "active"
+
+              result += f"""
+                  <!-- begin-node -->
+                  <div class="list-group-item {active_class}" style="border: none">
+                      <div class="list-group-item-header" style="padding:0">
+                          <div class="list-view-pf-body">
+                              <div class="list-view-pf-description">
+                                  <div class="list-group-item-text">
+                                      <a href="{test_plan.get_absolute_url()}">
+                                          TP-{test_plan.pk}: {test_plan.name}
+                                      </a>
+                                  </div>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+              """
+
+          return result
+  ```
+
+test "rank1276: TestPlan.tree_view_html sanitizes the plan name before interpolation"
+  lang python
+  file models.py
+  reject VYQL-INJ-122
+  reject_review code.UnescapedHtmlPresenter
+  code
+  ```
+  from tcms.core.templatetags.extra_filters import bleach_input
+
+
+  class TestPlan(TreeNode, UrlMixin):
+      def tree_view_html(self):
+          tree_nodes = self.get_descendants(include_self=True)
+          result = ""
+
+          for test_plan in tree_nodes:
+              active_class = ""
+              if test_plan.pk == self.pk:
+                  active_class = "active"
+
+              plan_name = bleach_input(test_plan.name)
+              result += f"""
+                  <!-- begin-node -->
+                  <div class="list-group-item {active_class}" style="border: none">
+                      <div class="list-group-item-header" style="padding:0">
+                          <div class="list-view-pf-body">
+                              <div class="list-view-pf-description">
+                                  <div class="list-group-item-text">
+                                      <a href="{test_plan.get_absolute_url()}">
+                                          TP-{test_plan.pk}: {plan_name}
+                                      </a>
+                                  </div>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+              """
+
+          return result
+  ```

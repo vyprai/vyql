@@ -1,0 +1,10 @@
+module vypr.injection;
+
+rule RawHtmlResponse {
+  meta {
+    cwe: [CWE_79]
+    id: "VYQL-INJ-204"
+    severity: high
+  }
+  issue code.RawHtmlResponse as sink
+}

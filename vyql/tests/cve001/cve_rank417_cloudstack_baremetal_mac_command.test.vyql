@@ -1,0 +1,53 @@
+# Rank 417 / CVE-2019-17562: Apache CloudStack baremetal virtual router
+# accepted the provisiondone MAC path parameter before formatting it into a
+# shell-backed curl command.
+
+test "rank417: CloudStack baremetal provisiondone accepts unvalidated mac"
+  lang python
+  expect VYQL-INJ-074
+  expect_review code.CloudStackBaremetalMacCommandInjection
+  code
+  ```
+  from flask import Flask
+
+  app = Flask(__name__)
+
+  class Server(object):
+      def notify_provisioning_done(self, mac):
+          cmd = "http://gw:8080/client/api?command=notifyBaremetalProvisionDone&mac=%s" % mac
+          shell("curl -X GET '%s'" % cmd)
+
+  server = Server()
+
+  @app.route('/baremetal/provisiondone/<mac>', methods=['GET'])
+  def notify_provisioning_done(mac):
+      return server.notify_provisioning_done(mac)
+  ```
+
+test "rank417: CloudStack baremetal provisiondone validates mac"
+  lang python
+  reject VYQL-INJ-074
+  reject_review code.CloudStackBaremetalMacCommandInjection
+  code
+  ```
+  import re
+  from flask import Flask
+
+  app = Flask(__name__)
+
+  class Server(object):
+      def notify_provisioning_done(self, mac):
+          cmd = "http://gw:8080/client/api?command=notifyBaremetalProvisionDone&mac=%s" % mac
+          shell("curl -X GET '%s'" % cmd)
+
+  server = Server()
+
+  @app.route('/baremetal/provisiondone/<mac>', methods=['GET'])
+  def notify_provisioning_done(mac):
+      if not is_a_mac(mac):
+          raise "not a mac"
+      return server.notify_provisioning_done(mac)
+
+  def is_a_mac(mac):
+      return re.match("[0-9a-f]{2}([-:]?)[0-9a-f]{2}(\\1[0-9a-f]{2}){4}$", mac.lower())
+  ```

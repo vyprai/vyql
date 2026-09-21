@@ -1,0 +1,8 @@
+module code;
+
+review code.DotNetArchiveOrRenamePathTraversal {
+  category: path
+  expected: [core.PathAccessCheck]
+  kind: attention
+  text: "review .NET archive extraction or rename paths for Path.GetFullPath containment under the configured root"
+}

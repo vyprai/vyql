@@ -1,0 +1,57 @@
+module bindings.rust.generated.m9c201208;
+
+binding deserialization0 {
+  requires {
+    dependency("config")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("config")
+  }
+  query pattern callExpr where callee.method == "deserialize_enum"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("config")
+  }
+  query pattern callExpr where callee.method == "deserialize_unit_struct"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("config")
+  }
+  query pattern callExpr where callee.method == "deserialize_newtype_struct"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("config")
+  }
+  query pattern callExpr where callee.method == "deserialize_tuple"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("config")
+  }
+  query pattern callExpr where callee.method == "deserialize_tuple_struct"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization6 {
+  requires {
+    dependency("config")
+  }
+  query pattern callExpr where callee.method == "deserialize_struct"
+  emit sink code.Deserialization at args[0]
+}

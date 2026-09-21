@@ -1,0 +1,37 @@
+module bindings.python.pyjwt_critical_extension_validation;
+
+// PyJWT exports both the `PyJWS` class and its `decode_complete` method in
+// `__all__`: the class is the JWS consumer, and the method is where a
+// compact token is parsed and its verified segments returned. RFC 7515
+// §4.1.11 gives the JOSE header a `crit` parameter naming extensions the
+// producer declares mandatory to process, and requires a consumer to reject
+// any token whose `crit` lists an extension it does not implement -- a
+// token that verifies while a declared-mandatory extension goes unenforced
+// reads as signed-and-valid to a relying party keying a control on that
+// extension.
+//
+// The header is attacker-chosen JSON, so the obligation sits with the
+// consumer class, and a class that nowhere reads the `crit` parameter cannot
+// reject on it: the parameter must be read to be checked, and every
+// implementation of the check reads that key -- wherever in the class the
+// check lives. The negation therefore matches the quoted parameter read
+// against the class body's text, which Python hands to every method's
+// context: a read in a sibling helper, in the supported-extension table, or
+// in the decode routine itself all quiet the binding, while prose that
+// merely says "critical" does not. The residual is the false-negative
+// direction: a `crit` read that only guards encoding quiets the binding
+// while the decode path still accepts the token.
+//
+// The clauses answer to the declared surface and the RFC, not to one
+// incident: the exported class name, the exported decode entry, and the
+// parameter's quoted name. A consumer class that reads `crit` anywhere does
+// not match, and neither does a decode routine on any other class.
+
+binding unsupportedCriticalExtensionAccepted {
+  query pattern presenceNode where node.scope == "function"
+    and node.token contains "lang=python"
+    and containsAny(node.context.functionName, ["decode_complete"])
+    and containsAny(node.context.className, ["PyJWS"])
+    and not containsAny(node.token, ["\"crit\"", "'crit'"])
+  emit issue code.UnsupportedCriticalExtensionAccepted at node
+}

@@ -1,0 +1,9 @@
+module bindings.php.generated.m9aa40318;
+
+binding userControlledData0 {
+  requires {
+    dependency("symfony/polyfill-mbstring")
+  }
+  query pattern callExpr where callee.method == "mb_parse_str"
+  emit source core.UserControlledData at call.result
+}

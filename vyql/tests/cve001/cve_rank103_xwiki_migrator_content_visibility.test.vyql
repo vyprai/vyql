@@ -1,0 +1,38 @@
+# Rank 103 / CVE-2025-27604: the migrator saved generated JSON documents of
+# macro statistics into the wiki without marking them hidden, so any user
+# could read migration data. The fix calls setHidden(true) before saving.
+
+test "rank103: generated JSON doc saved without setHidden"
+  lang java
+  expect VYQL-SEC-053
+  code
+  ```
+  import com.xpn.xwiki.doc.XWikiDocument;
+
+  public class Manager {
+      private void persist(XWikiContext context, String json) throws Exception {
+          XWikiDocument doc = context.getWiki().getDocument(
+              new DocumentReference(context.getWikiId(), "ConfluenceMigratorPro", "MigratedMacrosCountJSON"), context);
+          doc.setContent(context.getWiki().getContent(toJson(json, context), context));
+          context.getWiki().saveDocument(doc, context);
+      }
+  }
+  ```
+
+test "rank103: generated JSON doc marked hidden before save"
+  lang java
+  reject VYQL-SEC-053
+  code
+  ```
+  import com.xpn.xwiki.doc.XWikiDocument;
+
+  public class Manager {
+      private void persist(XWikiContext context, String json) throws Exception {
+          XWikiDocument doc = context.getWiki().getDocument(
+              new DocumentReference(context.getWikiId(), "ConfluenceMigratorPro", "MigratedMacrosCountJSON"), context);
+          doc.setHidden(true);
+          doc.setContent(context.getWiki().getContent(toJson(json, context), context));
+          context.getWiki().saveDocument(doc, context);
+      }
+  }
+  ```

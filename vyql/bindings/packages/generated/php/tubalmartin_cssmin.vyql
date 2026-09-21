@@ -1,0 +1,9 @@
+module bindings.php.generated.m67d1d8df;
+
+binding deserialization0 {
+  requires {
+    dependency("tubalmartin/cssmin")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.Deserialization at args[0]
+}

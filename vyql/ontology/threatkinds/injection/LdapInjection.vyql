@@ -1,0 +1,6 @@
+module injection;
+
+threat LdapInjection {
+  cwe: [CWE_90]
+  desc: "Untrusted data in an LDAP query"
+}

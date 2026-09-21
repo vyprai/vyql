@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule NamespacedSubjectKeyCollision {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_200, CWE_863]
+    id: "VYQL-AUTH-010"
+    severity: medium
+  }
+  issue code.NamespacedSubjectKeyCollision as subject
+}

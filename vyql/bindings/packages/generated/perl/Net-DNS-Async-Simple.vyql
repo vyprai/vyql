@@ -1,0 +1,9 @@
+module bindings.perl.generated.m60a1ed12;
+
+binding networkSend0 {
+  requires {
+    dependency("Net-DNS-Async-Simple")
+  }
+  query pattern callExpr where callee.method == "massDNSLookup"
+  emit sink code.NetworkSend at args[0]
+}

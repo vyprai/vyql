@@ -1,0 +1,52 @@
+# Rank 1159 / CVE-2026-33937: Handlebars.compile() accepts a pre-parsed AST
+# object as an alternative to a template string (the repo's own test suite
+# exercises this with Handlebars.compile({type: 'Program', body: [...]})).
+# A caller that deserializes an externally supplied AST and passes it
+# straight to compile() hands the template compiler a structure it never
+# parsed, and the real fix (68d8df5a, not the version-bump dce542c9a6 this
+# rank's pool row pointed at) has to add a dedicated validateInputAst() walk
+# in lib/handlebars/compiler/base.js to reject non-literal field values in
+# that AST before compiling it.
+#
+# Detection: Handlebars.compile()/handlebars.compile() are already sinks for
+# code.TemplateRender (VYQL-INJ-008), bound on args[0] regardless of whether
+# that argument is a template string or an AST object — the API accepts
+# either, and the sink does not need to know which. A JSON payload decoded
+# from a caller and handed to compile() as the AST still carries taint through
+# JSON.parse into that sink. The safe form keeps the template fixed and only
+# lets caller data flow into the render context, never into compile() itself.
+
+test "rank1159: compiling a caller-supplied precompiled AST is template injection"
+  lang javascript
+  profile library
+  file server/render.js
+  expect VYQL-INJ-008
+  code
+  ```
+  var Handlebars = require('handlebars');
+
+  function renderFromPayload(payload) {
+    var ast = JSON.parse(payload);
+    var template = Handlebars.compile(ast);
+    return template({});
+  }
+
+  module.exports = renderFromPayload;
+  ```
+
+test "rank1159: compiling a fixed template string and only letting data vary is safe"
+  lang javascript
+  profile library
+  file server/render.js
+  reject VYQL-INJ-008
+  code
+  ```
+  var Handlebars = require('handlebars');
+
+  function renderFromPayload(payload) {
+    var template = Handlebars.compile('<div>{{name}}</div>');
+    return template(JSON.parse(payload));
+  }
+
+  module.exports = renderFromPayload;
+  ```

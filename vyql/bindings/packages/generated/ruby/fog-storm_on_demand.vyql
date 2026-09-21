@@ -1,0 +1,25 @@
+module bindings.ruby.generated.mbe406f0a;
+
+binding networkConnect0 {
+  requires {
+    dependency("fog-storm_on_demand")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("fog-storm_on_demand")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding httpInput2 {
+  requires {
+    dependency("fog-storm_on_demand")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit source code.HttpInput at call.result
+}

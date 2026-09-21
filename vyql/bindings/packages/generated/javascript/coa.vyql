@@ -1,0 +1,43 @@
+module bindings.javascript.generated.m5b9c56c6;
+
+binding cliArgument0 {
+  requires {
+    dependency("coa")
+  }
+  query pattern callExpr where callee.method == "Cmd"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument1 {
+  requires {
+    dependency("coa")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit source code.CliArgument at call.result
+}
+
+binding inputValidation2 {
+  requires {
+    dependency("coa")
+  }
+  query pattern callExpr where callee.method == "escape"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation3 {
+  requires {
+    dependency("coa")
+  }
+  query pattern callExpr where callee.method == "unescape"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

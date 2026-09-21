@@ -1,0 +1,33 @@
+module bindings.c.x509_name_oneline_ex_unchecked_outparam;
+
+// X509_NAME_oneline_ex renders an X509_NAME into a caller-supplied buffer
+// only when the rendering fits: its size argument is an in/out parameter
+// (input the buffer's capacity, output the rendered length), and when the
+// name needs more bytes than the buffer holds, the function updates *size
+// alone and leaves the buffer exactly as it found it -- the contract its
+// own definition comment states and its body keeps. A caller that hands
+// over a stack buffer and then reads the buffer without consulting
+// anything about the call reads whatever was on the stack. The return
+// value is the buffer itself in every case, success or not, so there is
+// no error code to consult; the idioms that still engage with the call's
+// outcome are a comparison naming it and a capture into a named variable,
+// which lower to the binary: and assign: tokens (CWE-908's CWE-824 child:
+// an invalid read of an uninitialised stack value a crafted certificate
+// triggers, since a certificate controls how long the rendered name is).
+//
+// The anchor is exact-token, so the public X509_NAME_oneline -- a
+// different function, which truncates into its buffer and returns a
+// pointer or NULL -- is not drawn in.
+//
+// Residuals: a caller that captures or compares the call yet still reads
+// the buffer without consulting the size parameter clears (false
+// negative, the safe direction for precision), and a two-pass
+// measure-then-fill caller -- first call with a NULL buffer to learn the
+// length, allocation, second call to fill -- reports even though its
+// second call always writes. The remediation that keeps the helper is to
+// compare the in/out size against the buffer after the call, which only
+// the caller's own locals name, so no token route can credit it.
+binding x509NameOnelineExUncheckedOutparam {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.call in ["X509_NAME_oneline_ex"] and not (node.context.binary contains "X509_NAME_oneline_ex") and not (node.context.assign contains "X509_NAME_oneline_ex")
+  emit issue code.UninitializedBufferExposure at node
+}

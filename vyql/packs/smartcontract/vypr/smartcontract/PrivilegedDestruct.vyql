@@ -1,0 +1,10 @@
+module vypr.smartcontract;
+
+rule PrivilegedDestruct {
+  meta {
+    cwe: [CWE_284]
+    id: "VYQL-SC-002"
+    severity: critical
+  }
+  taint core.UserControlledData -> code.PrivilegedOpSink
+}

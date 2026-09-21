@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule CheckmkPendingChangeTextUnescapeXss {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_79]
+    id: "VYQL-INJ-063"
+    severity: high
+  }
+  issue code.CheckmkPendingChangeTextUnescapeXss as sink
+}

@@ -1,0 +1,44 @@
+test "rank730: dynamic widget require joins unvalidated id into local module path"
+  lang javascript
+  expect VYQL-PATH-035
+  file load-widget.js
+  code
+  ```
+  const path = require('path')
+
+  function runWidget (widgetId, config) {
+    const file = `widget-${widgetId}.js`
+    const widget = require(path.join(__dirname, file))
+    return widget.widgetRun(config)
+  }
+  ```
+
+test "rank730: widget id validation and containment helper protects dynamic require"
+  lang javascript
+  reject VYQL-PATH-035
+  file load-widget.js
+  code
+  ```
+  const path = require('path')
+  const widgetIdPattern = /^[a-z0-9-]+$/
+
+  function resolveWidgetPath (widgetId, widgetDirectory = __dirname) {
+    if (typeof widgetId !== 'string' || !widgetIdPattern.test(widgetId)) {
+      throw new Error(`Invalid widget ID: ${widgetId}`)
+    }
+
+    const widgetPath = path.resolve(widgetDirectory, `widget-${widgetId}.js`)
+    const relativePath = path.relative(widgetDirectory, widgetPath)
+
+    if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+      throw new Error(`Invalid widget ID: ${widgetId}`)
+    }
+
+    return widgetPath
+  }
+
+  function runWidget (widgetId, config) {
+    const widget = require(resolveWidgetPath(widgetId))
+    return widget.widgetRun(config)
+  }
+  ```

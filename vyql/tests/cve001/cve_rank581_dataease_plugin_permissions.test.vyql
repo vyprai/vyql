@@ -1,0 +1,60 @@
+test "rank581: plugin upload and uninstall endpoints require permissions"
+  lang java
+  expect VYQL-AUTH-035
+  code
+  ```
+  import org.springframework.web.bind.annotation.PostMapping;
+  import org.springframework.web.bind.annotation.RequestParam;
+  import org.springframework.web.multipart.MultipartFile;
+
+  class SysPluginController {
+      private PluginService pluginService;
+
+      @PostMapping("upload")
+      public Object localUpload(@RequestParam("file") MultipartFile file) throws Exception {
+          return pluginService.localInstall(file);
+      }
+
+      @PostMapping("/uninstall/{pluginId}")
+      public Boolean unInstall(Long pluginId) {
+          return pluginService.uninstall(pluginId);
+      }
+  }
+
+  interface PluginService {
+      Object localInstall(MultipartFile file) throws Exception;
+      Boolean uninstall(Long pluginId);
+  }
+  ```
+
+test "rank581: plugin upload and uninstall endpoints have operation permissions"
+  lang java
+  reject VYQL-AUTH-035
+  code
+  ```
+  import org.apache.shiro.authz.annotation.RequiresPermissions;
+  import org.springframework.web.bind.annotation.PostMapping;
+  import org.springframework.web.bind.annotation.RequestParam;
+  import org.springframework.web.multipart.MultipartFile;
+
+  class SysPluginController {
+      private PluginService pluginService;
+
+      @PostMapping("upload")
+      @RequiresPermissions("plugin:upload")
+      public Object localUpload(@RequestParam("file") MultipartFile file) throws Exception {
+          return pluginService.localInstall(file);
+      }
+
+      @PostMapping("/uninstall/{pluginId}")
+      @RequiresPermissions("plugin:uninstall")
+      public Boolean unInstall(Long pluginId) {
+          return pluginService.uninstall(pluginId);
+      }
+  }
+
+  interface PluginService {
+      Object localInstall(MultipartFile file) throws Exception;
+      Boolean uninstall(Long pluginId);
+  }
+  ```

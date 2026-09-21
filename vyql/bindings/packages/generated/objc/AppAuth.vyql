@@ -1,0 +1,9 @@
+module bindings.objc.generated.ma922fea9;
+
+binding deserialization0 {
+  requires {
+    dependency("AppAuth")
+  }
+  query pattern callExpr where callee.method == "initWithIDTokenString:"
+  emit sink code.Deserialization at args[0]
+}

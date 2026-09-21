@@ -1,0 +1,25 @@
+module bindings.objc.generated.m8d031327;
+
+binding userControlledData0 {
+  requires {
+    dependency("KakaoSDKLink")
+  }
+  query pattern callExpr where callee.method == "isKakaoLinkUrl"
+  emit source core.UserControlledData at call.result
+}
+
+binding urlFetch1 {
+  requires {
+    dependency("KakaoSDKLink")
+  }
+  query pattern callExpr where callee.method == "scrapLink"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch2 {
+  requires {
+    dependency("KakaoSDKLink")
+  }
+  query pattern callExpr where callee.method == "imageScrap"
+  emit sink code.UrlFetch at args[0]
+}

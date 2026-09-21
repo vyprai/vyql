@@ -1,0 +1,11 @@
+module code;
+
+concept CompileSassCleanupShellCommandWithoutPathCheck : issue {
+  cwe: [CWE_78]
+  reviewAssumption: "library callers can provide cssPath values containing shell metacharacters"
+  reviewCategory: command
+  reviewCondition: "compile-sass cleanup runs a caller-controlled CSS path through a shell rm command without a filesystem preflight check"
+  reviewConfidence: high
+  reviewEvidence: "compile-sass cleanup context {pattern} formats cssPath into rm -r before child_process.exec"
+  vulnerableTo: [injection.CommandInjection]
+}

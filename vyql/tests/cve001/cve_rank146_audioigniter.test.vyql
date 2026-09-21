@@ -1,0 +1,91 @@
+# Rank 146 / CVE-2026-8679: AudioIgniter served the public playlist JSON
+# endpoint from a rewrite-selected playlist id without checking publish
+# status or read permission.
+
+test "rank146: rewrite-selected playlist id reaches playlist JSON without a read policy"
+  lang php
+  file audioigniter.php
+  expect VYQL-AUTH-081
+  expect_review code.IdorPolicyReview
+  code
+  ```
+  <?php
+  class AudioIgniter {
+    public function handle_playlist_endpoint() {
+      global $wp_query;
+
+      $playlist_id = $wp_query->get( 'audioigniter_playlist_id' );
+
+      if ( empty( $playlist_id ) ) {
+        return;
+      }
+
+      $playlist_id = intval( $playlist_id );
+      $post        = get_post( $playlist_id );
+
+      if ( empty( $post ) || $post->post_type !== $this->post_type ) {
+        wp_send_json_error( __( "ID doesn't match a playlist", 'audioigniter' ) );
+      }
+
+      $response = array();
+      $tracks   = $this->get_post_meta( $playlist_id, '_audioigniter_tracks', array() );
+
+      foreach ( $tracks as $track ) {
+        $track_response = array();
+        $track_response['title'] = $track['title'];
+        $track_response['audio'] = $track['track_url'];
+        $response[] = $track_response;
+      }
+
+      wp_send_json( $response );
+    }
+  }
+  ?>
+  ```
+
+test "rank146: playlist JSON endpoint refuses unpublished playlists without read permission"
+  lang php
+  file audioigniter.php
+  reject VYQL-AUTH-081
+  expect_review core.AuthorizationCheck
+  reject_review code.IdorPolicyReview
+  code
+  ```
+  <?php
+  class AudioIgniter {
+    public function handle_playlist_endpoint() {
+      global $wp_query;
+
+      $playlist_id = $wp_query->get( 'audioigniter_playlist_id' );
+
+      if ( empty( $playlist_id ) ) {
+        return;
+      }
+
+      $playlist_id = (int) $playlist_id;
+      $post        = get_post( $playlist_id );
+
+      if ( empty( $post ) || $post->post_type !== $this->post_type ) {
+        wp_send_json_error( __( "ID doesn't match a playlist", 'audioigniter' ) );
+      }
+      if ( ( ! is_user_logged_in() && 'publish' !== $post->post_status ) ||
+        ( is_user_logged_in() && ! current_user_can( 'read_post', $playlist_id ) )
+      ) {
+        wp_send_json_error( __( 'Sorry, you are not allowed to access this playlist.', 'audioigniter' ) );
+      }
+
+      $response = array();
+      $tracks   = $this->get_post_meta( $playlist_id, '_audioigniter_tracks', array() );
+
+      foreach ( $tracks as $track ) {
+        $track_response = array();
+        $track_response['title'] = $track['title'];
+        $track_response['audio'] = $track['track_url'];
+        $response[] = $track_response;
+      }
+
+      wp_send_json( $response );
+    }
+  }
+  ?>
+  ```

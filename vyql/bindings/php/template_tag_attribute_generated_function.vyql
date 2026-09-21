@@ -1,0 +1,37 @@
+module bindings.php.template_tag_attribute_generated_function;
+
+// A template engine that compiles to PHP turns markup the template author
+// wrote into a string of generated code, and whatever that string declares is
+// executed when the compiled template is included. Smarty's compile-plugin
+// contract is the shape every such engine shares: a tag handler extends the
+// engine's compile base, reads the tag's attributes through the documented
+// Smarty_Internal_CompileBase::getAttributes() accessor, and returns generated
+// PHP. An attribute the template author names -- {function name='...'},
+// {block name='...'} -- is author-chosen text, and the one thing it may never
+// be is an arbitrary byte string: the generated declaration
+//   "function {$_funcName}(Smarty_Internal_Template \$_smarty_tpl,\$params) {"
+// closes as soon as the name carries `(){}`, so a template naming its function
+// `rce(){};echo "hi";function ` injects PHP straight into the compiled output.
+//
+// The attribute read and the code generation sit in different methods of
+// different classes (the opening handler reads and registers the name, the
+// closing handler emits the declaration), so this reads the compilation unit
+// rather than one function: a unit that reads tag attributes through the
+// documented accessor and declares a generated function from an interpolated
+// or concatenated local, with no identifier validation anywhere in the unit.
+// The declaration clauses match the assign token's compacted text, so the
+// interpolated spelling `function {$name}` and the concatenated
+// `function ' . $name . '` both read; a generated declaration whose name is
+// the engine's own property or a subscripted hash -- Smarty's unifunc -- is a
+// different value and does not. The validation clause is over call tokens,
+// which are AST-derived, so a commented-out preg_match does not count as
+// validation and neither does prose naming one. A sprintf-built declaration
+// (`sprintf('function %s(...)', $name)`) is not read: its needle would be a
+// bare format string, which ordinary message text also carries.
+binding templateTagAttributeGeneratedFunction {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "php"
+    and containsAny(node.context.assign, ["function{$_", "function'.$_", "function\".$_"])
+    and node.context.assignCallMethod in ["getAttributes"]
+    and not containsAny(node.context.call, ["preg_match", "ctype_alnum", "ctype_alpha", "ctype_digit", "ctype_xdigit", "filter_var"])
+  emit issue code.IncompleteTemplateValidation at node
+}

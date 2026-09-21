@@ -1,0 +1,25 @@
+module bindings.scala.generated.m64142f68;
+
+binding deserialization0 {
+  requires {
+    dependency("jakarta.xml.bind:jakarta.xml.bind-api")
+  }
+  query pattern callExpr where callee.method == "unmarshal"
+  emit sink code.Deserialization at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("jakarta.xml.bind:jakarta.xml.bind-api")
+  }
+  query pattern callExpr where callee.method == "marshal"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("jakarta.xml.bind:jakarta.xml.bind-api")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

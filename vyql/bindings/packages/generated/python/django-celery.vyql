@@ -1,0 +1,9 @@
+module bindings.python.generated.mec4f601a;
+
+binding codeEval0 {
+  requires {
+    dependency("django-celery")
+  }
+  query pattern callExpr where callee.method == "apply"
+  emit sink code.CodeEval at args[0]
+}

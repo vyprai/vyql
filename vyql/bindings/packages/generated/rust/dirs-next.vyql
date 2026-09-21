@@ -1,0 +1,129 @@
+module bindings.rust.generated.m3e745044;
+
+binding filePathAccess0 {
+  requires {
+    dependency("dirs-next")
+  }
+  query pattern callExpr where callee.method == "home_dir"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("dirs-next")
+  }
+  query pattern callExpr where callee.method == "cache_dir"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("dirs-next")
+  }
+  query pattern callExpr where callee.method == "config_dir"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("dirs-next")
+  }
+  query pattern callExpr where callee.method == "data_dir"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("dirs-next")
+  }
+  query pattern callExpr where callee.method == "data_local_dir"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess5 {
+  requires {
+    dependency("dirs-next")
+  }
+  query pattern callExpr where callee.method == "executable_dir"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess6 {
+  requires {
+    dependency("dirs-next")
+  }
+  query pattern callExpr where callee.method == "runtime_dir"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess7 {
+  requires {
+    dependency("dirs-next")
+  }
+  query pattern callExpr where callee.method == "audio_dir"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess8 {
+  requires {
+    dependency("dirs-next")
+  }
+  query pattern callExpr where callee.method == "desktop_dir"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess9 {
+  requires {
+    dependency("dirs-next")
+  }
+  query pattern callExpr where callee.method == "document_dir"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess10 {
+  requires {
+    dependency("dirs-next")
+  }
+  query pattern callExpr where callee.method == "download_dir"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess11 {
+  requires {
+    dependency("dirs-next")
+  }
+  query pattern callExpr where callee.method == "font_dir"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess12 {
+  requires {
+    dependency("dirs-next")
+  }
+  query pattern callExpr where callee.method == "picture_dir"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess13 {
+  requires {
+    dependency("dirs-next")
+  }
+  query pattern callExpr where callee.method == "public_dir"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess14 {
+  requires {
+    dependency("dirs-next")
+  }
+  query pattern callExpr where callee.method == "template_dir"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess15 {
+  requires {
+    dependency("dirs-next")
+  }
+  query pattern callExpr where callee.method == "video_dir"
+  emit sink code.FilePathAccess at args[0]
+}

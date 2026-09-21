@@ -1,0 +1,32 @@
+module bindings.java.http2_stream_reset_rate_control;
+
+// A multiplexed protocol session such as HTTP/2 answers a stream error by
+// writing a reset frame to the peer and dropping the stream from its own
+// registry. That path is reachable by the peer: any frame that violates the
+// protocol makes the session generate the reset, so the peer decides how often
+// it runs. The frame is produced locally rather than received, so the inbound
+// frame-flood counters never observe it, and the stream leaves the concurrency
+// registry as soon as it is removed. A peer that keeps provoking stream errors
+// therefore gets unmetered stream creation, teardown and frame emission out of
+// the connection.
+//
+// Every HTTP/2 stack ships the counter this needs. Jetty documents
+// org.eclipse.jetty.http2.parser.RateControl, whose onEvent returns false once
+// the connection has spent its budget, and reaches it through
+// Parser.rateControlOnEvent; other stacks use a token bucket or an explicit
+// per-connection counter. The names below cover both spellings, and any of them
+// appearing on the teardown path is enough to suppress the finding, because the
+// finding is about the charge being absent rather than about which limiter
+// performs it.
+//
+// The teardown path is identified by three things together: it receives the
+// reset frame or the stream error that describes it, it writes that frame out
+// itself, and it removes the stream from the session. All three are needed. A
+// method that only forwards the frame to the session -- the stream-level reset
+// an application calls -- does not write it, so the charge belongs to the
+// session method it forwards to and not to the caller. A method that only
+// removes a stream is ordinary bookkeeping with no frame emission behind it.
+binding http2StreamResetWithoutRateControl {
+  query pattern presenceNode where node.scope == "function" and containsAny(node.context.paramType, ["ResetFrame", "RstStreamFrame", "Http2ResetFrame", "StreamException"]) and containsAny(node.context.callPath, ["control", "writeRstStream", "sendRstStream", "writeStreamReset", "sendStreamReset", "writeReset", "sendReset"]) and containsAny(node.context.callPath, ["removeStream", "closeStream", "deregisterStream", "unregisterStream"]) and not (containsAny(node.context.callPath, ["rateControlOnEvent", "getRateControl", "rateControl.onEvent", "rateControl.isAllowed", "rateLimiter.tryAcquire", "rateLimiter.acquire", "limiter.tryAcquire", "limiter.acquire", "throttle", "checkRate", "onEvent"])) and not (containsAny(node.context.identifier, ["rateControl", "RateControl", "rateLimiter", "RateLimiter", "ENHANCE_YOUR_CALM"]))
+  emit issue code.StreamResetWithoutRateControl at node
+}

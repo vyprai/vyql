@@ -1,0 +1,9 @@
+module bindings.php.generated.m934faa45;
+
+binding filePathAccess0 {
+  requires {
+    dependency("psr/http-factory")
+  }
+  query pattern callExpr where callee.method == "createStreamFromFile"
+  emit sink code.FilePathAccess at args[0]
+}

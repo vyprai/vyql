@@ -1,0 +1,33 @@
+module bindings.python.generated.m65d9ea34;
+
+binding deserialization0 {
+  requires {
+    dependency("rsa")
+  }
+  query pattern callExpr where callee.method == "decrypt"
+  emit sink code.Deserialization at args[0]
+}
+
+binding weakHash1 {
+  requires {
+    dependency("rsa")
+  }
+  query pattern callExpr where callee.method == "sign"
+  emit issue code.WeakHash at call
+}
+
+binding secretValue2 {
+  requires {
+    dependency("rsa")
+  }
+  query pattern callExpr where callee.method == "load_pkcs1"
+  emit source code.SecretValue at call.result
+}
+
+binding weakRandomValue3 {
+  requires {
+    dependency("rsa")
+  }
+  query pattern callExpr where callee.method == "read_random_bits"
+  emit issue code.WeakRandomValue at call
+}

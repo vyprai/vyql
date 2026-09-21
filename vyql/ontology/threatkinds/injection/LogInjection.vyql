@@ -1,0 +1,6 @@
+module injection;
+
+threat LogInjection {
+  cwe: [CWE_117]
+  desc: "Untrusted data in log output"
+}

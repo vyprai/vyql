@@ -1,0 +1,9 @@
+module bindings.perl.generated.m5f66b2d1;
+
+binding filePathAccess0 {
+  requires {
+    dependency("Toadfarm-Plugin-Letsencrypt")
+  }
+  query pattern callExpr where callee.method == "register"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.objc.generated.mae7ba55f;
+
+binding userControlledData0 {
+  requires {
+    dependency("Adjust")
+  }
+  query pattern callExpr where callee.method == "initWithDeeplink"
+  emit source core.UserControlledData at call.result
+}

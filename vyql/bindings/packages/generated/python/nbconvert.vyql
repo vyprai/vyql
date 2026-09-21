@@ -1,0 +1,9 @@
+module bindings.python.generated.mbad44e6b;
+
+binding commandExecution0 {
+  requires {
+    dependency("nbconvert")
+  }
+  query pattern callExpr where callee.method == "run_command"
+  emit sink code.CommandExecution at args[0]
+}

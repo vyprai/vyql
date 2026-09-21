@@ -1,0 +1,12 @@
+module code;
+
+concept StateChangeSmell : sink {
+  cwe: [CWE_862, CWE_306, CWE_352, CWE_841]
+  enabledBy: [taint.UntrustedData]
+  reviewAssumption: "the operation is not otherwise gated"
+  reviewCategory: access_control
+  reviewCondition: "user-controlled data drives a state change with no authentication in the path"
+  reviewConfidence: medium
+  reviewEvidence: "state change {pattern} receives tainted input"
+  vulnerableTo: [access_control.IncorrectAuthorization, authentication.MissingAuthentication]
+}

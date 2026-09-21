@@ -1,0 +1,12 @@
+module vypr.injection;
+
+rule StoredHtmlWriteRequiresSanitization {
+  meta {
+    confidenceFloor: low
+    cwe: [CWE_79]
+    id: "VYQL-INJ-028"
+    severity: high
+  }
+  issue code.StoredHtmlWrite as sink
+  unless sink.endpoint coveredBy core.HtmlEscape
+}

@@ -1,0 +1,146 @@
+# Rank 1781 / CVE-2026-40982: spring-cloud-config's JGit environment
+# repository cleaned its clone basedir by listing the directory's
+# entries and passing each one to JGit's recursive delete
+#   FileUtils.delete(file, FileUtils.RECURSIVE)
+# (JGitEnvironmentRepository.deleteBaseDirIfExists, CWE-59). An entry
+# planted as a directory symlink makes the recursive delete traverse and
+# remove the link target's tree outside the basedir. The fixed revision (cc71e5c)
+# replaces the listing loop with a walk that follows no links, deletes
+# entries without recursion, and re-asserts every visited path stays
+# under the base -- and the same commit resolves every path it touches
+# with LinkOption.NOFOLLOW_LINKS. What clears the finding is link-safety
+# handling inside the deleting function: a symbolic-link test, a
+# no-follow resolution, or the walk-based cleanup, in any spelling --
+# not the helper's name.
+
+test "rank1781: listing-driven recursive delete with no link handling"
+  lang java
+  file JGitEnvironmentRepository.java
+  expect VYQL-PATH-082
+  expect_review code.RecursiveDeleteWithoutSymlinkCheck
+  code
+  ```
+  public class JGitEnvironmentRepository {
+    private void deleteBaseDirIfExists() {
+      if (getBasedir().exists()) {
+        for (File file : getBasedir().listFiles()) {
+          try {
+            FileUtils.delete(file, FileUtils.RECURSIVE);
+          }
+          catch (IOException e) {
+            throw new IllegalStateException("Failed to initialize base directory", e);
+          }
+        }
+      }
+    }
+  }
+  ```
+
+test "rank1781: walk-based cleanup that follows no links"
+  lang java
+  file JGitEnvironmentRepositoryPatched.java
+  reject VYQL-PATH-082
+  reject_review code.RecursiveDeleteWithoutSymlinkCheck
+  code
+  ```
+  public class JGitEnvironmentRepositoryPatched {
+    private void deleteBaseDirIfExists() {
+      File basedirFile = getBasedir();
+      if (!Files.exists(basedirFile.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+        return;
+      }
+      Path base = basedirFile.toPath().toAbsolutePath().normalize();
+      try {
+        Files.walkFileTree(base, EnumSet.noneOf(FileVisitOption.class), Integer.MAX_VALUE,
+            new SimpleFileVisitor<Path>() {
+              @Override
+              public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                assertPathUnderBase(file, base);
+                Files.delete(file);
+                return FileVisitResult.CONTINUE;
+              }
+            });
+      }
+      catch (IOException e) {
+        throw new IllegalStateException("Failed to initialize base directory", e);
+      }
+    }
+  }
+  ```
+
+test "rank1781: symbolic-link test before each recursive delete clears it"
+  lang java
+  file JGitEnvironmentRepositoryLinkTest.java
+  reject VYQL-PATH-082
+  reject_review code.RecursiveDeleteWithoutSymlinkCheck
+  code
+  ```
+  public class JGitEnvironmentRepositoryLinkTest {
+    private void deleteBaseDirIfExists() {
+      if (getBasedir().exists()) {
+        for (File file : getBasedir().listFiles()) {
+          if (Files.isSymbolicLink(file.toPath())) {
+            continue;
+          }
+          try {
+            FileUtils.delete(file, FileUtils.RECURSIVE);
+          }
+          catch (IOException e) {
+            throw new IllegalStateException("Failed to initialize base directory", e);
+          }
+        }
+      }
+    }
+  }
+  ```
+
+test "rank1781: no-follow resolution of the entry clears it"
+  lang java
+  file JGitEnvironmentRepositoryNoFollow.java
+  reject VYQL-PATH-082
+  reject_review code.RecursiveDeleteWithoutSymlinkCheck
+  code
+  ```
+  public class JGitEnvironmentRepositoryNoFollow {
+    private void deleteBaseDirIfExists() {
+      if (getBasedir().exists()) {
+        for (File file : getBasedir().listFiles()) {
+          try {
+            Path real = file.toPath().toRealPath(LinkOption.NOFOLLOW_LINKS);
+            FileUtils.delete(real.toFile(), FileUtils.RECURSIVE);
+          }
+          catch (IOException e) {
+            throw new IllegalStateException("Failed to initialize base directory", e);
+          }
+        }
+      }
+    }
+  }
+  ```
+
+test "rank1781: link handling in a sibling method does not clear it"
+  lang java
+  file JGitEnvironmentRepositorySiblingGuard.java
+  expect VYQL-PATH-082
+  expect_review code.RecursiveDeleteWithoutSymlinkCheck
+  code
+  ```
+  public class JGitEnvironmentRepositorySiblingGuard {
+    private boolean isLink(File file) {
+      return Files.isSymbolicLink(file.toPath());
+    }
+
+    private void deleteBaseDirIfExists() {
+      if (getBasedir().exists()) {
+        for (File file : getBasedir().listFiles()) {
+          try {
+            FileUtils.delete(file, FileUtils.RECURSIVE);
+          }
+          catch (IOException e) {
+            throw new IllegalStateException("Failed to initialize base directory", e);
+          }
+        }
+      }
+    }
+  }
+  ```

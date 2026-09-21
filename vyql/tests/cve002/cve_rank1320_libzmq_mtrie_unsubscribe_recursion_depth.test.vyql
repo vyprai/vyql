@@ -1,0 +1,292 @@
+# Rank 1320 / CVE-2021-20236 (GHSA-4j25-p3vq-p264): libzmq's PUB/XPUB
+# subscription store, `zmq::generic_mtrie_t` (src/generic_mtrie_impl.hpp), is
+# a byte-per-level trie that is walked by recursion, one frame per byte of the
+# topic:
+#
+#   const rm_result ret = next_node->rm_helper (prefix_ + 1, size_ - 1, pipe_);
+#   if (next_node->is_redundant ()) { ... }   // post-recursion work
+#
+# `prefix_`/`size_` come straight from the wire: xpub.cpp's xread_activated
+# takes `msg.data ()`, skips the one-byte subscribe/cancel marker, and hands
+# the remainder to `_subscriptions.rm (data, size, pipe_)` (and `.add`). A
+# remote peer therefore chooses the recursion depth, and nothing in the walk
+# counts levels or caps them. The work after the recursive call (pruning a
+# redundant child, compacting the node table) makes the calls non-tail, so no
+# compiler turns them into a loop either: the stack grows linearly with the
+# topic length until it is exhausted (oss-fuzz 22488, CWE-674 uncontrolled
+# recursion; NVD files it as CWE-787/CWE-120 because the overflow lands off
+# the end of the stack). Reachable pre-authentication on any PUB/XPUB socket
+# without CURVE/ZAP.
+#
+# Fix ab301ebf799b4dbddb1351d77da49b2e6e1cf8ec (merged as 522abc7376,
+# PR #3959) converts both `add` and both `rm` overloads to iterative
+# algorithms: `add` becomes a plain `while (size_)` descent, and `rm` keeps an
+# explicit `std::list<struct iter> stack` with a `processed_for_removal`
+# boolean so the post-recursion half of each frame can be re-visited after its
+# children, on the heap instead of the call stack.
+#
+# ATTENTION, engine gap. The self-call is visible in the data: the vulnerable
+# function's own analysis.function.context carries `call:rm_helper` and
+# `call_path:next_node.rm_helper` (probe-verified on the real file -- five
+# function contexts in generic_mtrie_impl.hpp carry a `call:rm_helper` token,
+# rm_helper's own among them), and the graph holds the call node itself at
+# generic_mtrie_impl.hpp:351 with `path=next_node.rm_helper`. Naming the
+# construct needs two things the data layer cannot say, and both are needed:
+#
+#  1. The C/C++ structured-context walk emits no `function_name:` token
+#     (internal/extract/frontend/treesitter/c.go; the csharp, php and rust
+#     walks each emit one), and a presence predicate's right side must be a
+#     string literal, so "the callee is the enclosing function" is not
+#     writable in either direction: spelling the callee literally is one
+#     codebase's identifier, and comparing the `call:` field to the
+#     `functionName` field is not a predicate the engine has. Same
+#     no-unification limit the JavaScript, Kotlin and C identity ranks hold.
+#  2. The depth-cap half. A bare same-name-call label matches 159 function
+#     bodies in libzmq/src at the vulnerable revision (permissive signature
+#     walk over src/*.c|cc|cpp|h|hpp), of which the two vulnerable helpers
+#     are 2 -- the rest is ordinary bounded recursion and same-name
+#     base-class delegation (`process_term`, `timer_event`, `plug`,
+#     `rollback`). Without also asking whether any guard operand on the path
+#     is a depth counter the label is unshippable, and that question needs a
+#     new analysis observation rather than a spelling of the ones that exist.
+#
+# The taint route is closed independently of both: `vyql trace -from
+# code.HttpInput` on the real checkout connects 2 source-sink pairs (both in
+# test and perf scripts) and dead-ends 73 sources, none of it in
+# generic_mtrie_impl.hpp; on the minimal pair below the recv source stops at
+# the walk entry with "callee not traced", because the member call through a
+# pointer lowers to a receiver-qualified name that resolves to no body.
+#
+# Real-checkout measurements, 3x `--cache off --max-ram 6GB`, timeout 180:
+# 944 findings (73 at or above high) at ab301ebf^ against 940 (74) at
+# ab301ebf, and generic_mtrie_impl.hpp carries 8x VYQL-MEM-006, 2x MEM-012
+# and 4x MEM-016 before the fix against 3x MEM-006, 1x MEM-008, 2x MEM-012
+# and 4x MEM-016 after it -- the patched revision gains a finding rather than
+# losing one, so nothing discriminates in either direction and no rule
+# reports the walk at either revision. The CWE-674 rules do not reach C/C++
+# here: VYQL-DOS-035 and VYQL-DOS-045 bind JavaScript and PHP only,
+# VYQL-DOS-036's sole cpp binding (recursiveCompressedPacketDecompression74,
+# vyql/bindings/cpp/m4e783366.vyql) asks for one codebase's seven identifiers
+# in one function, and VYQL-DOS-049's depth-limit binding is Ruby-only.
+#
+# Not mechanical. Closing it needs a new structural observation -- a function
+# calling itself with a length/count argument decremented from a
+# caller-supplied parameter, and no operand of any guard on that path a depth
+# counter -- plus a concept and a language-neutral rule over it. That is a new
+# classification and a new relation between a call site and the enclosing
+# function's own identity, not a correction to an extraction path the frontend
+# walks.
+#
+# The pair below isolates the construct: two walks identical except that one
+# carries a depth counter checked against a cap and the other does not. The
+# scanner reports the same thing for both -- nothing -- which is the gap.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1320: mtrie unsubscription recurses once per topic byte with no depth bound"
+  lang cpp
+  file generic_mtrie_impl.hpp
+  reject VYQL-DOS-035
+  reject VYQL-DOS-036
+  reject VYQL-DOS-045
+  reject_review code.RecursiveCompressedPacketDecompression
+  code
+  ```
+  namespace zmq
+  {
+  template <typename T>
+  typename generic_mtrie_t<T>::rm_result
+  generic_mtrie_t<T>::rm (prefix_t prefix_, size_t size_, value_t *pipe_)
+  {
+      return rm_helper (prefix_, size_, pipe_);
+  }
+
+  template <typename T>
+  typename generic_mtrie_t<T>::rm_result
+  generic_mtrie_t<T>::rm_helper (prefix_t prefix_, size_t size_, value_t *pipe_)
+  {
+      if (!size_) {
+          if (!_pipes)
+              return not_found;
+          typename pipes_t::size_type erased = _pipes->erase (pipe_);
+          if (_pipes->empty ()) {
+              LIBZMQ_DELETE (_pipes);
+              return last_value_removed;
+          }
+          return (erased == 1) ? values_remain : not_found;
+      }
+
+      const unsigned char c = *prefix_;
+      if (!_count || c < _min || c >= _min + _count)
+          return not_found;
+
+      generic_mtrie_t *next_node =
+        _count == 1 ? _next.node : _next.table[c - _min];
+      if (!next_node)
+          return not_found;
+
+      const rm_result ret = next_node->rm_helper (prefix_ + 1, size_ - 1, pipe_);
+
+      if (next_node->is_redundant ()) {
+          LIBZMQ_DELETE (next_node);
+          if (_count == 1) {
+              _next.node = 0;
+              _count = 0;
+              --_live_nodes;
+          } else {
+              _next.table[c - _min] = 0;
+              --_live_nodes;
+          }
+      }
+
+      return ret;
+  }
+  }
+  ```
+
+test "rank1320: fix walks the same trie with an explicit stack instead of the call stack"
+  lang cpp
+  file generic_mtrie_impl.hpp
+  reject VYQL-DOS-035
+  reject VYQL-DOS-036
+  reject VYQL-DOS-045
+  reject_review code.RecursiveCompressedPacketDecompression
+  code
+  ```
+  namespace zmq
+  {
+  template <typename T>
+  typename generic_mtrie_t<T>::rm_result
+  generic_mtrie_t<T>::rm (prefix_t prefix_, size_t size_, value_t *pipe_)
+  {
+      rm_result ret = not_found;
+      std::list<struct iter> stack;
+      struct iter it = {this, NULL, prefix_, size_, 0, 0, 0, false};
+      stack.push_back (it);
+
+      while (!stack.empty ()) {
+          it = stack.back ();
+          stack.pop_back ();
+
+          if (!it.processed_for_removal) {
+              if (!it.size) {
+                  if (!it.node->_pipes) {
+                      ret = not_found;
+                      continue;
+                  }
+                  typename pipes_t::size_type erased =
+                    it.node->_pipes->erase (pipe_);
+                  if (it.node->_pipes->empty ()) {
+                      LIBZMQ_DELETE (it.node->_pipes);
+                      ret = last_value_removed;
+                      continue;
+                  }
+                  ret = (erased == 1) ? values_remain : not_found;
+                  continue;
+              }
+
+              it.current_child = *it.prefix;
+              if (!it.node->_count || it.current_child < it.node->_min
+                  || it.current_child >= it.node->_min + it.node->_count) {
+                  ret = not_found;
+                  continue;
+              }
+
+              it.next_node =
+                it.node->_count == 1
+                  ? it.node->_next.node
+                  : it.node->_next.table[it.current_child - it.node->_min];
+              if (!it.next_node) {
+                  ret = not_found;
+                  continue;
+              }
+
+              it.processed_for_removal = true;
+              stack.push_back (it);
+              struct iter next = {
+                it.next_node, NULL, it.prefix + 1, it.size - 1, 0, 0, 0, false};
+              stack.push_back (next);
+          } else {
+              it.processed_for_removal = false;
+              if (it.next_node->is_redundant ()) {
+                  LIBZMQ_DELETE (it.next_node);
+                  if (it.node->_count == 1) {
+                      it.node->_next.node = NULL;
+                      it.node->_count = 0;
+                      --it.node->_live_nodes;
+                  } else {
+                      it.node->_next.table[it.current_child - it.node->_min] = 0;
+                      --it.node->_live_nodes;
+                  }
+              }
+          }
+      }
+
+      return ret;
+  }
+  }
+  ```
+
+test "rank1320: minimal pair -- a self-recursive walk whose depth is a peer-supplied length, with no depth cap"
+  lang cpp
+  file walk.cpp
+  reject VYQL-DOS-035
+  reject VYQL-DOS-036
+  reject VYQL-DOS-045
+  reject_review code.RecursiveCompressedPacketDecompression
+  code
+  ```
+  struct node_t {
+      node_t *next;
+      int walk (const unsigned char *prefix, size_t size);
+  };
+
+  int node_t::walk (const unsigned char *prefix, size_t size)
+  {
+      if (!size)
+          return 0;
+      const int ret = next->walk (prefix + 1, size - 1);
+      if (!ret)
+          next = NULL;
+      return ret;
+  }
+
+  void handle (int fd, node_t *root)
+  {
+      unsigned char buf[256];
+      size_t n = recv (fd, buf, sizeof buf, 0);
+      root->walk (buf, n);
+  }
+  ```
+
+test "rank1320: minimal pair -- the identical walk carrying a depth counter checked against a cap"
+  lang cpp
+  file walk.cpp
+  reject VYQL-DOS-035
+  reject VYQL-DOS-036
+  reject VYQL-DOS-045
+  reject_review code.RecursiveCompressedPacketDecompression
+  code
+  ```
+  struct node_t {
+      node_t *next;
+      int walk (const unsigned char *prefix, size_t size, unsigned depth);
+  };
+
+  int node_t::walk (const unsigned char *prefix, size_t size, unsigned depth)
+  {
+      if (!size || depth > 64)
+          return 0;
+      const int ret = next->walk (prefix + 1, size - 1, depth + 1);
+      if (!ret)
+          next = NULL;
+      return ret;
+  }
+
+  void handle (int fd, node_t *root)
+  {
+      unsigned char buf[256];
+      size_t n = recv (fd, buf, sizeof buf, 0);
+      root->walk (buf, n, 0);
+  }
+  ```

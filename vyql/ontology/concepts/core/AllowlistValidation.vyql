@@ -1,0 +1,7 @@
+module core;
+
+concept AllowlistValidation : check {
+  applies: path
+  covers: [endpoint, path]
+  neutralizes: [injection.CommandInjection, request_forgery.Ssrf]
+}

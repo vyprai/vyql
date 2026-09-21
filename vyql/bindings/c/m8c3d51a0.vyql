@@ -1,0 +1,21 @@
+module bindings.c.generated.m8c3d51a0;
+
+// APR ships two array copies and its header documents them as opposites.
+// apr_array_copy() "copies the entire array". apr_array_copy_hdr() "copies the
+// headers of the array, and arranges for the elements to be copied if and only
+// if the code subsequently does a push or arraycat" -- its implementation is
+// res->elts = arr->elts, so until that push happens the returned array is an
+// alias for element storage the source pool still owns. The remark beside it
+// says the variant is meant for elements that are read only.
+//
+// Storing that alias where it outlives the call is what turns documented
+// sharing into a lifetime defect: assigned to a struct field or through an out
+// parameter, the copy lives as long as whatever holds it, while its elements are
+// freed with the source pool. A cached or pooled object assembled from a
+// configuration or per-request pool then reads freed memory the next time it
+// walks the array. A copy kept in a local dies with the frame and is not that
+// shape, which is why the assignment target is part of the pattern.
+binding aprArrayHeaderCopyRetainedAlias1 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and containsAny(node.context.assignShape, [".FIELD=apr_array_copy_hdr(", "*ID=apr_array_copy_hdr("])
+  emit issue code.UnsafeMutableAlias at node
+}

@@ -1,0 +1,47 @@
+# Rank 1 / CVE-2025-59332: 3DAlloy copied MediaWiki parser hook attributes
+# into Html::element canvas attributes before validating them with
+# Sanitizer::validateAttributes.
+
+test "rank1: mediawiki parser hook args reach html attributes"
+  lang php
+  expect VYQL-INJ-004
+  code
+  ```
+  <?php
+  class ThreeDimentionAlloy {
+    static public function parse3DTag($input, array $args, Parser $parser, PPFrame $frame) {
+      $params = array_merge(["class" => "mw-3d", "style" => ""], $args);
+      $par = [];
+      foreach ($params as $key => $value) {
+        if ($value !== '') {
+          $par[$key] = $value;
+        }
+      }
+      return Html::element('canvas', $par, $input);
+    }
+  }
+  ?>
+  ```
+
+test "rank1: mediawiki attribute validation is clean"
+  lang php
+  reject VYQL-INJ-004
+  code
+  ```
+  <?php
+  class ThreeDimentionAlloy {
+    static public function parse3DTag($input, array $args, Parser $parser, PPFrame $frame) {
+      $params = array_merge(["class" => "mw-3d", "style" => ""], $args);
+      $par = [];
+      foreach ($params as $key => $value) {
+        if ($value !== '') {
+          $par[$key] = $value;
+        }
+      }
+      $par = Sanitizer::validateAttributes($par, ['file', 'width', 'height', 'style', 'class']);
+      return Html::element('canvas', $par, $input);
+    }
+  }
+  ?>
+  ```
+

@@ -1,0 +1,9 @@
+module bindings.cpp.generated.me2776dd4;
+
+binding deserialization0 {
+  requires {
+    dependency("gzip-hpp")
+  }
+  query pattern callExpr where callee.method == "decompress"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,33 @@
+module bindings.solidity.signature_compact_encoding;
+
+// OpenZeppelin's ECDSA library documents its bytes-form recovery entry as
+// malleability-rejecting: the doc block on tryRecover(bytes32, bytes memory)
+// reads "The ecrecover EVM opcode allows for malleable (non-unique)
+// signatures: this function rejects them by requiring the s value to be in
+// the lower half order, and the v value to be either 27 or 28". That promise
+// is written against the canonical 65-byte (r, s, v) encoding. A second
+// length arm accepting the EIP-2098 64-byte (r, vs) compact form alongside
+// it breaks the promise by construction: the compact encoding maps
+// ambiguously onto (v, s) pairs, so the same commitment recovers through
+// two different encodings and every scheme built on signature uniqueness --
+// nonces, replay guards, seen-signature sets -- admits the malleable twin.
+// The fixing commit removes the 64-byte arm from the bytes-form entry
+// entirely, leaving the compact form reachable only through the
+// explicit-field overloads where the caller names the encoding.
+//
+// The clauses are each answerable to the library's documented surface rather
+// than to one incident: the recovery entry's name, and the two lengths the
+// documentation itself distinguishes -- 65-byte standard against 64-byte
+// EIP-2098 short form -- compared off the signature's own length member in
+// the memory-form dispatcher. An entry that handles only one length does not
+// match, and neither does the calldata dispatcher written as an assembly
+// switch over mload(signature), the dialect whose libraries (Solady,
+// Solmate) document dual acceptance as an intentional contract with an
+// explicit non-malleability warning. Residual: a memory-form entry that
+// compares against both lengths in order to reject the compact one reads
+// the same to these clauses and is flagged; the review text asks for the
+// uniqueness assumption, which is the judgement these labels cannot make.
+binding signatureCompactEncodingAccepted {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "solidity" and node.context.functionName contains "recover" and node.token contains ".length==64" and node.token contains ".length==65"
+  emit issue code.SignatureCompactEncodingAccepted at node
+}

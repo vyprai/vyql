@@ -1,0 +1,49 @@
+module bindings.python.generated.m0d09c3b2;
+
+binding storedDataRead0 {
+  requires {
+    dependency("django-storages")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.StoredDataRead at call.result
+}
+
+binding storedDataWrite1 {
+  requires {
+    dependency("django-storages")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.StoredDataWrite at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("django-storages")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("django-storages")
+  }
+  query pattern callExpr where callee.method == "url"
+  emit source core.UserControlledData at call.result
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("django-storages")
+  }
+  query pattern callExpr where callee.method == "listdir"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess5 {
+  requires {
+    dependency("django-storages")
+  }
+  query pattern callExpr where callee.method == "list_all"
+  emit sink code.FilePathAccess at args[0]
+}

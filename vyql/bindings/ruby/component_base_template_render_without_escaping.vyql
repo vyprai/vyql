@@ -1,0 +1,50 @@
+module bindings.ruby.component_base_template_render_without_escaping;
+
+// A view component's markup reaches the page through one class: the framework
+// base whose render entry dispatches the compiled template and returns the
+// result. Component authors write the markup -- `call` methods and template
+// files that interpolate request data -- and the base decides whether that
+// output is escaped on the way out, so the base is the unit that either
+// applies an HTML escape or does not.
+//
+// The escape ships as a helper on the same class rather than a call inside the
+// render entry itself, which is why the render entry's own body cannot carry
+// the discriminator: every remediated spelling still dispatches the template
+// renderer from the entry (the current base does exactly that, with the escape
+// two helpers away), so a function-scoped binding keyed on the entry's call
+// set reports remediated code. The class is the finest scope that holds both
+// halves -- the template dispatch it is named for and the escape it owes -- and
+// `scope == "class"` reads exactly that.
+//
+// The escape conjunct is the vocabulary the Ruby `core.HtmlEscape` bindings
+// already treat as an HTML escape: `html_escape` (ERB::Util's, ActionView's
+// bare spelling and any receiver-qualified form), `escape_html` (Rack::Utils')
+// and `escapeHTML` (CGI's). A class carrying any of them has the machinery;
+// one carrying none returns whatever the component authored.
+//
+// Costs and residuals, stated rather than hidden.
+//
+//   * The conjunct asks whether the class escapes anywhere, not whether it
+//     escapes the render pipeline, so an escape applied to some other method
+//     of the same class also suppresses. False-negative direction.
+//   * `h` -- ERB::Util's short alias -- is too short a needle to key a
+//     negation on, and `sanitize` is a tag-stripper rather than an escaper
+//     with a name that collides with unrelated methods, so a class escaping
+//     through either of those alone stays reported. False-positive direction,
+//     and the review flag asks the reader to check the pipeline.
+//   * `html_safe` marks a string trusted without escaping it, so it is
+//     deliberately not in the conjunct: the remediated base uses it for the
+//     default postamble and for annotation markers while the escape itself is
+//     `html_escape`, and a class that only marked strings trusted would still
+//     deserve the review.
+//   * The finding lands on the class declaration rather than the render
+//     method, because the render entry is not distinguishable at class scope.
+
+binding componentBaseTemplateRenderWithoutEscaping {
+  query pattern presenceNode where node.scope == "class"
+    and node.context.language == "ruby"
+    and node.context.classBase contains "ActionView.Base"
+    and node.context.callPath contains "render_template_for"
+    and not (containsAny(node.context.callPath, ["html_escape", "escape_html", "escapeHTML"]))
+  emit issue code.UnescapedHtmlPresenter at node
+}

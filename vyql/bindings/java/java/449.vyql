@@ -1,0 +1,13 @@
+module bindings.java.generated.m420f6b67;
+
+binding binding449 {
+  query pattern callExpr where callee.method == "startsWith"
+  emit check core.InputValidation at call {
+    advisory: true
+    about: code.TrustBoundary
+    covers dominates {
+      from: call
+      to: call
+    }
+  }
+}

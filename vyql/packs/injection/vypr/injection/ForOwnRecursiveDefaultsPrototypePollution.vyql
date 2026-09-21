@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule ForOwnRecursiveDefaultsPrototypePollution {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_1321]
+    id: "VYQL-INJ-130"
+    severity: high
+  }
+  issue code.ForOwnRecursiveDefaultsPrototypePollution as sink
+}

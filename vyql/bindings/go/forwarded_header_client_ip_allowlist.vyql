@@ -1,0 +1,27 @@
+module bindings.go.forwarded_header_client_ip_allowlist;
+
+// A CIDR allowlist is an access-control decision on *where the request came
+// from*, so it is only as trustworthy as the address it parses. The two
+// candidate addresses in a Go handler are spelled differently for a reason:
+// `r.RemoteAddr` is the transport peer the kernel reports, while the helpers
+// named for the *client* IP -- `ClientIP`, `GetClientIP`, `RealIP` and their
+// spellings -- exist precisely to prefer `X-Forwarded-For`/`X-Real-IP` when a
+// reverse proxy is in front (gin's `c.ClientIP()` and echo's `RealIP`
+// middleware document exactly that preference, and RFC 7239 plus every
+// proxy's forwarding note says the left entries are client-chosen). Feeding
+// such a helper's result to `net.ParseIP` inside a `net.ParseCIDR` loop is
+// therefore an allowlist a request can satisfy by setting a header.
+//
+// The flagged shape ties the three together at the argument, not by
+// co-presence in the function: the IP handed to `net.ParseIP` must flow from
+// a call whose method is one of the client-IP spellings, in a function that
+// also parses CIDR networks. A function that tests the transport peer
+// instead -- `net.ParseIP(r.RemoteAddr)`, or a peer-address helper's result
+// inline or through a local -- produces a different argument token and does
+// not match, whichever name that helper carries. A proxy-aware client-IP
+// helper (trusted-proxy right-walk) is indistinguishable from a spoofable
+// one at the call site, so the issue is a review flag, not a taint path.
+binding forwardedHeaderClientIpAllowlist {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "go" and node.context.callPath contains "net.ParseCIDR" and containsAny(node.context.callArg, ["net.ParseIP:ClientIP", "net.ParseIP:GetClientIP", "net.ParseIP:FindClientIP", "net.ParseIP:ClientIp", "net.ParseIP:GetClientIp", "net.ParseIP:FindClientIp", "net.ParseIP:RealIP", "net.ParseIP:RealIp", "net.ParseIP:GetRealIP"])
+  emit issue code.ProxyClientIpSpoofingBypass at node
+}

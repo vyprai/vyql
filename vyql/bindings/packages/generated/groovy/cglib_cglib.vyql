@@ -1,0 +1,9 @@
+module bindings.groovy.generated.md0814db7;
+
+binding filePathAccess0 {
+  requires {
+    dependency("cglib:cglib")
+  }
+  query pattern callExpr where callee.method == "copy"
+  emit sink code.FilePathAccess at args[0]
+}

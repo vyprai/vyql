@@ -1,0 +1,31 @@
+module bindings.javascript.mattermost_post_props_deserialization;
+
+// A Mattermost webapp plugin renders its own message types by registering a
+// component for a custom post type, and the component receives the `Post` it
+// has to draw. `Post.props` is documented as a free-form property bag --
+// `Record<string, any>` in `@mattermost/types/posts` -- and it is written by
+// whoever created the post, which for a plugin's own post types includes any
+// member who can reach the endpoint that creates them. So a props entry is
+// remote input in exactly the same sense a request body is: it may be missing,
+// it may not be a string, it may not be valid JSON, and it may be valid JSON of
+// a shape the component was not written for.
+//
+// `JSON.parse` throws `SyntaxError` on anything it cannot parse and returns
+// `any` on everything it can, so neither failure mode is caught by a
+// TypeScript annotation on the result -- annotations are erased before the code
+// runs. A component that parses a props entry and then iterates the result is
+// therefore one malformed post away from throwing inside its own render, and a
+// throw in a React render subtree takes the surrounding message list down with
+// it for every viewer of the channel, not just for the post's author.
+//
+// The binding looks for one function that parses with `JSON.parse` and iterates
+// with `map` while a post props path is in scope, and treats an `Array.isArray`
+// check as the neutralising control: a component that confirms the parsed value
+// is an array before walking it, or that delegates parsing to a wrapper which
+// returns a sentinel instead of throwing, is not reported. `map` is matched as
+// a whole `call:` token rather than a substring so `flatMap` and `mapValues` do
+// not stand in for it.
+binding mattermostPostPropsCollectionUnvalidated {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "JSON.parse" and containsAny(node.context.selector, ["post.props"]) and node.context.call == "map" and not (node.context.callPath contains "Array.isArray")
+  emit issue code.UnvalidatedDeserializedCollection at node
+}

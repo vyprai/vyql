@@ -1,0 +1,279 @@
+# Nextcloud Text's SessionController publishes the collaborative-editing
+# push/sync endpoints with @PublicPage, so the app framework dispatches them
+# without an authenticated session. Both hand a client-supplied
+# $sessionToken to the private loginSessionUser(), which resolves the
+# collaborative session, fetches the user stored in it through
+# IUserManager::get($currentSession->getUserId()), and installs that user as
+# the request's principal with $this->userSession->setUser($user):
+#
+#     private function loginSessionUser(int $documentId, int $sessionId, string $sessionToken) {
+#         $currentSession = $this->sessionService->getSession($documentId, $sessionId, $sessionToken);
+#         if ($currentSession !== false) {
+#             $user = $this->userManager->get($currentSession->getUserId());
+#             if ($user !== null) {
+#                 $this->userSession->setUser($user);
+#             }
+#         }
+#     }
+#
+# setUser() writes the identity into the PHP session, and nothing consults
+# IUserSession::isLoggedIn() first or restores the previous identity after,
+# so the installed user survives the request. That is the CVE's mechanism: a
+# session that is never cleared at the boundary where the identity is
+# assumed is not correctly destroyed on logout, and after authenticating
+# with any other account the previous session is continued and the requester
+# is authenticated as the installed user.
+#
+# The fixed revision (f97a5873, merged as 3b9f3531) does two things, both inside the
+# function that performs the write: it refuses to run when a user is
+# logged in (`$currentSession !== false && !$this->userSession->isLoggedIn()`)
+# and it saves and restores the prior identity
+# ($this->userToRestore = $this->userSession->getUser() before setUser, and a
+# new restoreSessionUser() called from a `finally` in every caller).
+#
+# The row's recorded SHA 3b9f353172ff284cd483cf7b88f2be1b3a36a8
+# is missing a character and resolves in no repository; the merge commit is
+# 3b9f353172ff284cd483cf7b88f2be1b3a7a36a8 (PR #3946, which the advisory
+# references), and its single commit f97a58735a9e8b6dca56dc0d983b7bf0a7cc6280
+# carries the readable diff.
+#
+# Detection keys on the OCP API, not on the incident: a class that declares
+# IUserSession and calls setUser on it from a @PublicPage route with no
+# isLoggedIn consultation in scope. Measured with `vyql match` on the real
+# lib/ tree at both revisions: one label at SessionController.php:37 before
+# the fixed revision, zero after. Reachable set enumerated exhaustively by grep over
+# every campaign clone rather than sampled: `userSession->setUser(` occurs on
+# six lines outside this repository -- two test files, three files_external
+# occ console commands, and OC_User::setUserId in lib/private/legacy -- and
+# none of the six sits in a @PublicPage file, so the binding reports none of
+# them. Dropping the @PublicPage clause reports the three console commands
+# (operator-supplied identifier, process exits with the request), and
+# widening the receiver-qualified call path to the bare setUser method name
+# reports two further controllers whose ->setUser( is
+# INotification::setUser on a notification builder; both clauses are
+# load-bearing. Renaming the fixed revision's own helpers leaves the flag where it is:
+# the discriminator is the documented isLoggedIn() consultation, which
+# predates the fixing change in the platform.
+
+test "rank1843: a public route installs the token-resolved user as the session user"
+  lang php
+  file SessionController.php
+  expect VYQL-AUTH-161
+  code
+  ```
+  <?php
+
+  namespace OCA\Text\Controller;
+
+  use OCA\Text\Service\ApiService;
+  use OCA\Text\Service\NotificationService;
+  use OCA\Text\Service\SessionService;
+  use OCP\AppFramework\Controller;
+  use OCP\AppFramework\Http\DataResponse;
+  use OCP\IRequest;
+  use OCP\IUserManager;
+  use OCP\IUserSession;
+
+  class SessionController extends Controller {
+  	private ApiService $apiService;
+  	private SessionService $sessionService;
+  	private NotificationService $notificationService;
+  	private IUserManager $userManager;
+  	private IUserSession $userSession;
+
+  	public function __construct(string $appName, IRequest $request, ApiService $apiService, SessionService $sessionService, NotificationService $notificationService, IUserManager $userManager, IUserSession $userSession) {
+  		parent::__construct($appName, $request);
+  		$this->apiService = $apiService;
+  		$this->sessionService = $sessionService;
+  		$this->notificationService = $notificationService;
+  		$this->userManager = $userManager;
+  		$this->userSession = $userSession;
+  	}
+
+  	/**
+  	 * @NoAdminRequired
+  	 * @PublicPage
+  	 */
+  	public function push(int $documentId, int $sessionId, string $sessionToken, int $version, array $steps, string $awareness): DataResponse {
+  		$this->loginSessionUser($documentId, $sessionId, $sessionToken);
+  		return $this->apiService->push($documentId, $sessionId, $sessionToken, $version, $steps, $awareness);
+  	}
+
+  	/**
+  	 * @NoAdminRequired
+  	 * @PublicPage
+  	 */
+  	public function sync(int $documentId, int $sessionId, string $sessionToken, int $version = 0, string $autosaveContent = null, string $documentState = null, bool $force = false, bool $manualSave = false): DataResponse {
+  		$this->loginSessionUser($documentId, $sessionId, $sessionToken);
+  		return $this->apiService->sync($documentId, $sessionId, $sessionToken, $version, $autosaveContent, $documentState, $force, $manualSave);
+  	}
+
+  	private function loginSessionUser(int $documentId, int $sessionId, string $sessionToken) {
+  		$currentSession = $this->sessionService->getSession($documentId, $sessionId, $sessionToken);
+  		if ($currentSession !== false) {
+  			$user = $this->userManager->get($currentSession->getUserId());
+  			if ($user !== null) {
+  				$this->userSession->setUser($user);
+  			}
+  		}
+  	}
+  }
+  ```
+
+test "rank1843: an authenticated consultation stops the install"
+  lang php
+  file SessionControllerPatched.php
+  reject VYQL-AUTH-161
+  code
+  ```
+  <?php
+
+  namespace OCA\Text\Controller;
+
+  use OCA\Text\Service\ApiService;
+  use OCA\Text\Service\NotificationService;
+  use OCA\Text\Service\SessionService;
+  use OCP\AppFramework\Controller;
+  use OCP\AppFramework\Http\DataResponse;
+  use OCP\IRequest;
+  use OCP\IUser;
+  use OCP\IUserManager;
+  use OCP\IUserSession;
+
+  class SessionControllerPatched extends Controller {
+  	private ApiService $apiService;
+  	private SessionService $sessionService;
+  	private NotificationService $notificationService;
+  	private IUserManager $userManager;
+  	private IUserSession $userSession;
+
+  	private bool $restoreUser = false;
+  	private ?IUser $userToRestore = null;
+
+  	public function __construct(string $appName, IRequest $request, ApiService $apiService, SessionService $sessionService, NotificationService $notificationService, IUserManager $userManager, IUserSession $userSession) {
+  		parent::__construct($appName, $request);
+  		$this->apiService = $apiService;
+  		$this->sessionService = $sessionService;
+  		$this->notificationService = $notificationService;
+  		$this->userManager = $userManager;
+  		$this->userSession = $userSession;
+  	}
+
+  	/**
+  	 * @NoAdminRequired
+  	 * @PublicPage
+  	 */
+  	public function push(int $documentId, int $sessionId, string $sessionToken, int $version, array $steps, string $awareness): DataResponse {
+  		try {
+  			$this->loginSessionUser($documentId, $sessionId, $sessionToken);
+  			return $this->apiService->push($documentId, $sessionId, $sessionToken, $version, $steps, $awareness);
+  		} finally {
+  			$this->restoreSessionUser();
+  		}
+  	}
+
+  	/**
+  	 * @NoAdminRequired
+  	 * @PublicPage
+  	 */
+  	public function sync(int $documentId, int $sessionId, string $sessionToken, int $version = 0, string $autosaveContent = null, string $documentState = null, bool $force = false, bool $manualSave = false): DataResponse {
+  		try {
+  			$this->loginSessionUser($documentId, $sessionId, $sessionToken);
+  			return $this->apiService->sync($documentId, $sessionId, $sessionToken, $version, $autosaveContent, $documentState, $force, $manualSave);
+  		} finally {
+  			$this->restoreSessionUser();
+  		}
+  	}
+
+  	private function loginSessionUser(int $documentId, int $sessionId, string $sessionToken) {
+  		$currentSession = $this->sessionService->getSession($documentId, $sessionId, $sessionToken);
+  		if ($currentSession !== false && !$this->userSession->isLoggedIn()) {
+  			$user = $this->userManager->get($currentSession->getUserId());
+  			if ($user !== null) {
+  				$this->restoreUser = true;
+  				$this->userToRestore = $this->userSession->getUser();
+  				$this->userSession->setUser($user);
+  			}
+  		}
+  	}
+
+  	private function restoreSessionUser(): void {
+  		if ($this->restoreUser) {
+  			$this->userSession->setUser($this->userToRestore);
+  		}
+  	}
+  }
+  ```
+
+test "rank1843: a console command installs the operator-named user outside any public route"
+  lang php
+  file ListCommand.php
+  reject VYQL-AUTH-161
+  code
+  ```
+  <?php
+
+  namespace OCA\Files_External\Command;
+
+  use OCP\IUserManager;
+  use OCP\IUserSession;
+
+  class ListCommand extends Base {
+  	private IUserManager $userManager;
+  	private IUserSession $userSession;
+
+  	public function __construct(IUserManager $userManager, IUserSession $userSession) {
+  		$this->userManager = $userManager;
+  		$this->userSession = $userSession;
+  	}
+
+  	protected function getStorageService($userId) {
+  		if (!empty($userId)) {
+  			$user = $this->userManager->get($userId);
+  			if (is_null($user)) {
+  				throw new NoUserException("user $userId not found");
+  			}
+  			$this->userSession->setUser($user);
+  			return $this->userService;
+  		}
+  		return $this->globalService;
+  	}
+  }
+  ```
+
+test "rank1843: a notification builder's fluent setUser is not the session identity"
+  lang php
+  file Notifications.php
+  reject VYQL-AUTH-161
+  code
+  ```
+  <?php
+
+  namespace OCA\Comments\Controller;
+
+  use OCP\IUserSession;
+  use OCP\Notification\IManager;
+
+  class Notifications extends Controller {
+  	private IManager $notificationManager;
+  	private IUserSession $userSession;
+
+  	public function __construct(IManager $notificationManager, IUserSession $userSession) {
+  		$this->notificationManager = $notificationManager;
+  		$this->userSession = $userSession;
+  	}
+
+  	/**
+  	 * @NoAdminRequired
+  	 * @PublicPage
+  	 */
+  	public function markProcessed(IComment $comment, IUser $currentUser): void {
+  		$notification = $this->notificationManager->createNotification();
+  		$notification->setApp('comments')
+  			->setObject('comment', $comment->getId())
+  			->setSubject('mention')
+  			->setUser($currentUser->getUID());
+  		$this->notificationManager->markProcessed($notification);
+  	}
+  }
+  ```

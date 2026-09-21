@@ -1,0 +1,52 @@
+test "cve rank569 cxf: server-side HTML body echoed into fault diagnostic is XSS"
+  lang java
+  expect VYQL-INJ-047
+  code
+  ```
+  import org.apache.cxf.interceptor.Fault;
+  import org.apache.cxf.message.Message;
+  import org.apache.cxf.helpers.IOUtils;
+  import java.io.InputStream;
+
+  class StaxInInterceptor {
+      void handleMessage(Message message, InputStream is) throws Exception {
+          String contentType = (String) message.get(Message.CONTENT_TYPE);
+          if (contentType != null && contentType.contains("text/html")) {
+              String htmlMessage = IOUtils.toString(is, 500);
+              throw new Fault(new org.apache.cxf.common.i18n.Message("INVALID_HTML_RESPONSETYPE",
+                      null, htmlMessage));
+          }
+      }
+  }
+  ```
+
+test "cve rank569 cxf: client-side HTML fault diagnostic is gated by requestor check"
+  lang java
+  reject VYQL-INJ-047
+  code
+  ```
+  import org.apache.cxf.interceptor.Fault;
+  import org.apache.cxf.message.Message;
+  import org.apache.cxf.message.MessageUtils;
+  import java.io.InputStream;
+  import java.io.InputStreamReader;
+
+  class StaxInInterceptor {
+      void handleMessage(Message message, InputStream is) throws Exception {
+          String contentType = (String) message.get(Message.CONTENT_TYPE);
+          if (contentType != null && contentType.contains("text/html")
+              && MessageUtils.isRequestor(message)) {
+              StringBuilder htmlMessage = new StringBuilder(1024);
+              InputStreamReader reader = new InputStreamReader(is, (String) message.get(Message.ENCODING));
+              char s[] = new char[1024];
+              int i = reader.read(s);
+              while (htmlMessage.length() < 64536 && i > 0) {
+                  htmlMessage.append(s, 0, i);
+                  i = reader.read(s);
+              }
+              throw new Fault(new org.apache.cxf.common.i18n.Message("INVALID_HTML_RESPONSETYPE",
+                      null, htmlMessage));
+          }
+      }
+  }
+  ```

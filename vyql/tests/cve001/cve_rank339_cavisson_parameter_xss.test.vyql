@@ -1,0 +1,31 @@
+# Rank 339 / CVE-2022-34191: Jenkins NS-ND parameter name/description XSS.
+# Ledger verification: VYQL-INJ-004 catches unescaped Jelly parameter display.
+
+test "rank339: Cavisson parameter display renders unescaped names"
+  lang config
+  file index.jelly
+  expect VYQL-INJ-004
+  code
+  ```
+  <?jelly escape-by-default='true'?>
+  <j:jelly xmlns:j="jelly:core" xmlns:f="/lib/form">
+    <f:entry title="${it.name}" description="${it.description}">
+      <div>${it.name}</div>
+    </f:entry>
+  </j:jelly>
+  ```
+
+test "rank339: Cavisson parameter display escapes names"
+  lang config
+  file index.jelly
+  reject VYQL-INJ-004
+  code
+  ```
+  <?jelly escape-by-default='true'?>
+  <j:jelly xmlns:j="jelly:core" xmlns:f="/lib/form">
+    <j:set var="escapeEntryTitleAndDescription" value="true"/>
+    <f:entry title="${it.name}" description="${it.description}">
+      <div>${h.escape(it.name)}</div>
+    </f:entry>
+  </j:jelly>
+  ```

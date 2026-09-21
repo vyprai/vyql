@@ -1,0 +1,7 @@
+module code;
+
+review code.UnsupportedCriticalExtensionAccepted {
+  category: crypto
+  kind: attention
+  text: "review JOSE token consumption for rejection of tokens whose crit header names extensions the class does not implement"
+}

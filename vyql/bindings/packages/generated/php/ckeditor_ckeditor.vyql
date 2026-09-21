@@ -1,0 +1,26 @@
+module bindings.php.generated.me4bd0673;
+
+binding commandExecution0 {
+  requires {
+    dependency("ckeditor/ckeditor")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding xmlParse1 {
+  requires {
+    dependency("ckeditor/ckeditor")
+  }
+  query pattern callExpr where callee.method == "onLoad"
+  emit sink code.XmlParse at args[0]
+}
+
+binding regexCompile2 {
+  requires {
+    dependency("ckeditor/ckeditor")
+  }
+  query pattern callExpr where callee.method == "RegExp"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}

@@ -1,0 +1,9 @@
+module bindings.swift.generated.m8ff3f383;
+
+binding commandExecution0 {
+  requires {
+    dependency("github.com/ChimeHQ/LanguageClient")
+  }
+  query pattern callExpr where callee.method == "localProcessChannel"
+  emit sink code.CommandExecution at args[0]
+}

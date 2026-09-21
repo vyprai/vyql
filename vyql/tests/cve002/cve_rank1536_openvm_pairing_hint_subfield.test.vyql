@@ -1,0 +1,264 @@
+# OpenVM's pairing-check guest consumed the host's hinted scalar factor
+# without verifying it lies in the proper subfield, so a malicious hint
+# could make the zkVM's pairing check pass on invalid arguments
+# (cryptographic verification unsoundness, CWE-347/CWE-310; GHSA-76mq-
+# v757-53gr). The guest reads the hint over the host channel: the
+# PairingCheck trait documents pairing_check_hint as returning "the final
+# exponentiation hint from Novakovic-Eagon ... Output is c (residue
+# witness inverse) and u (cubic nonresidue power)", and the guest-libs
+# implementations receive it through a custom instruction and hint buffer,
+# so both components arrive host-chosen. try_honest_pairing_check in
+# guest-libs/pairing/src/bls12_381/pairing.rs (and the bn254 twin) did
+# `let (c, s) = Self::pairing_check_hint(P, Q);` and went straight to the
+# equivalent-condition check -- the Fp12 element s must lie in the Fp6
+# subfield for the hint to be honest, and nothing checked. Pool commit
+# a720e2c7ba is the real fix (COMMIT_OK): the odd coefficients of the
+# hinted factor are required to be zero -- `for i in [1, 3, 5] { if
+# s.c[i] != Fp2::ZERO { return None; } }` -- in both curves' library
+# functions and both example wrappers, matching gnark's E12 pairing
+# subfield check, with host tests proving prank hints are rejected. No
+# pool correction.
+#
+# ## What fires, both revisions
+#
+# Three --cache off runs per revision (timeout 180, --max-ram 6GB), full
+# findings view, not the `-flags` only view. The vulnerable file itself
+# reports zero findings at a720e2c7ba^ and at the fix. The pairing crate's
+# src/ reports 33 findings at both revisions -- 24 VYQL-CRY-003
+# WeakRandomValue rows in the two tests.rs files and 9 VYQL-MEM-006
+# NullableDeref advisories in the fp12/fp6 internals -- none on either
+# pairing.rs. The whole checkout reports 2355/2355/2355 findings at the
+# parent and 2355/2355/2355 at the fix; the fingerprint diff is 27 removed
+# / 27 added, every row a line-number shift (CRY-003 rows in bls12_381/
+# tests.rs moving past the eight inserted lines, MEM-005 pairs in the
+# example program moving with its rewrite). No rule appears or disappears
+# on the vulnerable functions. The algorithm-pairing sibling shipped for
+# the JavaScript family (VYQL-CRY-057, SignatureKeyAlgorithmBindingMissing)
+# is confined to node.context.language == "javascript" and its openpgp.js
+# selector set, so it cannot touch this Rust code -- confirmed by the zero
+# on the file.
+#
+# ## Why nothing ships
+#
+# Four measured links, each independent:
+#
+# * The generic negation is dead at the parent. A binding that asks
+#   "does the function check or compare the hinted value at all" is
+#   already satisfied by the vulnerable code: bls12_381's parent zero-
+#   checks the other hint component (`if c_conj == Fp12::ZERO`, bn254's
+#   `if c == Fp12::ZERO`), compares an expression containing the hinted
+#   factor against a field constant (`fc * s == c_q`, `fc * c_mul * u ==
+#   Fp12::ONE`), and calls conjugate() on it. Probe bindings over the
+#   function context confirm: `binary contains "Fp12::ZERO"` = 1,
+#   `binary contains "ZERO"` = 1, `call in [is_zero, conjugate]` = 1 at
+#   the parent. Zero discrimination in the generic direction.
+# * The only discriminating token is the fixing commit's own spelling.
+#   `binary contains "Fp2::ZERO"` is 0 at the parent and 1 at the fix --
+#   the sole function-confined fact that separates the revisions. The
+#   coefficient subscript the fix reads (`s.c[i]`) emits no context token
+#   at either revision (`subscript contains "["` = 0/0), so no structural
+#   fact carries the check; only the constant name the fix happens to
+#   compare against. A binding negated on it encodes the fix's layout,
+#   not the weakness.
+# * The maintainer documents a differently-shaped remediation. The fix
+#   commit's own message prefers having pairing_check_hint "return Fp6
+#   directly instead of Fp12", dropped only because the trait lacks an
+#   associated Fp6 type. Under that form the consuming function contains
+#   no Fp2::ZERO comparison, so a binding negated on the spelling keeps
+#   flagging fully remediated code; so do is_zero() spellings or a check
+#   extracted to a sibling (the Rust fact attribution gap already on
+#   record).
+# * The positive clause does not pay for itself. Repo-wide, callPath
+#   containing pairing_check_hint labels 8 functions at the parent: the
+#   4 genuine consumers (both library try_honest_pairing_check bodies and
+#   both example wrappers) plus 4 test callers that only print the hint's
+#   output (bls12_381/tests.rs:265, bn254/tests.rs:252, and the two
+#   final_exp_hint examples). The measured candidate binding (hint call
+#   AND NOT binary contains "Fp2::ZERO") reports 8 rows at the parent and
+#   still 4 at the fix, 3x stable at each -- the test callers have no
+#   check to add and no verification to perform, so the flag is
+#   permanent noise on them. The trait's documentation states no
+#   caller-side validation contract (it presents the hint as computed
+#   output), so unlike the delegated-verifier JSDoc that anchored the
+#   JavaScript sibling, there is no documented surface the binding is
+#   answerable to: a binding on pairing_check_hint detects this project
+#   rather than the weakness.
+#
+# No definition change shipped. No ENGINE-GAPS.md entry: nothing is
+# mishandled -- the callPath, binary and call tokens the diagnosis uses
+# all extract correctly, and what is missing is a semantic fact (which
+# comparisons constrain a value to an algebraic subfield), a new
+# classification rather than a localized correction to a known construct.
+#
+# ## Recheck measurements (knowledge base tip e5b26e2f2)
+#
+# Baselines above. Probe matrix on try_honest_pairing_check's function
+# context, parent/fix: callPath "pairing_check_hint" 1/1; subscript
+# ".c[" 0/0; subscript "[" 0/0; binary "Fp2::ZERO" 0/1; binary
+# "Fp12::ZERO" 1/1; binary "ZERO" 1/1; call [is_zero, conjugate] 1/1.
+# Candidate binding A/B over guest-libs/pairing: 8 findings at the
+# parent, 4 at the fix, 3x stable per revision. Collateral: no other
+# clone under /tmp/cve-work carries pairing_check_hint, and the
+# identifiers are absent from both OWASP benchmark corpora. Narrow spec
+# passing with -v; full TestVyqlSpecs and go test ./internal/definitions/
+# pass. Rank stays ATTENTION.
+
+test "rank1536: the hinted factor is consumed without its subfield check"
+  lang rust
+  file guest-libs/pairing/src/bls12_381/pairing.rs
+  reject VYQL-CRY-016
+  code
+  ```
+  use openvm_algebra_guest::field::{ComplexConjugate, FieldExtension};
+
+  pub struct PairingCheckError;
+
+  impl Bls12_381 {
+      fn try_honest_pairing_check(
+          P: &[AffinePoint<<Self as PairingCheck>::Fp>],
+          Q: &[AffinePoint<<Self as PairingCheck>::Fp2>],
+      ) -> Option<Result<(), PairingCheckError>> {
+          let (c, s) = Self::pairing_check_hint(P, Q);
+
+          // We compute c^q before c is consumed by conjugate() below
+          let c_q = FieldExtension::frobenius_map(&c, 1);
+          let c_conj = c.conjugate();
+          if c_conj == Fp12::ZERO {
+              return None;
+          }
+          let c_conj_inv = Fp12::ONE.div_unsafe(&c_conj);
+          let fc = Self::multi_miller_loop_embedded_exp(P, Q, Some(c_conj_inv));
+
+          if fc * s == c_q {
+              Some(Ok(()))
+          } else {
+              None
+          }
+      }
+  }
+  ```
+
+test "rank1536: the fixed revision requires the hinted factor to lie in Fp6"
+  lang rust
+  file guest-libs/pairing/src/bls12_381/pairing.rs
+  reject VYQL-CRY-016
+  code
+  ```
+  use openvm_algebra_guest::field::{ComplexConjugate, FieldExtension};
+
+  pub struct PairingCheckError;
+
+  impl Bls12_381 {
+      fn try_honest_pairing_check(
+          P: &[AffinePoint<<Self as PairingCheck>::Fp>],
+          Q: &[AffinePoint<<Self as PairingCheck>::Fp2>],
+      ) -> Option<Result<(), PairingCheckError>> {
+          let (c, s) = Self::pairing_check_hint(P, Q);
+          // Hint is only honest if `s` lies in proper subfield Fp6.
+          // The Fp6 representation is fp6_c0 = [s.c[0], s.c[2], s.c[4]]
+          // and fp6_c1 = [s.c[1], s.c[3], s.c[5]].
+          for i in [1, 3, 5] {
+              if s.c[i] != Fp2::ZERO {
+                  return None;
+              }
+          }
+
+          // We compute c^q before c is consumed by conjugate() below
+          let c_q = FieldExtension::frobenius_map(&c, 1);
+          let c_conj = c.conjugate();
+          if c_conj == Fp12::ZERO {
+              return None;
+          }
+          let c_conj_inv = Fp12::ONE.div_unsafe(&c_conj);
+          let fc = Self::multi_miller_loop_embedded_exp(P, Q, Some(c_conj_inv));
+
+          if fc * s == c_q {
+              Some(Ok(()))
+          } else {
+              None
+          }
+      }
+  }
+  ```
+
+test "rank1536: the bn254 twin consumes its own hinted factor name unchecked"
+  lang rust
+  file guest-libs/pairing/src/bn254/pairing.rs
+  reject VYQL-CRY-016
+  code
+  ```
+  use openvm_algebra_guest::field::{ComplexConjugate, FieldExtension};
+
+  pub struct PairingCheckError;
+
+  impl Bn254 {
+      fn try_honest_pairing_check(
+          P: &[AffinePoint<<Self as PairingCheck>::Fp>],
+          Q: &[AffinePoint<<Self as PairingCheck>::Fp2>],
+      ) -> Option<Result<(), PairingCheckError>> {
+          let (c, u) = Self::pairing_check_hint(P, Q);
+          if c == Fp12::ZERO {
+              return None;
+          }
+          let c_inv = Fp12::ONE.div_unsafe(&c);
+
+          // c_mul = c^-{q^3 - q^2 + q}
+          let c_q3_inv = FieldExtension::frobenius_map(&c_inv, 3);
+          let c_q2 = FieldExtension::frobenius_map(&c, 2);
+          let c_q_inv = FieldExtension::frobenius_map(&c_inv, 1);
+          let c_mul = c_q3_inv * c_q2 * c_q_inv;
+
+          // fc == f * c^-{6x + 2}
+          let fc = Self::multi_miller_loop_embedded_exp(P, Q, Some(c_inv));
+
+          if fc * c_mul * u == Fp12::ONE {
+              Some(Ok(()))
+          } else {
+              None
+          }
+      }
+  }
+  ```
+
+test "rank1536: the bn254 twin's fix checks that factor's coefficients"
+  lang rust
+  file guest-libs/pairing/src/bn254/pairing.rs
+  reject VYQL-CRY-016
+  code
+  ```
+  use openvm_algebra_guest::field::{ComplexConjugate, FieldExtension};
+
+  pub struct PairingCheckError;
+
+  impl Bn254 {
+      fn try_honest_pairing_check(
+          P: &[AffinePoint<<Self as PairingCheck>::Fp>],
+          Q: &[AffinePoint<<Self as PairingCheck>::Fp2>],
+      ) -> Option<Result<(), PairingCheckError>> {
+          let (c, u) = Self::pairing_check_hint(P, Q);
+          if c == Fp12::ZERO {
+              return None;
+          }
+          // Hint is only honest if `u` lies in proper subfield Fp6.
+          for i in [1, 3, 5] {
+              if u.c[i] != Fp2::ZERO {
+                  return None;
+              }
+          }
+          let c_inv = Fp12::ONE.div_unsafe(&c);
+
+          let c_q3_inv = FieldExtension::frobenius_map(&c_inv, 3);
+          let c_q2 = FieldExtension::frobenius_map(&c, 2);
+          let c_q_inv = FieldExtension::frobenius_map(&c_inv, 1);
+          let c_mul = c_q3_inv * c_q2 * c_q_inv;
+
+          let fc = Self::multi_miller_loop_embedded_exp(P, Q, Some(c_inv));
+
+          if fc * c_mul * u == Fp12::ONE {
+              Some(Ok(()))
+          } else {
+              None
+          }
+      }
+  }
+  ```

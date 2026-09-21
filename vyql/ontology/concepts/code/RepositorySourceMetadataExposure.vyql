@@ -1,0 +1,11 @@
+module code;
+
+concept RepositorySourceMetadataExposure : issue {
+  cwe: [CWE_200]
+  reviewAssumption: "repository URLs may include user-info credentials supplied by CI or command-line automation"
+  reviewCategory: secret
+  reviewCondition: "repository source or Git remote URL metadata is exported to durable build metadata after it may contain embedded credentials"
+  reviewConfidence: high
+  reviewEvidence: "metadata export context {pattern} adds a repository/Git source key before iterating properties into a metadata writer"
+  vulnerableTo: [secrets.SecretLeak]
+}

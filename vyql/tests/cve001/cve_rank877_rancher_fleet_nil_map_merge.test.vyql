@@ -1,0 +1,103 @@
+# Rank 877 / CVE-2025-23390: Rancher Fleet getValues could pass a nil
+# Helm values map into a merge helper that writes dest[k] = v.
+
+test "rank877: Helm valuesFrom merge can write through nil values map"
+  lang go
+  file internal/helmdeployer/install.go
+  expect VYQL-DOS-034
+  expect_review code.NilMapMergeWritePanic
+  code
+  ```
+  package helmdeployer
+
+  type Helm struct { template bool }
+  type Options struct { Helm *HelmOptions }
+  type HelmOptions struct {
+    Values *Values
+    ValuesFrom []ValuesFrom
+  }
+  type Values struct { Data map[string]interface{} }
+  type ValuesFrom struct { SecretKeyRef *KeyRef }
+  type KeyRef struct { Name string }
+
+  func (h *Helm) getValues(options Options) (map[string]interface{}, error) {
+    if options.Helm == nil {
+      return nil, nil
+    }
+    var values map[string]interface{}
+    if options.Helm.Values != nil {
+      values = options.Helm.Values.Data
+    }
+    if !h.template {
+      for _, valuesFrom := range options.Helm.ValuesFrom {
+        var tempValues map[string]interface{}
+        if valuesFrom.SecretKeyRef != nil {
+          tempValues = map[string]interface{}{"x": valuesFrom.SecretKeyRef.Name}
+        }
+        if tempValues != nil {
+          values = mergeValues(values, tempValues)
+        }
+      }
+    }
+    return values, nil
+  }
+
+  func mergeValues(dest, src map[string]interface{}) map[string]interface{} {
+    for k, v := range src {
+      dest[k] = v
+    }
+    return dest
+  }
+  ```
+
+test "rank877: Helm valuesFrom merge initializes nil values map"
+  lang go
+  file internal/helmdeployer/install.go
+  reject VYQL-DOS-034
+  reject_review code.NilMapMergeWritePanic
+  code
+  ```
+  package helmdeployer
+
+  type Helm struct { template bool }
+  type Options struct { Helm *HelmOptions }
+  type HelmOptions struct {
+    Values *Values
+    ValuesFrom []ValuesFrom
+  }
+  type Values struct { Data map[string]interface{} }
+  type ValuesFrom struct { SecretKeyRef *KeyRef }
+  type KeyRef struct { Name string }
+
+  func (h *Helm) getValues(options Options) (map[string]interface{}, error) {
+    if options.Helm == nil {
+      return nil, nil
+    }
+    var values map[string]interface{}
+    if options.Helm.Values != nil {
+      values = options.Helm.Values.Data
+    }
+    if values == nil {
+      values = map[string]interface{}{}
+    }
+    if !h.template {
+      for _, valuesFrom := range options.Helm.ValuesFrom {
+        var tempValues map[string]interface{}
+        if valuesFrom.SecretKeyRef != nil {
+          tempValues = map[string]interface{}{"x": valuesFrom.SecretKeyRef.Name}
+        }
+        if tempValues != nil {
+          values = mergeValues(values, tempValues)
+        }
+      }
+    }
+    return values, nil
+  }
+
+  func mergeValues(dest, src map[string]interface{}) map[string]interface{} {
+    for k, v := range src {
+      dest[k] = v
+    }
+    return dest
+  }
+  ```

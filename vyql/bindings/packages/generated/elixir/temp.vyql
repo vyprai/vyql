@@ -1,0 +1,57 @@
+module bindings.elixir.generated.m12f6fb11;
+
+binding filePathAccess0 {
+  requires {
+    dependency("temp")
+  }
+  query pattern callExpr where callee.method == "path"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("temp")
+  }
+  query pattern callExpr where callee.method == "path!"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("temp")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("temp")
+  }
+  query pattern callExpr where callee.method == "open!"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("temp")
+  }
+  query pattern callExpr where callee.method == "track_file"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess5 {
+  requires {
+    dependency("temp")
+  }
+  query pattern callExpr where callee.method == "mkdir"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess6 {
+  requires {
+    dependency("temp")
+  }
+  query pattern callExpr where callee.method == "mkdir!"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule UnvalidatedModelSelection {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_20, CWE_863]
+    id: "VYQL-AUTH-029"
+    severity: medium
+  }
+  issue code.UnvalidatedModelSelection as selector
+}

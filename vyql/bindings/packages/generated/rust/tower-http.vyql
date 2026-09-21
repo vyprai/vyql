@@ -1,0 +1,13 @@
+module bindings.rust.generated.mfa58e746;
+
+binding authorizationCheck0 {
+  requires {
+    dependency("tower-http")
+  }
+  query pattern callExpr where callee.method == "ValidateRequestHeaderLayer.bearer"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

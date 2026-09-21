@@ -1,0 +1,205 @@
+# CVE-2024-39901 (GHSA-77vc-rj32-2r33, CWE-285 + CWE-639): the OpenSearch
+# Observability plugin let any authenticated user of a cluster read, update and
+# delete the observability objects another user had saved in their private
+# tenant.
+#
+# OpenSearch's security plugin addresses every user's private tenant by one
+# reserved name, `__user__`, so `User.getRequestedTenant()` returns the same
+# string for all of them. UserAccessManager.getSearchAccessInfonew
+# that -- it returns `listOf("User:${user.name}")` for a private-tenant
+# requester with the comment "No sharing allowed in private tenant" -- but the
+# per-document decision UserAccessManager.doesUserHasAccess(user, tenant,
+# access), which ObservabilityActions.get/update/delete call on the stored
+# document, only compared `getUserTenant(user) != tenant` and then fell through
+# to the admin override and the filter-by branch. Inside `__user__` that
+# comparison holds for everybody, and with the default filterBy of NoFilter the
+# `when` returns true outright, so every private observability object in the
+# cluster is readable and writable by every user.
+#
+# Pool row 014423178f8f61d90442dde03cbdcd754c70a84e is the 2.x backport of
+# de183277b3c8 (PR #1821) and reads normally; its Kotlin hunk is the whole fix.
+# 
+#
+#   +        if (isUserPrivateTenant(user)) {
+#   +            return access.contains("$USER_TAG${user.name}")
+#   +        }
+#
+# Caught at the concept layer by code.IdorPolicyReview (rule VYQL-AUTH-081),
+# which covers an object access decision missing its current-principal
+# ownership constraint and carries CWE-639. The new binding
+# kotlinTenantScopedDocumentAccessWithoutPrivateTenantConstraint in
+# vyql/bindings/kotlin/openSearchTenantScopedDocumentAccess.vyql reads off the
+# security plugin's own tenancy contract: a UserAccessManager decision that
+# reads the requester's tenant and then answers from the document's access list
+# or the requester's roles, with no private-tenant question anywhere in that
+# function, is deciding on a tenant name every user of the cluster shares.
+#
+# Measured, --cache off, three runs each, whole trees:
+#   opensearch-project/observability @ fix^   0 -> 1 finding, exactly
+#     src/main/kotlin/.../security/UserAccessManager.kt:147
+#   opensearch-project/observability @ fix    0 -> 0
+#   opensearch-project/reporting (same class, carries the branch)
+#     5 -> 5, no VYQL-AUTH-081 row
+#   opensearch-project/simple-schema (same class, still unpatched today)
+#     2 -> 3, the new row at
+#     service/src/main/kotlin/.../security/UserAccessManager.kt:134
+#   3023 Kotlin files across the 210 other CVE clones under /tmp/cve-work
+#     contain no getUserTenant call at all, so the anchor's reachable set
+#     outside these plugins is empty.
+
+test "rank1480: a tenant-scoped document access decision that never asks whether the requester is in their private tenant"
+  lang kotlin
+  file src/main/kotlin/org/opensearch/observability/security/UserAccessManager.kt
+  expect_review code.IdorPolicyReview
+  code
+  ```
+  internal object UserAccessManager {
+      private const val USER_TAG = "User:"
+      private const val ROLE_TAG = "Role:"
+      private const val BACKEND_ROLE_TAG = "BERole:"
+      private const val ALL_ACCESS_ROLE = "all_access"
+      private const val PRIVATE_TENANT = "__user__"
+      const val DEFAULT_TENANT = ""
+
+      fun getUserTenant(user: User?): String {
+          return when (val requestedTenant = user?.requestedTenant) {
+              null -> DEFAULT_TENANT
+              else -> requestedTenant
+          }
+      }
+
+      fun getSearchAccessInfo(user: User?): List<String> {
+          if (user == null) {
+              return listOf()
+          }
+          if (isUserPrivateTenant(user)) {
+              return listOf("$USER_TAG${user.name}")
+          }
+          if (canAdminViewAllItems(user)) {
+              return listOf()
+          }
+          return when (PluginSettings.filterBy) {
+              FilterBy.NoFilter -> listOf()
+              FilterBy.User -> listOf("$USER_TAG${user.name}")
+              FilterBy.Roles -> user.roles.stream()
+                  .filter { !PluginSettings.ignoredRoles.contains(it) }
+                  .map { "$ROLE_TAG$it" }
+                  .collect(Collectors.toList())
+              FilterBy.BackendRoles -> user.backendRoles.map { "$BACKEND_ROLE_TAG$it" }
+          }
+      }
+
+      fun doesUserHasAccess(user: User?, tenant: String, access: List<String>): Boolean {
+          if (user == null) {
+              return true
+          }
+          if (getUserTenant(user) != tenant) {
+              return false
+          }
+          if (canAdminViewAllItems(user)) {
+              return true
+          }
+          return when (PluginSettings.filterBy) {
+              FilterBy.NoFilter -> true
+              FilterBy.User -> access.contains("$USER_TAG${user.name}")
+              FilterBy.Roles -> user.roles.stream()
+                  .filter { !PluginSettings.ignoredRoles.contains(it) }
+                  .map { "$ROLE_TAG$it" }
+                  .anyMatch { it in access }
+              FilterBy.BackendRoles -> user.backendRoles.map { "$BACKEND_ROLE_TAG$it" }.any { it in access }
+          }
+      }
+
+      private fun canAdminViewAllItems(user: User): Boolean {
+          return PluginSettings.adminAccess == PluginSettings.AdminAccess.AllObservabilityObjects && isAdminUser(user)
+      }
+
+      private fun isAdminUser(user: User): Boolean {
+          return user.roles.contains(ALL_ACCESS_ROLE)
+      }
+
+      private fun isUserPrivateTenant(user: User?): Boolean {
+          return getUserTenant(user) == PRIVATE_TENANT
+      }
+  }
+  ```
+
+test "rank1480: the same decision constrains a private-tenant document to the requester's own access-list entry"
+  lang kotlin
+  file src/main/kotlin/org/opensearch/observability/security/UserAccessManager.kt
+  reject_review code.IdorPolicyReview
+  code
+  ```
+  internal object UserAccessManager {
+      private const val USER_TAG = "User:"
+      private const val ROLE_TAG = "Role:"
+      private const val BACKEND_ROLE_TAG = "BERole:"
+      private const val ALL_ACCESS_ROLE = "all_access"
+      private const val PRIVATE_TENANT = "__user__"
+      const val DEFAULT_TENANT = ""
+
+      fun getUserTenant(user: User?): String {
+          return when (val requestedTenant = user?.requestedTenant) {
+              null -> DEFAULT_TENANT
+              else -> requestedTenant
+          }
+      }
+
+      fun getSearchAccessInfo(user: User?): List<String> {
+          if (user == null) {
+              return listOf()
+          }
+          if (isUserPrivateTenant(user)) {
+              return listOf("$USER_TAG${user.name}")
+          }
+          if (canAdminViewAllItems(user)) {
+              return listOf()
+          }
+          return when (PluginSettings.filterBy) {
+              FilterBy.NoFilter -> listOf()
+              FilterBy.User -> listOf("$USER_TAG${user.name}")
+              FilterBy.Roles -> user.roles.stream()
+                  .filter { !PluginSettings.ignoredRoles.contains(it) }
+                  .map { "$ROLE_TAG$it" }
+                  .collect(Collectors.toList())
+              FilterBy.BackendRoles -> user.backendRoles.map { "$BACKEND_ROLE_TAG$it" }
+          }
+      }
+
+      fun doesUserHasAccess(user: User?, tenant: String, access: List<String>): Boolean {
+          if (user == null) {
+              return true
+          }
+          if (getUserTenant(user) != tenant) {
+              return false
+          }
+          if (isUserPrivateTenant(user)) {
+              return access.contains("$USER_TAG${user.name}")
+          }
+          if (canAdminViewAllItems(user)) {
+              return true
+          }
+          return when (PluginSettings.filterBy) {
+              FilterBy.NoFilter -> true
+              FilterBy.User -> access.contains("$USER_TAG${user.name}")
+              FilterBy.Roles -> user.roles.stream()
+                  .filter { !PluginSettings.ignoredRoles.contains(it) }
+                  .map { "$ROLE_TAG$it" }
+                  .anyMatch { it in access }
+              FilterBy.BackendRoles -> user.backendRoles.map { "$BACKEND_ROLE_TAG$it" }.any { it in access }
+          }
+      }
+
+      private fun canAdminViewAllItems(user: User): Boolean {
+          return PluginSettings.adminAccess == PluginSettings.AdminAccess.AllObservabilityObjects && isAdminUser(user)
+      }
+
+      private fun isAdminUser(user: User): Boolean {
+          return user.roles.contains(ALL_ACCESS_ROLE)
+      }
+
+      private fun isUserPrivateTenant(user: User?): Boolean {
+          return getUserTenant(user) == PRIVATE_TENANT
+      }
+  }
+  ```

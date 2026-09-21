@@ -1,0 +1,39 @@
+# Rank 669 / CVE-2020-10683: dom4j DocumentHelper.parseText used SAXReader
+# without disabling external DTD/entity loading.
+
+test "rank669: SAXReader parseText reads XML without external entity hardening"
+  lang java
+  expect VYQL-DESER-004
+  code
+  ```
+  import org.xml.sax.InputSource;
+  import java.io.StringReader;
+  public final class DocumentHelper {
+      public static Document parseText(String text) throws DocumentException {
+          SAXReader reader = new SAXReader();
+          InputSource source = new InputSource(new StringReader(text));
+          Document result = reader.read(source);
+          return result;
+      }
+  }
+  ```
+
+test "rank669: SAXReader parseText disables external DTD and entities before read"
+  lang java
+  reject VYQL-DESER-004
+  code
+  ```
+  import org.xml.sax.InputSource;
+  import java.io.StringReader;
+  public final class DocumentHelper {
+      public static Document parseText(String text) throws DocumentException {
+          SAXReader reader = new SAXReader();
+          reader.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+          reader.setFeature("http://xml.org/sax/features/external-general-entities", false);
+          reader.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+          InputSource source = new InputSource(new StringReader(text));
+          Document result = reader.read(source);
+          return result;
+      }
+  }
+  ```

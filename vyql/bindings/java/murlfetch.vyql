@@ -1,0 +1,16 @@
+module bindings.java.generated.murlfetch;
+
+pattern bindingMetadata {
+  binding: {
+    name: "java"
+    meta: {
+      fidelity: "resolved"
+      match: "contains"
+    }
+  }
+}
+
+binding urlFetch0 {
+  query pattern callExpr where callee.method == "openStream"
+  emit sink code.UrlFetch at callee.receiver
+}

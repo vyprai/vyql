@@ -1,0 +1,9 @@
+module bindings.scala.generated.m55c6baa1;
+
+binding sqlExecution0 {
+  requires {
+    dependency("org.testcontainers:postgresql")
+  }
+  query pattern callExpr where callee.method == "getTestQueryString"
+  emit sink code.SqlExecution at args[0]
+}

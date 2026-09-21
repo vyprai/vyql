@@ -1,0 +1,202 @@
+# Gradle registers HTTP repository credentials against Apache HttpClient's
+# wildcard AuthScope, so any host the build's HTTP client connects to during
+# dependency resolution receives the same credentials: a redirect or a
+# compromised repository captures credentials meant only for the configured
+# one (CWE-522, CWE-200). HttpClientConfigurer.configureCredentials calls
+# useCredentials(credentialsProvider, AuthScope.ANY_HOST, AuthScope.ANY_PORT,
+# authentications), and useCredentials registers every authentication's
+# credentials through credentialsProvider.setCredentials(new AuthScope(host,
+# port, AuthScope.ANY_REALM, scheme), httpCredentials) -- a scope matching any
+# host, because host and port arrive from the wildcard constants. The fix
+# (de6f4f15, "Fill AuthScope with host and port") drops the wildcard
+# arguments and takes each authentication's own host and port from
+# getHostsForAuthentication().
+#
+# Vocabulary. The wildcard read and the credential registration sit in
+# sibling methods of one class -- the registration site shows only parameter
+# names -- so bindings.java.wildcardScopeCredentialRegistration anchors at
+# class scope and reads two library facts: a call receiving AuthScope.ANY_HOST
+# or AuthScope.ANY_PORT (call-argument pair) and a CredentialsProvider
+# setCredentials call (call path). The paired argument token keeps the needle
+# on an argument a call actually receives, so prose and sibling mentions
+# cannot satisfy it. The concept code.WildcardAuthScopeCredentialRegistration
+# (VYQL-SEC-054) carries the judgement; no engine change.
+#
+# Discrimination, three --cache off scans of the resources-http subproject at
+# each revision, identical every run: 30 findings with exactly 2
+# VYQL-SEC-054 (one per class declaration in HttpClientConfigurer.java) on
+# de6f4f15^, 30 findings and 0 VYQL-SEC-054 on de6f4f15. Whole-tree scans
+# exceed the 180s bound at both revisions, so the subproject holding the
+# vulnerable file is the measured tree; exhaustive grep puts AuthScope.ANY_HOST
+# or AuthScope.ANY_PORT at exactly one line of the whole vulnerable revision
+# and zero in the fixed one, so no other file can carry the finding.
+#
+# verify_current_expected: fixed
+test "rank1141: credentials are registered against a wildcard host and port"
+  lang java
+  file HttpClientConfigurer.java
+  expect VYQL-SEC-054
+  expect_review code.WildcardAuthScopeCredentialRegistration
+  code
+  ```
+  package org.gradle.internal.resource.transport.http;
+
+  import org.apache.http.auth.AuthScope;
+  import org.apache.http.auth.Credentials;
+  import org.apache.http.auth.UsernamePasswordCredentials;
+  import org.apache.http.client.CredentialsProvider;
+
+  public class HttpClientConfigurer {
+      private void configureCredentials(HttpClientBuilder builder, CredentialsProvider credentialsProvider, Collection<Authentication> authentications) {
+          if (authentications.size() > 0) {
+              useCredentials(credentialsProvider, AuthScope.ANY_HOST, AuthScope.ANY_PORT, authentications);
+          }
+      }
+
+      private void useCredentials(CredentialsProvider credentialsProvider, String host, int port, Collection<? extends Authentication> authentications) {
+          for (Authentication authentication : authentications) {
+              PasswordCredentials passwordCredentials = (PasswordCredentials) ((AuthenticationInternal) authentication).getCredentials();
+              Credentials httpCredentials = new UsernamePasswordCredentials(passwordCredentials.getUsername(), passwordCredentials.getPassword());
+              credentialsProvider.setCredentials(new AuthScope(host, port, AuthScope.ANY_REALM, "basic"), httpCredentials);
+          }
+      }
+  }
+  ```
+
+test "rank1141: credentials are registered only against the hosts the authentication declares"
+  lang java
+  file HttpClientConfigurer.java
+  reject VYQL-SEC-054
+  reject_review code.WildcardAuthScopeCredentialRegistration
+  code
+  ```
+  package org.gradle.internal.resource.transport.http;
+
+  import org.apache.http.auth.AuthScope;
+  import org.apache.http.auth.Credentials;
+  import org.apache.http.auth.UsernamePasswordCredentials;
+  import org.apache.http.client.CredentialsProvider;
+
+  public class HttpClientConfigurer {
+      private void configureCredentials(HttpClientBuilder builder, CredentialsProvider credentialsProvider, Collection<Authentication> authentications) {
+          if (authentications.size() > 0) {
+              useCredentials(credentialsProvider, authentications);
+          }
+      }
+
+      private void useCredentials(CredentialsProvider credentialsProvider, Collection<? extends Authentication> authentications) {
+          for (Authentication authentication : authentications) {
+              AuthenticationInternal authenticationInternal = (AuthenticationInternal) authentication;
+              PasswordCredentials passwordCredentials = (PasswordCredentials) authenticationInternal.getCredentials();
+
+              Collection<AuthenticationInternal.HostAndPort> hostsForAuthentication = authenticationInternal.getHostsForAuthentication();
+              for (AuthenticationInternal.HostAndPort hostAndPort : hostsForAuthentication) {
+                  Credentials httpCredentials = new UsernamePasswordCredentials(passwordCredentials.getUsername(), passwordCredentials.getPassword());
+                  credentialsProvider.setCredentials(new AuthScope(hostAndPort.getHost(), hostAndPort.getPort(), AuthScope.ANY_REALM, "basic"), httpCredentials);
+              }
+          }
+      }
+  }
+  ```
+
+test "rank1141: a comment claiming host checks does not satisfy either clause"
+  lang java
+  file HttpClientConfigurer.java
+  expect VYQL-SEC-054
+  expect_review code.WildcardAuthScopeCredentialRegistration
+  code
+  ```
+  package org.gradle.internal.resource.transport.http;
+
+  import org.apache.http.auth.AuthScope;
+  import org.apache.http.auth.Credentials;
+  import org.apache.http.auth.UsernamePasswordCredentials;
+  import org.apache.http.client.CredentialsProvider;
+
+  public class HttpClientConfigurer {
+      private void configureCredentials(CredentialsProvider credentialsProvider, Collection<Authentication> authentications) {
+          // hosts are checked against the configured repository before any credential is sent
+          useCredentials(credentialsProvider, AuthScope.ANY_HOST, AuthScope.ANY_PORT, authentications);
+      }
+
+      private void useCredentials(CredentialsProvider credentialsProvider, String host, int port, Collection<? extends Authentication> authentications) {
+          for (Authentication authentication : authentications) {
+              Credentials httpCredentials = new UsernamePasswordCredentials("user", "password");
+              credentialsProvider.setCredentials(new AuthScope(host, port, AuthScope.ANY_REALM, "basic"), httpCredentials);
+          }
+      }
+  }
+  ```
+
+test "rank1141: a wildcard pass in a class that registers no credentials is not this leak"
+  lang java
+  file ScopePrinter.java
+  reject VYQL-SEC-054
+  reject_review code.WildcardAuthScopeCredentialRegistration
+  code
+  ```
+  package org.gradle.internal.resource.transport.http;
+
+  import org.apache.http.auth.AuthScope;
+
+  public class ScopePrinter {
+      private void printScope() {
+          describeScope(AuthScope.ANY_HOST, AuthScope.ANY_PORT);
+      }
+
+      private void describeScope(String host, int port) {
+          System.out.println(host + ":" + port);
+      }
+  }
+  ```
+
+test "rank1141: concrete proxy host and port are not the wildcard"
+  lang java
+  file HttpClientConfigurer.java
+  reject VYQL-SEC-054
+  reject_review code.WildcardAuthScopeCredentialRegistration
+  code
+  ```
+  package org.gradle.internal.resource.transport.http;
+
+  import org.apache.http.auth.AuthScope;
+  import org.apache.http.auth.Credentials;
+  import org.apache.http.auth.UsernamePasswordCredentials;
+  import org.apache.http.client.CredentialsProvider;
+
+  public class HttpClientConfigurer {
+      private void configureProxy(CredentialsProvider credentialsProvider, HttpProxySettings.HttpProxy proxy) {
+          if (proxy.credentials != null) {
+              useCredentials(credentialsProvider, proxy.host, proxy.port, Collections.singleton(new AllSchemesAuthentication(proxy.credentials)));
+          }
+      }
+
+      private void useCredentials(CredentialsProvider credentialsProvider, String host, int port, Collection<? extends Authentication> authentications) {
+          for (Authentication authentication : authentications) {
+              Credentials httpCredentials = new UsernamePasswordCredentials("user", "password");
+              credentialsProvider.setCredentials(new AuthScope(host, port, AuthScope.ANY_REALM, "basic"), httpCredentials);
+          }
+      }
+  }
+  ```
+
+test "rank1141: the blanket registration spelling names its own wildcard"
+  lang java
+  file SimpleClient.java
+  reject VYQL-SEC-054
+  reject_review code.WildcardAuthScopeCredentialRegistration
+  code
+  ```
+  package org.gradle.internal.resource.transport.http;
+
+  import org.apache.http.auth.AuthScope;
+  import org.apache.http.auth.Credentials;
+  import org.apache.http.auth.UsernamePasswordCredentials;
+  import org.apache.http.client.CredentialsProvider;
+
+  public class SimpleClient {
+      private void configure(CredentialsProvider credentialsProvider, String user, String password) {
+          credentialsProvider.setCredentials(AuthScope.ANY, new UsernamePasswordCredentials(user, password));
+      }
+  }
+  ```

@@ -1,0 +1,262 @@
+# Apollo Router keys its query-plan caches on a digest of the *projection* the
+# traversal visits. `QueryHashVisitor` (SHA-256) walks the executable document
+# and hashes field names, parent type names, argument names and values, visited
+# types and fragments -- deliberately normalized so formatting and aliases do
+# not change the key. Two genuinely different operations can project to the
+# same visited fields. `CachingQueryKey`'s Display, the key the in-memory and
+# Redis plan caches share, mixes that QueryHash with the operation name, cache
+# metadata and plan options -- never the serialized operation text and never
+# the schema. With distributed query-plan caching over Redis, an operation
+# could retrieve and run the plan cached for a different operation. The v1.45.1
+# release commit ff9f666598cd17661880fe7fc6e9c9611316e529 bundles the fix: it
+# folds `executable.to_string()` into the digest inside `hash_query`, threads
+# the raw schema string through the visitor and hashes it whole when an
+# introspection field (`__schema` / `__type`) is met, and adds the schema SDL
+# to `CachingQueryKey`'s Display.
+#
+# Nothing separates the two revisions. On the subtree the fix touches
+# (apollo-router/src/spec/query + apollo-router/src/query_planner, materialized
+# clean from each revision), three `--cache off` runs per side (timeout 180,
+# --max-ram 6GB) report 14 findings and 43 flags at both revisions, identical
+# except three line-number shifts where the fix inserted lines. No finding or
+# flag sits on the digest path at either revision. `vyql match` labels
+# hash_query's parameters `code.ExternalEntryInput` and nothing hash-shaped;
+# `vyql trace` shows the executable parameter's taint reaching
+# `traverse.document` and `Ok` in the same body and stopping there as external
+# calls -- the document does reach the digest calls, so this is not a flow the
+# engine mishandles (the Rust return-flow gap does not apply: no hop crosses a
+# function return). What is wrong is how much of the input the digest covers,
+# and that is a property of the projection, not of any call.
+#
+# The one hash-shaped finding in the file, VYQL-CRY-001 (`code.WeakHash`), sits
+# on `stats_report_key_hash`'s SHA-1 -- a different function with a different
+# weakness, present unchanged at both revisions, firing identically at
+# caching_query_planner.rs:516 (parent) and :519 (fix). The last case pins
+# that: the nearest detection is revision-blind and off-target.
+#
+# No fix is justifiable today. The sole intra-procedural discriminator between
+# the revisions is the fix's own added statement,
+# `executable.to_string().hash(&mut visitor)`, plus the threaded schema folds;
+# a binding keyed on its absence keys on the fixing commit's own layout, and
+# folding text into a digest has unbounded correct spellings, so the negation
+# flags every correct implementation that incorporates its input differently.
+# The property itself -- a cache key's digest omits an input the cached
+# artifact depends on -- is a sufficiency judgement no binding can read from an
+# API's documentation, and minting a concept for it is one per weakness
+# instance rather than per weakness class. The nearest existing concepts each
+# assume a different weakness: `code.WeakHash` judges the algorithm (SHA-256
+# here), `code.NamespacedSubjectKeyCollision` a Kubernetes reflector cache,
+# `code.PublicVisibilityCacheInvalidationMissing` sandbox-proxy status entries,
+# `code.SessionHashMissingAuthorizationState` session hashes over passwords.
+#
+# verify_current_expected: attention-vocabulary-gap
+
+test "rank1687: hash_query digests only the visited projection of the operation, so distinct operations sharing visited fields collide in the plan-cache key"
+  lang rust
+  file apollo-router/src/spec/query/change.rs
+  reject VYQL-CRY-001
+  reject VYQL-AUTH-010
+  reject VYQL-AUTH-036
+  reject VYQL-AUTH-058
+  code
+  ```
+  impl<'a> QueryHashVisitor<'a> {
+      pub(crate) fn hash_query(
+          schema: &'a schema::Schema,
+          executable: &'a executable::ExecutableDocument,
+          operation_name: Option<&str>,
+      ) -> Result<Vec<u8>, BoxError> {
+          let mut visitor = QueryHashVisitor::new(schema, executable);
+          traverse::document(&mut visitor, executable, operation_name)?;
+          Ok(visitor.finish())
+      }
+
+      pub(crate) fn finish(self) -> Vec<u8> {
+          self.hasher.finalize().as_slice().into()
+      }
+  }
+  ```
+
+test "rank1687: the fixed revision folds the serialized operation text into the digest and threads the schema string through the visitor"
+  lang rust
+  file apollo-router/src/spec/query/change.rs
+  reject VYQL-CRY-001
+  reject VYQL-AUTH-010
+  reject VYQL-AUTH-036
+  reject VYQL-AUTH-058
+  code
+  ```
+  impl<'a> QueryHashVisitor<'a> {
+      pub(crate) fn hash_query(
+          schema: &'a schema::Schema,
+          schema_str: &'a str,
+          executable: &'a executable::ExecutableDocument,
+          operation_name: Option<&str>,
+      ) -> Result<Vec<u8>, BoxError> {
+          let mut visitor = QueryHashVisitor::new(schema, schema_str, executable);
+          traverse::document(&mut visitor, executable, operation_name)?;
+          executable.to_string().hash(&mut visitor);
+          Ok(visitor.finish())
+      }
+
+      pub(crate) fn finish(self) -> Vec<u8> {
+          self.hasher.finalize().as_slice().into()
+      }
+  }
+  ```
+
+test "rank1687: the visitor's field hook hashes parent type, name and arguments only, so an introspection field carries none of the schema it answers from"
+  lang rust
+  file apollo-router/src/spec/query/change.rs
+  reject VYQL-CRY-001
+  reject VYQL-AUTH-010
+  reject VYQL-AUTH-036
+  code
+  ```
+  impl<'a> Visitor for QueryHashVisitor<'a> {
+      fn field(
+          &mut self,
+          parent_type: &str,
+          field_def: &ast::FieldDefinition,
+          node: &executable::Field,
+      ) -> Result<(), BoxError> {
+          self.hash_field(
+              parent_type.to_string(),
+              field_def.name.as_str().to_string(),
+              field_def,
+              &node.arguments,
+          )?;
+
+          traverse::field(self, field_def, node)
+      }
+  }
+  ```
+
+test "rank1687: the fixed revision folds the whole schema string into the digest when the visitor meets an introspection field"
+  lang rust
+  file apollo-router/src/spec/query/change.rs
+  reject VYQL-CRY-001
+  reject VYQL-AUTH-010
+  reject VYQL-AUTH-036
+  code
+  ```
+  impl<'a> Visitor for QueryHashVisitor<'a> {
+      fn field(
+          &mut self,
+          parent_type: &str,
+          field_def: &ast::FieldDefinition,
+          node: &executable::Field,
+      ) -> Result<(), BoxError> {
+          if !self.seen_introspection && (field_def.name == "__schema" || field_def.name == "__type")
+          {
+              self.seen_introspection = true;
+              self.schema_str.hash(self);
+          }
+
+          self.hash_field(
+              parent_type.to_string(),
+              field_def.name.as_str().to_string(),
+              field_def,
+              &node.arguments,
+          )?;
+
+          traverse::field(self, field_def, node)
+      }
+  }
+  ```
+
+test "rank1687: the distributed plan-cache key mixes the projection hash, operation name, metadata and plan options but not the operation text or the schema"
+  lang rust
+  file apollo-router/src/query_planner/caching_query_planner.rs
+  reject VYQL-CRY-001
+  reject VYQL-AUTH-010
+  reject VYQL-AUTH-036
+  reject VYQL-AUTH-058
+  code
+  ```
+  #[derive(Debug, Clone, PartialEq, Eq)]
+  pub(crate) struct CachingQueryKey {
+      pub(crate) query: String,
+      pub(crate) operation: Option<String>,
+      pub(crate) hash: Arc<QueryHash>,
+      pub(crate) metadata: CacheKeyMetadata,
+      pub(crate) plan_options: PlanOptions,
+  }
+
+  impl std::fmt::Display for CachingQueryKey {
+      fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+          let mut hasher = Sha256::new();
+          hasher.update(self.operation.as_deref().unwrap_or("-"));
+          let operation = hex::encode(hasher.finalize());
+
+          let mut hasher = Sha256::new();
+          hasher.update(&serde_json::to_vec(&self.metadata).expect("serialization should not fail"));
+          hasher.update(
+              &serde_json::to_vec(&self.plan_options).expect("serialization should not fail"),
+          );
+          let metadata = hex::encode(hasher.finalize());
+
+          write!(
+              f,
+              "plan:{}:{}:{}:{}",
+              FEDERATION_VERSION, self.hash, operation, metadata,
+          )
+      }
+  }
+  ```
+
+test "rank1687: the fixed revision adds the raw schema SDL to the distributed plan-cache key"
+  lang rust
+  file apollo-router/src/query_planner/caching_query_planner.rs
+  reject VYQL-CRY-001
+  reject VYQL-AUTH-010
+  reject VYQL-AUTH-036
+  reject VYQL-AUTH-058
+  code
+  ```
+  #[derive(Debug, Clone, PartialEq, Eq)]
+  pub(crate) struct CachingQueryKey {
+      pub(crate) query: String,
+      pub(crate) sdl: Arc<String>,
+      pub(crate) operation: Option<String>,
+      pub(crate) hash: Arc<QueryHash>,
+      pub(crate) metadata: CacheKeyMetadata,
+      pub(crate) plan_options: PlanOptions,
+  }
+
+  impl std::fmt::Display for CachingQueryKey {
+      fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+          let mut hasher = Sha256::new();
+          hasher.update(self.operation.as_deref().unwrap_or("-"));
+          let operation = hex::encode(hasher.finalize());
+
+          let mut hasher = Sha256::new();
+          hasher.update(&serde_json::to_vec(&self.metadata).expect("serialization should not fail"));
+          hasher.update(
+              &serde_json::to_vec(&self.plan_options).expect("serialization should not fail"),
+          );
+          hasher.update(&serde_json::to_vec(&self.sdl).expect("serialization should not fail"));
+          let metadata = hex::encode(hasher.finalize());
+
+          write!(
+              f,
+              "plan:{}:{}:{}:{}",
+              FEDERATION_VERSION, self.hash, operation, metadata,
+          )
+      }
+  }
+  ```
+
+test "rank1687: the only hash-shaped finding in the file is the weak-algorithm one on the stats-report key, unchanged by the fix"
+  lang rust
+  file apollo-router/src/query_planner/caching_query_planner.rs
+  expect VYQL-CRY-001
+  code
+  ```
+  fn stats_report_key_hash(stats_report_key: &str) -> String {
+      let mut hasher = sha1::Sha1::new();
+      hasher.update(stats_report_key.as_bytes());
+      let result = hasher.finalize();
+      hex::encode(result)
+  }
+  ```

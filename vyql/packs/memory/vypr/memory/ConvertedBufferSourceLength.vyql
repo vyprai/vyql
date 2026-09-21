@@ -1,0 +1,11 @@
+module vypr.memory;
+
+rule ConvertedBufferSourceLength {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_125, CWE_131]
+    id: "VYQL-MEM-078"
+    severity: medium
+  }
+  issue code.ConvertedBufferSourceLength as c
+}

@@ -1,0 +1,242 @@
+# Rank 1571 / CVE-2026-46364 (GHSA-289f-fq7w-6q2w): phpMyFAQ's built-in
+# captcha interpolated the User-Agent header and the client IP into DELETE
+# and INSERT queries with sprintf and no escaping, and both queries run on
+# every hit to the unauthenticated `GET /api/captcha` route (SQL injection,
+# CWE-89). BuiltinCaptcha's constructor captures the two values at
+# construction time,
+#
+#   $this->userAgent = $request->headers->get('user-agent');
+#   $this->ip = $request->getClientIp();
+#
+# and garbageCollector() / saveCaptcha() drop them into
+# `"DELETE FROM %sfaqcaptcha WHERE useragent = '%s' AND language = '%s'
+# AND ip = '%s'"` and the matching INSERT, each passed straight to
+# `$this->configuration->getDb()->query()`.
+#
+# ## The pool row points at the wrong commit
+#
+# The row names 05f83bf4e5 ("fix: improved queries"), which hardens
+# Faq.php, Tags.php, SearchDatabase.php, Relation.php and Search.php and
+# does not touch BuiltinCaptcha.php at all; its parent already carries the
+# escaping. The remediation for this advisory is 77062d4903 ("fix: added
+# missing escaping", five days earlier), which routes both fields and the
+# captcha code through a new escapeQueryValue() helper that delegates to
+# Database::escape(). The pair below is measured against 77062d4903^ and
+# 77062d4903, not against the row's commit.
+#
+# ## What fires, both revisions
+#
+# Three --cache off runs per revision over BuiltinCaptcha.php report 0
+# findings at 77062d4903^ and 0 at the fix, identically; the Captcha
+# directory (8 files) and CaptchaController.php also report 0. The bounded
+# src/ scan (669 files) reports 281 findings at the parent and 284 at the
+# fix, stable over three runs each, with these rows naming BuiltinCaptcha:
+# 2 at the parent (:475, :501 -- checkCaptchaCode and removeCaptcha, both
+# already escaped or parameter-fed) and 5 at the fix (:329, :351, :373,
+# :486, :516 -- the same two paths plus the three new escapeQueryValue
+# locals). Every one of the seven carries the same source,
+# code.HttpInput at Api/Pagination/PaginationRequest.php:106, and every
+# one ends `unless path coveredBy core.SqlParameterization: not satisfied`.
+# None is on the defect: garbageCollector's DELETE and saveCaptcha's
+# INSERT, the two sinks the advisory names, carry no finding at either
+# revision, and no row anywhere has the constructor's header source.
+#
+# ## Why no binding converts it
+#
+# Both halves are labelled. `vyql match` on BuiltinCaptcha.php at the
+# parent reports `$request.headers.get code.HttpHeader :112` (php.input,
+# resolved) and six `code.SqlExecution` sinks (:310, :324, :340, :362,
+# :475, :501). `vyql trace -from code.HttpHeader -to code.SqlExecution`
+# dead-ends at the field store itself:
+#
+#   taint stops at: Call#11 code.Call :112 call=$this.userAgent
+#     no outgoing flow (callee not traced -- external or cross-package)
+#
+# -- the cross-method object-field hop rank 1198 filed (a field written on
+# $this in one method is invisible to a read of the same field in another
+# method of the same class; aliasReceiverSelf does not connect the two).
+# The isolating pair below reproduces it with this rank's own source and
+# sink: the same header read flowing through a local in one method
+# reports VYQL-INJ-001 at high, the identical read stored on $this in the
+# constructor and read in a sibling method reports nothing. No binding can
+# bridge that hop, and a data workaround that fakes the path is out of
+# bounds.
+#
+# The reject direction has a second, independent blocker: no binding
+# anywhere emits a SQL control for a database wrapper's escape() -- PHP's
+# only core.SqlParameterization emitter is PDO prepare(), dependency-gated
+# -- so the fix's escapeQueryValue() is not credited. Measured on the
+# same-method form, which fires today: routing the header read through the
+# class's escape helper, or through $db->escape() directly, still reports
+# VYQL-INJ-001 at high with the unless clause unsatisfied, and that is
+# what produces the 2 + 5 false-positive rows on the real file above.
+# Binding `callee.method == "escape"` to a SQL control would clear SQL
+# findings on every escape() call in every PHP tree, HTML and URL
+# escapers included, so the reject half waits for a receiver-aware control
+# rather than a method name.
+#
+# Flip conditions: when the cross-method field hop lands, the third and
+# fourth blocks below already discriminate (the third fires, the fourth
+# must flip to expect with it). When a receiver-aware SQL escape control
+# lands, the second block must stay rejected -- until then it would fire
+# alongside the first, which is why both hold as reject today.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1571: the captcha's user agent reaches the DELETE unescaped"
+  lang php
+  file BuiltinCaptcha.php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  class BuiltinCaptcha implements CaptchaInterface
+  {
+      /** @var string */
+      private readonly mixed $userAgent;
+      /** @var string */
+      private readonly mixed $ip;
+
+      public function __construct(
+          private readonly Configuration $configuration,
+      ) {
+          $request = Request::createFromGlobals();
+          $this->userAgent = $request->headers->get('user-agent');
+          $this->ip = $request->getClientIp();
+      }
+
+      private function garbageCollector(): void
+      {
+          $delete = sprintf(
+              "
+              DELETE FROM
+                  %sfaqcaptcha
+              WHERE
+                  useragent = '%s' AND language = '%s' AND ip = '%s'",
+              Database::getTablePrefix(),
+              $this->userAgent,
+              $this->configuration->getLanguage()->getLanguage(),
+              $this->ip,
+          );
+
+          $this->configuration->getDb()->query($delete);
+      }
+  }
+  ```
+
+test "rank1571: the fixed revision escapes both fields before the sprintf"
+  lang php
+  file BuiltinCaptcha.php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  class BuiltinCaptcha implements CaptchaInterface
+  {
+      /** @var string */
+      private readonly mixed $userAgent;
+      /** @var string */
+      private readonly mixed $ip;
+
+      public function __construct(
+          private readonly Configuration $configuration,
+      ) {
+          $request = Request::createFromGlobals();
+          $this->userAgent = $request->headers->get('user-agent');
+          $this->ip = $request->getClientIp();
+      }
+
+      private function garbageCollector(): void
+      {
+          $db = $this->configuration->getDb();
+          $userAgent = $this->escapeQueryValue($this->userAgent);
+          $language = $this->escapeQueryValue($this->configuration->getLanguage()->getLanguage());
+          $ip = $this->escapeQueryValue($this->ip);
+
+          $delete = sprintf(
+              "
+              DELETE FROM
+                  %sfaqcaptcha
+              WHERE
+                  useragent = '%s' AND language = '%s' AND ip = '%s'",
+              Database::getTablePrefix(),
+              $userAgent,
+              $language,
+              $ip,
+          );
+
+          $db->query($delete);
+      }
+
+      private function escapeQueryValue(mixed $value): string
+      {
+          return $this->configuration->getDb()->escape((string) ($value ?? ''));
+      }
+  }
+  ```
+
+# The isolating pair. Same source (the header read php.input already
+# resolves), same sink (the sprintf-built DELETE into the db query), same
+# template; only whether the value crosses a method boundary through a
+# field differs.
+
+test "rank1571: the header read reaches the DELETE inline, in one method"
+  lang php
+  file inline.php
+  expect VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  class BuiltinCaptcha implements CaptchaInterface
+  {
+      public function garbageCollector(): void
+      {
+          $request = Request::createFromGlobals();
+          $userAgent = $request->headers->get('user-agent');
+
+          $delete = sprintf(
+              "DELETE FROM %sfaqcaptcha WHERE useragent = '%s'",
+              Database::getTablePrefix(),
+              $userAgent,
+          );
+
+          $this->configuration->getDb()->query($delete);
+      }
+  }
+  ```
+
+test "rank1571: the same header read, stored on the constructor's field and read in another method"
+  lang php
+  file field_crossing.php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  class BuiltinCaptcha implements CaptchaInterface
+  {
+      /** @var string */
+      private readonly mixed $userAgent;
+
+      public function __construct(
+          private readonly Configuration $configuration,
+      ) {
+          $request = Request::createFromGlobals();
+          $this->userAgent = $request->headers->get('user-agent');
+      }
+
+      public function garbageCollector(): void
+      {
+          $delete = sprintf(
+              "DELETE FROM %sfaqcaptcha WHERE useragent = '%s'",
+              Database::getTablePrefix(),
+              $this->userAgent,
+          );
+
+          $this->configuration->getDb()->query($delete);
+      }
+  }
+  ```

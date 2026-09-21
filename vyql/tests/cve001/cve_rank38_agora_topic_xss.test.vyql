@@ -1,0 +1,11 @@
+# Rank 38 / CVE-2025-55133: Agora topicName reaches browser-visible HTML.
+
+test "rank38: topic name reaches HTML rendering"
+  expect VYQL-INJ-004
+  graph
+  ```
+  node src core.UserControlledData
+  node sink code.HtmlRender
+  edge FLOWS src -> sink
+  ```
+

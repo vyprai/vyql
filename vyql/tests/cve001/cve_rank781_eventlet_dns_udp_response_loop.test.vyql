@@ -1,0 +1,76 @@
+# Rank 781 / CVE-2023-29483: Eventlet greendns accepted a UDP datagram
+# from the expected address before parsing and correlating the DNS response.
+test "rank781: DNS UDP response is parsed only after source-address break"
+  lang python
+  expect VYQL-DOS-026
+  code
+  ```
+  import dns
+  import socket
+
+  def udp(q, where, timeout=10, port=53, ignore_unexpected=False):
+      wire = q.to_wire()
+      destination = (where, port)
+      s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+      s.settimeout(timeout)
+      try:
+          s.sendto(wire, destination)
+          while True:
+              try:
+                  wire, from_address = s.recvfrom(65535)
+              except socket.timeout:
+                  continue
+              if from_address == destination:
+                  break
+              if not ignore_unexpected:
+                  raise dns.query.UnexpectedSource()
+      finally:
+          s.close()
+
+      r = dns.message.from_wire(wire, keyring=q.keyring, request_mac=q.mac)
+      if not q.is_response(r):
+          raise dns.query.BadResponse()
+      return r
+  ```
+
+test "rank781: DNS UDP response is parsed and correlated inside receive loop"
+  lang python
+  reject VYQL-DOS-026
+  code
+  ```
+  import dns
+  import socket
+
+  def udp(q, where, timeout=10, port=53, ignore_unexpected=False, ignore_errors=False):
+      wire = q.to_wire()
+      destination = (where, port)
+      s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+      s.settimeout(timeout)
+      try:
+          s.sendto(wire, destination)
+          while True:
+              try:
+                  wire, from_address = s.recvfrom(65535)
+              except socket.timeout:
+                  continue
+              if from_address != destination:
+                  if ignore_unexpected:
+                      continue
+                  raise dns.query.UnexpectedSource()
+              try:
+                  r = dns.message.from_wire(wire, keyring=q.keyring, request_mac=q.mac)
+                  if not q.is_response(r):
+                      raise dns.query.BadResponse()
+                  break
+              except dns.message.Truncated as e:
+                  if ignore_errors and not q.is_response(e.message()):
+                      continue
+                  raise
+              except Exception:
+                  if ignore_errors:
+                      continue
+                  raise
+      finally:
+          s.close()
+      return r
+  ```

@@ -1,0 +1,11 @@
+module vypr.dos;
+
+rule FeedMeSaveFeedMissingErrorGuard {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_248, CWE_400]
+    id: "VYQL-DOS-043"
+    severity: medium
+  }
+  issue code.FeedMeSaveFeedMissingErrorGuard as action
+}

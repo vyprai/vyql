@@ -1,0 +1,9 @@
+module bindings.python.generated.m4cad6409;
+
+binding deserialization0 {
+  requires {
+    dependency("statsmodels")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

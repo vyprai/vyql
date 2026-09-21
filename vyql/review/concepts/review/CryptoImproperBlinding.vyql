@@ -1,0 +1,7 @@
+module code;
+
+review code.CryptoImproperBlinding {
+  category: crypto
+  kind: attention
+  text: "review private-key blinding code for required subgroup/Jacobi/square hardening before inverse or unblinding use"
+}

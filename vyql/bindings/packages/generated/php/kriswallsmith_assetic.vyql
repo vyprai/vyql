@@ -1,0 +1,9 @@
+module bindings.php.generated.m6bc6646f;
+
+binding weakHash0 {
+  requires {
+    dependency("kriswallsmith/assetic")
+  }
+  query pattern presenceNode where node.path ~= "kriswallsmith.assetic.hash"
+  emit issue code.WeakHash at node
+}

@@ -1,0 +1,17 @@
+module bindings.cpp.generated.m616ac445;
+
+binding deserialization0 {
+  requires {
+    dependency("double-conversion")
+  }
+  query pattern callExpr where callee.method == "StringToDouble"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("double-conversion")
+  }
+  query pattern callExpr where callee.method == "Strtod"
+  emit sink code.Deserialization at args[0]
+}

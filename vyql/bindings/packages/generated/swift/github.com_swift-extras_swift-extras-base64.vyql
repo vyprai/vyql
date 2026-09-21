@@ -1,0 +1,17 @@
+module bindings.swift.generated.m8fa4417f;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/swift-extras/swift-extras-base64")
+  }
+  query pattern callExpr where callee.method == "Base32.decode"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/swift-extras/swift-extras-base64")
+  }
+  query pattern callExpr where callee.method == "Base64.decode"
+  emit sink code.Deserialization at args[0]
+}

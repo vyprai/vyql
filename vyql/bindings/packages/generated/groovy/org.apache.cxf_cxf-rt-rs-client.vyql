@@ -1,0 +1,41 @@
+module bindings.groovy.generated.md30241c6;
+
+binding httpInput0 {
+  requires {
+    dependency("org.apache.cxf:cxf-rt-rs-client")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput1 {
+  requires {
+    dependency("org.apache.cxf:cxf-rt-rs-client")
+  }
+  query pattern callExpr where callee.method == "header"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput2 {
+  requires {
+    dependency("org.apache.cxf:cxf-rt-rs-client")
+  }
+  query pattern callExpr where callee.method == "headers"
+  emit source code.HttpInput at call.result
+}
+
+binding networkSend3 {
+  requires {
+    dependency("org.apache.cxf:cxf-rt-rs-client")
+  }
+  query pattern callExpr where callee.method == "writeBody"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkData4 {
+  requires {
+    dependency("org.apache.cxf:cxf-rt-rs-client")
+  }
+  query pattern callExpr where callee.method == "readBody"
+  emit source code.NetworkData at call.result
+}

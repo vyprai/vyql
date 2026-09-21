@@ -1,0 +1,9 @@
+module bindings.objc.generated.mab0308b7;
+
+binding userControlledData0 {
+  requires {
+    dependency("CapacitorApp")
+  }
+  query pattern callExpr where callee.method == "getLaunchUrl"
+  emit source core.UserControlledData at call.result
+}

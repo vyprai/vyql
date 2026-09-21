@@ -1,0 +1,42 @@
+# Rank 796 / CVE-2016-8897: Exponent CMS routed request parameter names through
+# strrpos($key, '_id', -3) without proving the key was at least three bytes long,
+# allowing warning/error disclosure for short keys.
+
+test "rank796: PHP strrpos negative offset on request key lacks length guard"
+  lang php
+  file expRouter.php
+  expect VYQL-SEC-026
+  expect_review code.PhpNegativeOffsetStringSearchWarningDisclosure
+  code
+  ```
+  <?php
+  class expRouter {
+      public function routeRequest() {
+          foreach ($_REQUEST as $key=>$var) {
+              if (is_string($var) && strrpos($key, '_id', -3) !== false) {
+                  $_REQUEST[$key] = intval($_REQUEST[$key]);
+              }
+          }
+      }
+  }
+  ```
+
+test "rank796: PHP strrpos negative offset guarded by key length"
+  lang php
+  file expRouter.php
+  reject VYQL-SEC-026
+  reject_review code.PhpNegativeOffsetStringSearchWarningDisclosure
+  code
+  ```
+  <?php
+  class expRouter {
+      public function routeRequest() {
+          foreach ($_REQUEST as $key=>$var) {
+              if (is_string($var) && strlen($key) >= 3 &&
+                  strrpos($key, '_id', -3) !== false) {
+                  $_REQUEST[$key] = intval($_REQUEST[$key]);
+              }
+          }
+      }
+  }
+  ```

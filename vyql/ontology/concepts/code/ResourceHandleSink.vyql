@@ -1,0 +1,6 @@
+module code;
+
+concept ResourceHandleSink : sink {
+  cwe: [CWE_772]
+  vulnerableTo: [resource.ResourceLeak]
+}

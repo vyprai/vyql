@@ -1,0 +1,76 @@
+# Rank 1555 / CVE-2026-34747: Payload's drizzle adapter spliced
+# request-supplied field paths into raw SQL identifiers, so a crafted
+# where-clause key broke out of the quoted column name and influenced
+# query execution (SQL injection, CWE-89; GHSA-7xxh-373w-35vg, patched
+# in 3.79.1 by e4742054, "fix: stricter input validation (#15868)" --
+# the pool row's fba2438057 is a sibling drizzle bug fix, the
+# hasMany-contains error path). parseParams in
+# packages/drizzle/src/queries/parseParams.ts built
+# `${jsonQuerySelector} ${operator} ${formattedValue}` into
+# sql.raw(rawSQLQuery) (:207 at the parent), and the adapter's
+# createJSONQuery implementations formatted the where-key segments
+# straight into the selector. The fix adds
+# packages/drizzle/src/utilities/sanitizePathSegment.ts, which throws
+# APIError 400 unless the segment matches /^\w+$/, and threads it
+# through every key-to-identifier site.
+#
+# VYQL-INJ-001 reports the sink at both revisions: packages/drizzle/src
+# scans to 226 findings at the parent and 226 at the fix (3x --cache
+# off each, identical rule/file/line keys; 65 are INJ-001), the only
+# movement being line shifts from the added imports -- the sink itself
+# moves parseParams.ts:207 -> :211 and keeps reporting. Crediting the
+# guard changes nothing: the reported taint paths ride the `adapter`
+# parameter through unresolved receiver calls
+# (adapter.convertPathToJSONTraversal, adapter.createJSONQuery) and
+# never enter the implementations the fix hardened, so a
+# core.SqlParameterization check emitted at every
+# sanitizePathSegment call site (fourteen: postgres/sqlite
+# createJSONQuery, convertPathToJSONTraversal,
+# find/traverseFields.ts:88) registers only as a near-miss on a
+# sibling path and clears 0 of the 65 findings. Discriminating this fix needs the receiver call resolved
+# into its implementation so the path traverses the guard, plus
+# allowlist-guard controls credited inside it; the JavaScript
+# regex-guard synthesis is deliberately denylist-only and
+# command-argument-only. Both tests expect VYQL-INJ-001, the rule's
+# behaviour today; when those two land, the sanitized form must flip
+# to reject.
+
+test "rank1555: the where key is spliced into a raw identifier"
+  lang javascript
+  file packages/drizzle/src/queries/parseParams.js
+  expect VYQL-INJ-001
+  code
+  ```
+  import { sql } from 'drizzle-orm';
+
+  function buildWhereClause(req) {
+    const where = req.query.where;
+    const k = Object.keys(where)[0];
+
+    const jsonQuerySelector = k.split('.').join('_');
+    const rawSQLQuery = `${jsonQuerySelector} = '${where[k]}'`;
+    return sql.raw(rawSQLQuery);
+  }
+  ```
+
+test "rank1555: the fixed revision validates every segment before splicing"
+  lang javascript
+  file packages/drizzle/src/queries/parseParams.js
+  expect VYQL-INJ-001
+  code
+  ```
+  import { sql } from 'drizzle-orm';
+  import { sanitizePathSegment } from '../utilities/sanitizePathSegment.js';
+
+  function buildWhereClause(req) {
+    const where = req.query.where;
+    const k = Object.keys(where)[0];
+
+    const jsonQuerySelector = k
+      .split('.')
+      .map((s) => sanitizePathSegment(s))
+      .join('_');
+    const rawSQLQuery = `${jsonQuerySelector} = '${where[k]}'`;
+    return sql.raw(rawSQLQuery);
+  }
+  ```

@@ -1,0 +1,187 @@
+# Rank 1682 / CVE-2026-29198 (GHSA-h257-f28j-hfjg, recorded CWE-89, CVSS 9.8):
+# Rocket.Chat's OAuth2 server accepted the access token over three transports.
+# The REST middleware in apps/meteor/app/api/server/middlewares/authentication.ts
+# handed the whole `req.query` object to the shared authenticator, and the
+# authenticator in apps/meteor/app/oauth2-server-config/server/oauth/oauth2-server.ts
+# read the member out itself:
+#
+#   export async function oAuth2ServerAuth(partialRequest: {
+#       headers: Record<string, string | undefined>;
+#       query: Record<string, string | undefined>;
+#   }): Promise<IUser | undefined> {
+#       const headerToken = partialRequest.headers.authorization?.replace('Bearer ', '');
+#       const queryToken = partialRequest.query.access_token;
+#       const incomingToken = headerToken || queryToken;
+#       if (!incomingToken) { return; }
+#       const accessToken = await getAccessToken(incomingToken);
+#
+# getAccessToken() is `OAuthAccessTokens.findOneByAccessToken(accessToken)`, a
+# MongoDB `findOne({ accessToken })` under a one-line wrapper. Express builds
+# `req.query` with a nested query parser, so `?access_token[$ne]=null` arrives
+# as the object `{'$ne': 'null'}`: truthy, past the `!incomingToken` check, and
+# spent on the token lookup as a `$ne` operator that matches any token in the
+# collection. With an OAuth app configured the match is an account takeover of
+# the first user holding a token -- the advisory's own words are "a NoSQL
+# injection vulnerability can lead to account takeover", so the recorded
+# CWE-89 (SQL injection) is the generic-database tag for what is CWE-943
+# operator injection.
+#
+# The fixed revision, f4dcad44d578b1ac325cd0249c35c491004a1b30 (step 0 `nocommit` flag:
+# the GHSA links no commit, so the pool SHA is never verified against the
+# repository -- it resolves directly and is the fixing change, ral fix), stops threading the
+# query object: both call sites extract `typeof req.query.access_token ===
+# 'string' ? req.query.access_token : undefined` and pass the pre-validated
+# scalar, and the shared authenticator's signature shrinks to
+# `{ authorization?: string; accessToken?: string }` so the query member read
+# leaves that function entirely. The regression tests added in the same commit
+# drive `access_token[$ne]`, `[$exists]`, `[$gt]` and `[$regex]` at the API
+# and expect 401.
+#
+# FIXED. The taint route cannot discriminate this fix and is measured doing
+# so: `req.query` carries the `code.HttpInput`, the whole chain
+# (object-literal argument -> parameter -> `.query` -> `.access_token` member
+# reads -> nested call -> `findOneByAccessToken` argument) propagates, and
+# with a labelled sink stand-in VYQL-INJ-007 fires at high on BOTH revisions,
+# because the string-guarded value still flows to the same lookup -- the fixed revisionx
+# is a type validation, not a cut. The `unless path coveredBy` clause cannot
+# see it either: a `typeof` ternary is not a call, so no check node can sit on
+# the path, and the guard sits in the caller three frames above the sink, so
+# no same-function or dominance cover applies (the TypeScript instance of the
+# delegated-check attribution family). What the fixed revision does leave readable is in
+# the frame that spends the token: the vulnerable routine strips a `Bearer `
+# prefix (RFC 6750's header transport) while also reading the query-string
+# `access_token` member (RFC 6750's query transport, under the parameter name
+# the RFC defines) with no scalar check, and the fixed revision removes exactly that
+# query read from the function. So this adds
+# code.OauthQueryTokenScalarCheckMissing / VYQL-AUTH-147 for the class: a
+# bearer-token authentication routine that also accepts the access token from
+# the request query string and spends it without pinning it to a string. Both
+# conjuncts are protocol vocabulary, not project names -- renaming the fixed revision's
+# own `oAuth2ServerAuth` helper changes nothing.
+#
+# Measured, bounded (timeout 180, --max-ram 6GB, --cache off): on the
+# vulnerable revision of the real file the binding labels exactly the one
+# function context at oauth2-server.ts:22 (oAuth2ServerAuth) and nothing else
+# in the file; on the fixed revision it labels nothing -- the query read now
+# lives in the API.v1.addAuthMethod callback, which parses no Bearer header.
+# A scan of the three touched subtrees (the oauth app, the API middlewares,
+# packages/models) at the vulnerable revision reports VYQL-AUTH-147 once, at
+# oauth2-server.ts:22, and the same scan at the fixed revision reports it zero
+# times. Across every other clone under /tmp/cve-work/rank*/ the anchor shape
+# exists in exactly one file -- mastodon's streaming/index.js, whose
+# `accountFromRequest` reads `location.query.access_token` and strips
+# `^Bearer ` in one function -- and reports there twice (the arrow body and
+# its nested Promise executor both carry the tokens, one extra flag per
+# wrapped function): a review-direction flag on a function that genuinely
+# accepts the token from the query string. Nothing else fires.
+#
+# Also measured and deliberately not shipped here: the Mongo sink spellings
+# `this.findOne` and `findOneByX` wrapper forms are unlabelled in JavaScript
+# (only `collection.findOne` / `Model.findOne` literal receivers bind
+# code.NosqlQuery), which is why the raw taint rule needs the stand-in above.
+# Widening the sink cannot be part of this rank because it fires identically
+# on both revisions of this code; it is a separate decision for the corpus.
+
+test "rank1682: oauth server reads the bearer token from the query string untyped"
+  lang javascript
+  file oauth2-server.ts
+  expect VYQL-AUTH-147
+  expect_review code.OauthQueryTokenScalarCheckMissing
+  code
+  ```
+  import type { IUser } from '@rocket.chat/core-typings';
+  import { OAuthAccessTokens, Users } from '@rocket.chat/models';
+
+  async function getAccessToken(accessToken: any) {
+  	return OAuthAccessTokens.findOneByAccessToken(accessToken);
+  }
+
+  export async function oAuth2ServerAuth(partialRequest: {
+  	headers: Record<string, string | undefined>;
+  	query: Record<string, string | undefined>;
+  }): Promise<IUser | undefined> {
+  	const headerToken = partialRequest.headers.authorization?.replace('Bearer ', '');
+  	const queryToken = partialRequest.query.access_token;
+  	const incomingToken = headerToken || queryToken;
+
+  	if (!incomingToken) {
+  		return;
+  	}
+
+  	const accessToken = await getAccessToken(incomingToken);
+
+  	if (!accessToken || (accessToken.expires != null && accessToken.expires < new Date())) {
+  		return;
+  	}
+
+  	return Users.findOneById(accessToken.userId);
+  }
+  ```
+
+test "rank1682: oauth server takes a pre-validated scalar instead of the query object"
+  lang javascript
+  file oauth2-server.ts
+  reject VYQL-AUTH-147
+  reject_review code.OauthQueryTokenScalarCheckMissing
+  code
+  ```
+  import type { IUser } from '@rocket.chat/core-typings';
+  import { OAuthAccessTokens, Users } from '@rocket.chat/models';
+
+  async function getAccessToken(accessToken: any) {
+  	return OAuthAccessTokens.findOneByAccessToken(accessToken);
+  }
+
+  export async function oAuth2ServerAuth(partialRequest: { authorization?: string; accessToken?: string }): Promise<IUser | undefined> {
+  	const headerToken = partialRequest.authorization?.replace('Bearer ', '');
+  	const incomingToken = headerToken || partialRequest.accessToken;
+
+  	if (!incomingToken) {
+  		return;
+  	}
+
+  	const accessToken = await getAccessToken(incomingToken);
+
+  	if (!accessToken || (accessToken.expires != null && accessToken.expires < new Date())) {
+  		return;
+  	}
+
+  	return Users.findOneById(accessToken.userId);
+  }
+  ```
+
+test "rank1682: query read kept but pinned to a string clears the finding"
+  lang javascript
+  file oauth2-server.ts
+  reject VYQL-AUTH-147
+  reject_review code.OauthQueryTokenScalarCheckMissing
+  code
+  ```
+  import type { IUser } from '@rocket.chat/core-typings';
+  import { OAuthAccessTokens, Users } from '@rocket.chat/models';
+
+  async function getAccessToken(accessToken: any) {
+  	return OAuthAccessTokens.findOneByAccessToken(accessToken);
+  }
+
+  export async function oAuth2ServerAuth(partialRequest: {
+  	headers: Record<string, string | undefined>;
+  	query: Record<string, string | undefined>;
+  }): Promise<IUser | undefined> {
+  	const headerToken = partialRequest.headers.authorization?.replace('Bearer ', '');
+  	const queryToken = typeof partialRequest.query.access_token === 'string' ? partialRequest.query.access_token : undefined;
+  	const incomingToken = headerToken || queryToken;
+
+  	if (!incomingToken) {
+  		return;
+  	}
+
+  	const accessToken = await getAccessToken(incomingToken);
+
+  	if (!accessToken || (accessToken.expires != null && accessToken.expires < new Date())) {
+  		return;
+  	}
+
+  	return Users.findOneById(accessToken.userId);
+  }
+  ```

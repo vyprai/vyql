@@ -1,0 +1,11 @@
+module code;
+
+concept DockerCliProgramDataPluginSearchPath : issue {
+  cwe: [CWE_427]
+  reviewAssumption: "a lower-privileged Windows user can create the ProgramData plugin directory and place a plugin binary that a privileged Docker CLI process later executes"
+  reviewCategory: path
+  reviewCondition: "Docker CLI for Windows searches the writable ProgramData plugin directory before trusted system plugin locations"
+  reviewConfidence: high
+  reviewEvidence: "Docker CLI plugin-manager default directory list {pattern} includes %ProgramData%\\Docker\\cli-plugins"
+  vulnerableTo: [path.UncontrolledSearchPath, access_control.PrivilegeEscalation]
+}

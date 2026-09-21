@@ -1,0 +1,11 @@
+module code;
+
+concept ChatterBotSqlalchemySessionPoolExhaustion : issue {
+  cwe: [CWE_400]
+  reviewAssumption: "concurrent get_response calls can partially consume generator results or hit exceptional paths that hold database sessions long enough to exhaust the pool"
+  reviewCategory: resource
+  reviewCondition: "SQLAlchemy session and connection-pool management lacks bounded pool defaults and guaranteed session cleanup"
+  reviewConfidence: medium
+  reviewEvidence: "SQL storage adapter context {pattern} constructs sessions and yields query results without the patched scoped-session/pool-timeout/finally cleanup pattern"
+  vulnerableTo: [dos.UncontrolledResourceConsumption]
+}

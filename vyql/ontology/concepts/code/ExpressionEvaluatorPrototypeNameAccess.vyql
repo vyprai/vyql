@@ -1,0 +1,11 @@
+module code;
+
+concept ExpressionEvaluatorPrototypeNameAccess : issue {
+  cwe: [CWE_1321]
+  reviewAssumption: "a caller supplies the expression or template text that names what gets resolved"
+  reviewCategory: prototype_pollution
+  reviewCondition: "an evaluator or name-keyed registry resolves externally supplied variable, member or entry names against JavaScript objects without rejecting prototype-sensitive names"
+  reviewConfidence: high
+  reviewEvidence: "name-keyed lookup context {pattern} resolves an externally supplied name against an object whose prototype chain stays reachable, with no own-property or prototype-name guard and no null-prototype storage"
+  vulnerableTo: [injection.PrototypePollution]
+}

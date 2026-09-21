@@ -1,0 +1,17 @@
+module bindings.objc.generated.me97a2706;
+
+binding secretValue0 {
+  requires {
+    dependency("Braintree")
+  }
+  query pattern callExpr where callee.method == "tokenize"
+  emit source code.SecretValue at call.result
+}
+
+binding networkSend1 {
+  requires {
+    dependency("Braintree")
+  }
+  query pattern callExpr where callee.method == "httpRequest"
+  emit sink code.NetworkSend at args[0]
+}

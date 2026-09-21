@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule EscapedSqlValueFunctionCallAllowed {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_89]
+    id: "VYQL-INJ-183"
+    severity: high
+  }
+  issue code.EscapedSqlValueFunctionCallAllowed as sink
+}

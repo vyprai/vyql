@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m25456827;
+
+binding templateRender0 {
+  requires {
+    dependency("jbuilder")
+  }
+  query pattern callExpr where callee.method == "partial!"
+  emit sink code.TemplateRender at args[0]
+}

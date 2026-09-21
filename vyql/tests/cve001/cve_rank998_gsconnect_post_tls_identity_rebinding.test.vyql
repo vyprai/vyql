@@ -1,0 +1,65 @@
+# Rank 998 / CVE-2025-66270: GSConnect accepted a second encrypted identity
+# packet without checking that it matched the pre-TLS identity.
+
+test "rank998: post TLS identity rebinding without checks is flagged"
+  lang javascript
+  file lan.js
+  expect VYQL-AUTH-077
+  code
+  ```
+  class LanChannel {
+    async accept(connection) {
+      this.identity = new Core.Packet(data[0]);
+
+      if (!this.identity.body.deviceId)
+        throw new Error('missing deviceId');
+
+      if (!Device.validateId(this.identity.body.deviceId))
+        throw new Error(`invalid deviceId "${this.identity.body.deviceId}"`);
+
+      this._connection = await this._encryptClient(connection);
+
+      if (this.identity.body.protocolVersion >= 8) {
+        await this.sendPacket(this.backend.identity);
+        this.identity = await this.readPacket();
+      }
+    }
+  }
+  ```
+
+test "rank998: post TLS identity rebinding with stable field checks is clean"
+  lang javascript
+  file lan.js
+  reject VYQL-AUTH-077
+  code
+  ```
+  class LanChannel {
+    async _exchangeIdentities() {
+      await this.sendPacket(this.backend.identity);
+      const identity = await this.readPacket();
+
+      if (this.identity.body.protocolVersion !== identity.body.protocolVersion)
+        throw new Error('unexpected protocol version');
+
+      if (this.identity.body.deviceId !== identity.body.deviceId)
+        throw new Error('unexpected device ID');
+
+      this.identity = identity;
+    }
+
+    async accept(connection) {
+      this.identity = new Core.Packet(data[0]);
+
+      if (!this.identity.body.deviceId)
+        throw new Error('missing deviceId');
+
+      if (!Device.validateId(this.identity.body.deviceId))
+        throw new Error(`invalid deviceId "${this.identity.body.deviceId}"`);
+
+      this._connection = await this._encryptClient(connection);
+
+      if (this.identity.body.protocolVersion >= 8)
+        await this._exchangeIdentities();
+    }
+  }
+  ```

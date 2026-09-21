@@ -1,0 +1,69 @@
+module bindings.rust.generated.mb94f3e97;
+
+binding codeEval0 {
+  requires {
+    dependency("js-sys")
+  }
+  query pattern callExpr where callee.method == "eval"
+  emit sink code.CodeEval at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("js-sys")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding inputValidation2 {
+  requires {
+    dependency("js-sys")
+  }
+  query pattern callExpr where callee.method == "decode_uri"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation3 {
+  requires {
+    dependency("js-sys")
+  }
+  query pattern callExpr where callee.method == "decode_uri_component"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation4 {
+  requires {
+    dependency("js-sys")
+  }
+  query pattern callExpr where callee.method == "encode_uri"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation5 {
+  requires {
+    dependency("js-sys")
+  }
+  query pattern callExpr where callee.method == "encode_uri_component"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

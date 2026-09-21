@@ -1,0 +1,75 @@
+# Rank 1188 / CVE-2026-26275: httpsig-rs's hyper adapter verified the
+# Content-Digest header with a plain byte-slice equality (digest ==
+# expected_digest) instead of a constant-time comparison, letting an
+# attacker recover a valid digest one byte at a time from response timing.
+
+test "rank1188: content digest verified with ordinary equality"
+  lang rust
+  expect VYQL-CRY-006
+  expect_review code.SecretComparisonReview
+  code
+  ```
+  pub trait RequestContentDigest {
+    async fn verify_content_digest(self) -> Result<Self, DigestError>
+    where
+      Self: Sized;
+  }
+
+  impl RequestContentDigest for Request {
+    async fn verify_content_digest(self) -> Result<Self, DigestError>
+    where
+      Self: Sized,
+    {
+      let header_map = self.headers();
+      let (cd_type, expected_digest) = extract_content_digest(header_map).await?;
+      let body_bytes = self.into_bytes().await?;
+      let digest = derive_digest(&body_bytes, &cd_type);
+
+      if digest == expected_digest {
+        Ok(self)
+      } else {
+        Err(DigestError::InvalidContentDigest("Content-Digest verification failed".to_string()))
+      }
+    }
+  }
+  ```
+
+test "rank1188: content digest verified with constant-time comparison"
+  lang rust
+  reject VYQL-CRY-006
+  reject_review code.SecretComparisonReview
+  code
+  ```
+  use subtle::ConstantTimeEq;
+
+  pub trait RequestContentDigest {
+    async fn verify_content_digest(self) -> Result<Self, DigestError>
+    where
+      Self: Sized;
+  }
+
+  impl RequestContentDigest for Request {
+    async fn verify_content_digest(self) -> Result<Self, DigestError>
+    where
+      Self: Sized,
+    {
+      let header_map = self.headers();
+      let (cd_type, expected_digest) = extract_content_digest(header_map).await?;
+      let body_bytes = self.into_bytes().await?;
+      let digest = derive_digest(&body_bytes, &cd_type);
+
+      if is_equal_digest(&digest, &expected_digest) {
+        Ok(self)
+      } else {
+        Err(DigestError::InvalidContentDigest("Content-Digest verification failed".to_string()))
+      }
+    }
+  }
+
+  fn is_equal_digest(digest1: &[u8], digest2: &[u8]) -> bool {
+    if digest1.len() != digest2.len() {
+      return false;
+    }
+    digest1.ct_eq(digest2).into()
+  }
+  ```

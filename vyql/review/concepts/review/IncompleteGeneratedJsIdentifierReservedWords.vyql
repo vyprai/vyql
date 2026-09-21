@@ -1,0 +1,8 @@
+module code;
+
+review code.IncompleteGeneratedJsIdentifierReservedWords {
+  category: injection
+  expected: [core.InputValidation]
+  kind: target
+  text: "verify generated JavaScript identifier validation rejects eval and arguments before names enter generated source"
+}

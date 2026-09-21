@@ -1,0 +1,56 @@
+# Rank 961 / CVE-2021-29484: Ghost admin preview wrote postMessage
+# data into the document without validating the sender origin.
+
+test "rank961: preview frame writes postMessage HTML without origin check"
+  lang javascript
+  profile api
+  file preview.html
+  expect VYQL-INJ-192
+  expect_review code.PostMessageHtmlWriteMissingOriginCheck
+  code
+  ```
+  <script type="text/javascript">
+  (function(){
+      function onReceive(message) {
+          if (window.location.protocol === 'http:') {
+              document.write(message.data);
+              document.close();
+              return;
+          }
+
+          var domParser = new DOMParser();
+          var html = domParser.parseFromString(message.data, 'text/html');
+          document.getElementsByTagName('head')[0].innerHTML = html.getElementsByTagName('head')[0].innerHTML;
+          document.getElementsByTagName('body')[0].innerHTML = html.getElementsByTagName('body')[0].innerHTML;
+      }
+
+      addEventListener("message", onReceive, true);
+      top.postMessage('loaded', "*");
+  })();
+  </script>
+  ```
+
+test "rank961: preview frame validates message origin before writing HTML"
+  lang javascript
+  profile api
+  file preview.html
+  reject VYQL-INJ-192
+  reject_review code.PostMessageHtmlWriteMissingOriginCheck
+  code
+  ```
+  <script type="text/javascript">
+  (function(){
+      function onReceive(message) {
+          if (message.origin !== window.location.origin) {
+              return;
+          }
+
+          var domParser = new DOMParser();
+          var html = domParser.parseFromString(message.data, 'text/html');
+          document.getElementsByTagName('body')[0].innerHTML = html.getElementsByTagName('body')[0].innerHTML;
+      }
+
+      addEventListener("message", onReceive, true);
+  })();
+  </script>
+  ```

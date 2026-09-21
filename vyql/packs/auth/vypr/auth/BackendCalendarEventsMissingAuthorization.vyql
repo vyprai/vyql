@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule BackendCalendarEventsMissingAuthorization {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_862]
+    id: "VYQL-AUTH-093"
+    severity: high
+  }
+  issue code.BackendCalendarEventsMissingAuthorization as endpoint
+}

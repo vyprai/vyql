@@ -1,0 +1,49 @@
+module bindings.javascript.dnsResolvedAddressCheckNotPinned;
+
+// Node's `dns.lookup`/`dns.resolve`/`dns.resolve4` return the address a name
+// resolved to at the moment they were called, and nothing more: the documented
+// result is a `{ address, family }` record or an array of addresses, not a
+// handle on a connection. An SSRF host filter that resolves the hostname itself
+// and tests the answer against loopback, RFC 1918, link-local or cloud-metadata
+// ranges therefore validates one resolution, while the outbound request that
+// follows is issued against the *hostname*, which `http.request`, `net.connect`,
+// axios, undici and fetch all resolve again through their own lookup. Two
+// resolutions of a name whose DNS the caller controls need not agree, so the
+// address that was checked and the address that is connected to are different
+// values (CWE-367), and the second one can be 127.0.0.1 or 169.254.169.254
+// (CWE-918).
+//
+// Node documents the remedy on the transport, not on the filter: `lookup` is an
+// option of `net.createConnection`, `http.Agent` and `https.Agent`, and a
+// `tls.connect`/`net.connect` call takes a host directly, so a caller reaches
+// the validated address either by giving the connection its own resolver or by
+// connecting to the address and carrying the name in `servername`/`Host`. Code
+// that carries the validated address through to the connection does one of
+// those in the same module; code that only answers "is this host allowed"
+// cannot, whatever it returns. That absence is what this reports, so the
+// negations name those transport APIs rather than any particular filter's
+// helper.
+//
+// The gate is deliberately the whole documented signature of an address filter:
+// a `dns` module import, a resolution call, and a special-use address *range* to
+// compare the answer against -- either a range prefix handed to a string test or
+// a range-anchored regular expression. A module that resolves a name for another
+// reason (mail exchangers, reverse lookups, a dev server rewriting one loopback
+// address for display) carries no range, and a module that lists ranges without
+// resolving anything is classifying a value it was handed, so it has no second
+// resolution that could disagree. There are two bindings rather than one because
+// a presenceNode `where` clause takes no parenthesised alternative; they differ
+// only in which of the two range forms they read.
+//
+// Module scope is the unit: the filter and the transport that would pin it are
+// siblings, either static methods of one class or exported functions of one
+// module, with the pinning helper beside the range test rather than inside it.
+binding jsDnsResolvedAddressCheckNotPinnedRangePrefix {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.literal in ["dns", "dns/promises", "node:dns", "node:dns/promises"] and node.context.call in ["lookup", "resolve", "resolve4", "resolve6", "resolveAny"] and node.context.literal in ["127.", "10.", "192.168.", "172.16.", "169.254.", "fd00:", "fc00:"] and not (containsAny(node.context.callPath, ["http.Agent", "https.Agent", "net.connect", "net.createConnection", "tls.connect", "undici.Agent"])) and not (containsAny(node.context.selector, ["http.Agent", "https.Agent", ".createConnection"])) and not (containsAny(node.context.prop, ["lookup=", "socketPath=", "createConnection="]))
+  emit issue code.UnpinnedResolvedAddressCheck at node
+}
+
+binding jsDnsResolvedAddressCheckNotPinnedRangeRegex {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.literal in ["dns", "dns/promises", "node:dns", "node:dns/promises"] and node.context.call in ["lookup", "resolve", "resolve4", "resolve6", "resolveAny"] and containsAny(node.context.regex, ["^127\\.", "^10\\.", "^192\\.168", "^172\\.1", "^169\\.254", "^fd00:", "^fc00:", "^fe80:"]) and not (containsAny(node.context.callPath, ["http.Agent", "https.Agent", "net.connect", "net.createConnection", "tls.connect", "undici.Agent"])) and not (containsAny(node.context.selector, ["http.Agent", "https.Agent", ".createConnection"])) and not (containsAny(node.context.prop, ["lookup=", "socketPath=", "createConnection="]))
+  emit issue code.UnpinnedResolvedAddressCheck at node
+}

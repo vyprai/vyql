@@ -1,0 +1,97 @@
+module bindings.objc.generated.mdcbba98f;
+
+binding networkConnect0 {
+  requires {
+    dependency("OMGHTTPURLRQ")
+  }
+  query pattern callExpr where callee.method == "GET:parameters:error:"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("OMGHTTPURLRQ")
+  }
+  query pattern callExpr where callee.method == "GET:parameters:error:"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect2 {
+  requires {
+    dependency("OMGHTTPURLRQ")
+  }
+  query pattern callExpr where callee.method == "POST:parametersOrMultipartFormData:error:"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend3 {
+  requires {
+    dependency("OMGHTTPURLRQ")
+  }
+  query pattern callExpr where callee.method == "POST:parametersOrMultipartFormData:error:"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect4 {
+  requires {
+    dependency("OMGHTTPURLRQ")
+  }
+  query pattern callExpr where callee.method == "PUT:parameters:error:"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend5 {
+  requires {
+    dependency("OMGHTTPURLRQ")
+  }
+  query pattern callExpr where callee.method == "PUT:parameters:error:"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect6 {
+  requires {
+    dependency("OMGHTTPURLRQ")
+  }
+  query pattern callExpr where callee.method == "PATCH:JSON:error:"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend7 {
+  requires {
+    dependency("OMGHTTPURLRQ")
+  }
+  query pattern callExpr where callee.method == "PATCH:JSON:error:"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect8 {
+  requires {
+    dependency("OMGHTTPURLRQ")
+  }
+  query pattern callExpr where callee.method == "DELETE:parameters:error:"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend9 {
+  requires {
+    dependency("OMGHTTPURLRQ")
+  }
+  query pattern callExpr where callee.method == "DELETE:parameters:error:"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend10 {
+  requires {
+    dependency("OMGHTTPURLRQ")
+  }
+  query pattern callExpr where callee.method == "addFile:parameterName:filename:contentType:"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend11 {
+  requires {
+    dependency("OMGHTTPURLRQ")
+  }
+  query pattern callExpr where callee.method == "addText:parameterName:"
+  emit sink code.NetworkSend at args[0]
+}

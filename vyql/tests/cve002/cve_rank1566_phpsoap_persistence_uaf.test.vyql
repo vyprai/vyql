@@ -1,0 +1,155 @@
+# Rank 1566 / CVE-2026-7261: PHP's SOAP extension destroyed the
+# handler object on header-parsing failure even when the service ran
+# with SOAP_PERSISTENCE_SESSION, leaving the session pointing at
+# freed memory that the next request re-entered (use-after-free,
+# CWE-416; GHSA-m33r-qmcv-p97q). Two error paths in ext/soap/soap.c
+# did `if (service->type == SOAP_CLASS && soap_obj) {zval_ptr_dtor(
+# soap_obj);}` -- with session persistence the object lives in
+# service->soap_object across requests, so destroying it here frees
+# what the session still references. The fixing commit db2a7f9348
+# ("GHSA-m33r-qmcv-p97q: [soap] Fix use-after-free after header
+# parsing failure with SOAP_PERSISTENCE_SESSION") guards both sites
+# with `service->soap_class.persistence != SOAP_PERSISTENCE_SESSION`.
+#
+# ATTENTION, destructor condition vs storage lifetime, re-measured.
+# Nothing fires on the defect at either revision: 3 x --cache off on
+# ext/soap/soap.c reports 34 findings (2 high) at db2a7f9348^ and
+# 34/2 at db2a7f9348, row-for-row identical (the fixed histogram is
+# the vulnerable one shifted +8 lines by the patch), none at the two
+# defect sites (soap.c:1441/1446); the ext/soap directory reports
+# 209 findings (19 high) at both. zval_ptr_dtor carries no label at
+# all (C binds code.PointerFree to `free` and code.PointerUse to
+# `__deref` only), and the use is cross-request: the fail: label
+# never touches soap_obj, so no in-function free-then-use or
+# free-then-free pair exists for MEM-007/MEM-008 to order. Labelling
+# zval_ptr_dtor code.PointerFree was measured in a probe binding and
+# rejected: soap.c goes 34 -> 54 findings (16 VYQL-MEM-008 + 4
+# VYQL-MEM-007 rows, identical at both revisions -- `reaches` is
+# guard-blind), the new rows landing on the already-persistence-
+# guarded dtor sites (1463/1488/1528) and parser loops, never on
+# 1441/1446; 819 zval_ptr_dtor call sites across ext/ scale that to
+# hundreds of rows for zero discrimination. The discriminating
+# judgement is per-site: does this dtor's condition cover the
+# persistence mode that extends the freed object's lifetime. A
+# function-scoped guard negation cannot make it -- the vulnerable
+# function already spells `persistence != SOAP_PERSISTENCE_SESSION`
+# three times (soap.c:1462/1484/1524) while 1441/1446 stay unguarded,
+# and one dtor site (1467) is the #else branch of a preprocessor
+# conditional -- so the guard text coexists with the defect in one
+# body and suppresses what it does not protect, the same
+# condition-blind guard-attribution family as ranks 1540/1561 and the
+# native memory-lifetime family of rank 1547 (folded into the
+# rank-1702 ENGINE-GAPS entry). Cross-request re-entry is
+# additionally a protocol fact no frontend emits. Spec pins three
+# facts, all asserting reject VYQL-MEM-006: the unguarded
+# failure-path dtor and the mixed function holding both the guarded
+# and unguarded forms must flip to expect when a per-site lifetime
+# observation lands; the persistence-checked form must stay reject.
+
+test "rank1566: the failure path destroys the session-persisted object"
+  lang c
+  file ext/soap/soap.c
+  reject VYQL-MEM-006
+  code
+  ```
+  #include <stdint.h>
+
+  #define SOAP_CLASS 1
+
+  typedef struct _soap_service {
+      int type;
+      struct {
+          int persistence;
+      } soap_class;
+  } soap_service;
+
+  typedef struct _zval_struct zval;
+
+  void zval_ptr_dtor(zval *zv);
+
+  static void handle_header_failure(soap_service *service, zval *soap_obj)
+  {
+      /* Header parsing failed: clean up and leave the request */
+      if (service->type == SOAP_CLASS && soap_obj) {zval_ptr_dtor(soap_obj);}
+      goto fail;
+
+  fail:
+      return;
+  }
+  ```
+
+test "rank1566: the fixed revision keeps session-persisted objects alive"
+  lang c
+  file ext/soap/soap.c
+  reject VYQL-MEM-006
+  code
+  ```
+  #include <stdint.h>
+
+  #define SOAP_CLASS 1
+  #define SOAP_PERSISTENCE_SESSION 1
+
+  typedef struct _soap_service {
+      int type;
+      struct {
+          int persistence;
+      } soap_class;
+  } soap_service;
+
+  typedef struct _zval_struct zval;
+
+  void zval_ptr_dtor(zval *zv);
+
+  static void handle_header_failure(soap_service *service, zval *soap_obj)
+  {
+      /* Header parsing failed: clean up and leave the request */
+      if (service->type == SOAP_CLASS && soap_obj) {
+          if (service->soap_class.persistence != SOAP_PERSISTENCE_SESSION) {
+              zval_ptr_dtor(soap_obj);
+          }
+      }
+      goto fail;
+
+  fail:
+      return;
+  }
+  ```
+
+test "rank1566: the same function already guards the completion paths, so a function-scoped guard negation suppresses what it does not protect"
+  lang c
+  file ext/soap/soap.c
+  reject VYQL-MEM-006
+  code
+  ```
+  #include <stdint.h>
+
+  #define SOAP_CLASS 1
+  #define SOAP_PERSISTENCE_SESSION 1
+
+  typedef struct _soap_service {
+      int type;
+      struct {
+          int persistence;
+      } soap_class;
+  } soap_service;
+
+  typedef struct _zval_struct zval;
+
+  void zval_ptr_dtor(zval *zv);
+
+  static void handle_request(soap_service *service, zval *soap_obj)
+  {
+      /* Failure path: destroys the object the session still holds */
+      if (service->type == SOAP_CLASS && soap_obj) {zval_ptr_dtor(soap_obj);}
+      goto fail;
+
+  fail:
+      /* Completion path: keeps the session-persisted object alive */
+      if (service->type == SOAP_CLASS) {
+          if (soap_obj && service->soap_class.persistence != SOAP_PERSISTENCE_SESSION) {
+              zval_ptr_dtor(soap_obj);
+          }
+      }
+      return;
+  }
+  ```

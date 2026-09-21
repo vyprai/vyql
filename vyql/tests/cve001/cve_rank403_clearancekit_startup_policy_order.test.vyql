@@ -1,0 +1,38 @@
+# Rank 403 / CVE-2026-34218: ClearanceKit applied full policy state before
+# adapter.start created the EndpointSecurity client, so managed/user rules were
+# not enforced until a later XPC policy mutation.
+
+test "rank403: ClearanceKit applies policy before ES adapter starts"
+  lang swift
+  expect VYQL-AUTH-020
+  expect_review code.ClearanceKitPolicyApplyBeforeAdapterStart
+  code
+  ```
+  let interactor = FilterInteractor(initialRules: faaPolicy)
+  let adapter = ESInboundAdapter(interactor: interactor, esAdapterQueue: esAdapterQueue)
+  let server = XPCServer(interactor: interactor, adapter: adapter)
+
+  server.applyPolicyToFilter()
+  server.applyAllowlistToFilter()
+  server.applyJailRulesToFilter()
+
+  let initialRules = server.mergedRules()
+  adapter.start(initialRules: initialRules, onXProtectChanged: { server.handleXProtectChange() })
+  ```
+
+test "rank403: ClearanceKit applies policy after ES adapter starts"
+  lang swift
+  reject VYQL-AUTH-020
+  reject_review code.ClearanceKitPolicyApplyBeforeAdapterStart
+  code
+  ```
+  let interactor = FilterInteractor(initialRules: faaPolicy)
+  let adapter = ESInboundAdapter(interactor: interactor, esAdapterQueue: esAdapterQueue)
+  let server = XPCServer(interactor: interactor, adapter: adapter)
+
+  let initialRules = server.mergedRules()
+  adapter.start(initialRules: initialRules, onXProtectChanged: { server.handleXProtectChange() })
+  server.applyPolicyToFilter()
+  server.applyAllowlistToFilter()
+  server.applyJailRulesToFilter()
+  ```

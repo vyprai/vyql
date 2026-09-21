@@ -1,0 +1,8 @@
+module code;
+
+review code.StreamResetWithoutRateControl {
+  category: resource
+  expected: [code.RateLimitCheck]
+  kind: target
+  text: "verify a multiplexed session charges a per-connection rate control before it writes a stream reset frame and removes the stream"
+}

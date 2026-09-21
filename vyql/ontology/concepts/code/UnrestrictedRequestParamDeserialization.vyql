@@ -1,0 +1,6 @@
+module code;
+
+concept UnrestrictedRequestParamDeserialization : issue {
+  cwe: [CWE_502]
+  vulnerableTo: [deserialization.DeserializationAbuse]
+}

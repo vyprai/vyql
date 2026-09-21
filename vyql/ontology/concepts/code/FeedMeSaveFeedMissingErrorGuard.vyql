@@ -1,0 +1,11 @@
+module code;
+
+concept FeedMeSaveFeedMissingErrorGuard : issue {
+  cwe: [CWE_248, CWE_400]
+  reviewAssumption: "invalid feed model state can be created from a browser-backed save request"
+  reviewCategory: availability
+  reviewCondition: "Feed Me save action redirects through saveFeed before checking model errors from _getModelFromPost"
+  reviewConfidence: high
+  reviewEvidence: "function context {pattern} builds a feed from POST and calls _saveAndRedirect without getErrors guard"
+  vulnerableTo: [dos.UncontrolledResourceConsumption]
+}

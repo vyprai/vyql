@@ -1,0 +1,35 @@
+test "python: media filename appended to argv without option terminator is option injection"
+  lang python
+  expect VYQL-INJ-031
+  code
+  ```
+  import subprocess
+
+  class Player:
+      args = ["mpv", "--no-terminal"]
+
+      def _play(self, tag):
+          subprocess.Popen(
+              self.args + [tag.filename],
+              stdout=subprocess.DEVNULL,
+              stderr=subprocess.DEVNULL,
+          )
+  ```
+
+test "python: option terminator before media filename is clean"
+  lang python
+  reject VYQL-INJ-031
+  code
+  ```
+  import subprocess
+
+  class Player:
+      args = ["mpv", "--no-terminal"]
+
+      def _play(self, tag):
+          subprocess.Popen(
+              self.args + ["--", tag.filename],
+              stdout=subprocess.DEVNULL,
+              stderr=subprocess.DEVNULL,
+          )
+  ```

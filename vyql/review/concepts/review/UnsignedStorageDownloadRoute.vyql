@@ -1,0 +1,8 @@
+module code;
+
+review code.UnsignedStorageDownloadRoute {
+  category: access_control
+  expected: [core.AuthenticationCheck, core.AuthorizationCheck]
+  kind: target
+  text: "verify wildcard storage download routes require signed URLs or authorization middleware before returning framework storage files"
+}

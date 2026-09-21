@@ -1,0 +1,149 @@
+# CVE-2021-33564: Dragonfly's ImageMagick plugin exposes a job step whose
+# argument string is the raw convert argument list, so a request that names
+# that step supplies ImageMagick's options (CWE-74, CWE-88).
+#
+#   app.add_processor :rotate do |content, amount|
+#     content.process!(:convert, "-rotate #{amount}")
+#   end
+#
+# Content#process! dispatches to a registered job step by name, and the
+# plugin's `:convert` step is the raw one: its argument is interpolated into
+# the convert command line verbatim ("#{convert_command} ... #{args}
+# #{new_path}"), behind per-word shell escaping that stops metacharacters and
+# nothing else. ImageMagick parses a leading dash as an option, so a value
+# like `-write /var/www/shell.rb` is one shell-safe token that convert reads
+# as an option. Job steps are reachable from the URL-driven job API, so the
+# argument is request data whenever the application runs the server without
+# URL signatures. Seven call sites dispatch the raw step: the rotate shortcut
+# above, Encode, Thumb, Plain, Plasma and Text (twice), each forwarding a
+# request-derived parameter -- an args string, a geometry option hash, a
+# width/height/colour interpolation, or an annotate string.
+#
+# Fix 25399297bb keeps the command assembly byte-for-byte (it moves to
+# Dragonfly::ImageMagick::Commands.convert, with the same `#{args}`
+# interpolation) and instead stops dispatching the raw step: every remaining
+# call site validates its parameters first -- ParamValidators.is_number for
+# rotate's amount, is_word plus an option whitelist for Encode, is_number and
+# is_word for Thumb's format/frame, is_number and is_word for Plain and
+# Plasma's dimensions and colour, is_words and a colour pattern for Text --
+# and calls the Commands module directly. No value a request controls reaches
+# the convert argument list unvalidated, and the `:convert` processor and
+# generator registrations are gone, so the step is no longer addressable.
+#
+# Because the command assembly is unchanged by the fix, no binding on the
+# assembly can discriminate: the same interpolation exists in both revisions,
+# once as Processors::Convert#call and once as Commands.convert. Detection
+# rides on the dispatch instead -- binding dragonflyConvertStepRawArguments
+# (vyql/bindings/ruby/dragonfly_convert_step_raw_arguments.vyql) labels the
+# call that names the raw step, and the existing rules VYQL-INJ-031 and
+# VYQL-VAL-004 judge the label. A taint route cannot carry this: Job
+# deserialization turns a URL-encoded job spec into dynamic dispatch by step
+# name, so the argument never reaches the runner through a resolved call
+# chain. Same presence route as the ruby-git fetch vector (VYQL-INJ-031 on
+# gitArgvPositionalValueLeadsVector) and the same weakness class as the
+# cocoapods-downloader ls-remote vector recorded at rank 1050.
+#
+# The pair below records one residual in shipped detection, unchanged by this
+# fix: core.ShellEscape covers a direct Shellwords.escape call but not the
+# map-then-join idiom Dragonfly's own Shell#escape_args uses
+# (args.shellsplit.map { |a| escape(a) }.join(' ')), the standard Ruby way to
+# escape an array of shell words, so correctly escaped code still reports
+# VYQL-INJ-002.
+#
+# Measured on the real checkout: the fix's parent reports VYQL-INJ-031 and
+# VYQL-VAL-004 seven times each, one per dispatch site
+# (lib/dragonfly/image_magick/plugin.rb:68, processors/encode.rb:11,
+# processors/thumb.rb:29, generators/plain.rb:9, generators/plasma.rb:8,
+# generators/text.rb:75 and :88), stable over three --cache off runs; the
+# fixed revision reports neither, same three runs; those fourteen rows are the
+# only finding deltas between the revisions. Across every .rb file in the
+# corpus clones, process!/generate! occurs only in this plugin, so the binding
+# adds no collateral finding.
+#
+# verify_current_expected: fixed, 7 -> 0.
+
+test "rank1085: a url-controlled value is dispatched to the raw convert step"
+  lang ruby
+  file lib/dragonfly/image_magick/plugin.rb
+  expect VYQL-INJ-031
+  code
+  ```
+  module Dragonfly
+    module ImageMagick
+      class Plugin
+        def call(app, opts = {})
+          app.env[:convert_command] = opts[:convert_command] || "convert"
+
+          app.add_processor :rotate do |content, amount|
+            content.process!(:convert, "-rotate #{amount}")
+          end
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1085: the fixed rotate validates before calling the command module"
+  lang ruby
+  file lib/dragonfly/image_magick/plugin.rb
+  reject VYQL-INJ-031
+  code
+  ```
+  module Dragonfly
+    module ImageMagick
+      class Plugin
+        def call(app, opts = {})
+          app.env[:convert_command] = opts[:convert_command] || "convert"
+
+          app.add_processor :rotate do |content, amount|
+            ParamValidators.validate!(amount, &ParamValidators.is_number)
+            Commands.convert(content, "-rotate #{amount}")
+          end
+        end
+      end
+    end
+  end
+  ```
+
+# The escape pair: Shellwords.escape is bound as core.ShellEscape and
+# suppresses VYQL-INJ-002 called directly. Wrapped in the map-then-join idiom
+# Dragonfly's own escape_args uses, the same value still reaches the sink and
+# still reports.
+
+test "rank1085: a direct Shellwords.escape call suppresses the finding"
+  lang ruby
+  file direct.rb
+  reject VYQL-INJ-002
+  code
+  ```
+  require "shellwords"
+  require "open3"
+
+  class ImageController < ApplicationController
+    def show
+      args = params[:args]
+      escaped = Shellwords.escape(args)
+      command = "convert #{escaped} #{path} #{new_path}"
+      Open3.capture3(command)
+    end
+  end
+  ```
+
+test "rank1085: the same escape wrapped in map-then-join does not"
+  lang ruby
+  file mapped.rb
+  expect VYQL-INJ-002
+  code
+  ```
+  require "shellwords"
+  require "open3"
+
+  class ImageController < ApplicationController
+    def show
+      args = params[:args]
+      escaped = args.shellsplit.map { |a| Shellwords.escape(a) }.join(" ")
+      command = "convert #{escaped} #{path} #{new_path}"
+      Open3.capture3(command)
+    end
+  end
+  ```

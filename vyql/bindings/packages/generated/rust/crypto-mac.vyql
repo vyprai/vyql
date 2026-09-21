@@ -1,0 +1,9 @@
+module bindings.rust.generated.m32a203eb;
+
+binding secretValue0 {
+  requires {
+    dependency("crypto-mac")
+  }
+  query pattern callExpr where callee.method == "new"
+  emit source code.SecretValue at call.result
+}

@@ -1,0 +1,25 @@
+module bindings.elixir.generated.ma393e52c;
+
+binding sqlExecution0 {
+  requires {
+    dependency("mongodb_driver")
+  }
+  query pattern callExpr where callee.method == "admin_command"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution1 {
+  requires {
+    dependency("mongodb_driver")
+  }
+  query pattern callExpr where callee.method == "command"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("mongodb_driver")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

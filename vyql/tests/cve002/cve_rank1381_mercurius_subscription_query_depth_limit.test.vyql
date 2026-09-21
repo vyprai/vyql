@@ -1,0 +1,228 @@
+# Rank 1381 / CVE-2026-30241: mercurius applied its configured `queryDepth`
+# option only on the HTTP execution path. `index.js` parses the operation,
+# validates it, then runs `queryDepth(document.definitions, queryDepthLimit)`
+# before executing; `lib/subscription-connection.js` parses the WebSocket
+# message's `query` with graphql's `parse` and hands the document straight to
+# graphql's `subscribe`, with neither `validate` nor any depth check in between.
+# The option is not even plumbed to the connection: `lib/subscription.js` and
+# `lib/routes.js` never forwarded it. Any client that can open a subscription
+# socket could therefore submit an arbitrarily deeply nested operation, and on a
+# schema with recursive types the resolver work per subscription event grows with
+# the nesting the client chose (CWE-400/CWE-770). Fix 5b56f60f4b forwards
+# `queryDepthLimit` through the route and connection handlers and runs the same
+# `queryDepth` check inside `_executeSubscription`.
+#
+# The corpus records CWE-863 for this row, which is wrong: nothing about the
+# authorization decision changed, and the advisory's own impact statement is
+# denial of service through exponential data resolution.
+#
+# Detection: graphql-js documents `execute` and `subscribe` as running a document
+# that is validated, so the vocabulary is the library's, not this
+# advisory's -- a module that parses a client-supplied operation and executes it
+# with no validation and no cost bound has no upper limit on the work the client
+# can ask for. The existing concept code.UnboundedAllocationReview (VYQL-DOS-041,
+# CWE-400/CWE-770) carries that judgement, so this adds a binding and no
+# new concept or rule. Three signals mean a bound exists and suppress the flag: a
+# `validate` call (the documented rule-driven route, where every cost package
+# plugs in), an identifier naming a depth or complexity budget (how a server that
+# computes the bound itself reads, whatever its helper is named), and a module
+# that builds the schema it executes against, which is a harness rather than a
+# request path.
+#
+# Measured over seven GraphQL JavaScript/TypeScript repositories, 1399 analysed
+# files: one flag, lib/subscription-connection.js on the vulnerable revision,
+# and none on the fixed one. index.js is a negative control in the same
+# repository -- it carries both `validate` and `queryDepth`, so the HTTP path
+# stays silent. Nothing on express-graphql, graphql-http, apollo-server,
+# graphql-yoga, graphql-ws or graphql-js, and nothing on three large general
+# JavaScript trees (vite 1697 files, nest 1832, eleventy 481) or the OWASP
+# JavaScript port (2747 files). The schema-construction clause is what carries
+# that: without it graphql-js's `__tests__` and `benchmark/` modules, graphql-ws's
+# tests/server.test.ts and one graphql-yoga spec reported, all of them parsing a
+# literal operation against a schema they built themselves.
+#
+# The scope is the module rather than the executing method for a reason beyond
+# taste: mercurius exports this class as `module.exports = class
+# SubscriptionConnection`, and a class expression on the right of an assignment
+# gets no FuncDef at all, so its methods have no function-scope facts, no
+# parameters and no resolution target. A named `class X {}` declaration and
+# `const X = class {}` both work. Reproduce with one method calling `subscribe`,
+# once under each spelling.
+
+test "rank1381: a websocket-supplied graphql operation is parsed and subscribed with no depth or complexity bound"
+  lang javascript
+  file lib/subscription-connection.js
+  expect_review code.UnboundedAllocationReview
+  code
+  ```
+  'use strict'
+
+  const { subscribe, parse, print, getOperationAST } = require('graphql')
+  const { SubscriptionContext } = require('./subscriber')
+
+  module.exports = class SubscriptionConnection {
+    async handleMessage (message) {
+      const { id, type, payload = {} } = this.protocolMessageTypes.parse(message)
+      const { query, variables, operationName } = payload
+
+      const document = typeof query !== 'string' ? query : parse(query)
+      if (!document) {
+        throw new Error('Must provide document.')
+      }
+
+      const operationAST = getOperationAST(document, operationName)
+      if (operationAST.operation === 'subscription') {
+        await this._executeSubscription({ document, query, context: this.context, variables, operationName, id })
+      }
+    }
+
+    async _executeSubscription ({ document, query, context, variables, operationName, id }) {
+      const schema = this.fastify.graphql.schema
+      this.resolverContext = context
+
+      const sc = new SubscriptionContext({
+        fastify: this.fastify,
+        pubsub: this.subscriber,
+        queueHighWaterMark: this.queueHighWaterMark
+      })
+
+      this.subscriptionContexts.set(id, sc)
+
+      const subIter = await subscribe({
+        schema,
+        document,
+        rootValue: {},
+        contextValue: {
+          ...context,
+          get __currentQuery () {
+            return print(document)
+          },
+          id,
+          pubsub: sc
+        },
+        variableValues: variables,
+        operationName
+      })
+
+      return subIter
+    }
+  }
+  ```
+
+test "rank1381: the subscription path runs the same query-depth check before subscribing"
+  lang javascript
+  file lib/subscription-connection.js
+  reject_review code.UnboundedAllocationReview
+  code
+  ```
+  'use strict'
+
+  const { subscribe, parse, print, getOperationAST } = require('graphql')
+  const { SubscriptionContext } = require('./subscriber')
+  const { MER_ERR_GQL_VALIDATION } = require('./errors')
+  const queryDepth = require('./queryDepth')
+
+  module.exports = class SubscriptionConnection {
+    async handleMessage (message) {
+      const { id, type, payload = {} } = this.protocolMessageTypes.parse(message)
+      const { query, variables, operationName } = payload
+
+      const document = typeof query !== 'string' ? query : parse(query)
+      if (!document) {
+        throw new Error('Must provide document.')
+      }
+
+      const operationAST = getOperationAST(document, operationName)
+      if (operationAST.operation === 'subscription') {
+        await this._executeSubscription({ document, query, context: this.context, variables, operationName, id })
+      }
+    }
+
+    async _executeSubscription ({ document, query, context, variables, operationName, id }) {
+      const schema = this.fastify.graphql.schema
+      this.resolverContext = context
+
+      const sc = new SubscriptionContext({
+        fastify: this.fastify,
+        pubsub: this.subscriber,
+        queueHighWaterMark: this.queueHighWaterMark
+      })
+
+      if (this.queryDepthLimit) {
+        const queryDepthErrors = queryDepth(document.definitions, this.queryDepthLimit)
+
+        if (queryDepthErrors.length > 0) {
+          const err = new MER_ERR_GQL_VALIDATION()
+          err.errors = queryDepthErrors
+          throw err
+        }
+      }
+
+      this.subscriptionContexts.set(id, sc)
+
+      const subIter = await subscribe({
+        schema,
+        document,
+        rootValue: {},
+        contextValue: {
+          ...context,
+          get __currentQuery () {
+            return print(document)
+          },
+          id,
+          pubsub: sc
+        },
+        variableValues: variables,
+        operationName
+      })
+
+      return subIter
+    }
+  }
+  ```
+
+test "rank1381: the http path validates the document and applies the depth limit before executing"
+  lang javascript
+  file index.js
+  reject_review code.UnboundedAllocationReview
+  code
+  ```
+  'use strict'
+
+  const { parse, validate, execute, specifiedRules, getOperationAST } = require('graphql')
+  const queryDepth = require('./lib/queryDepth')
+  const { MER_ERR_GQL_VALIDATION } = require('./lib/errors')
+
+  async function run (source, variables, operationName, context) {
+    const queryDepthLimit = this.opts.queryDepth
+    const document = parse(source)
+
+    const validationErrors = validate(this.schema, document, specifiedRules)
+    if (validationErrors.length > 0) {
+      const err = new MER_ERR_GQL_VALIDATION()
+      err.errors = validationErrors
+      throw err
+    }
+
+    if (queryDepthLimit) {
+      const queryDepthErrors = queryDepth(document.definitions, queryDepthLimit)
+
+      if (queryDepthErrors.length > 0) {
+        const err = new MER_ERR_GQL_VALIDATION()
+        err.errors = queryDepthErrors
+        throw err
+      }
+    }
+
+    return execute({
+      schema: this.schema,
+      document,
+      rootValue: {},
+      contextValue: context,
+      variableValues: variables,
+      operationName
+    })
+  }
+
+  module.exports = run
+  ```

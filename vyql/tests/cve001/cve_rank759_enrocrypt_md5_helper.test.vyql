@@ -1,0 +1,31 @@
+# Rank 759 / CVE-2021-39182: EnroCrypt exposed an MD5 hashing helper.
+
+test "rank759: EnroCrypt MD5 helper uses weak hash"
+  lang python
+  file hashing.py
+  expect VYQL-CRY-001
+  code
+  ```
+  import hashlib
+
+  class Hashing:
+      def MD5(self, data: str):
+          sha = hashlib.md5(bytes(data.encode()))
+          hash = str(sha.digest())
+          return self.__Salt(hash, salt=self.salt)
+  ```
+
+test "rank759: EnroCrypt SHA256 helper is not weak hash"
+  lang python
+  file hashing.py
+  reject VYQL-CRY-001
+  code
+  ```
+  import hashlib
+
+  class Hashing:
+      def SHA256(self, data: str):
+          sha = hashlib.sha256(bytes(data.encode()))
+          hash = sha.digest()
+          return self.__Salt(hash, salt=self.salt)
+  ```

@@ -1,0 +1,25 @@
+module bindings.dart.generated.m1887021b;
+
+binding deserialization0 {
+  requires {
+    dependency("csv")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("csv")
+  }
+  query pattern callExpr where callee.method == "decodeWithHeaders"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("csv")
+  }
+  query pattern callExpr where callee.method == "convert"
+  emit sink code.Deserialization at args[0]
+}

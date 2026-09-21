@@ -1,0 +1,8 @@
+module code;
+
+review code.RepositorySourceMetadataExposure {
+  category: secret
+  expected: [core.SecretRedaction]
+  kind: target
+  text: "verify repository or Git remote URLs are redacted before being written to durable metadata outputs"
+}

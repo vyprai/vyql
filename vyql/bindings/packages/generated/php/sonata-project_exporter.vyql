@@ -1,0 +1,17 @@
+module bindings.php.generated.m648b9d02;
+
+binding fileUse0 {
+  requires {
+    dependency("sonata-project/exporter")
+  }
+  query pattern callExpr where callee.method == "fputcsv"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding fileUse1 {
+  requires {
+    dependency("sonata-project/exporter")
+  }
+  query pattern callExpr where callee.method == "file_put_contents"
+  emit sink code.FileUseSink at args[0]
+}

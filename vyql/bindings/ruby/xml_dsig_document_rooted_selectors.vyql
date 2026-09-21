@@ -1,0 +1,44 @@
+module bindings.ruby.xml_dsig_document_rooted_selectors;
+
+// An XPath selector that starts with `//` selects from the document root no
+// matter which element it is evaluated against -- REXML documents this for
+// `XPath.first(element, path)`, and the context element only constrains
+// selectors that start with `./` or `.//`. A signature validator that resolves
+// the parts of an XML signature with `//ds:Reference`, `//ds:DigestMethod`,
+// `//ds:DigestValue`, `//ds:CanonicalizationMethod` or `//ds:Transforms/...`
+// therefore takes those parts from wherever in the document they appear first,
+// not from inside the signature it is checking, and `at_xpath` on the
+// reference URI's ID takes the first element carrying that ID. Both are the
+// signature-wrapping shape: a response holding a legitimately signed element
+// beside an attacker-authored one that re-uses its ID passes the digest and
+// signature checks while hashing the attacker's element. The remediation is
+// documented in the XML Signature processing rules the selectors implement:
+// resolve the Reference relative to the signature's SignedInfo, and reject a
+// document where the referenced ID matches more than one element.
+//
+// The `ds:` prefix bound to the XML-DSig namespace is the technology anchor,
+// and each selector is matched as a whole `literal:` token, so a selector
+// rooted elsewhere (`//ds:Signature`, which locates the signature itself, or
+// `//ds:Signature/ds:SignedInfo/ds:Reference` naming the full path) is not one
+// of these tokens.
+//
+// The conjuncts take different routes, because the two token kinds confine
+// differently in Ruby: a positive `literal:` conjunct on a function context
+// falls back to the file-wide search, so a document-rooted selector anywhere
+// in the file satisfies it, while `assign:` conjuncts are matched against the
+// function's own facts and nothing else. The two assign conjuncts therefore
+// carry the function's identity -- it resolves through `REXML::XPath` and it
+// computes over what it selected (canonicalize, digest) -- and the file-wide
+// literal says which file it happens in. A function that only canonicalizes
+// or only selects is not reported, which is what keeps a signature-building
+// method in the same file out: it constructs elements and never resolves
+// through `REXML::XPath`. The tokens are AST-derived, so a comment naming a
+// selector cannot stand in for the call.
+binding xmlDsigDocumentRootedSelectors {
+  query pattern presenceNode where node.scope == "function"
+    and node.context.language == "ruby"
+    and node.context.literal in ["//ds:Reference", "//ds:DigestValue", "//ds:DigestMethod", "//ds:CanonicalizationMethod", "//ds:Transforms/ds:Transform"]
+    and containsAny(node.context.assign, [".canonicalize(", ".digest("])
+    and containsAny(node.context.assign, ["=REXML::XPath.first(", "=REXML::XPath.match("])
+  emit issue code.SamlAssertionWrappingBypass at node
+}

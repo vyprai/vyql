@@ -1,0 +1,11 @@
+module code;
+
+concept SessionAuthStateOwnerBindingMissing : issue {
+  cwe: [CWE_287, CWE_863]
+  reviewAssumption: "an authentication state resolved through the session was accumulated under the principal named when the session bound it, while the request consuming the state names its own principal, so crediting a request-verified credential to that state without comparing the two principals accepts the requester as the state's owner"
+  reviewCondition: "a login path resolves an authentication state through the session, validates a credential for a request-supplied principal, and credits it to that state with no owner comparison in scope"
+  reviewEvidence: "authentication context {pattern} resolves a session auth state and validates a request-named principal's credential with no state-owner comparison"
+  reviewConfidence: high
+  reviewCategory: auth
+  vulnerableTo: [authentication.ImproperAuthentication, access_control.IncorrectAuthorization]
+}

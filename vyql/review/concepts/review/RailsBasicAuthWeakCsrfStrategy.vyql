@@ -1,0 +1,8 @@
+module code;
+
+review code.RailsBasicAuthWeakCsrfStrategy {
+  category: csrf
+  expected: [core.CsrfProtection, core.AuthenticationCheck]
+  kind: target
+  text: "verify Rails HTTP Basic auth controllers use protect_from_forgery with: :exception so CSRF failures fail closed"
+}

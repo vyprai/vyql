@@ -1,0 +1,8 @@
+module code;
+
+review code.ReallocFailurePathInputFree {
+  category: memory
+  expected: [core.ResourceRelease]
+  kind: target
+  text: "verify realloc failure paths preserve caller ownership of the original pointer instead of freeing it before returning null"
+}

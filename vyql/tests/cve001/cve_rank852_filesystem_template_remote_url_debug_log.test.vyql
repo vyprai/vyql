@@ -1,0 +1,68 @@
+# Rank 852 / CVE-2022-21186: filesystem-template logged a URL object while
+# fetching remote repository sources, exposing credential-bearing URL parts.
+
+test "rank852: TypeScript remote repo fetch logs URL object"
+  lang javascript
+  file file-utils.ts
+  expect VYQL-SEC-029
+  expect_review code.RemoteUrlObjectDebugLog
+  code
+  ```
+  import { existsSync } from 'fs';
+
+  type CacheInfo = { path: string; origin?: string; repoName?: string; branch?: string };
+  const logger = {
+    debug(value: unknown) {},
+    info(value: string) {},
+    ylw(value: string | undefined) { return value || ''; },
+    grn(value: string | undefined) { return value || ''; },
+    blu(value: string | undefined) { return value || ''; },
+  };
+
+  export const fetchRepo = async (url: URL, cacheInfo: CacheInfo, options?: { cache?: boolean }): Promise<string> => {
+    let branch = cacheInfo.branch;
+    const { path: repo, origin, repoName } = cacheInfo;
+
+    if (options?.cache && existsSync(repo)) {
+      logger.info(`will copy repo ${logger.grn(repoName)} (cached)`);
+      return repo;
+    }
+
+    logger.debug({ url, branch, repo, origin });
+    logger.info(`will clone ${branch ? `${logger.blu(branch)} of ` : ''}${logger.ylw(origin)} into ${logger.grn(repoName)}`);
+    return repo;
+  };
+  ```
+
+test "rank852: TypeScript remote repo fetch omits URL object from debug log"
+  lang javascript
+  file file-utils.ts
+  reject VYQL-SEC-029
+  reject_review code.RemoteUrlObjectDebugLog
+  code
+  ```
+  import { existsSync } from 'fs';
+
+  type CacheInfo = { path: string; origin?: string; repoName?: string; branch?: string };
+  const logger = {
+    debug(value: unknown) {},
+    info(value: string) {},
+    ylw(value: string | undefined) { return value || ''; },
+    grn(value: string | undefined) { return value || ''; },
+    blu(value: string | undefined) { return value || ''; },
+  };
+
+  export const fetchRepo = async (cacheInfo: CacheInfo, options?: { cache?: boolean }): Promise<string> => {
+    let branch = cacheInfo.branch;
+    const { path: repo, origin, repoName } = cacheInfo;
+
+    if (options?.cache && existsSync(repo)) {
+      logger.info(`will copy repo ${logger.grn(repoName)} (cached)`);
+      return repo;
+    }
+
+    logger.debug({ branch, repo, origin });
+    logger.info(`will clone ${branch ? `${logger.blu(branch)} of ` : ''}${logger.ylw(origin)} into ${logger.grn(repoName)}`);
+    return repo;
+  };
+  ```

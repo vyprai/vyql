@@ -1,0 +1,26 @@
+module bindings.csharp.samlTokenReplay;
+
+// A SAML service provider's response handler answers one question per
+// assertion before it mints claims: is this the first time this assertion has
+// been presented? The SAML2 profile delivers assertions through the browser,
+// so a captured response is an attacker-held bearer capability, and the
+// profile requires the receiver to detect reuse. Microsoft's validation stack
+// exposes exactly one switch for that: `TokenValidationParameters.ValidateTokenReplay`,
+// documented as controlling whether replay is validated, false by default and
+// only consulted by the token handler's `ValidateToken` when it is true. A
+// handler that builds the parameters, walks the response's assertion elements
+// and calls `ValidateToken` without ever setting that switch (and without
+// wiring the `TokenReplayCache` it needs) accepts every replayed assertion
+// inside its validity window -- the capture-replay authentication bypass
+// SAML2 stacks have repeatedly shipped.
+//
+// Every anchor is the validation API's own documented name, so any C# SAML
+// validation path built on the same stack reports, whichever library wraps
+// it. A function that enables `ValidateTokenReplay` anywhere in its body --
+// assignment statement or object initializer -- satisfies the control and is
+// not reported. Ordinary JWT bearer validation does not match: it names no
+// assertion, and the two facts must sit in one function.
+binding samlTokenReplay {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and node.context.call == "TokenValidationParameters" and node.context.call == "ValidateToken" and containsAny(node.context.selector, ["Assertion"]) and not (node.context.assign contains "ValidateTokenReplay")
+  emit issue code.SamlAssertionReplayBypass at node
+}

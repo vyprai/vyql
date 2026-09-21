@@ -1,0 +1,115 @@
+# Rank 1570 / CVE-2019-19617: phpMyAdmin rendered the Git revision
+# information on its index page without escaping, so crafted commit
+# hashes, branch names or repository URLs executed markup in an
+# administrator's browser (reflected cross-site scripting, CWE-79; the
+# task list's repo! flag resolves as packaging: the advisory names
+# phpmyadmin/composer while the code lives in phpmyadmin/phpmyadmin,
+# the pool row's target). display() in libraries/classes/Display/
+# GitRevision.php built the revision line as `'<strong title="' .
+# htmlspecialchars($GLOBALS['PMA_Config']->get('PMA_VERSION_GIT_MESSAGE'))
+# . '">' . $commit_hash . '</strong>'` and the remote-commit link as
+# `'.../commit/' . $GLOBALS['PMA_Config']->get('PMA_VERSION_GIT_...')`
+# with htmlspecialchars nowhere on the rendered values, and Footer.php's
+# _getDemoMessage the same through the build-generated
+# revision-info.php include. Fix 1119de642b ("Escape Git information on
+# the index page"): every interpolated value and URL passes through
+# htmlspecialchars() before the markup.
+#
+# ## What fires, both revisions
+#
+# Three --cache off runs per revision over GitRevision.php report 0
+# findings at the vulnerable parent c31d66b6e and 0 at the fix,
+# identically. The full tree at the parent reports 975 findings with
+# zero rows naming GitRevision.php, and Footer.php rows only at lines
+# 167, 192 and 206 -- the $_GET params flowing through
+# Url::getCommonRaw into response headers, not the revision markup at
+# lines 83-96. vyql match on GitRevision.php labels the
+# htmlspecialchars control at five sites and nothing else: no source,
+# no sink. The sink side is open on the real code too -- the revision
+# markup leaves display() through Core::printListItem, whose echo sits
+# behind Template::get('list/item')->render(...), and match on
+# Template.php labels nothing at all, so even a labelled source would
+# dead-end before a sink on the real file.
+#
+# ## Why no binding converts it
+#
+# Every value arrives through $GLOBALS['PMA_Config']->get(...), an
+# untyped-receiver config-object read: resolve reports `$GLOBALS.get`
+# at GitRevision.php:47 and :57 as unresolved (no callee body, not a
+# known source/sink/control) and trace from code.HttpInput to
+# code.HtmlRender reports 0 sources, so no taint path starts -- the
+# same object-field boundary ranks 1518, 1521, 1526, 1545 and 1568
+# recorded. A generic `->get(...)` input binding is the config-read
+# shape that labels ordinary code everywhere, and a binding naming
+# PMA_Config would detect this application rather than the weakness;
+# either fails the genericity test. What would convert the rank is
+# config-field provenance vocabulary (a classification of where an
+# accessor's values come from, so a git-environment-populated config
+# read can be a source) plus a template-render sink for the real
+# markup path. Both blocks below stay reject VYQL-INJ-004 until that
+# vocabulary lands. The flip condition is measured: the echo sink and
+# the htmlspecialchars control are bound in both blocks, and the same
+# snippets with the config reads replaced by $_GET subscripts report
+# VYQL-INJ-004 at high on the raw form and 0 findings on the escaped
+# one, so the raw block must flip to expect the day a binding labels
+# the config read it interpolates.
+
+test "rank1570: the git revision line renders its values raw"
+  lang php
+  file libraries/classes/Display/GitRevision.php
+  reject VYQL-INJ-004
+  code
+  ```
+  <?php
+
+  class GitRevision
+  {
+      public static function display($cfg)
+      {
+          $commit_hash = substr($cfg->get('PMA_VERSION_GIT_COMMITHASH'), 0, 7);
+          $commit_hash = '<strong title="'
+              . htmlspecialchars($cfg->get('PMA_VERSION_GIT_MESSAGE'))
+              . '">' . $commit_hash . '</strong>';
+          $commit_hash = '<a href="https://github.com/phpmyadmin/phpmyadmin/commit/'
+              . $cfg->get('PMA_VERSION_GIT_COMMITHASH')
+              . '">' . $commit_hash . '</a>';
+
+          $branch = $cfg->get('PMA_VERSION_GIT_BRANCH');
+          $branch = sprintf('%1$s from %2$s branch', $commit_hash, $branch);
+
+          echo '<li>' . $branch . '</li>';
+      }
+  }
+  ```
+
+test "rank1570: the fixed revision escapes every interpolated value"
+  lang php
+  file libraries/classes/Display/GitRevision.php
+  reject VYQL-INJ-004
+  code
+  ```
+  <?php
+
+  class GitRevision
+  {
+      public static function display($cfg)
+      {
+          $commit_hash = substr($cfg->get('PMA_VERSION_GIT_COMMITHASH'), 0, 7);
+          $commit_hash = '<strong title="'
+              . htmlspecialchars($cfg->get('PMA_VERSION_GIT_MESSAGE'))
+              . '">' . htmlspecialchars($commit_hash) . '</strong>';
+          $commit_hash = '<a href="https://github.com/phpmyadmin/phpmyadmin/commit/'
+              . htmlspecialchars($cfg->get('PMA_VERSION_GIT_COMMITHASH'))
+              . '">' . $commit_hash . '</a>';
+
+          $branch = $cfg->get('PMA_VERSION_GIT_BRANCH');
+          $branch = sprintf(
+              '%1$s from %2$s branch',
+              $commit_hash,
+              htmlspecialchars($branch)
+          );
+
+          echo '<li>' . $branch . '</li>';
+      }
+  }
+  ```

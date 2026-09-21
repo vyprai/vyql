@@ -1,0 +1,33 @@
+module bindings.php.generated.mde9f224e;
+
+binding secretValue0 {
+  requires {
+    dependency("friendsofsymfony/user-bundle")
+  }
+  query pattern callExpr where callee.method == "setPassword"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("friendsofsymfony/user-bundle")
+  }
+  query pattern callExpr where callee.method == "setPlainPassword"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue2 {
+  requires {
+    dependency("friendsofsymfony/user-bundle")
+  }
+  query pattern callExpr where callee.method == "getPassword"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue3 {
+  requires {
+    dependency("friendsofsymfony/user-bundle")
+  }
+  query pattern callExpr where callee.method == "getPlainPassword"
+  emit source code.SecretValue at call.result
+}

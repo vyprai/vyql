@@ -1,0 +1,30 @@
+module bindings.c.generated.mce355dd5;
+
+binding commandExecution0 {
+  requires {
+    dependency("libodb")
+  }
+  query pattern callExpr where callee.method == "spawn"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding sqlExecution1 {
+  requires {
+    dependency("libodb")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlParameterization2 {
+  requires {
+    dependency("libodb")
+  }
+  query pattern callExpr where callee.method == "prepared_already_cached"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

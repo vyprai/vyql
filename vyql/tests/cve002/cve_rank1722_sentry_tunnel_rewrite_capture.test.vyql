@@ -1,0 +1,302 @@
+# Rank 1722 / CVE-2023-46729 (GHSA-2rmr-xw8m-22q9, CWE-918): @sentry/nextjs's
+# optional `tunnelRoute` works by injecting a rewrite rule into the user's
+# Next.js config, so that `GET <tunnelPath>?o=<orgid>&p=<projectid>` is
+# forwarded to `https://o:orgid.ingest.sentry.io/api/:projectid/envelope/`
+# and the browser's ad-blocker never sees an ingest hostname. The rule is
+# declarative: setUpTunnelRewriteRules in packages/nextjs/src/config/
+# withSentryConfig.ts sets `userNextConfig.rewrites` to a function returning
+# `{ source, has: [{type:'query', key:'o', value:'(?<orgid>.*)'}, {type:'query',
+# key:'p', value:'(?<projectid>.*)'}], destination: 'https://...' }`. Next.js
+# turns `has` into route-match regexes and interpolates the named captures
+# into `destination` as `:name` -- and because the captures are `.*`, they
+# accept every character, so the orgid the requester typed becomes the
+# authority and the projectid the path of the URL the *server* fetches, and
+# the response comes back to the requester. The tunnel is an open proxy:
+# internal addresses, port scans, cloud metadata. The advisory's severity is
+# Medium (CVSS 6.1) and its workaround is to drop `tunnelRoute` entirely.
+#
+# The fixed revision (ddbda3c0, "fix(nextjs): Strictly validate tunnel target
+# parameters") changes two regex bodies and nothing else:
+#   (?<orgid>.*)       -> (?<orgid>[a-fA-F0-9]*)
+#   (?<projectid>.*)   -> (?<projectid>\d*)
+# which are the documented alphabets of a Sentry organisation id (hex) and
+# project id (decimal). The remediation is present at the fixed revision and the
+# unrestricted form at its parent, so the pair discriminates cleanly.
+#
+# Detection is a JavaScript function-scope binding,
+# `rewriteTargetFromUnrestrictedCapture`, emitting the new
+# `code.RewriteTargetFromUnrestrictedCapture` (VYQL-RF-049, CWE-918/CWE-20).
+# It reads three literal facts about a rewrite-rule object and judges none:
+# a matcher type from the router's documented set (query, host, header,
+# cookie), a capture that accepts any character (`>.*`), and a destination
+# carrying a scheme. The object-literal *keys* (`source`, `has`,
+# `destination`) emit no tokens in this frontend, so the binding anchors on
+# the documented matcher-type vocabulary instead -- which is what makes it
+# rule-agnostic: it never names `rewrites`, `tunnelRoute`, Sentry, or any
+# identifier from the fixing commit. A capture restricted by any alphabet,
+# anchor or bound removes the any-character literal and stops the report, so
+# the discriminator is the capture's strength and not the spelling the fixed revision
+# happened to choose; a destination with no scheme stays inside the origin
+# and is not reported at all.
+#
+# Concepts considered before minting: `code.WebhookUrlFetchMissingSsrfGuard`
+# describes a delivery fetch of a caller-configured callback URL, and this is
+# a declarative route table, not a fetch call. `code.RequestHostUrlValidation
+# Bypass` and `code.WeakRedirectUrlValidation` describe validation helpers
+# that accept too much; here no validation code exists, the matcher itself is
+# the admission control. `code.ConfigUrlStoredBeforeSchemeValidation` is a
+# persisted connector setting, not a per-request capture. `code.Unanchored
+# HostPathRoutingMatch` is the nearest neighbour -- a router selecting a
+# backend too loosely -- but its target is *selected* by a substring test
+# while here the target is *assembled* from the captured bytes, and its
+# review category is authorization. The class this rank adds is new: the
+# admission control and the outbound target are both static literals in one
+# function, which is exactly what the earlier members of the URL-allowlist
+# family lacked -- at those ranks the guard is a runtime check whose
+# strength no binding could read, and the honest outcome is no coverage.
+#
+# Measured on the whole checkout of both revisions (2142 JavaScript files,
+# `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB`, three runs each):
+# 601 findings before the binding, none touching withSentryConfig.ts; with
+# it, 603 at the vulnerable revision 4371b2c8 and 601 at the fixed revision ddbda3c0,
+# identical across all three runs on each side, the fingerprint delta being
+# two VYQL-RF-049 rows on packages/nextjs/src/config/withSentryConfig.ts at
+# the two enclosing functions (setUpTunnelRewriteRules and the rewrites
+# callback it installs).
+#
+# Collateral, enumerated over every corpus checkout rather than sampled:
+# grepping all clones for the binding's three literals co-occurring in one
+# file yields 44 files, which deduplicate to eight distinct artifacts -- the
+# yarn 4.0.2/4.6.0/4.12.0 bundles, the swagger-ui bundle, the swagger-ui
+# es-bundle, Next.js's compiled cssnano, the nocodb dist CLI and MediaWiki's
+# Uri.js, plus Next.js's own custom-routes fixtures and this rank's repros.
+# Scanning one of each: zero new rows on every bundle and on Uri.js, and 4
+# rows on the Next.js fixtures -- one of them the same weakness (`type:
+# 'host'`, `(?<subdomain>.*)-test.example.com`, destination
+# `https://:subdomain.example.com/...`), the other three the loose
+# function-scope co-occurrence of a `.*` header capture from one rule with
+# another rule's absolute destination in the same config function. The
+# swagger-ui es-bundle times out at 180s with or without the binding, so it
+# measures nothing either way. Two whole trees scanned clean: qwik (1161
+# findings, 0 new) and RSSHub (1919 findings, 0 new).
+
+test "rank1722: the tunnel rewrite captures the org and project ids with .* into an absolute destination"
+  lang javascript
+  file packages/nextjs/src/config/withSentryConfig.ts
+  expect VYQL-RF-049
+  expect_review code.RewriteTargetFromUnrestrictedCapture
+  code
+  ```
+  interface NextConfigObject {
+    [key: string]: any;
+    rewrites?: any;
+  }
+
+  function setUpTunnelRewriteRules(userNextConfig: NextConfigObject, tunnelPath: string): void {
+    const originalRewrites = userNextConfig.rewrites;
+
+    userNextConfig.rewrites = async (...args: unknown[]) => {
+      const injectedRewrite = {
+        // Matched rewrite routes look like `[tunnelPath]?o=[orgid]&p=[projectid]`
+        source: `${tunnelPath}(/?)`,
+        has: [
+          {
+            type: 'query',
+            key: 'o',
+            value: '(?<orgid>.*)',
+          },
+          {
+            type: 'query',
+            key: 'p',
+            value: '(?<projectid>.*)',
+          },
+        ],
+        destination: 'https://o:orgid.ingest.sentry.io/api/:projectid/envelope/?hsts=0',
+      };
+
+      if (typeof originalRewrites !== 'function') {
+        return [injectedRewrite];
+      }
+
+      const originalRewritesResult = await originalRewrites(...args);
+      if (Array.isArray(originalRewritesResult)) {
+        return [injectedRewrite, ...originalRewritesResult];
+      }
+      return originalRewritesResult;
+    };
+  }
+  ```
+
+test "rank1722: the tunnel rewrite restricts each capture to its identifier's alphabet"
+  lang javascript
+  file packages/nextjs/src/config/withSentryConfig.ts
+  reject VYQL-RF-049
+  reject_review code.RewriteTargetFromUnrestrictedCapture
+  code
+  ```
+  interface NextConfigObject {
+    [key: string]: any;
+    rewrites?: any;
+  }
+
+  function setUpTunnelRewriteRules(userNextConfig: NextConfigObject, tunnelPath: string): void {
+    const originalRewrites = userNextConfig.rewrites;
+
+    userNextConfig.rewrites = async (...args: unknown[]) => {
+      const injectedRewrite = {
+        source: `${tunnelPath}(/?)`,
+        has: [
+          {
+            type: 'query',
+            key: 'o',
+            value: '(?<orgid>[a-fA-F0-9]*)',
+          },
+          {
+            type: 'query',
+            key: 'p',
+            value: '(?<projectid>\\d*)',
+          },
+        ],
+        destination: 'https://o:orgid.ingest.sentry.io/api/:projectid/envelope/?hsts=0',
+      };
+
+      if (typeof originalRewrites !== 'function') {
+        return [injectedRewrite];
+      }
+
+      const originalRewritesResult = await originalRewrites(...args);
+      if (Array.isArray(originalRewritesResult)) {
+        return [injectedRewrite, ...originalRewritesResult];
+      }
+      return originalRewritesResult;
+    };
+  }
+  ```
+
+test "rank1722: the same weakness in an ordinary next.config rewrites block, on the host matcher"
+  lang javascript
+  file next.config.js
+  expect VYQL-RF-049
+  expect_review code.RewriteTargetFromUnrestrictedCapture
+  code
+  ```
+  // A tenant-facing rewrite: any subdomain of the platform is forwarded to
+  // that tenant's own origin, with the subdomain taken from the request.
+  module.exports = {
+    async rewrites() {
+      return [
+        {
+          source: '/api/v1/:path*',
+          has: [
+            {
+              type: 'host',
+              value: '(?<tenant>.*).app.example.com',
+            },
+          ],
+          destination: 'https://:tenant.tenant-origin.internal/api/v1/:path*',
+        },
+      ];
+    },
+  };
+  ```
+
+test "rank1722: an anchored, alphabet-restricted capture is a guarded rewrite"
+  lang javascript
+  file next.config.js
+  reject VYQL-RF-049
+  reject_review code.RewriteTargetFromUnrestrictedCapture
+  code
+  ```
+  // The same tenant rewrite with the capture restricted to the identifier's
+  // alphabet and anchored: the requester can no longer move the host.
+  module.exports = {
+    async rewrites() {
+      return [
+        {
+          source: '/api/v1/:path*',
+          has: [
+            {
+              type: 'host',
+              key: undefined,
+              value: '^(?<tenant>[a-z0-9-]{1,63})\\.app\\.example\\.com$',
+            },
+          ],
+          destination: 'https://:tenant.tenant-origin.internal/api/v1/:path*',
+        },
+      ];
+    },
+  };
+  ```
+
+test "rank1722: a capture restricted to a non-hex alphabet is guarded whichever alphabet it picks"
+  lang javascript
+  file next.config.js
+  reject VYQL-RF-049
+  reject_review code.RewriteTargetFromUnrestrictedCapture
+  code
+  ```
+  module.exports = {
+    async rewrites() {
+      return [
+        {
+          source: '/strings.json',
+          has: [
+            {
+              type: 'query',
+              key: 'lang',
+              value: '(?<locale>[a-z]{2}(-[A-Z]{2})?)',
+            },
+          ],
+          destination: 'https://cdn.example.com/i18n/:locale/strings.json',
+        },
+      ];
+    },
+  };
+  ```
+
+test "rank1722: an origin-internal rewrite with an unrestricted capture moves nothing off the host"
+  lang javascript
+  file next.config.js
+  reject VYQL-RF-049
+  reject_review code.RewriteTargetFromUnrestrictedCapture
+  code
+  ```
+  // The capture is unrestricted, but the destination carries no scheme: the
+  // request is re-routed inside the same origin and never leaves it.
+  module.exports = {
+    async rewrites() {
+      return [
+        {
+          source: '/legacy/:section*',
+          has: [
+            {
+              type: 'query',
+              key: 'view',
+              value: '(?<view>.*)',
+            },
+          ],
+          destination: '/legacy/:view/:section*',
+        },
+      ];
+    },
+  };
+  ```
+
+test "rank1722: an absolute destination with no capture forwards to a target the author spelled out"
+  lang javascript
+  file next.config.js
+  reject VYQL-RF-049
+  reject_review code.RewriteTargetFromUnrestrictedCapture
+  code
+  ```
+  module.exports = {
+    async rewrites() {
+      return [
+        {
+          source: '/external-docs',
+          destination: 'https://docs.example.com/guide',
+        },
+      ];
+    },
+  };
+  ```

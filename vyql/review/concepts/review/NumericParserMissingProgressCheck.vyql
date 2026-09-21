@@ -1,0 +1,8 @@
+module code;
+
+review code.NumericParserMissingProgressCheck {
+  category: resource
+  expected: [core.InputValidation]
+  kind: target
+  text: "review numeric parsers for a cursor-progress guard before retrying fallback parse paths"
+}

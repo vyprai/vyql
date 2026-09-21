@@ -1,0 +1,7 @@
+module code;
+
+review code.UnconditionalVerificationSuccess {
+  category: crypto
+  kind: attention
+  text: "review signature, checksum and integrity verification routines whose body only returns the success value, so every artifact is accepted"
+}

@@ -1,0 +1,260 @@
+# Pterodactyl Wings validated every server path by resolving it first:
+# Filesystem.SafePath lexically cleaned the requested path, ran
+# filepath.EvalSymlinks over it, and required the resolved path to stay
+# inside the server's data directory (server/filesystem/path.go). The
+# acts on the path then went through the standard library -- os.OpenFile
+# in Touch and the fileOpener, os.Open in File, os.RemoveAll in Delete --
+# none of which consults the snapshot EvalSymlinks took: each call
+# re-resolves links when the kernel handles it, and follows a link at the
+# final component unless O_NOFOLLOW is in the flags. A server owner
+# controls their own data directory, so a symlink swapped in between the
+# resolution and the act is followed at the act: reading, writing and
+# deleting outside the sandbox (CWE-367; the advisory for CVE-2024-27102
+# records it as a race condition enabling link following, critical 9.9).
+#
+# The fixed revision rewrites the whole server/filesystem package over an internal
+# filesystem that opens with O_NOFOLLOW unconditionally and unlinks
+# relative to an open parent directory handle, so no act on a name
+# re-resolves a path the code had validated a moment earlier.
+#
+# Detection is the existing file TOCTOU order rule, VYQL-RACE-001
+# (code.FileCheck reaches code.FileUse), which until now had no Go
+# bindings at all. The new bindings label filepath.EvalSymlinks and
+# os.Readlink as the check (the link-resolution probes; os.Stat and
+# os.Lstat are deliberately left out, since stat-then-open is the
+# ordinary existence idiom in Go) and the path-acting os calls as the
+# use, with the open forms suppressed when the call itself carries
+# O_NOFOLLOW. Measured on the two revisions of the repository: the
+# pre-fix tree reports 2 findings, both in the rewritten package --
+# the delete path that resolves links and then RemoveAlls the
+# un-resolved name, and the backup archiver that reads a link target and
+# then opens the path -- and the rewritten tree reports 0 (49 to 29
+# findings overall, the difference being the rewrite's own removal of
+# unrelated code paths plus these 2).
+#
+# Residual, stated rather than hidden: the decompression write path
+# (extractStream -> Writefile -> Touch) has its EvalSymlinks inside
+# SafePath, another file from every open, and the reachability relation
+# the rule uses is region-scoped -- a check in one function cannot reach
+# a use in a sibling -- so the delegated-validator form stays unreported
+# and only the same-function pairs are covered. The same bindings are
+# measured on three other Go repositories with EvalSymlinks or Readlink
+# usage: velociraptor's file accessor (resolve then open), vitess's
+# symlinked data-dir removal (resolve then RemoveAll, twice in one
+# function) and a Vault test helper -- every produced finding is the
+# same resolve-then-act shape, no other rule changed.
+
+test "rank1952: resolve-links-then-remove in the server filesystem reports the check-use race"
+  lang go
+  file server/filesystem/filesystem.go
+  expect VYQL-RACE-001
+  code
+  ```
+  package filesystem
+
+  import (
+  	"os"
+  	"path/filepath"
+  	"strings"
+  )
+
+  type Filesystem struct {
+  	root string
+  }
+
+  func (fs *Filesystem) unsafeFilePath(p string) string {
+  	return filepath.Clean(filepath.Join(fs.root, strings.TrimPrefix(p, fs.root)))
+  }
+
+  func (fs *Filesystem) unsafeIsInDataDirectory(p string) bool {
+  	return strings.HasPrefix(p+"/", strings.TrimSuffix(fs.root, "/")+"/")
+  }
+
+  // Delete removes a file from the server. This is one of the few places
+  // not using SafePath: the path is resolved by hand, walking up the path
+  // chain when the target does not exist, so a deletion through a
+  // directory symlink stays inside the data directory.
+  func (fs *Filesystem) Delete(p string) error {
+  	resolved := fs.unsafeFilePath(p)
+  	if !fs.unsafeIsInDataDirectory(resolved) {
+  		return NewBadPathResolution(p, resolved)
+  	}
+  	st, err := os.Lstat(resolved)
+  	if err != nil {
+  		parts := strings.Split(filepath.Dir(resolved), "/")
+  		for k := range parts {
+  			try := strings.Join(parts[:(len(parts)-k)], "/")
+  			if !fs.unsafeIsInDataDirectory(try) {
+  				break
+  			}
+  			if t, err := filepath.EvalSymlinks(try); err == nil {
+  				if !fs.unsafeIsInDataDirectory(t) {
+  					return NewBadPathResolution(p, t)
+  				}
+  				break
+  			}
+  		}
+  		return nil
+  	}
+  	if st.Mode()&os.ModeSymlink == 0 {
+  		if ep, err := filepath.EvalSymlinks(resolved); err == nil {
+  			if !fs.unsafeIsInDataDirectory(ep) {
+  				return NewBadPathResolution(p, ep)
+  			}
+  		}
+  	}
+  	return os.RemoveAll(resolved)
+  }
+
+  func NewBadPathResolution(p string, r string) error {
+  	return &os.PathError{Op: "lstat", Path: p, Err: os.ErrNotExist}
+  }
+  ```
+
+test "rank1952: readlink-then-open in the backup archiver reports the check-use race"
+  lang go
+  file server/filesystem/archive.go
+  expect VYQL-RACE-001
+  code
+  ```
+  package filesystem
+
+  import (
+  	"io/fs"
+  	"os"
+  	"path/filepath"
+  )
+
+  type TarProgress struct {
+  	w io.Writer
+  }
+
+  type Archive struct {
+  	BasePath string
+  }
+
+  // addToArchive records a file in the backup. A symlink is lstat'ed and
+  // its target read so the link itself can be written into the archive,
+  // then the path is opened for copying.
+  func (a *Archive) addToArchive(p string, rp string, w *TarProgress) error {
+  	s, err := os.Lstat(p)
+  	if err != nil {
+  		if os.IsNotExist(err) {
+  			return nil
+  		}
+  		return err
+  	}
+  	var target string
+  	if s.Mode()&fs.ModeSymlink != 0 {
+  		target, err = os.Readlink(s.Name())
+  		if err != nil {
+  			return nil
+  		}
+  	}
+  	_ = filepath.ToSlash(target)
+  	f, err := os.Open(p)
+  	if err != nil {
+  		if os.IsNotExist(err) {
+  			return nil
+  		}
+  		return err
+  	}
+  	defer f.Close()
+  	return nil
+  }
+  ```
+
+test "rank1952: the rewritten filesystem delegates the act to the no-follow layer"
+  lang go
+  file server/filesystem/filesystem.go
+  reject VYQL-RACE-001
+  code
+  ```
+  package filesystem
+
+  import (
+  	"github.com/pterodactyl/wings/internal/ufs"
+  )
+
+  type Filesystem struct {
+  	unixFS *ufs.Quota
+  }
+
+  // Delete after the rewrite: no name is resolved here at all, every act
+  // goes through the internal filesystem, which opens with O_NOFOLLOW
+  // unconditionally and unlinks relative to the open parent handle.
+  func (fs *Filesystem) Delete(p string) error {
+  	return fs.unixFS.RemoveAll(p)
+  }
+  ```
+
+test "rank1952: a resolve whose open refuses to follow the final link does not report"
+  lang go
+  file server/filesystem/filesystem.go
+  reject VYQL-RACE-001
+  code
+  ```
+  package filesystem
+
+  import (
+  	"os"
+  	"path/filepath"
+  	"strings"
+  )
+
+  // The same validation as the vulnerable form, and the open itself
+  // carries O_NOFOLLOW, so a link swapped in between the two is refused
+  // at the open instead of followed.
+  func (fs *Filesystem) TouchHardened(root string, name string) (*os.File, error) {
+  	p := filepath.Join(root, name)
+  	ep, err := filepath.EvalSymlinks(p)
+  	if err != nil {
+  		return nil, err
+  	}
+  	if !strings.HasPrefix(ep+"/", strings.TrimSuffix(root, "/")+"/") {
+  		return nil, os.ErrPermission
+  	}
+  	return os.OpenFile(p, os.O_RDWR|os.O_CREATE|os.O_TRUNC|os.O_NOFOLLOW, 0o644)
+  }
+  ```
+
+test "rank1952: a link resolution with no later path-acting use does not report"
+  lang go
+  file server/filesystem/path.go
+  reject VYQL-RACE-001
+  code
+  ```
+  package filesystem
+
+  import (
+  	"os"
+  	"path/filepath"
+  	"strings"
+  )
+
+  type Filesystem struct {
+  	root string
+  }
+
+  func (fs *Filesystem) unsafeFilePath(p string) string {
+  	return filepath.Clean(filepath.Join(fs.root, strings.TrimPrefix(p, fs.root)))
+  }
+
+  func (fs *Filesystem) unsafeIsInDataDirectory(p string) bool {
+  	return strings.HasPrefix(p+"/", strings.TrimSuffix(fs.root, "/")+"/")
+  }
+
+  // SafePath is the validator on its own: it resolves the links and
+  // checks containment, and nothing here acts on the path.
+  func (fs *Filesystem) SafePath(p string) (string, error) {
+  	r := fs.unsafeFilePath(p)
+  	ep, err := filepath.EvalSymlinks(r)
+  	if err != nil && !os.IsNotExist(err) {
+  		return "", err
+  	}
+  	if !fs.unsafeIsInDataDirectory(ep) {
+  		return "", os.ErrPermission
+  	}
+  	return r, nil
+  }
+  ```

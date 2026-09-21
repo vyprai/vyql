@@ -1,0 +1,9 @@
+module bindings.perl.generated.m0690ea48;
+
+binding filePathAccess0 {
+  requires {
+    dependency("Perlanet")
+  }
+  query pattern callExpr where callee.method == "feed_file"
+  emit sink code.FilePathAccess at args[0]
+}

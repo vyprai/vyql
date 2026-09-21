@@ -1,0 +1,25 @@
+module bindings.groovy.generated.mb7697fce;
+
+binding htmlRender0 {
+  requires {
+    dependency("com.sun.faces:jsf-api")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender1 {
+  requires {
+    dependency("com.sun.faces:jsf-api")
+  }
+  query pattern callExpr where callee.method == "startElement"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender2 {
+  requires {
+    dependency("com.sun.faces:jsf-api")
+  }
+  query pattern callExpr where callee.method == "writeAttribute"
+  emit sink code.HtmlRender at args[0]
+}

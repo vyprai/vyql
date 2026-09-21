@@ -1,0 +1,73 @@
+module bindings.rust.generated.m00180752;
+
+binding httpInput0 {
+  requires {
+    dependency("wry")
+  }
+  query pattern callExpr where callee.method == "with_url_and_headers"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput1 {
+  requires {
+    dependency("wry")
+  }
+  query pattern callExpr where callee.method == "with_url"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput2 {
+  requires {
+    dependency("wry")
+  }
+  query pattern callExpr where callee.method == "with_headers"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput3 {
+  requires {
+    dependency("wry")
+  }
+  query pattern callExpr where callee.method == "url"
+  emit source code.HttpInput at call.result
+}
+
+binding secretValue4 {
+  requires {
+    dependency("wry")
+  }
+  query pattern callExpr where callee.method == "cookies_for_url"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue5 {
+  requires {
+    dependency("wry")
+  }
+  query pattern callExpr where callee.method == "cookies"
+  emit source code.SecretValue at call.result
+}
+
+binding urlFetch6 {
+  requires {
+    dependency("wry")
+  }
+  query pattern callExpr where callee.method == "load_url"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding secretValue7 {
+  requires {
+    dependency("wry")
+  }
+  query pattern callExpr where callee.method == "set_cookie"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue8 {
+  requires {
+    dependency("wry")
+  }
+  query pattern callExpr where callee.method == "delete_cookie"
+  emit source code.SecretValue at call.result
+}

@@ -1,0 +1,8 @@
+module core;
+
+concept MemoryBoundsCheck : check {
+  applies: path
+  covers: [endpoint]
+  cwe: [CWE_125, CWE_787]
+  neutralizes: [memory.OobRead, memory.OobWrite]
+}

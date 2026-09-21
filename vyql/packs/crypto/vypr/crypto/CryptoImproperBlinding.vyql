@@ -1,0 +1,11 @@
+module vypr.crypto;
+
+rule CryptoImproperBlinding {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_200, CWE_203, CWE_208]
+    id: "VYQL-CRY-011"
+    severity: high
+  }
+  issue code.CryptoImproperBlinding as b
+}

@@ -1,0 +1,8 @@
+module code;
+
+review code.OauthQueryTokenScalarCheckMissing {
+  category: auth
+  expected: [core.InputValidation]
+  kind: attention
+  text: "pin the query-string access token to a string before the token lookup, since the query parser lets the requester choose its runtime type and an operator object satisfies a NoSQL equality match without being the token"
+}

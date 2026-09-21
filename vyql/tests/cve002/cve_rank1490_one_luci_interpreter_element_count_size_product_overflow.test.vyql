@@ -1,0 +1,248 @@
+# Rank 1490 / CVE-2026-40449 (CWE-190, GHSA-6g74-v723-hrch): Samsung/ONE, the
+# luci-interpreter kernels compute a raw memory-copy length as the product of a
+# tensor's element count and its element size with nothing bounding the product.
+#
+# `luci_interpreter::Shape::num_elements()` returns `int32_t` and computes the
+# product of the dimensions in `int32_t`. A .circle model file states those
+# dimensions, so a model whose dimensions multiply past 2^31 makes the count
+# wrap. Every kernel that copies a whole tensor then does the same thing with
+# it (compiler/luci-interpreter/src/kernels/Reshape.cpp:104 at the vulnerable
+# revision):
+#
+#   const size_t element_size = getDataTypeSize(input()->element_type());
+#   const int32_t num_elements = input()->shape().num_elements();
+#   std::memcpy(output_data, input_data, num_elements * element_size);
+#
+# The wrapped count is signed, so it can be negative; converted to `size_t` for
+# the `memcpy` length it becomes a value near 2^64, and the copy runs off both
+# buffers. ExpandDims.cpp:83, If.cpp:86, While.cpp:39 and Reshape.cpp:104 all
+# carry the identical three lines, and BuddyMemoryManager.cpp:46 carries the
+# allocation form of it.
+#
+# 95fba2da18 widens the count to `int64_t` via a new `large_num_elements()` and
+# puts the documented multiplication-overflow precheck in front of every one of
+# them:
+#
+#   const int64_t num_elements = input()->shape().large_num_elements();
+#   if (num_elements < 0 || static_cast<uint64_t>(num_elements) > SIZE_MAX / element_size)
+#     throw std::runtime_error("Integer overflow in size calculation");
+#   const int64_t total_size = num_elements * element_size;
+#   std::memcpy(output_data, input_data, static_cast<size_t>(total_size));
+#
+# That guard -- `count > LIMIT_MAX / element_size` before multiplying -- is the
+# form CERT INT30-C and MEM07-C prescribe, not anything specific to this
+# project, and it is what the detection keys on. The fixed revision also validates the
+# STRING offset table in luci/import CircleConst.cpp and the operator-code index
+# in onert BaseLoader.h; those are separate bounds defects bundled into the same
+# commit and are not what this spec covers.
+#
+# Pool row. The row is correct in every field; `nocommit` is wrong here for the
+# reason measured at rank 1432 -- the flag means "never checked", not
+# "unavailable". The metadata reads `REPO_IN_REFS` and names no commit` because the
+# GHSA is unreviewed and carries no commit reference at all, so the SHA is
+# never resolved against any repository. `git show 95fba2da18` in a plain clone
+# of Samsung/ONE reads it on the first try: a single non-merge commit on the
+# default branch, 9 files, +94/-13, whose message names the change.
+#
+# Detection. The vulnerable shape is a raw memory operation whose length
+# argument is a bare product of two runtime values, in a function that performs
+# no `*_MAX`-relative overflow precheck. `code.SizeSensitiveIntegerArithmetic`
+# exists for exactly this (CWE-190, "attacker-controlled value
+# participates in size-sensitive arithmetic") and VYQL-NUM-017 judges
+# it; only the Go and Java bindings emitted it, so this rank widens the
+# concept's language coverage to the C family rather than minting anything.
+#
+# The C frontend's `call_arg_shape_at:` token is what makes this precise, and
+# in two directions. `ccExprShape` has no case for `sizeof_expression`, so the
+# ubiquitous benign form `memcpy(d, s, n * sizeof(T))` produces no shape token
+# for the length argument at all and is never flagged; only a product of two
+# runtime values yields `...:2:ID*ID`. And `call_arg_shape_at:` is derived from
+# the AST, so a comment naming the missing check does not silence it.
+#
+# Measured, `--cache off`, three runs each, on compiler/luci-interpreter/src:
+# 4 VYQL-NUM-017 at 95fba2da18^ and 0 at 95fba2da18, identical across all three
+# runs. The subtree's other 67 findings (59 VYQL-MEM-006, 8 VYQL-MEM-016) are
+# the same on both revisions. The four are ExpandDims::execute, If::execute,
+# Reshape::execute and While::copy -- precisely the four memcpy sites the fixed revision
+# rewrites, with no other function in the subtree flagged. VYQL-MEM-016 reports 8
+# `code.RawMemoryCopySize` rows on both revisions alike, including Tensor.cpp
+# and Squeeze.cpp, so it is presence of a computed copy size, not this defect.
+#
+# Reachable set, by grep over the whole 15k-file tree: 16 `mem*(..., a * b)`
+# sites, 4 of them the fixed ones and 5 more the same unfixed defect copied
+# into onert-micro. Collateral over sixteen other C/C++ subtrees in the corpus
+# (~20k C-family files): 16 rows total, median 0 per subtree -- open5gs
+# `ogs_calloc`'s unchecked `memset(ptr, 0, nmemb * size)`, llama.cpp's
+# `memset(mean->data, 0, n_tokens*n_seqs_unq*...)`, apr's `apr_array_cat`, and
+# libvips' `vips_region_copy`, all instances of the same class.
+
+test "rank1490: (a) a tensor copy whose memcpy length is the product of a 32-bit element count and an element size, with nothing bounding the product"
+  lang cpp
+  file compiler/luci-interpreter/src/kernels/Reshape.cpp
+  expect VYQL-NUM-017
+  code
+  ```
+  #include <cstdint>
+  #include <cstring>
+
+  namespace luci_interpreter
+  {
+  namespace kernels
+  {
+
+  void Reshape::execute() const
+  {
+    const auto *input_data = input()->data<void>();
+    auto *output_data = output()->data<void>();
+
+    const size_t element_size = getDataTypeSize(input()->element_type());
+    const int32_t num_elements = input()->shape().num_elements();
+    std::memcpy(output_data, input_data, num_elements * element_size);
+  }
+
+  } // namespace kernels
+  } // namespace luci_interpreter
+  ```
+
+test "rank1490: (b) the fixed revision widens the element count and rejects any product that would exceed the size type before copying"
+  lang cpp
+  file compiler/luci-interpreter/src/kernels/Reshape.cpp
+  reject VYQL-NUM-017
+  code
+  ```
+  #include <cstdint>
+  #include <cstring>
+  #include <stdexcept>
+
+  namespace luci_interpreter
+  {
+  namespace kernels
+  {
+
+  void Reshape::execute() const
+  {
+    const auto *input_data = input()->data<void>();
+    auto *output_data = output()->data<void>();
+
+    const size_t element_size = getDataTypeSize(input()->element_type());
+    const int64_t num_elements = input()->shape().large_num_elements();
+
+    // Check for integer overflow in size calculation
+    if (num_elements < 0 || static_cast<uint64_t>(num_elements) > SIZE_MAX / element_size)
+    {
+      throw std::runtime_error("Integer overflow in size calculation");
+    }
+
+    const int64_t total_size = num_elements * element_size;
+    std::memcpy(output_data, input_data, static_cast<size_t>(total_size));
+  }
+
+  } // namespace kernels
+  } // namespace luci_interpreter
+  ```
+
+test "rank1490: (c) the precheck clears the copy even when the product is left inline, so the guard and not the fixed revision's statement layout is what discriminates"
+  lang cpp
+  file compiler/luci-interpreter/src/kernels/Reshape.cpp
+  reject VYQL-NUM-017
+  code
+  ```
+  #include <cstdint>
+  #include <cstring>
+  #include <stdexcept>
+
+  namespace luci_interpreter
+  {
+  namespace kernels
+  {
+
+  void Reshape::execute() const
+  {
+    const auto *input_data = input()->data<void>();
+    auto *output_data = output()->data<void>();
+
+    const size_t element_size = getDataTypeSize(input()->element_type());
+    const int64_t num_elements = input()->shape().large_num_elements();
+
+    if (num_elements < 0 || static_cast<uint64_t>(num_elements) > SIZE_MAX / element_size)
+    {
+      throw std::runtime_error("Integer overflow in size calculation");
+    }
+
+    std::memcpy(output_data, input_data, num_elements * element_size);
+  }
+
+  } // namespace kernels
+  } // namespace luci_interpreter
+  ```
+
+test "rank1490: (d) a copy length scaled by sizeof is the ordinary array idiom and is not a product of two runtime values"
+  lang cpp
+  file compiler/luci-interpreter/src/kernels/TransposeConv.cpp
+  reject VYQL-NUM-017
+  code
+  ```
+  #include <cstdint>
+  #include <cstring>
+
+  namespace luci_interpreter
+  {
+  namespace kernels
+  {
+
+  void TransposeConv::evalQuantizedS16() const
+  {
+    auto *scratch_data = scratch_tensor->data<void>();
+    std::memset(scratch_data, 0, num_elements * sizeof(int64_t));
+  }
+
+  } // namespace kernels
+  } // namespace luci_interpreter
+  ```
+
+test "rank1490: (e) the same unbounded element-count product as a plain C copy length"
+  lang c
+  file compiler/luci-interpreter/src/kernels/Reshape.c
+  expect VYQL-NUM-017
+  code
+  ```
+  #include <stdint.h>
+  #include <string.h>
+
+  size_t type_size(const struct Tensor *t);
+  int32_t tensor_num_elements(const struct Tensor *t);
+
+  void copy_tensor(void *dst, const void *src, const struct Tensor *t)
+  {
+    const size_t element_size = type_size(t);
+    const int32_t num_elements = tensor_num_elements(t);
+    memcpy(dst, src, num_elements * element_size);
+  }
+  ```
+
+test "rank1490: (f) a C copy that rejects any product exceeding the size type before copying"
+  lang c
+  file compiler/luci-interpreter/src/kernels/Reshape.c
+  reject VYQL-NUM-017
+  code
+  ```
+  #include <stdint.h>
+  #include <stdlib.h>
+  #include <string.h>
+
+  size_t type_size(const struct Tensor *t);
+  int64_t tensor_large_num_elements(const struct Tensor *t);
+
+  void copy_tensor(void *dst, const void *src, const struct Tensor *t)
+  {
+    const size_t element_size = type_size(t);
+    const int64_t num_elements = tensor_large_num_elements(t);
+
+    if (num_elements < 0 || (uint64_t)num_elements > SIZE_MAX / element_size)
+    {
+      abort();
+    }
+
+    memcpy(dst, src, (size_t)num_elements * element_size);
+  }
+  ```

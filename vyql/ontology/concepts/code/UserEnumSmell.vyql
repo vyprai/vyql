@@ -1,0 +1,11 @@
+module code;
+
+concept UserEnumSmell : issue {
+  cwe: [CWE_204, CWE_203, CWE_200]
+  reviewAssumption: "the difference is observable to an unauthenticated caller"
+  reviewCategory: auth
+  reviewCondition: "an authentication response distinguishes a known account from an unknown one"
+  reviewConfidence: medium
+  reviewEvidence: "auth response {pattern} varies by account existence"
+  vulnerableTo: [access_control.IncorrectAuthorization]
+}

@@ -1,0 +1,331 @@
+# Wireshark's RDPEGFX bulk-data decompressor keeps a decompression context
+# whose output segment is a fixed member array: epan/tvbuff_rdp.c declares
+# `uint8_t outputSegment[65536]` inside struct _zgfx_context_t (heap-allocated
+# through wmem_alloc0). The compressed path bounds every write into that
+# array -- zgfx_write_literal returns false at outputCount == 65535,
+# zgfx_write_raw rejects outputCount > 65535 - count, and the token loop
+# checks `count > sizeof(zgfx->outputSegment) - zgfx->outputCount` -- but
+# rdp8_decompress_segment's uncompressed branch took the segment length
+# straight from the packet, `len = tvb_reported_length(tvb); len--;`, and
+# handed it to `tvb_memcpy(tvb, zgfx->outputSegment, 1, len)` with no bound at
+# at all (tvbuff_rdp.c:344 at the parent). A bulk-data PDU whose payload
+# exceeds 65535 bytes writes past the member array; [MS-RDPEGFX] 3.1.9.1.2
+# caps a single uncompressed segment at 65535 bytes, so fix 45eb952b adds
+# `if (len > 65535) { return false; }` on that branch. Remediation confirmed
+# present at the fixed revision; the unbounded write confirmed at its parent.
+#
+# Detected by the member_capacity_unchecked fact
+# (ccDestCapacityMemberArrayObservations,
+# internal/extract/frontend/treesitter/c.go) through binding
+# destCapacityMemberArray in vyql/bindings/c/dest_capacity_member_array.vyql,
+# judged by the existing VYQL-MEM-071 (code.DestCapacityUncheckedCopy), whose
+# reviewCondition now names the third way a body states a destination's
+# capacity: an array bound the destination's own declaration fixes. The fact
+# collects the file's struct-member array declarators with a constant size,
+# pairs a transfer whose first or second argument is an object path naming
+# one of those fields with a count arriving as the last argument spelled as a
+# bare identifier, and reports it when the count is never related to anything:
+# a relational comparison naming the count clears (the fix shape), and so does
+# a clamp that enters the count's own assignment by the destination's own
+# size or by an identifier its declared size names. A comparison naming the
+# destination's size but a different value clears nothing, which is what keeps
+# the compressed path's own bound from vouching for the unbounded copy in the
+# same function -- the two branches bound two different counts, and only the
+# one reaching the transfer counts. The argument position rides in the fact
+# and the binding chooses it per spelling, so a transfer reading from a member
+# array is never read as one writing into it.
+#
+# Measured on the real checkout, 3 x --cache off runs per revision (timeout
+# 180, --max-ram 6GB) over epan/tvbuff_rdp.c alone: VYQL-MEM-071 reports 1 at
+# the parent, on the tvb_memcpy line itself, and 0 at the fix, every other
+# rule count identical (24 vs 23 findings, the one row being the defect).
+# Precision on real code, same bounds: on a 122-file subtree (epan top level
+# plus the packet-rdp* dissectors, materialized at the fixed revision) the
+# finding set is byte-identical to the unmodified engine, 1336 rows with 0
+# VYQL-MEM-071; collateral, same bounds, finding sets identical on
+# qemu (562 rows), qpdf (509) and openjpeg (13801); protobuf/src is not
+# measurable under the 180s bound on either engine. Two shapes were measured
+# out during the pass and are pinned as rejects below: a constant count states
+# its own bound and is not reported, and a member array in the source position
+# with an allocated destination is not a write into the array. The taint route
+# stays unshippable here on its own: labelling tvb_memcpy's size argument and
+# tvb_reported_length's result reports the defect line identically at both
+# revisions because the guard does not clear taint, which is why the capacity
+# correlation is the discriminator.
+
+test "rank1957: the uncompressed RDP segment writes packet-length bytes into the 65536-byte member array"
+  lang c
+  file tvbuff_rdp.c
+  expect VYQL-MEM-071
+  reject VYQL-MEM-003
+  code
+  ```
+  #include <stdint.h>
+  #include <stdbool.h>
+
+  typedef struct tvbuff tvbuff_t;
+
+  struct _zgfx_context_t {
+      uint8_t historyBuffer[2500000];
+      uint32_t historyIndex;
+      uint32_t historyBufferSize;
+      uint32_t outputCount;
+      uint8_t outputSegment[65536];
+  };
+  typedef struct _zgfx_context_t zgfx_context_t;
+
+  #define ZGX_PACKET_COMPRESSED 0x02
+
+  unsigned tvb_reported_length (tvbuff_t *);
+  uint8_t tvb_get_uint8 (tvbuff_t *, int);
+  tvbuff_t *tvb_new_subset_remaining (tvbuff_t *, int);
+  void tvb_memcpy (tvbuff_t *, void *, int, unsigned);
+
+  static void
+  zgfx_write_history_buffer_tvb (zgfx_context_t *zgfx, tvbuff_t *src,
+      uint32_t count)
+  {
+      uint32_t front;
+
+      if (count > zgfx->historyBufferSize) {
+          const uint32_t residue = count - zgfx->historyBufferSize;
+          count = zgfx->historyBufferSize;
+          zgfx->historyIndex = (zgfx->historyIndex + residue)
+              % zgfx->historyBufferSize;
+      }
+
+      if (zgfx->historyIndex + count <= zgfx->historyBufferSize) {
+          tvb_memcpy (src, &(zgfx->historyBuffer[zgfx->historyIndex]),
+              0, count);
+      } else {
+          front = zgfx->historyBufferSize - zgfx->historyIndex;
+          tvb_memcpy (src, &(zgfx->historyBuffer[zgfx->historyIndex]),
+              0, front);
+          tvb_memcpy (src, &(zgfx->historyBuffer), 0, count - front);
+      }
+
+      zgfx->historyIndex = (zgfx->historyIndex + count)
+          % zgfx->historyBufferSize;
+  }
+
+  static bool
+  zgfx_write_raw (zgfx_context_t *zgfx, const uint8_t *data, uint32_t count)
+  {
+      if (zgfx->outputCount > 65535 - count) {
+          return false;
+      }
+      for (uint32_t i = 0; i < count; i++) {
+          zgfx->outputSegment[zgfx->outputCount++] = data[i];
+      }
+      return true;
+  }
+
+  static bool
+  rdp8_decompress_segment (zgfx_context_t *zgfx, tvbuff_t *tvb)
+  {
+      int offset = 0;
+      int len = tvb_reported_length (tvb);
+      uint8_t flags = tvb_get_uint8 (tvb, offset);
+      offset++;
+      len--;
+
+      if (!(flags & ZGX_PACKET_COMPRESSED)) {
+          tvbuff_t *raw = tvb_new_subset_remaining (tvb, 1);
+          zgfx_write_history_buffer_tvb (zgfx, raw, len);
+
+          tvb_memcpy (tvb, zgfx->outputSegment, 1, len);
+          zgfx->outputCount += len;
+          return true;
+      }
+
+      uint32_t count = tvb_get_uint8 (tvb, offset);
+      if (count > sizeof (zgfx->outputSegment) - zgfx->outputCount) {
+          return false;
+      }
+      return zgfx_write_raw (zgfx, zgfx->outputSegment, count);
+  }
+  ```
+
+test "rank1957: the segment-length cap keeps the uncompressed copy inside the array"
+  lang c
+  file tvbuff_rdp_fixed.c
+  reject VYQL-MEM-071
+  reject VYQL-MEM-003
+  code
+  ```
+  #include <stdint.h>
+  #include <stdbool.h>
+
+  typedef struct tvbuff tvbuff_t;
+
+  struct _zgfx_context_t {
+      uint8_t historyBuffer[2500000];
+      uint32_t historyIndex;
+      uint32_t historyBufferSize;
+      uint32_t outputCount;
+      uint8_t outputSegment[65536];
+  };
+  typedef struct _zgfx_context_t zgfx_context_t;
+
+  #define ZGX_PACKET_COMPRESSED 0x02
+
+  unsigned tvb_reported_length (tvbuff_t *);
+  uint8_t tvb_get_uint8 (tvbuff_t *, int);
+  tvbuff_t *tvb_new_subset_remaining (tvbuff_t *, int);
+  void tvb_memcpy (tvbuff_t *, void *, int, unsigned);
+
+  static void
+  zgfx_write_history_buffer_tvb (zgfx_context_t *zgfx, tvbuff_t *src,
+      uint32_t count)
+  {
+      uint32_t front;
+
+      if (count > zgfx->historyBufferSize) {
+          const uint32_t residue = count - zgfx->historyBufferSize;
+          count = zgfx->historyBufferSize;
+          zgfx->historyIndex = (zgfx->historyIndex + residue)
+              % zgfx->historyBufferSize;
+      }
+
+      if (zgfx->historyIndex + count <= zgfx->historyBufferSize) {
+          tvb_memcpy (src, &(zgfx->historyBuffer[zgfx->historyIndex]),
+              0, count);
+      } else {
+          front = zgfx->historyBufferSize - zgfx->historyIndex;
+          tvb_memcpy (src, &(zgfx->historyBuffer[zgfx->historyIndex]),
+              0, front);
+          tvb_memcpy (src, &(zgfx->historyBuffer), 0, count - front);
+      }
+
+      zgfx->historyIndex = (zgfx->historyIndex + count)
+          % zgfx->historyBufferSize;
+  }
+
+  static bool
+  rdp8_decompress_segment (zgfx_context_t *zgfx, tvbuff_t *tvb)
+  {
+      int offset = 0;
+      int len = tvb_reported_length (tvb);
+      uint8_t flags = tvb_get_uint8 (tvb, offset);
+      offset++;
+      len--;
+
+      if (!(flags & ZGX_PACKET_COMPRESSED)) {
+          if (len > 65535) {
+              return false;
+          }
+          tvbuff_t *raw = tvb_new_subset_remaining (tvb, 1);
+          zgfx_write_history_buffer_tvb (zgfx, raw, len);
+
+          tvb_memcpy (tvb, zgfx->outputSegment, 1, len);
+          zgfx->outputCount += len;
+          return true;
+      }
+      return false;
+  }
+  ```
+
+test "rank1957: the history path clamps its count to the destination capacity before copying"
+  lang c
+  file history_path.c
+  reject VYQL-MEM-071
+  reject VYQL-MEM-003
+  code
+  ```
+  #include <stdint.h>
+
+  typedef struct tvbuff tvbuff_t;
+
+  struct _zgfx_context_t {
+      uint8_t historyBuffer[2500000];
+      uint32_t historyIndex;
+      uint32_t historyBufferSize;
+  };
+  typedef struct _zgfx_context_t zgfx_context_t;
+
+  void tvb_memcpy (tvbuff_t *, void *, int, unsigned);
+
+  static void
+  zgfx_write_history_buffer_tvb (zgfx_context_t *zgfx, tvbuff_t *src,
+      uint32_t count)
+  {
+      uint32_t front;
+
+      if (count > zgfx->historyBufferSize) {
+          const uint32_t residue = count - zgfx->historyBufferSize;
+          count = zgfx->historyBufferSize;
+          zgfx->historyIndex = (zgfx->historyIndex + residue)
+              % zgfx->historyBufferSize;
+      }
+
+      if (zgfx->historyIndex + count <= zgfx->historyBufferSize) {
+          tvb_memcpy (src, &(zgfx->historyBuffer[zgfx->historyIndex]),
+              0, count);
+      } else {
+          front = zgfx->historyBufferSize - zgfx->historyIndex;
+          tvb_memcpy (src, &(zgfx->historyBuffer[zgfx->historyIndex]),
+              0, front);
+          tvb_memcpy (src, &(zgfx->historyBuffer), 0, count - front);
+      }
+
+      zgfx->historyIndex = (zgfx->historyIndex + count)
+          % zgfx->historyBufferSize;
+  }
+  ```
+
+test "rank1957: a member array in the source position is not a write into it"
+  lang c
+  file sized_dest.c
+  reject VYQL-MEM-071
+  reject VYQL-MEM-003
+  code
+  ```
+  #include <stdint.h>
+  #include <stdlib.h>
+
+  typedef struct tvbuff tvbuff_t;
+
+  struct _zgfx_context_t {
+      uint32_t outputCount;
+      uint8_t outputSegment[65536];
+  };
+  typedef struct _zgfx_context_t zgfx_context_t;
+
+  void *wmem_alloc (void *, unsigned);
+  void tvb_memcpy (tvbuff_t *, void *, int, unsigned);
+
+  static uint8_t *
+  read_uncompressed_segment (void *scope, zgfx_context_t *zgfx,
+      tvbuff_t *tvb, unsigned len)
+  {
+      uint8_t *dest;
+
+      dest = wmem_alloc (scope, len);
+      tvb_memcpy (tvb, dest, 1, len);
+      memcpy (dest, zgfx->outputSegment, len);
+      return dest;
+  }
+  ```
+
+test "rank1957: a constant count states its own bound and is not reported"
+  lang c
+  file const_count.c
+  reject VYQL-MEM-071
+  reject VYQL-MEM-003
+  code
+  ```
+  #include <stdint.h>
+  #include <string.h>
+
+  struct _manuf_t {
+      uint8_t addr[3];
+      uint32_t len;
+  };
+  typedef struct _manuf_t manuf_t;
+
+  static void
+  fill (manuf_t *m, const uint8_t *addr)
+  {
+      memcpy (m->addr, addr, 3);
+  }
+  ```

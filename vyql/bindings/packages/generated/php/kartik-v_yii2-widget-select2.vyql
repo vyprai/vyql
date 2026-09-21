@@ -1,0 +1,9 @@
+module bindings.php.generated.mfb131e49;
+
+binding expressionEval0 {
+  requires {
+    dependency("kartik-v/yii2-widget-select2")
+  }
+  query pattern callExpr where callee.method == "JsExpression"
+  emit sink code.ExpressionEval at args[0]
+}

@@ -1,0 +1,381 @@
+# pgjdbc's simple-query-mode parameter stringification left the numeric bind
+# outside the quoting wrapper every sibling type passes through, so a crafted
+# value could re-parse as part of the surrounding statement (SQL injection in
+# simple query mode, CWE-89; CVE-2024-1597 / GHSA-24rp-q3w6-vc56 -- with
+# preferQueryMode=simple a PreparedStatement's binds are inlined into the
+# query text, and a negative numeric beside an unconsumed placeholder turns
+# the rest of the line into a comment).
+#
+# toString(index, standardConformingStrings) in
+# pgjdbc/src/main/java/org/postgresql/core/v3/SimpleParameterList.java
+# renders each stored bind through the private quoteAndCast helper, which
+# emits ('...'::type) with Utils.escapeLiteral under
+# standard-conforming-strings. The advisory shipped in two merges of the same
+# branch: 93b0fcb introduced quoteAndCast, parenthesised NULL and routed
+# seven of the eight binary types through it, and 06abfb78a6 (the pool row's
+# fix) completed the set -- at <fix>^ the Oid.NUMERIC case still ended in
+#
+#     Number n = ByteConverter.numeric((byte[]) paramValue);
+#     ...
+#     return n.toString();
+#
+# raw, with no quotes, no cast and no parentheses, while INT2/INT4/INT8/
+# FLOAT4/FLOAT8/UUID/POINT/BOX beside it each returned
+# quoteAndCast(...). The fix assigns textValue/type per case and leaves the
+# function through a single return quoteAndCast(textValue, type,
+# standardConformingStrings).
+#
+# Held ATTENTION at recheck, escape-wrapper completeness -- the sanitizer
+# exists and is correct, the defect is one type branch that bypasses it, the
+# same present-but-incomplete family as the flagless regex sanitizer, the
+# bracket-blind host check, the adapter param that never enters its
+# sanitising helper and the route group with no middleware.
+#
+# Measured at recheck against the current knowledge base, not inherited.
+# Three --cache off scans per revision of the real tree (timeout 180,
+# --max-ram 6GB) report 210 findings at 06abfb78a6^ and 210 at 06abfb78a6
+# with identical per-rule counts and byte-identical fingerprint sets; nothing
+# names SimpleParameterList.java in the findings report or in the 1794-flag
+# -flags only view (the file's only flag is core.ResourceRelease on
+# streamWrapper.close), and cache-cleared vyql match reports the same 41
+# labels (40 code.MassAssign on the bind setters plus that release) at both
+# revisions. VYQL-INJ-030, the rule that catches this renderer family,
+# fires zero rows here: its Java presence bindings key on a hand-rolled
+# "::uuid"/"::point"/"::box" cast literal inside a toString function, and at
+# <fix>^ the renderer's only cast literals are the parenthesised NaN
+# constants. One merge earlier, at 93b0fcb^1 where every type hand-rolled its
+# own literal (return "'" + uuid + "'::uuid"; and the raw Short.toString(s)
+# forms), the same tree scans 226 findings with 16 VYQL-INJ-030 rows, all on
+# SimpleParameterList.java:188-283 -- the weakness is detected in its full
+# form and the residual one-branch miss carries no literal at all.
+#
+# The branch axis is not expressible. Presence predicates are function-scoped
+# -- node.context.* tokens carry every call and literal of toString, so the
+# quoteAndCast siblings, the NaN constants and the bare n.toString() are
+# visible to every return node alike, and a return-site probe keyed on the
+# context reads 23 labels on the vulnerable file, 23 on a minimal targeted
+# fix that only wraps the numeric case (all sixteen per-case returns kept)
+# and 7 on the shipped fix, which collapses the switch into one exit: the
+# delta is the fixing commit's own return layout, not escaping completeness,
+# so it flags a correct minimal fix and is not shippable. The graph does
+# carry the case identity (the raw return lowers to
+# fn28/.../sw32.c5/analysis.function.return with n.toString flowing straight
+# into it, the UUID case to sw32.c6 with quoteAndCast in between) but no
+# predicate exposes the switch case or the set of calls dominating a return,
+# and no source or sink concept describes a driver rendering a stored bind
+# into query text. A binding naming quoteAndCast or Utils.escapeLiteral would
+# detect this driver rather than the weakness.
+#
+# No ENGINE-GAPS.md entry: the piece is ontology design (an escape-wrapper
+# completeness relation over a renderer's return sites), not a localised
+# construct in one function. No definition change shipped. The first three
+# blocks reject VYQL-INJ-001 and flip to expect when that vocabulary lands;
+# the fourth block pins the hand-rolled-cast form one merge earlier, which
+# VYQL-INJ-030 does report today.
+#
+# verify_current_expected: attention-analysis-gap, both revisions rejected
+
+test "rank1564: the numeric bind returns outside the quoting wrapper its siblings use"
+  lang java
+  file pgjdbc/src/main/java/org/postgresql/core/v3/SimpleParameterList.java
+  reject VYQL-INJ-001
+  code
+  ```
+  class SimpleParameterList {
+    private Object[] paramValues;
+    private int[] paramTypes;
+    private int[] flags;
+    private static final Object NULL_OBJECT = new Object();
+
+    private static String quoteAndCast(String text, String type, boolean standardConformingStrings) {
+      StringBuilder sb = new StringBuilder((text.length() + 10) / 10 * 11);
+      sb.append("('");
+      sb.append(text);
+      sb.append("'");
+      if (type != null) {
+        sb.append("::");
+        sb.append(type);
+      }
+      sb.append(")");
+      return sb.toString();
+    }
+
+    public String toString(int index, boolean standardConformingStrings) {
+      --index;
+      Object paramValue = paramValues[index];
+      if (paramValue == null) {
+        return "?";
+      } else if (paramValue == NULL_OBJECT) {
+        return "(NULL)";
+      } else if ((flags[index] & BINARY) == BINARY) {
+        switch (paramTypes[index]) {
+          case Oid.INT2:
+            short s = ByteConverter.int2((byte[]) paramValue, 0);
+            return quoteAndCast(Short.toString(s), "int2", standardConformingStrings);
+
+          case Oid.INT4:
+            int i = ByteConverter.int4((byte[]) paramValue, 0);
+            return quoteAndCast(Integer.toString(i), "int4", standardConformingStrings);
+
+          case Oid.INT8:
+            long l = ByteConverter.int8((byte[]) paramValue, 0);
+            return quoteAndCast(Long.toString(l), "int8", standardConformingStrings);
+
+          case Oid.FLOAT8:
+            double d = ByteConverter.float8((byte[]) paramValue, 0);
+            if (Double.isNaN(d)) {
+              return "('NaN'::double precision)";
+            }
+            return quoteAndCast(Double.toString(d), "double precision", standardConformingStrings);
+
+          case Oid.NUMERIC:
+            Number n = ByteConverter.numeric((byte[]) paramValue);
+            if (n instanceof Double) {
+              assert ((Double) n).isNaN();
+              return "('NaN'::numeric)";
+            }
+            return n.toString();
+
+          case Oid.UUID:
+            String uuid =
+                new UUIDArrayAssistant().buildElement((byte[]) paramValue, 0, 16).toString();
+            return quoteAndCast(uuid, "uuid", standardConformingStrings);
+        }
+        return "?";
+      } else {
+        String param = paramValue.toString();
+        int paramType = paramTypes[index];
+        if (paramType == Oid.TIMESTAMP) {
+          return quoteAndCast(param, "timestamp", standardConformingStrings);
+        }
+        return quoteAndCast(param, null, standardConformingStrings);
+      }
+    }
+  }
+  ```
+
+test "rank1564: the fixed revision routes every type through the wrapper"
+  lang java
+  file pgjdbc/src/main/java/org/postgresql/core/v3/SimpleParameterList.java
+  reject VYQL-INJ-001
+  code
+  ```
+  class SimpleParameterList {
+    private Object[] paramValues;
+    private int[] paramTypes;
+    private int[] flags;
+    private static final Object NULL_OBJECT = new Object();
+
+    private static String quoteAndCast(String text, String type, boolean standardConformingStrings) {
+      StringBuilder sb = new StringBuilder((text.length() + 10) / 10 * 11);
+      sb.append("('");
+      sb.append(text);
+      sb.append("'");
+      if (type != null) {
+        sb.append("::");
+        sb.append(type);
+      }
+      sb.append(")");
+      return sb.toString();
+    }
+
+    public String toString(int index, boolean standardConformingStrings) {
+      --index;
+      Object paramValue = paramValues[index];
+      if (paramValue == null) {
+        return "?";
+      } else if (paramValue == NULL_OBJECT) {
+        return "(NULL)";
+      }
+      String textValue;
+      String type;
+      if ((flags[index] & BINARY) == BINARY) {
+        switch (paramTypes[index]) {
+          case Oid.INT2:
+            short s = ByteConverter.int2((byte[]) paramValue, 0);
+            textValue = Short.toString(s);
+            type = "int2";
+            break;
+
+          case Oid.INT4:
+            int i = ByteConverter.int4((byte[]) paramValue, 0);
+            textValue = Integer.toString(i);
+            type = "int4";
+            break;
+
+          case Oid.INT8:
+            long l = ByteConverter.int8((byte[]) paramValue, 0);
+            textValue = Long.toString(l);
+            type = "int8";
+            break;
+
+          case Oid.FLOAT8:
+            double d = ByteConverter.float8((byte[]) paramValue, 0);
+            if (Double.isNaN(d)) {
+              return "('NaN'::double precision)";
+            }
+            textValue = Double.toString(d);
+            type = "double precision";
+            break;
+
+          case Oid.NUMERIC:
+            Number n = ByteConverter.numeric((byte[]) paramValue);
+            if (n instanceof Double) {
+              assert ((Double) n).isNaN();
+              return "('NaN'::numeric)";
+            }
+            textValue = n.toString();
+            type = "numeric";
+            break;
+
+          case Oid.UUID:
+            textValue =
+                new UUIDArrayAssistant().buildElement((byte[]) paramValue, 0, 16).toString();
+            type = "uuid";
+            break;
+
+          default:
+            return "?";
+        }
+      } else {
+        textValue = paramValue.toString();
+        int paramType = paramTypes[index];
+        if (paramType == Oid.TIMESTAMP) {
+          type = "timestamp";
+        } else {
+          type = null;
+        }
+      }
+      return quoteAndCast(textValue, type, standardConformingStrings);
+    }
+  }
+  ```
+
+test "rank1564: the minimal fix wraps the numeric case and keeps every per-case return"
+  lang java
+  file pgjdbc/src/main/java/org/postgresql/core/v3/SimpleParameterList.java
+  reject VYQL-INJ-001
+  code
+  ```
+  class SimpleParameterList {
+    private Object[] paramValues;
+    private int[] paramTypes;
+    private int[] flags;
+    private static final Object NULL_OBJECT = new Object();
+
+    private static String quoteAndCast(String text, String type, boolean standardConformingStrings) {
+      StringBuilder sb = new StringBuilder((text.length() + 10) / 10 * 11);
+      sb.append("('");
+      sb.append(text);
+      sb.append("'");
+      if (type != null) {
+        sb.append("::");
+        sb.append(type);
+      }
+      sb.append(")");
+      return sb.toString();
+    }
+
+    public String toString(int index, boolean standardConformingStrings) {
+      --index;
+      Object paramValue = paramValues[index];
+      if (paramValue == null) {
+        return "?";
+      } else if (paramValue == NULL_OBJECT) {
+        return "(NULL)";
+      } else if ((flags[index] & BINARY) == BINARY) {
+        switch (paramTypes[index]) {
+          case Oid.INT2:
+            short s = ByteConverter.int2((byte[]) paramValue, 0);
+            return quoteAndCast(Short.toString(s), "int2", standardConformingStrings);
+
+          case Oid.INT4:
+            int i = ByteConverter.int4((byte[]) paramValue, 0);
+            return quoteAndCast(Integer.toString(i), "int4", standardConformingStrings);
+
+          case Oid.INT8:
+            long l = ByteConverter.int8((byte[]) paramValue, 0);
+            return quoteAndCast(Long.toString(l), "int8", standardConformingStrings);
+
+          case Oid.FLOAT8:
+            double d = ByteConverter.float8((byte[]) paramValue, 0);
+            if (Double.isNaN(d)) {
+              return "('NaN'::double precision)";
+            }
+            return quoteAndCast(Double.toString(d), "double precision", standardConformingStrings);
+
+          case Oid.NUMERIC:
+            Number n = ByteConverter.numeric((byte[]) paramValue);
+            if (n instanceof Double) {
+              assert ((Double) n).isNaN();
+              return "('NaN'::numeric)";
+            }
+            return quoteAndCast(n.toString(), "numeric", standardConformingStrings);
+
+          case Oid.UUID:
+            String uuid =
+                new UUIDArrayAssistant().buildElement((byte[]) paramValue, 0, 16).toString();
+            return quoteAndCast(uuid, "uuid", standardConformingStrings);
+        }
+        return "?";
+      } else {
+        String param = paramValue.toString();
+        int paramType = paramTypes[index];
+        if (paramType == Oid.TIMESTAMP) {
+          return quoteAndCast(param, "timestamp", standardConformingStrings);
+        }
+        return quoteAndCast(param, null, standardConformingStrings);
+      }
+    }
+  }
+  ```
+
+test "rank1564: the hand-rolled cast form the same renderer had one merge earlier"
+  lang java
+  file pgjdbc/src/main/java/org/postgresql/core/v3/SimpleParameterList.java
+  expect VYQL-INJ-030
+  code
+  ```
+  class SimpleParameterList {
+    private Object[] paramValues;
+    private int[] paramTypes;
+    private int[] flags;
+    private static final Object NULL_OBJECT = new Object();
+
+    public String toString(int index, boolean standardConformingStrings) {
+      --index;
+      Object paramValue = paramValues[index];
+      if (paramValue == null) {
+        return "?";
+      } else if (paramValue == NULL_OBJECT) {
+        return "NULL";
+      } else if ((flags[index] & BINARY) == BINARY) {
+        switch (paramTypes[index]) {
+          case Oid.INT2:
+            short s = ByteConverter.int2((byte[]) paramValue, 0);
+            return Short.toString(s);
+
+          case Oid.INT4:
+            int i = ByteConverter.int4((byte[]) paramValue, 0);
+            return Integer.toString(i);
+
+          case Oid.NUMERIC:
+            Number n = ByteConverter.numeric((byte[]) paramValue);
+            return n.toString();
+
+          case Oid.UUID:
+            String uuid =
+                new UUIDArrayAssistant().buildElement((byte[]) paramValue, 0, 16).toString();
+            return "'" + uuid + "'::uuid";
+
+          case Oid.POINT:
+            PGpoint pgPoint = new PGpoint();
+            pgPoint.setByteValue((byte[]) paramValue, 0);
+            return "'" + pgPoint.toString() + "'::point";
+        }
+        return "?";
+      }
+      return paramValue.toString();
+    }
+  }
+  ```

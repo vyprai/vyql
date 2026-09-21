@@ -1,0 +1,17 @@
+module bindings.php.generated.m73655d18;
+
+binding codeEval0 {
+  requires {
+    dependency("composer/installers")
+  }
+  query pattern callExpr where callee.method == "getInstallPath"
+  emit sink code.CodeEval at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("composer/installers")
+  }
+  query pattern callExpr where callee.method == "getInstallPath"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,11 @@
+module code;
+
+concept RecursiveJsonMarshalUnderLock : issue {
+  cwe: [CWE_667, CWE_400]
+  reviewAssumption: "the marshaler dispatches to MarshalJSON on the receiver type and the lock is not reentrant"
+  reviewCategory: concurrency
+  reviewCondition: "a JSON marshaler holds a receiver lock while marshaling the same receiver"
+  reviewConfidence: high
+  reviewEvidence: "MarshalJSON context {pattern} locks the receiver and passes it back to the JSON marshaler"
+  vulnerableTo: [concurrency.Deadlock, dos.UncontrolledResourceConsumption]
+}

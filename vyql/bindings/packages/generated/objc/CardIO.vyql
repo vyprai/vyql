@@ -1,0 +1,9 @@
+module bindings.objc.generated.m850e2164;
+
+binding secretValue0 {
+  requires {
+    dependency("CardIO")
+  }
+  query pattern callExpr where callee.method == "userDidProvideCreditCardInfo:inPaymentViewController:"
+  emit source code.SecretValue at call.result
+}
