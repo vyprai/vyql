@@ -836,6 +836,8 @@ func (c *rbConv) rbStructuredContextTokens(root *tree_sitter.Node, scope string)
 					add("selector:" + suffix)
 				}
 			}
+		case "case":
+			c.rbCaseArmTokens(n, add)
 		case "binary":
 			if expr := rbCompactText(c.text(n)); expr != "" {
 				add("expr:" + expr)
@@ -908,6 +910,86 @@ func rbDottedSuffixes(path string) []string {
 		out = append(out, strings.Join(parts[i:], "."))
 	}
 	return out
+}
+
+// rbCaseArmTokens records what each arm of a `case` produces, keyed by the label the
+// arm matches on (`case_arm:play_roles=view`) and, for the arm with no label, by
+// itself (`case_else=super`).
+//
+// Ruby's `case` is an expression, so an arm's result expression is the value the
+// enclosing method returns when the subject equals that label. The switch lowering
+// records the arm's code -- a Const with no path, a Seq with path=__object_literal
+// -- but nothing that names which label produced which value, so a method that
+// dispatches on one value to pick another left no readable fact behind. The labels
+// were already present as `literal:` tokens; this is the pairing.
+func (c *rbConv) rbCaseArmTokens(n *tree_sitter.Node, add func(string)) {
+	for _, ch := range c.namedChildren(n) {
+		switch c.kind(ch) {
+		case "when":
+			var labels []string
+			value := ""
+			for _, w := range c.namedChildren(ch) {
+				switch c.kind(w) {
+				case "pattern":
+					if k := c.namedChildren(w); len(k) > 0 {
+						if lab := rbContextValue(c.text(k[0])); lab != "" {
+							labels = append(labels, lab)
+						}
+					}
+				case "then":
+					value = c.rbArmValue(w)
+				}
+			}
+			if value == "" {
+				continue
+			}
+			for _, lab := range labels {
+				add("case_arm:" + lab + "=" + value)
+			}
+		case "else":
+			if value := c.rbArmValue(ch); value != "" {
+				add("case_else=" + value)
+			}
+		}
+	}
+}
+
+// rbArmValue is the value token of an arm's body: what the arm evaluates to. Ruby
+// takes the value from the body's LAST expression, so only that one is read, and
+// only the forms whose value the file itself states -- a symbol, a non-interpolated
+// string, a number, true/false/nil, a bare name or constant, and `super` for the arm
+// that defers to the superclass. An arm whose value is computed (a call, a
+// concatenation) yields nothing: the call is already in the context as `call_path:`,
+// and pairing it with a label would state that the method returns the call's result,
+// which the file does not say.
+func (c *rbConv) rbArmValue(body *tree_sitter.Node) string {
+	kids := c.namedChildren(body)
+	if len(kids) == 0 {
+		return ""
+	}
+	last := kids[len(kids)-1]
+	for c.kind(last) == "parenthesized_statements" {
+		if k := c.namedChildren(last); len(k) > 0 {
+			last = k[len(k)-1]
+		} else {
+			return ""
+		}
+	}
+	switch c.kind(last) {
+	case "simple_symbol", "hash_key_symbol":
+		return strings.TrimSuffix(strings.TrimPrefix(c.text(last), ":"), ":")
+	case "string", "heredoc_body", "heredoc_content":
+		return c.rbStringLiteral(last) // "" when interpolated: not a fixed value
+	case "integer", "float", "true", "false", "nil":
+		return rbCompactText(c.text(last))
+	case "identifier", "constant", "instance_variable", "global_variable":
+		return c.text(last)
+	case "scope_resolution":
+		return strings.ReplaceAll(rbCompactText(c.text(last)), "::", ".")
+	case "super":
+		return "super"
+	}
+	return ""
 }
 
 func rbContextValue(raw string) string {

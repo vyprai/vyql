@@ -451,6 +451,14 @@ func v2PresenceValuePrefix(field string) string {
 	// property the call takes.
 	case "callProperty":
 		return "call_property:"
+	// What one arm of a value-position `case` produces, keyed by the label the arm
+	// matches on (`case_arm:play_roles=view`), and what the label-less fallback arm
+	// produces (`case_else=super`). The value-side is the whole point: a label alone
+	// says the method dispatches on it, and only the pairing says what it gets.
+	case "caseArm":
+		return "case_arm:"
+	case "caseElse":
+		return "case_else="
 	// The facts of a sibling helper the function calls, attributed one hop by
 	// the frontend. One prefix with the fact's own key inside it, so a
 	// delegated fact can never satisfy a predicate over what the function
