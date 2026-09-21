@@ -1854,10 +1854,20 @@ func (c *rbConv) blockParams(blk *tree_sitter.Node) []string {
 	if bp == nil {
 		return nil
 	}
+	return c.paramIdentifiers(bp)
+}
+
+// paramIdentifiers collects the identifiers a parameter list binds, descending into
+// destructured parameters — |builder, (name, argument)| binds three names — which
+// may themselves nest: |a, (b, (c, d))| binds four.
+func (c *rbConv) paramIdentifiers(n *tree_sitter.Node) []string {
 	var out []string
-	for _, ch := range c.namedChildren(bp) {
-		if c.kind(ch) == "identifier" {
+	for _, ch := range c.namedChildren(n) {
+		switch c.kind(ch) {
+		case "identifier":
 			out = append(out, c.text(ch))
+		case "destructured_parameter":
+			out = append(out, c.paramIdentifiers(ch)...)
 		}
 	}
 	return out
