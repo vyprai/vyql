@@ -91,6 +91,38 @@ func TestAmbiguous(t *testing.T) {
 		// nested repeat that CAN match the separator leaves the boundary free.
 		{false, "separator delimits iterations, the repeat nested in a group", `^(?:,x(\*|:\d+)?)+$`},
 		{true, "nested repeat that matches the separator keeps the report", `^(?:,(\d,+))+$`},
+
+		// A separator pins the boundary BETWEEN iterations and says nothing about
+		// a division INSIDE one. The rank2887 semver grammar dots its segments —
+		// the `.` is a true separator — yet each segment's identifier branch is
+		// `[\da-z-]*[a-z-][\da-z-]*`: a mandatory member flanked by two runs over
+		// the same characters, whose position slides because either run can
+		// donate the member its character. The free choice is the member's
+		// place, and the loop multiplies it across segments. The strand reaches
+		// the pair through the nullable material around it: the `\b` at the end
+		// of the grammar fails after any division, and nothing mandatory stands
+		// between the two to disconnect them.
+		{true, "rank2887 semver grammar, identifier member slides", `(?<=^v?|\sv?)(?:(?:0|[1-9]\d*)\.){2}(?:0|[1-9]\d*)(?:-(?:0|[1-9]\d*|[\da-z-]*[a-z-][\da-z-]*)(?:\.(?:0|[1-9]\d*|[\da-z-]*[a-z-][\da-z-]*))*)?(?:\+[\da-z-]+(?:\.[\da-z-]+)*)?\b`},
+		{true, "sliding member between flanking runs", `^[\da-z-]*[a-z-][\da-z-]*!`},
+		{false, "a separator outside the runs' alphabet still pins", `^[\da-z-]*,[\da-z-]*!`},
+		{false, "atomic flanking run does not slide", `^(?>[\da-z-]*)[a-z-][\da-z-]*!`},
+		{false, "possessive member between flanking runs does not slide", `^[\da-z-]*[\da-z-]++[\da-z-]*!`},
+
+		// The member only slides when BOTH flanking runs could donate its
+		// character. Material one run can absorb but the other cannot is pinned:
+		// exactly one placement of it matches, so the engine walks the input
+		// linearly instead of re-splitting the run. The rank1111 fix admits the
+		// dot in its domain class but excludes it from the TLD class, and the
+		// rank2894 fix makes the value run possessive so it keeps what it took.
+		{false, "rank1111 fixed literal, dot outside the tld class", `^([a-zA-Z0-9_.\-+])+@[a-zA-Z0-9-.]+\.[a-zA-Z0-9-]{2,}$`},
+		{false, "rank2894 possessive value run pins the pair", `<([^>]*\srel\s*=\s*['"]?([^'" >]++)[^>]*)>`},
+
+		// The atomic wall is opaque from outside in every reading direction: a
+		// repeat buried in an atomic group is not a consumer an enclosing
+		// division can compete for, whether the walk arrives from the nesting
+		// report, the adjacent pair, or the run split.
+		{false, "atomic interior is not a run the outside competes for", `(?>(a+)+)(a+)$`},
+		{true, "plain interior is such a run", `(?:(a+)+)(a+)$`},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
