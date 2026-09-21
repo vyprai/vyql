@@ -3,6 +3,8 @@ package main
 import (
 	"testing"
 	"time"
+
+	"github.com/vyprai/vyql/internal/extract/frontend/treesitter"
 )
 
 func TestMemWatchFiresOnceThePollCrossesTheCeiling(t *testing.T) {
@@ -123,6 +125,48 @@ func TestBoundedMemoryCeilingDoesNotWrapUint64(t *testing.T) {
 	}
 	if got := boundedMemoryCeiling(4 << 30); got != 4<<30 {
 		t.Errorf("boundedMemoryCeiling(4 GiB) = %d, want %d", got, int64(4<<30))
+	}
+}
+
+// The parse bound is armed by exactly one thing in the shipped scanner: the
+// memory watch publishing its stop for the duration of the scan (see
+// watchResidentMemory). The scan-level runaway-parse test arms the stop by
+// hand, so on its own it cannot tell a scanner that publishes from one whose
+// bound is inert in every real scan — the parse would run unbounded exactly as
+// before the gap was closed, and no test would fail. These pin the wiring
+// itself: what the watch publishes while it runs, what it restores when it
+// ends, and that a scan with no ceiling publishes nothing at all.
+
+// A sentinel already in force when the watch arms, so the restore is pinned
+// against a stop that was genuinely there rather than passing because both
+// sides happen to be zero.
+func TestMemoryWatchPublishesItsStopToTheParseBound(t *testing.T) {
+	prev := treesitter.ParseStop()
+	sentinel := prev + 1<<30
+	treesitter.SetParseStop(sentinel)
+	t.Cleanup(func() { treesitter.SetParseStop(prev) })
+
+	limit := int64(4 << 30)
+	stop := watchResidentMemory(limit, "-max-ram 4GB")
+	if got, want := treesitter.ParseStop(), memoryStopThreshold(limit); got != want {
+		t.Fatalf("while the watch runs the parse bound reads %d, want the watch's own stop %d: a scan's runaway parse is halted by the stop the watch publishes, and nothing else arms it", got, want)
+	}
+	stop()
+	if got := treesitter.ParseStop(); got != sentinel {
+		t.Fatalf("after the watch ends the parse bound reads %d, want the stop in force before it (%d): a stop left published would hold the next scan's parses to a ceiling that scan never asked for", got, sentinel)
+	}
+}
+
+func TestMemoryWatchWithoutACeilingPublishesNothing(t *testing.T) {
+	prev := treesitter.ParseStop()
+	sentinel := prev + 1<<30
+	treesitter.SetParseStop(sentinel)
+	t.Cleanup(func() { treesitter.SetParseStop(prev) })
+
+	stop := watchResidentMemory(0, "no ceiling")
+	defer stop()
+	if got := treesitter.ParseStop(); got != sentinel {
+		t.Fatalf("a scan with no memory ceiling left the parse bound at %d, want the sentinel %d: there is no stop to publish, so parses must run unbounded exactly as they did before the bound existed", got, sentinel)
 	}
 }
 
