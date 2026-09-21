@@ -713,6 +713,18 @@ func v2PresenceValuePrefix(field string) string {
 		return "decorator_path:"
 	case "fieldType":
 		return "field_type:"
+	// The command-gate pairing a Rust function context carries: which
+	// compile-time command-name array the function gates with, what that array
+	// lists, which commands the binary's clap subcommand enum declares, and
+	// which of those declared commands the array omits.
+	case "gateArray":
+		return "gate_array:"
+	case "gateEntry":
+		return "gate_entry:"
+	case "gateSubcommand":
+		return "gate_subcommand:"
+	case "gateOmission":
+		return "gate_omission:"
 	case "instanceFieldInit":
 		return "instance_field_init:"
 	case "staticFieldInit":
