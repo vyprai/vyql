@@ -1,17 +1,15 @@
 package treesitter
 
 import (
-	"sync"
 	"sync/atomic"
-	"time"
 
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 )
 
 // The parse bound: one tree-sitter parse may not take the process past the
 // scan's resident-memory stop, the same figure the whole-process watch ends the
-// scan at. A parse that would cross it is halted through tree-sitter's
-// cancellation flag and the file is declined — the same outcome as a file that
+// scan at. A parse that would cross it is cancelled through tree-sitter's own
+// progress callback and the file is declined — the same outcome as a file that
 // cannot be read — instead of ending the scan with no report at all.
 //
 // The bound exists because a parse's cost is not proportional to its file. The
@@ -24,6 +22,13 @@ import (
 // the line for everything that check cannot see — a shebang claiming a
 // non-program, two markers in a document that quotes code, a genuine module
 // whose grammar state runs away.
+//
+// The progress callback is the mechanism tree-sitter itself ships for exactly
+// this (it replaced the cancellation flag the binding deprecated): the parser
+// calls it on the parse's own thread every hundred parse operations, and a
+// callback that returns true cancels the parse, which then yields no tree. So
+// the resident reading is taken where the memory is being spent, with no
+// sampler racing the parse and no watch left running once it has ended.
 //
 // It is armed by the Perl frontend, the grammar measured to run away; the hook
 // in the shared parse loop is inert for the languages that do not ask for it.
@@ -45,19 +50,15 @@ func SetParseStop(n int64) { parseStop = n }
 func ParseStop() int64 { return parseStop }
 
 const (
-	// parseWatchEvery is how often the watch samples resident memory while a
-	// parse runs. An order finer than the process watch's 100ms, because this
-	// one has to land BEFORE the stop: the parse it halts may be growing
-	// resident memory at gigabytes per second.
-	parseWatchEvery = 15 * time.Millisecond
 	// parseWatchMargin is the room below the stop where a parse is already too
-	// close. A halt is not instant — the flag is read every few hundred parse
-	// operations, and one sample interval of growth lands after it is set —
-	// and the measured overshoot at this cadence is under 100MB, so the margin
-	// holds the halt inside the stop with room to spare.
+	// close. A cancel is not instant — the callback returns between parse
+	// operations, and the tree the parse had built to that point is released
+	// only after it returns — so the halt has to land before the stop, with
+	// room for the pages in flight. The margin is deliberately the same order
+	// as the whole-process watch's own reserve.
 	parseWatchMargin = 256 << 20
 	// parseWatchGrowthFloor is how much resident memory must have appeared
-	// since the parse was armed before it can be the one halted. A process
+	// since the parse started before it can be the one halted. A process
 	// sitting near the stop for reasons of its own — a collector-squeezed heap
 	// — must not have every remaining file declined for memory its own parse
 	// never asked for; a parse costing less than this cannot be distinguished
@@ -65,60 +66,42 @@ const (
 	parseWatchGrowthFloor = 64 << 20
 )
 
-// armParseWatch bounds one parse of p by the published stop. It returns the
-// func that disarms the watch — waiting for the sampler to finish, so no
-// sample lands after the parse it was watching has moved on to the next file —
-// and reports whether this bound is what halted the parse.
+// boundParse is the parse the Perl frontend runs in place of the plain one: the
+// same input handling Parse itself performs, with the resident-memory bound
+// observed from tree-sitter's progress callback. It returns no tree when the
+// bound cancelled the parse, and reports whether the bound was what halted it.
 //
-// With no stop in force — or no resident reading on this platform — the parse
-// runs unbounded, exactly as it did before the bound existed, and the disarm
-// reports false.
-func armParseWatch(p *tree_sitter.Parser) func() bool {
+// With no stop in force — or no resident reading on this platform — this is the
+// plain parse, and the bound never declines a file.
+func boundParse(p *tree_sitter.Parser, src []byte) (*tree_sitter.Tree, bool) {
 	stop := atomic.LoadInt64(&parseStop)
 	if stop <= 0 {
-		return func() bool { return false }
+		return p.Parse(src, nil), false
 	}
-	// The parser reads this flag every few hundred parse operations; storing
-	// one word is all the halting costs the parse itself.
-	var flag uintptr
-	p.SetCancellationFlag(&flag)
 	base := parseResidentBytes()
-	done := make(chan struct{})
-	stopped := make(chan struct{})
-	go func() {
-		defer close(stopped)
-		t := time.NewTicker(parseWatchEvery)
-		defer t.Stop()
-		for {
-			select {
-			case <-done:
-				return
-			case <-t.C:
-				// A tick and a disarm can both be ready, and select chooses
-				// between them at random, so ask again before sampling.
-				select {
-				case <-done:
-					return
-				default:
-				}
-				rss := parseResidentBytes()
-				// The growth is read from this parse's arm time, so it counts
-				// whatever the process gained while the parse ran — a sibling
-				// worker's parse as much as this one's. That is deliberate:
-				// near the stop the total is what the ceiling sees, and a
-				// scan that close is halted or it dies, whichever parses are
-				// the cause.
-				if rss > stop-parseWatchMargin && rss-base > parseWatchGrowthFloor {
-					atomic.StoreUintptr(&flag, 1)
-					return
-				}
+	var halted bool
+	tree := p.ParseWithOptions(
+		func(offset int, _ tree_sitter.Point) []byte {
+			if offset < len(src) {
+				return src[offset:]
 			}
-		}
-	}()
-	var once sync.Once
-	return func() bool {
-		once.Do(func() { close(done) })
-		<-stopped
-		return atomic.LoadUintptr(&flag) != 0
-	}
+			return nil
+		},
+		nil,
+		&tree_sitter.ParseOptions{
+			ProgressCallback: func(_ tree_sitter.ParseState) bool {
+				// The reading is process-wide, so it counts whatever the
+				// process gained while this parse ran — a sibling worker's
+				// parse as much as this one's. That is deliberate: near the
+				// stop the total is what the ceiling sees, and a scan that
+				// close is halted or it dies, whichever parses are the cause.
+				rss := parseResidentBytes()
+				if rss > stop-parseWatchMargin && rss-base > parseWatchGrowthFloor {
+					halted = true
+					return true // true cancels the parse
+				}
+				return false
+			},
+		})
+	return tree, halted
 }

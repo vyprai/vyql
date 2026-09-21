@@ -126,7 +126,7 @@ func ExtractPerl(files []string, root string) (nir.Program, error) {
 			return p
 		},
 		nil,
-		armParseWatch,
+		boundParse,
 		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
 			c := &plConv{src: src, file: rel, key: moduleKey(root, abs, ".pl")}
 			return nir.Module{Key: c.key, File: rel, Body: c.block(tree.RootNode())}, true

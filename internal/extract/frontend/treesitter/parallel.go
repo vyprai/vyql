@@ -51,12 +51,17 @@ func parseModulesPreprocess(
 	return parseModulesBounded(files, root, newParser, preprocess, nil, build)
 }
 
-// parseBound arms a resident-memory bound on one parse of p and returns the
-// func that disarms it, reporting whether the bound is what halted the parse.
-// It is the hook a frontend whose grammar can outrun the file it reads passes
-// to parseModulesBounded; every other frontend leaves it nil and its parses
-// are untouched.
-type parseBound func(p *tree_sitter.Parser) (disarm func() bool)
+// parseBound is one file's parse under a resident-memory bound: it parses src
+// with p, returning no tree when the bound cancelled the parse and reporting
+// whether the bound was what halted it. It is the hook a frontend whose grammar
+// can outrun the file it reads passes to parseModulesBounded; every other
+// frontend leaves it nil and its parses are untouched.
+type parseBound func(p *tree_sitter.Parser, src []byte) (tree *tree_sitter.Tree, halted bool)
+
+// parseUnbounded is the plain parse every frontend that asked for no bound runs.
+func parseUnbounded(p *tree_sitter.Parser, src []byte) (*tree_sitter.Tree, bool) {
+	return p.Parse(src, nil), false
+}
 
 // parseModulesBounded is the one loop the wrappers above feed: parse files
 // concurrently, optionally rewriting each file's bytes (preprocess) and
@@ -138,12 +143,11 @@ func parseModulesBounded(
 						continue
 					}
 				}
-				disarm := func() bool { return false }
+				parse := parseUnbounded
 				if bound != nil {
-					disarm = bound(p)
+					parse = bound
 				}
-				tree := p.Parse(src, nil)
-				halted := disarm()
+				tree, halted := parse(p, src)
 				if tree == nil {
 					// A halted or errored parse leaves the parser holding the
 					// partial document; without this the next file's parse
