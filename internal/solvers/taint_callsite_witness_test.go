@@ -1,6 +1,7 @@
 package solvers
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/vyprai/vyql/internal/usg"
@@ -264,6 +265,75 @@ func TestWitnessKeepsTheOuterFrameThroughANestedCall(t *testing.T) {
 						t.Fatalf("witness does not enter through %q: %v", cg.wantArg, p)
 					}
 				})
+			}
+		})
+	}
+}
+
+// The one shape the re-anchor can chase forever: one helper invoked at three sites
+// whose results feed each other's arguments — site 2's result is site 3's argument and
+// site 3's is site 2's — with the source entering at site 1. The fixpoint is untroubled
+// (taint is a fixpoint; cycles are its daily work), but the witness walk re-anchors at
+// the shared param every time it passes: pred(param) is site 1's argument, which
+// belongs to neither rotating frame, so each pass jumps to the exiting frame's own
+// argument — whose pred chain then runs back to the param through the OTHER frame's
+// call, pushing that frame in turn. The walk rotates param -> a3 -> c2 -> ret -> body
+// -> param -> a2 -> c3 -> ret -> ... without end, and the step budget is what stops
+// it. The finding must still carry a witness — the recorded pred chain, itself a real
+// source->sink path — rather than hang the scan or drop the flow.
+func TestMutualWrapRotationFallsBackToTheRecordedWitness(t *testing.T) {
+	cg := callSiteGraph{
+		nodes: []usg.Node{
+			{ID: "src", Type: "code.Call", Loc: "app.go:9"},
+			{ID: "a1", Type: "code.Arg", Loc: "app.go:2", Props: map[string]string{"slot": "0"}},
+			{ID: "a2", Type: "code.Arg", Loc: "app.go:3", Props: map[string]string{"slot": "0"}},
+			{ID: "a3", Type: "code.Arg", Loc: "app.go:4", Props: map[string]string{"slot": "0"}},
+			{ID: "param", Type: "code.Param", Loc: "app.go:10", Props: map[string]string{"func": "helper", "name": "v"}},
+			{ID: "body", Type: "code.Name", Loc: "app.go:11"},
+			{ID: "ret", Type: "code.Return", Loc: "app.go:12", Props: map[string]string{"func": "helper"}},
+			{ID: "c1", Type: "code.Call", Loc: "app.go:2", Props: map[string]string{"arg0": "a1"}},
+			{ID: "c2", Type: "code.Call", Loc: "app.go:3", Props: map[string]string{"arg0": "a2"}},
+			{ID: "c3", Type: "code.Call", Loc: "app.go:4", Props: map[string]string{"arg0": "a3"}},
+			{ID: "sink", Type: "code.Arg", Loc: "app.go:5"},
+		},
+		labels: [][2]string{{"src", "test.Source"}, {"sink", "test.Sink"}},
+		edges: [][2]string{
+			{"src", "a1"},
+			{"a1", "param"}, {"a2", "param"}, {"a3", "param"},
+			{"param", "body"}, {"body", "ret"},
+			{"ret", "c1"}, {"ret", "c2"}, {"ret", "c3"},
+			{"c2", "a3"}, {"c3", "a2"}, // the rotating sites feed each other's arguments
+			{"c3", "sink"},
+		},
+	}
+	// The witness the fallback must produce, exactly: the fixpoint's own pred chain from
+	// the sink. It is forced regardless of taint order — param is tainted by a1 before
+	// a2 or a3 can exist as taint sources (both hang off calls reached only THROUGH
+	// param), and every other node on the chain has exactly one tainter — so both twins
+	// must report this path and nothing else.
+	want := []string{"src", "a1", "param", "body", "ret", "c3", "sink"}
+	for _, build := range []struct {
+		name string
+		mk   func() usg.Store
+	}{
+		{"string path", func() usg.Store { return usg.NewInMemStore() }},
+		{"int path", func() usg.Store { return usg.NewIntStore(len(cg.nodes)) }},
+	} {
+		t.Run(build.name, func(t *testing.T) {
+			flows, err := FindTaintFlows(cg.build(t, build.mk()),
+				set("test.Source"), set("test.Sink"), set("test.Kind"), nil, "", set())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(flows) != 1 {
+				t.Fatalf("want exactly one flow, got %d: %+v", len(flows), flows)
+			}
+			f := flows[0]
+			if f.SourceID != "src" || f.SinkID != "sink" {
+				t.Fatalf("reported %q -> %q, want src -> sink", f.SourceID, f.SinkID)
+			}
+			if !reflect.DeepEqual(f.Path, want) {
+				t.Fatalf("witness = %v, want the recorded pred chain %v", f.Path, want)
 			}
 		})
 	}
