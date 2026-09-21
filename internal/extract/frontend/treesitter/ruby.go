@@ -1670,7 +1670,7 @@ func (c *rbConv) string(n *tree_sitter.Node, L string) nir.Expr {
 	return nir.Const{Loc: L, Value: c.text(n)}
 }
 
-// subshell lowers a backtick or %x(…) shell-string literal (`` `pdfinfo #{file}` ``) to
+// subshell lowers a backtick or %x(…) shell-string literal — '`pdfinfo #{file}`' — to
 // the execution it performs: the operator is Kernel's backtick method, which takes the
 // command string and runs it through a shell, returning its stdout. Lowering it as just a
 // string value leaves no node a sink concept can attach to — taint followed into the
