@@ -140,6 +140,12 @@ type Lambda struct {
 	Body          []Stmt
 	Loc           string
 	ContextTokens []string
+	// BindsThis marks a lambda with a `this` of its own — a JavaScript function
+	// expression, which every call re-binds, as against an arrow, which keeps the
+	// lexical one. An iteration helper that invokes its callback with the iterated
+	// element as `this` ($.each) can only route the element into lambdas that carry
+	// this mark; routing it into an arrow would rewrite the enclosing `this`.
+	BindsThis bool
 }
 
 // Thru is a transparent wrapper (await, starred) that passes taint through.

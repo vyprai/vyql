@@ -233,6 +233,20 @@ type lowerer struct {
 	// taint into the callback's parameters.
 	lambdaParams map[string][]string
 
+	// lambdaThis maps a lowered function-value node to the stable `this` node its body
+	// reads — minted only for a callback that binds a `this` of its own (a JS function
+	// expression; an arrow keeps the lexical one) AND is an inline argument of an
+	// each/forEach call, the invocation that carries the iterated element as `this`. An
+	// iteration helper routes the element there, so a zero-parameter callback that reads
+	// `this` still receives the element.
+	lambdaThis map[string]string
+
+	// fnThis is the this-node the body being lowered inherited from an enclosing inline
+	// iteration callback's mint ("" when none): the one `this` binding a nested function
+	// expression's own `this` must shadow rather than resolve to, since the language gives
+	// the nested body a `this` of its own at every call.
+	fnThis string
+
 	// classSelf is the stable implicit-`this` node of a class, keyed by "ns\x1fClass" — one
 	// node for the whole class, not one per method, so a field one method writes through
 	// `this` and another method reads through `this` land on the SAME element slot.
@@ -3157,6 +3171,7 @@ func newLowerer(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 		dynSQLVar:        map[string]bool{},
 		debugPayloadVar:  map[string]bool{},
 		lambdaParams:     map[string][]string{},
+		lambdaThis:       map[string]string{},
 		classSelf:        map[string]string{},
 		classCtors:       map[string]string{},
 		paramObjects:     map[string]bool{},
@@ -5169,11 +5184,47 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 				l.parameterEntry(paramNode, ex.Loc, pe.Tokens)
 			}
 		}
+		// A callback that binds a `this` of its own (a JS function expression — an arrow keeps
+		// the lexical one, so it never carries the mark) gets ONE stable this-node instead of a
+		// fresh node per occurrence, but only where something actually invokes it with the
+		// iterated element as `this`: an inline argument of an each/forEach call, the shape
+		// the frontend's call_method mark names (eachElementCallback). Minted only for the
+		// spelling whose ONLY channel is `this` — a callback that names no parameter and reads
+		// `this` — because a callback that names its parameters holds the element by name, and
+		// standing in one node for every `this` it reads merges flows the per-occurrence nodes
+		// keep apart (a library plugin's receiver-anchored iteration reaches reads it should
+		// not). A class method's `this` is a binding the body inherits, so it suppresses the
+		// mint; an enclosing callback's minted node is not (this body binds its own), so it is
+		// overridden. The node is what an iteration helper's element-as-`this` invocation
+		// ($.each, forEach) is routed into below.
+		var thisNode string
+		if ex.BindsThis && l.eachElementCallback(ex) && len(paramNodes) == 0 &&
+			(inner.node["this"] == "" || l.fnThis != "") &&
+			l.freeNames(ex.Body, ex.Params)["this"] {
+			thisNode = l.nodeInline("Name", ex.Loc, nil, "this", "this", "", "")
+			inner.setNode("this", thisNode)
+		}
+		// A function expression that minted nothing still binds a `this` of its own at every
+		// call, so an enclosing callback's minted node must not stand in for its `this` reads:
+		// hide it for the body (a nested arrow then reads the same hidden binding, the
+		// per-occurrence spelling it always had). A class method's `this` stays visible — a
+		// nested function resolving it lexically is the approximation that codebase has
+		// always had.
+		savedFnThis := l.fnThis
+		switch {
+		case thisNode != "":
+			l.fnThis = thisNode
+		case ex.BindsThis && l.fnThis != "":
+			inner.setNode("this", "")
+			l.fnThis = ""
+		}
 		l.block(ex.Body, inner)
+		l.fnThis = savedFnThis
 		sc.undoFunc(fm)
 		l.region, l.funcRoot, l.branchCond = saveRegion, saveRoot, saveCond
 		fn := l.node("Func", ex.Loc, nil)
 		l.lambdaParams[fn] = paramNodes // for higher-order callback dispatch
+		l.lambdaThis[fn] = thisNode     // for element-as-`this` iteration dispatch
 		return fn
 	}
 	return l.node("Const", "?:0", nil)
@@ -6241,6 +6292,16 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 				}
 			}
 		}
+		// `recv.forEach(cb)` also invokes cb with the element as `this` in the jQuery-heritage
+		// spelling, so a callback that reads `this` instead of naming a parameter still
+		// receives the element (see lambdaThis for which callbacks that is).
+		if call.Method == "forEach" {
+			for _, av := range argVals {
+				if tn := l.lambdaThis[av]; tn != "" {
+					l.flow(recvNode, tn)
+				}
+			}
+		}
 		// self-passing scope functions (`recv.With/Also/Apply/Tap/Let(x => …)` — C# fluent
 		// helpers, Kotlin scope functions) invoke the lambda WITH THE RECEIVER, so the lambda's
 		// param IS the receiver: alias them so a field mutation via the param (`x.Field = …`)
@@ -6263,6 +6324,7 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	// callback argument itself is the evidence that the call is higher-order. FN-safe
 	// over-approximation.
 	l.flowArgsIntoCallbackParams(call, argVals, sc)
+	l.flowEachCallbackThis(call, argVals)
 	l.applyTargetArgsCallback(call, argVals, sc)
 	// Interprocedural taint. An arg routed into a RESOLVED local function flows through that
 	// function's body (arg → param → … → ret → result), so an in-body transform is
@@ -6519,6 +6581,43 @@ func (l *lowerer) flowArgsIntoCallbackParams(call nir.Call, argVals []string, sc
 			}
 		}
 	}
+}
+
+// flowEachCallbackThis routes the iterated collection into the `this` node of an
+// argument-anchored iteration helper's callback: `$.each(coll, cb)` / `each(coll, cb)` /
+// `forEach(coll, cb)` invoke cb with the element as `this` (jQuery's documented spelling),
+// so a callback that reads `this` — including one with no named parameters at all —
+// receives the collection's taint. The collection is the call's first argument, and a lone
+// argument is the receiver-anchored `recv.forEach(cb)` spelling, which the receiver-side
+// dispatch above already carries. FN-safe over-approximation.
+func (l *lowerer) flowEachCallbackThis(call nir.Call, argVals []string) {
+	if call.Method != "each" && call.Method != "forEach" || len(argVals) < 2 {
+		return
+	}
+	coll := argVals[0]
+	if coll == "" || len(l.lambdaParams[coll]) > 0 {
+		return // the first argument is itself a callback, not the iterated collection
+	}
+	for _, av := range argVals[1:] {
+		if tn := l.lambdaThis[av]; tn != "" {
+			l.flow(coll, tn)
+		}
+	}
+}
+
+// eachElementCallback reports whether this lambda is an inline argument of an each/forEach
+// call — the frontend's call_method mark names the method of the call a direct-argument
+// lambda was handed to. Those are the callbacks an iteration helper invokes with the
+// iterated element as `this`; a function value nothing routes that way (an object-literal
+// method, an event handler) is called with a `this` the graph has no fact about, so minting
+// a stable this-node for it would invent flows rather than model an invocation.
+func (l *lowerer) eachElementCallback(ex nir.Lambda) bool {
+	for _, tok := range ex.ContextTokens {
+		if tok == "call_method:each" || tok == "call_method:forEach" {
+			return true
+		}
+	}
+	return false
 }
 
 func (l *lowerer) applyTargetArgsCallback(call nir.Call, argVals []string, sc *scope) {
