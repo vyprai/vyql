@@ -393,3 +393,64 @@ X.fn.load = function (url) {
 		t.Fatal("a member assignment on a record built from a populated literal became a function definition; the record's members are already in place, the assignment rewrites one")
 	}
 }
+
+// A namespace is also built by a chained assignment onto the browser global —
+// `Ns = window.Ns = {}`, the spelling a UMD wrapper or a minified bundle emits to claim its
+// global. The chain's RHS is itself an assignment, so namespaceObjectInit has to look
+// through it (the assignment_expression arm); drop the arm and this namespace silently
+// stops existing, so the member assignments that follow keep the plain-store lowering and
+// a dotted call into one terminates at the call site.
+func TestChainedGlobalInitialiserRegistersMemberFunctions(t *testing.T) {
+	g := lowerJSFile(t, `
+Ns = window.Ns = {};
+Ns.consume = function (v) {
+    sink(v);
+};
+Ns.wire = function () {
+    Ns.consume(source());
+};
+`)
+	p := paramOf(g, "consume", "v")
+	arg := callArgOf(g, "Ns.consume", 0)
+	if p == "" {
+		t.Fatal("a member assignment on a chain-initialised namespace did not become a function definition, so the dotted call has no callee body")
+	}
+	if arg == "" {
+		t.Fatal("the namespace member call never lowered")
+	}
+	if !reaches(t, g, arg, p) {
+		t.Fatal("the argument of a dotted call into a chain-initialised namespace did not reach the assigned body's parameter")
+	}
+}
+
+// The typeof guard's ELSE branch builds the namespace too: `if (typeof Ns !== 'undefined')
+// { …keep… } else { Ns = {} }` is the same prologue as the main source's with the polarity
+// flipped, and the alternative arrives wrapped in an else_clause node scanNamespaceBranch
+// has to unwrap (its else_clause arm — the main source pins only the consequence arm).
+// Drop the arm and the else-built namespace silently stops existing.
+func TestGuardedNamespaceInitialiserInElseBranchRegistersMemberFunctions(t *testing.T) {
+	g := lowerJSFile(t, `
+if (typeof Ns !== 'undefined') {
+    Ns.kept = true;
+} else {
+    Ns = {};
+}
+Ns.consume = function (v) {
+    sink(v);
+};
+Ns.wire = function () {
+    Ns.consume(source());
+};
+`)
+	p := paramOf(g, "consume", "v")
+	arg := callArgOf(g, "Ns.consume", 0)
+	if p == "" {
+		t.Fatal("a member assignment on an else-built namespace did not become a function definition, so the dotted call has no callee body")
+	}
+	if arg == "" {
+		t.Fatal("the namespace member call never lowered")
+	}
+	if !reaches(t, g, arg, p) {
+		t.Fatal("the argument of a dotted call into an else-built namespace did not reach the assigned body's parameter")
+	}
+}
