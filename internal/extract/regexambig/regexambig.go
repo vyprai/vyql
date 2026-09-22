@@ -178,13 +178,16 @@ func regexClassSet(body string) regexCharSet {
 // regexAtom is one element of a regex sequence: what it can match, how often, and
 // — for a group — the source of its body so the analysis can descend.
 type regexAtom struct {
-	set      regexCharSet
-	quant    byte // 0, '?', '*' or '+'
-	bounded  bool // the quantifier carries a finite ceiling, as `{3}` or `{2,5}` do
-	group    bool
-	body     string
-	look     byte // 0, '=' for a positive lookaround, '!' for a negative one
-	nullable bool
+	set        regexCharSet
+	quant      byte // 0, '?', '*' or '+'
+	bounded    bool // the quantifier carries a finite ceiling, as `{3}` or `{2,5}` do
+	group      bool
+	atomic     bool // an (?>…) group: the engine never re-enters it once matched
+	possessive bool // a quantifier with a trailing `+`; the atom cannot give back what it matched
+	complement bool // the set came from a negated class [...], whose alphabet is the whole input minus a few exclusions
+	body       string
+	look       byte // 0, '=' for a positive lookaround, '!' for a negative one
+	nullable   bool
 }
 
 // regexRun is the run of input one atom hands its neighbour: the alphabet it
@@ -197,31 +200,34 @@ type regexRun struct {
 }
 
 // regexGroupInner strips a group's leading construct marker and reports whether
-// the group is a lookaround, which matches without consuming input.
-func regexGroupInner(inner string) (string, byte) {
+// the group is a lookaround, which matches without consuming input, and whether
+// it is atomic, which the engine never re-enters once it has matched.
+func regexGroupInner(inner string) (string, byte, bool) {
 	switch {
+	case strings.HasPrefix(inner, "?>"): // atomic group: the fix shape of CVE-2021-32740
+		return inner[2:], 0, true
 	case strings.HasPrefix(inner, "?:"):
-		return inner[2:], 0
+		return inner[2:], 0, false
 	case strings.HasPrefix(inner, "?="):
-		return inner[2:], '='
+		return inner[2:], '=', false
 	case strings.HasPrefix(inner, "?!"):
-		return inner[2:], '!'
+		return inner[2:], '!', false
 	case strings.HasPrefix(inner, "?<="):
-		return inner[3:], '='
+		return inner[3:], '=', false
 	case strings.HasPrefix(inner, "?<!"):
-		return inner[3:], '!'
+		return inner[3:], '!', false
 	case strings.HasPrefix(inner, "?P<"): // Python named group
 		if close := strings.IndexByte(inner, '>'); close >= 0 {
-			return inner[close+1:], 0
+			return inner[close+1:], 0, false
 		}
 	case strings.HasPrefix(inner, "?P="): // Python named backreference
-		return "", 0
+		return "", 0, false
 	case strings.HasPrefix(inner, "?<"):
 		if close := strings.IndexByte(inner, '>'); close >= 0 {
-			return inner[close+1:], 0
+			return inner[close+1:], 0, false
 		}
 	}
-	return inner, 0
+	return inner, 0, false
 }
 
 // regexAtomsOf splits one alternation branch into its atoms, left to right.
@@ -242,7 +248,11 @@ func regexAtomsOf(seq string, depth int) []regexAtom {
 				i++
 				continue
 			}
-			a.set = regexClassSet(seq[i+1 : end])
+			cls := seq[i+1 : end]
+			if strings.HasPrefix(cls, "^") {
+				a.complement = true
+			}
+			a.set = regexClassSet(cls)
 			i = end + 1
 		case seq[i] == '(':
 			end := regexGroupEnd(seq, i)
@@ -251,7 +261,7 @@ func regexAtomsOf(seq string, depth int) []regexAtom {
 				continue
 			}
 			a.group = true
-			a.body, a.look = regexGroupInner(seq[i+1 : end])
+			a.body, a.look, a.atomic = regexGroupInner(seq[i+1 : end])
 			i = end + 1
 		case seq[i] == '.':
 			a.set = regexAnySet()
@@ -264,15 +274,21 @@ func regexAtomsOf(seq string, depth int) []regexAtom {
 			i++
 		}
 		quant, next, bounded := jsRegexQuantifier(seq, i)
+		possessive := false
 		if quant != 0 && next < len(seq) {
 			switch seq[next] {
 			case '?': // lazy: still backtracks, just from the other end
 				next++
 			case '+': // possessive: cannot give back what it matched
-				quant, next = 0, next+1
+				quant, next, possessive = 0, next+1, true
 			}
 		}
-		a.quant, a.bounded, i = quant, bounded, next
+		if a.atomic && quant != 0 {
+			// An atomic group cannot give back what it matched either, so a
+			// quantifier over it iterates without ever re-splitting its content.
+			quant = 0
+		}
+		a.quant, a.bounded, a.possessive, i = quant, bounded, possessive, next
 		a.nullable = quant == '*' || quant == '?'
 		if a.group {
 			var bodyNullable bool
@@ -346,14 +362,18 @@ func regexAltHasAmbiguousRepeatStrand(alt string, depth int, strandAfter bool) b
 			return true
 		}
 		for k, a := range atoms {
-			if !a.group {
-				continue
+			if !a.group || a.atomic {
+				continue // an atomic group's interior is never re-entered, so it holds no ambiguity to retry
 			}
 			if isBacktrackingRepeat(a.quant) && regexBodyHasRepeat(a.body) &&
 				!regexLoopBodyDisambiguated(a.body, depth+1) {
 				return true
 			}
-			strand := regexSeqHasMandatoryFollower(atoms, k+1) ||
+			// strandAfter is carried in, not replaced: the nullable material that
+			// follows this group does not disconnect the group's interior from the
+			// failure that strands the enclosing sequence, so a division the body's
+			// own pairs make is retried under that failure too.
+			strand := strandAfter || regexSeqHasMandatoryFollower(atoms, k+1) ||
 				(k == len(atoms)-1 && endsAnchored)
 			if regexAltHasAmbiguousRepeatStrand(a.body, depth+1, strand) {
 				return true
@@ -376,11 +396,20 @@ func regexEndsInDollarAnchor(branch string) bool {
 // A quantifier character inside a [...] class is a literal member of that class,
 // not a quantifier, so class spans are skipped: `([a-z+])+` iterates over one
 // character from a fixed set — the class's own `+` does not make it explode.
+// An atomic group's span is skipped for the same reason from the outside: the
+// engine never re-enters it, so whatever repeats inside it is not a repeat the
+// enclosing loop can re-split.
 func regexBodyHasRepeat(body string) bool {
 	for i := 0; i < len(body); i++ {
 		if body[i] == '[' && !isEscaped(body, i) {
 			if end := regexCharClassEnd(body, i); end > i {
 				i = end // a class holds literals; its members cannot quantify
+			}
+			continue
+		}
+		if strings.HasPrefix(body[i:], "(?>") && !isEscaped(body, i) {
+			if end := regexGroupEnd(body, i); end > i {
+				i = end // an atomic group walls its interior off from backtracking
 			}
 			continue
 		}
@@ -617,16 +646,14 @@ func isBacktrackingRepeat(q byte) bool {
 }
 
 // regexBodyHasLiteralSeparator reports a mandatory single-character literal in the
-// body that none of its repeated atoms can match. Such a character can only come
-// from that position, so each iteration is delimited and the repeat is unambiguous.
+// body that no repeat anywhere in it can match — the repeat's own atoms or one
+// nested inside a group, which the loop re-splits just as freely. Such a
+// character can only come from that position, so each iteration is delimited and
+// the repeat is unambiguous.
 func regexBodyHasLiteralSeparator(body string, depth int) bool {
 	atoms := regexAtomsOf(body, depth+1)
 	var repeats regexCharSet
-	for _, a := range atoms {
-		if a.look == 0 && isBacktrackingRepeat(a.quant) {
-			repeats.union(a.set)
-		}
-	}
+	regexCollectRepeatAlphabet(atoms, depth+1, &repeats)
 	if repeats.empty() {
 		return false
 	}
@@ -639,6 +666,31 @@ func regexBodyHasLiteralSeparator(body string, depth int) bool {
 		}
 	}
 	return false
+}
+
+// regexCollectRepeatAlphabet accumulates the alphabet every repeat in the
+// sequence can consume, repeats nested inside group bodies included: a separator
+// none of the body's own atoms can match may still be swallowable by a repeat
+// buried in a group, and then the iteration boundary is not forced. Lookarounds
+// consume nothing, so they contribute no alphabet.
+func regexCollectRepeatAlphabet(atoms []regexAtom, depth int, into *regexCharSet) {
+	if depth > regexAnalysisMaxDepth {
+		*into = regexAnySet()
+		return
+	}
+	for _, a := range atoms {
+		if a.look != 0 {
+			continue
+		}
+		if isBacktrackingRepeat(a.quant) {
+			into.union(a.set)
+		}
+		if a.group {
+			for _, branch := range splitTopLevelRegexBranches(a.body) {
+				regexCollectRepeatAlphabet(regexAtomsOf(branch, depth+1), depth+1, into)
+			}
+		}
+	}
 }
 
 // regexSetSize counts the members of a character set.
@@ -714,7 +766,7 @@ func regexAtomsStartWithRepeat(atoms []regexAtom, c regexCharSet, depth int) boo
 		if !a.group && isBacktrackingRepeat(a.quant) && !isUniversalCharSet(a.set) && a.set.intersects(c) {
 			return true
 		}
-		if a.group && a.quant == 0 && regexAltStartsWithRepeat(a.body, c, depth+1) {
+		if a.group && !a.atomic && a.quant == 0 && regexAltStartsWithRepeat(a.body, c, depth+1) {
 			return true
 		}
 		if !a.nullable {
@@ -752,6 +804,12 @@ func isUniversalCharSet(s regexCharSet) bool {
 // to itself, because which branch runs is the run-split report's business and it
 // already declines to read one out of a group head (`\s*(?:\s+|x\d+)` stays
 // ordinary). A lookaround consumes nothing, so it is neither a run nor a separator.
+//
+// The pair does not have to be naked: mandatory material the first run can absorb
+// is walked through, and the second consumer beyond it still divides the same run.
+// What the walk carries has to sit in the alphabet BOTH runs share — see
+// regexSlidMaterialSitsInTheSharedRun — and a possessive atom stops it, since it
+// gives back nothing for the second consumer to compete for.
 func regexAdjacentOverlap(atoms []regexAtom, depth int, strandAfter bool) bool {
 	for i, a := range atoms {
 		if a.look != 0 {
@@ -761,6 +819,17 @@ func regexAdjacentOverlap(atoms []regexAtom, depth int, strandAfter bool) bool {
 		if !ok || run.bounded || isUniversalCharSet(run.set) {
 			continue
 		}
+		if a.complement {
+			// A negated class admits nearly every character, so "the separator
+			// sits in the alphabet both runs share" is vacuously true for it:
+			// the shared-alphabet test cannot tell a slid division from a pinned
+			// one, and reading it as slid reports the canonical safe idiom of a
+			// wide negated run, a literal separator and another negated run
+			// (email matching: [^@\s]+@[^@\s]+\.[^@\s]+) as catastrophic. The
+			// slide is only a signal for runs whose alphabet was spelled out.
+			continue
+		}
+		var slid []regexAtom // mandatory material the run absorbs, walked through
 		for j := i + 1; j < len(atoms); j++ {
 			b := atoms[j]
 			if b.look != 0 {
@@ -775,16 +844,53 @@ func regexAdjacentOverlap(atoms []regexAtom, depth int, strandAfter bool) bool {
 				// The enclosing sequence can strand the division too: a group
 				// body whose group is followed by a mandatory atom divides
 				// under failure even though the body itself ends on the pair.
-				if strandAfter || regexSeqHasMandatoryFollower(atoms, j+1) {
+				if regexSlidMaterialSitsInTheSharedRun(slid, run.set, next.set) &&
+					(strandAfter || regexSeqHasMandatoryFollower(atoms, j+1)) {
 					return true
 				}
 			}
-			if b.group || !b.nullable {
-				break // a group boundary, or mandatory material, pins the division
+			if b.group {
+				break // a group boundary pins the division
 			}
+			if !b.nullable {
+				if b.possessive || !b.set.subsetOf(run.set) {
+					// A possessive atom keeps what it took, so it donates no
+					// characters a later consumer could compete for; material
+					// the run cannot absorb pins the division just the same.
+					break
+				}
+				slid = append(slid, b)
+			}
+			// Mandatory material the run can itself absorb pins nothing: the run
+			// donates the characters to it, the division slides through, and a
+			// second consumer past it still competes for the same run. That is
+			// the semver prerelease identifier — `[\da-z-]*[a-z-][\da-z-]*`, a
+			// mandatory member flanked by two runs over the same characters —
+			// where the member's position, not a separator, is the free choice
+			// each iteration multiplies.
 		}
 	}
 	return false
+}
+
+// regexSlidMaterialSitsInTheSharedRun reports whether the mandatory material
+// walked through between the two runs is matchable within the alphabet BOTH of
+// them consume. A division slides only when the flanking runs can trade the
+// material's characters between them — the semver identifier's member `[a-z-]`
+// sits inside `[\da-z-]` on both sides, so either run can donate its character
+// and the member's place is the free choice each iteration multiplies. Material
+// outside one run's alphabet does not slide: only one placement of it can
+// match, the division is pinned there, and the engine's retries walk the input
+// linearly instead of re-splitting it. The domain run before a TLD class that
+// excludes the dot is the shape — the class admits the separator but the run
+// after it does not, so the boundary is forced.
+func regexSlidMaterialSitsInTheSharedRun(slid []regexAtom, a, b regexCharSet) bool {
+	for _, m := range slid {
+		if !m.set.subsetOf(a) || !m.set.subsetOf(b) {
+			return false
+		}
+	}
+	return true
 }
 
 // regexSeqMandatoryFollower reports a mandatory atom at or after index i: one the
@@ -805,12 +911,16 @@ func regexSeqHasMandatoryFollower(atoms []regexAtom, from int) bool {
 
 // regexHeadRepeatSet returns the run an atom starts with when that first consumer
 // is a backtracking repeat, and whether it has one. A plain atom is its own run; a
-// plain grouping is read through.
+// plain grouping is read through. An atomic group is a wall, not a window: its
+// interior cannot be re-split, so it is never the run a division competes for.
 func regexHeadRepeatSet(a regexAtom, depth int) (regexRun, bool) {
 	if !a.group {
 		if isBacktrackingRepeat(a.quant) {
 			return regexRun{set: a.set, bounded: a.bounded}, true
 		}
+		return regexRun{}, false
+	}
+	if a.atomic {
 		return regexRun{}, false
 	}
 	return regexSeqHeadRepeat(regexGroupBranchAtoms(a.body, depth), depth+1)
@@ -819,12 +929,15 @@ func regexHeadRepeatSet(a regexAtom, depth int) (regexRun, bool) {
 // regexTailRepeatSet is regexHeadRepeatSet read from the other end: the run an atom
 // finishes with, when that last consumer is a backtracking repeat. It is what lets
 // `[^\s;]+` inside `([^\/\s]+\/[^\s;]+)` be seen as the run the following `(.*)?`
-// competes with.
+// competes with. An atomic group walls its interior off the same way.
 func regexTailRepeatSet(a regexAtom, depth int) (regexRun, bool) {
 	if !a.group {
 		if isBacktrackingRepeat(a.quant) {
 			return regexRun{set: a.set, bounded: a.bounded}, true
 		}
+		return regexRun{}, false
+	}
+	if a.atomic {
 		return regexRun{}, false
 	}
 	return regexSeqTailRepeat(regexGroupBranchAtoms(a.body, depth), depth+1)
