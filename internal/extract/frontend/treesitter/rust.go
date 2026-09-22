@@ -139,6 +139,7 @@ func (c *rsConv) stmtH(n *tree_sitter.Node, attrs []string) []nir.Stmt {
 		body := c.block(c.field(n, "body"))
 		c.implHeaderType, c.implHeaderTrait = outerType, outerTrait
 		body = append(body, c.rsFunctionContext(n)...)
+		body = append(body, c.rsDeclaredTypeEvent(n)...)
 		body = append(body, c.rsTypeErasureMetadata(n)...)
 		body = append(body, c.rsRefcountedConversionMetadata(n)...)
 		exported := false
@@ -1277,9 +1278,6 @@ func (c *rsConv) rsFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
 	if abi := c.rsExternAbi(fn); abi != "" {
 		args = append(args, nir.Const{Loc: loc, Value: "abi=" + abi})
 	}
-	for _, tok := range c.rsDeclaredTypeTokens(fn) {
-		args = append(args, nir.Const{Loc: loc, Value: tok})
-	}
 	for _, tok := range c.rsStructuredContextTokens(body) {
 		args = append(args, nir.Const{Loc: loc, Value: tok})
 	}
@@ -1320,6 +1318,42 @@ func (c *rsConv) rsExternAbi(fn *tree_sitter.Node) string {
 		}
 	}
 	return ""
+}
+
+// rsDeclaredTypeEvent lowers a function's declaration types to their own
+// analysis.rust.signature presence node, separate from the
+// analysis.function.context event the body feeds.
+//
+// The separation is not cosmetic. A Rust type is full of angle brackets, and
+// shipped bindings use a bare `<` or `>` in the function context's tokens as
+// the carrier of "a comparison exists in this body" -- the bounds check an
+// Index impl owes its contract has no structured token, so the character is
+// the only witness (bindings/rust/index_operator_without_bounds_check.vyql).
+// Declaration types on that node would satisfy the negation for every generic
+// impl in the corpus and unfire the check. On their own node the types reach
+// the data layer without rewriting what any body-scoped predicate reads, the
+// same way delegated `callee:` facts stay keyed apart from a function's own.
+func (c *rsConv) rsDeclaredTypeEvent(fn *tree_sitter.Node) []nir.Stmt {
+	tokens := c.rsDeclaredTypeTokens(fn)
+	if len(tokens) == 0 {
+		return nil
+	}
+	loc := c.loc(fn)
+	path := "analysis.rust.signature"
+	args := []nir.Expr{
+		nir.Const{Loc: loc, Value: "lang=rust"},
+		nir.Const{Loc: loc, Value: "name=" + c.text(c.field(fn, "name"))},
+	}
+	for _, tok := range tokens {
+		args = append(args, nir.Const{Loc: loc, Value: tok})
+	}
+	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: path, Loc: loc},
+		Args:   args,
+		Path:   path,
+		Method: "signature",
+		Loc:    loc,
+	}}}
 }
 
 // rsDeclaredTypeTokens records what a function's declaration itself says about
