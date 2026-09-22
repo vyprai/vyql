@@ -2,6 +2,7 @@ package treesitter
 
 import (
 	"bytes"
+	"sort"
 	"strings"
 
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
@@ -31,6 +32,14 @@ type rsConv struct {
 	// attribution (rsDelegatedContextTokens).
 	siblings    map[string]*tree_sitter.Node
 	calleeFacts map[string][]string
+	// commandGates holds the string members of every compile-time string-array
+	// const and static the file declares (name -> members), and
+	// rootSubcommands holds the command names the clap subcommand enum a
+	// #[derive(Parser)] struct in this file reaches through a
+	// #[command(subcommand)] field declares. Together they pair a gate array
+	// with the commands it could omit (rsCommandGateTokens).
+	commandGates    map[string][]string
+	rootSubcommands []string
 }
 
 // rsFormatMacros build a string from their arguments (taint-propagating).
@@ -50,6 +59,7 @@ func ExtractRust(files []string, root string) (nir.Program, error) {
 		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
 			c := &rsConv{src: src, file: rel, key: moduleKey(root, abs, ".rs")}
 			c.rsCollectRefcountDrops(tree.RootNode())
+			c.commandGates, c.rootSubcommands = c.rsCollectCommandGates(tree.RootNode())
 			c.siblings = c.rsSiblingFunctionBodies(tree.RootNode())
 			c.calleeFacts = map[string][]string{}
 			return nir.Module{Key: c.key, File: rel, Body: c.decls(tree.RootNode())}, true
@@ -416,6 +426,287 @@ func rsDeriveTokens(raw string) []string {
 		}
 	}
 	return out
+}
+
+// Bounds on the command-gate pairing. A string array longer than
+// rsCommandGateMemberLimit is data, not a command-name gate, and an enum past
+// rsCommandGateSubcommandLimit stops contributing names, so one giant enum
+// cannot swell the context of every function that mentions the array.
+const (
+	rsCommandGateMemberLimit = 64
+	rsCommandGateSubcmdLimit = 128
+	rsCommandGateTokenLimit  = 384
+)
+
+// rsCollectCommandGates walks the file's items once and collects the two halves
+// of the command-gate pairing: the string members of every compile-time
+// string-array const and static the file declares, and the command names the
+// clap subcommand enum a #[derive(Parser)] struct in this file reaches through
+// a #[command(subcommand)] field declares. Only the enum the parser struct
+// names counts -- a binary's own command set -- so the nested enums a variant's
+// own #[command(subcommand)] field introduces stay out of the pairing. Both
+// halves are read from this file alone: extraction is content-addressed per
+// file, so a fact derived from another file's schema would be cached under this
+// file's key and go stale when only that file changed.
+func (c *rsConv) rsCollectCommandGates(root *tree_sitter.Node) (map[string][]string, []string) {
+	gates := map[string][]string{}
+	type subcommandEnum struct {
+		name     string
+		commands []string
+	}
+	var enums []subcommandEnum
+	byName := map[string]int{}
+	var parserEnums []string
+	var walkItems func(n *tree_sitter.Node)
+	walkItems = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		var pending []string // compact attribute texts preceding the next item
+		for _, ch := range c.namedChildren(n) {
+			kind := c.kind(ch)
+			if kind == "attribute_item" {
+				pending = append(pending, rustCompactText(c.text(ch)))
+				continue
+			}
+			if kind == "line_comment" {
+				continue
+			}
+			switch kind {
+			case "const_item", "static_item":
+				name := c.text(orSelf(c.field(ch, "name"), ch))
+				if members := c.rsStringArrayMembers(c.field(ch, "value")); name != "" && len(members) > 0 {
+					gates[name] = members
+				}
+			case "struct_item":
+				if !rsAttrsDerive(pending, "Parser") {
+					break
+				}
+				// A #[command(subcommand)] field names the enum this struct
+				// dispatches to -- the file's own command set.
+				var fields []string
+				for _, fd := range c.namedChildren(orSelf(c.field(ch, "body"), ch)) {
+					switch c.kind(fd) {
+					case "attribute_item":
+						fields = append(fields, rustCompactText(c.text(fd)))
+					case "field_declaration":
+						if !rsAttrsCommandSubcommand(fields) {
+							fields = nil
+							continue
+						}
+						if typ := c.field(fd, "type"); typ != nil && c.kind(typ) == "type_identifier" {
+							parserEnums = append(parserEnums, c.text(typ))
+						}
+						fields = nil
+					default:
+						fields = nil
+					}
+				}
+			case "enum_item":
+				if !rsAttrsDerive(pending, "Subcommand") {
+					break
+				}
+				name := c.text(orSelf(c.field(ch, "name"), ch))
+				e := subcommandEnum{name: name}
+				var variantAttrs []string
+				for _, vr := range c.namedChildren(orSelf(c.field(ch, "body"), ch)) {
+					switch c.kind(vr) {
+					case "attribute_item":
+						variantAttrs = append(variantAttrs, rustCompactText(c.text(vr)))
+					case "enum_variant":
+						if len(e.commands) < rsCommandGateSubcmdLimit {
+							e.commands = append(e.commands, rsVariantCommandName(c.text(orSelf(c.field(vr, "name"), vr)), variantAttrs))
+						}
+						variantAttrs = nil
+					default:
+						variantAttrs = nil
+					}
+				}
+				if _, dup := byName[name]; !dup && name != "" {
+					byName[name] = len(enums)
+					enums = append(enums, e)
+				}
+			case "mod_item":
+				walkItems(c.field(ch, "body"))
+			}
+			pending = nil
+		}
+	}
+	walkItems(root)
+	var subcommands []string
+	for _, name := range parserEnums {
+		if i, ok := byName[name]; ok {
+			subcommands = append(subcommands, enums[i].commands...)
+		}
+	}
+	return gates, subcommands
+}
+
+// rsStringArrayMembers returns the unquoted members of a `[…]`/`&[…]` literal
+// whose elements are all string literals, and nil for anything else: an array
+// with a computed element is not a compile-time command-name array.
+func (c *rsConv) rsStringArrayMembers(v *tree_sitter.Node) []string {
+	if v == nil {
+		return nil
+	}
+	if c.kind(v) == "reference_expression" {
+		v = orSelf(c.field(v, "value"), v)
+	}
+	if v == nil || c.kind(v) != "array_expression" {
+		return nil
+	}
+	var out []string
+	for _, ch := range c.namedChildren(v) {
+		if c.kind(ch) == "line_comment" {
+			continue
+		}
+		if c.kind(ch) != "string_literal" || len(out) >= rsCommandGateMemberLimit {
+			return nil
+		}
+		out = append(out, strings.Trim(rustStringValue(c.text(ch)), `"`))
+	}
+	return out
+}
+
+// rsAttrsDerive reports whether any of an item's preceding attribute texts
+// carries the named #[derive(...)] trait.
+func rsAttrsDerive(attrs []string, trait string) bool {
+	for _, a := range attrs {
+		for _, tok := range rsDeriveTokens(a) {
+			if tok == "derive:"+trait {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// rsAttrsCommandSubcommand reports whether any attribute text is clap's
+// #[command(subcommand)] spelling.
+func rsAttrsCommandSubcommand(attrs []string) bool {
+	for _, a := range attrs {
+		if a == "#[command(subcommand)]" || strings.HasPrefix(a, "#[command(subcommand,") {
+			return true
+		}
+	}
+	return false
+}
+
+// rsVariantCommandName spells an enum variant the way the subcommand derive
+// names its command: an explicit #[command(name = "…")] wins, and otherwise the
+// variant identifier's kebab-case form (the derive's documented default).
+func rsVariantCommandName(variant string, attrs []string) string {
+	for _, a := range attrs {
+		rest, ok := strings.CutPrefix(a, "#[command(name=")
+		if !ok || !strings.HasSuffix(rest, ")]") {
+			continue
+		}
+		rest = strings.TrimSuffix(rest, ")]")
+		if len(rest) >= 2 && rest[0] == '"' && rest[len(rest)-1] == '"' && rest[1:len(rest)-1] != "" {
+			return rest[1 : len(rest)-1]
+		}
+	}
+	return rustKebabCase(variant)
+}
+
+// rustKebabCase inserts a dash at each word boundary of a camel- or
+// Pascal-case identifier and lowercases it: before an uppercase rune that
+// follows a lowercase rune or digit, or that ends an acronym run followed by a
+// lowercase rune. Runes outside ASCII pass through unchanged.
+func rustKebabCase(name string) string {
+	var b strings.Builder
+	b.Grow(len(name) + 4)
+	runes := []rune(name)
+	for i, r := range runes {
+		if r >= 'A' && r <= 'Z' && i > 0 {
+			prev := runes[i-1]
+			next := rune(0)
+			if i+1 < len(runes) {
+				next = runes[i+1]
+			}
+			lower := func(x rune) bool { return x >= 'a' && x <= 'z' }
+			digit := func(x rune) bool { return x >= '0' && x <= '9' }
+			upper := func(x rune) bool { return x >= 'A' && x <= 'Z' }
+			if lower(prev) || digit(prev) || (upper(prev) && lower(next)) {
+				b.WriteByte('-')
+			}
+		}
+		if r >= 'A' && r <= 'Z' {
+			r += 'a' - 'A'
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
+// rsCommandGateTokens pairs each compile-time command-name array this function
+// references with the commands the file's root clap subcommand enum declares:
+// the array's own entries, the declared commands, and the declared commands the
+// array omits. The omission is stated, not judged -- whether an omitted command
+// should have been gated is a rule's decision.
+func (c *rsConv) rsCommandGateTokens(body *tree_sitter.Node) []string {
+	if len(c.commandGates) == 0 || len(c.rootSubcommands) == 0 {
+		return nil
+	}
+	referenced := c.rsReferencedGateNames(body)
+	if len(referenced) == 0 {
+		return nil
+	}
+	seen := map[string]bool{}
+	var out []string
+	add := func(tok string) {
+		if tok == "" || seen[tok] || len(out) >= rsCommandGateTokenLimit {
+			return
+		}
+		seen[tok] = true
+		out = append(out, tok)
+	}
+	for _, name := range referenced {
+		gated := map[string]bool{}
+		for _, m := range c.commandGates[name] {
+			gated[m] = true
+		}
+		add("gate_array:" + name)
+		for _, m := range c.commandGates[name] {
+			add("gate_entry:" + m)
+		}
+		for _, sc := range c.rootSubcommands {
+			add("gate_subcommand:" + sc)
+			if !gated[sc] {
+				add("gate_omission:" + sc)
+			}
+		}
+	}
+	return out
+}
+
+// rsReferencedGateNames returns, sorted, the gate arrays whose names appear as
+// identifiers in the body -- the arrays this function reads.
+func (c *rsConv) rsReferencedGateNames(body *tree_sitter.Node) []string {
+	remaining := make(map[string]bool, len(c.commandGates))
+	for name := range c.commandGates {
+		remaining[name] = true
+	}
+	var found []string
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil || len(remaining) == 0 {
+			return
+		}
+		if c.kind(n) == "identifier" {
+			if remaining[c.text(n)] {
+				delete(remaining, c.text(n))
+				found = append(found, c.text(n))
+			}
+			return
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(body)
+	sort.Strings(found)
+	return found
 }
 
 func rsSerdeTokens(raw string) []string {
@@ -1279,6 +1570,9 @@ func (c *rsConv) rsFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
 		args = append(args, nir.Const{Loc: loc, Value: "abi=" + abi})
 	}
 	for _, tok := range c.rsStructuredContextTokens(body) {
+		args = append(args, nir.Const{Loc: loc, Value: tok})
+	}
+	for _, tok := range c.rsCommandGateTokens(body) {
 		args = append(args, nir.Const{Loc: loc, Value: tok})
 	}
 	for _, tok := range c.rsDelegatedContextTokens(fn, body) {

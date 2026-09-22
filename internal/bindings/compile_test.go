@@ -1908,6 +1908,40 @@ binding contextFields {
 	}
 }
 
+// The Rust command-gate pairing reaches a rule through four context fields:
+// which compile-time command-name array the function gates with, what that
+// array lists, which commands the binary's clap subcommand enum declares, and
+// which of those declared commands the array omits. Each keeps its own prefix,
+// so an omission cannot answer for an entry and a declared command cannot
+// answer for a gated one.
+func TestV2PresenceNodeCommandGateContextFields(t *testing.T) {
+	sets, err := compileV2BindingsForTest(`
+module bindings.rust.native;
+binding fallbackGateOmitsSubcommand {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.gateArray contains "RTK_META_COMMANDS" and node.context.gateEntry contains "verify" and node.context.gateSubcommand contains "trust" and node.context.gateOmission contains "trust"
+  emit issue code.UnqualifiedExecutableDiscovery at node
+}
+`)
+	if err != nil {
+		t.Fatalf("parser.ParseV2Definitions: %v", err)
+	}
+	flag := sets[0].Mappings[0].Flag
+	if flag.Scope != "function" || len(flag.Predicates) != 5 {
+		t.Fatalf("flag predicates wrong: %+v", flag)
+	}
+	want := []struct{ field, value string }{
+		{"gate_array:", "gate_array:RTK_META_COMMANDS"},
+		{"gate_entry:", "gate_entry:verify"},
+		{"gate_subcommand:", "gate_subcommand:trust"},
+		{"gate_omission:", "gate_omission:trust"},
+	}
+	for i, w := range want {
+		if got := flag.Predicates[i+1]; got.Property != "tokens" || got.Op != "contains" || got.Values[0] != w.value {
+			t.Fatalf("%s predicate wrong: got %+v, want value %q", w.field, got, w.value)
+		}
+	}
+}
+
 // The C/C++ index observation reports the bound its guard was credited from,
 // which side of the access that comparison stands on, and the field access a
 // locally held index was computed from. A rule separating a guarded access
