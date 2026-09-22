@@ -98,6 +98,13 @@ func (c *rbConv) rbBindParamLocals(n *tree_sitter.Node, set map[string]bool) {
 			set[c.text(ch)] = true
 		case "left_assignment_list":
 			c.rbBindTarget(ch, set)
+		case "destructured_parameter":
+			// |builder, (name, argument)| binds the inner names too (see
+			// paramIdentifiers); a local they are not is lowered as an implicit
+			// call, which strands the taint the block's join gave them.
+			for _, id := range c.paramIdentifiers(ch) {
+				set[id] = true
+			}
 		default:
 			if nm := c.field(ch, "name"); nm != nil {
 				set[c.text(nm)] = true
