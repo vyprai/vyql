@@ -111,13 +111,22 @@ type plConv struct {
 }
 
 // ExtractPerl parses .pl/.pm/.cgi files into one NIR Program.
+//
+// Every parse carries the resident-memory bound: this is the grammar measured
+// to outrun the file it reads — prose peaked near 6GB per 338KB, and a 217KB
+// core module at 3.7GB — so a claimed file whose parse would cross the scan's
+// stop is halted and declined rather than ending the scan it is part of. The
+// file yields no module, exactly as a file that cannot be read does; the claim
+// itself still counts it, so the scan's coverage says it was there.
 func ExtractPerl(files []string, root string) (nir.Program, error) {
-	mods := parseModules(files, root,
+	mods := parseModulesBounded(files, root,
 		func() *tree_sitter.Parser {
 			p := tree_sitter.NewParser()
 			_ = p.SetLanguage(tree_sitter.NewLanguage(pl.Language()))
 			return p
 		},
+		nil,
+		boundParse,
 		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
 			c := &plConv{src: src, file: rel, key: moduleKey(root, abs, ".pl")}
 			return nir.Module{Key: c.key, File: rel, Body: c.block(tree.RootNode())}, true

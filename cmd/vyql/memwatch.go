@@ -7,6 +7,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/vyprai/vyql/internal/extract/frontend/treesitter"
 )
 
 const memoryWatchInterval = 100 * time.Millisecond
@@ -93,6 +95,12 @@ func memWatch(limit int64, every time.Duration, resident func() int64, onExceed 
 // ends with the standard "could not complete" status, after the cleanups have
 // run, so an interrupted graph store does not survive the failure.
 //
+// It also publishes the same stop to the parse bound, so a single tree-sitter
+// parse that would cross it is halted and its file declined (see
+// treesitter.SetParseStop) instead of being the parse the whole-process watch
+// stops the scan over — a file that cannot be afforded is a file skipped, not a
+// scan ended with no report.
+//
 // ceiling is how the message names the limit. It is the user's own spelling of
 // -max-ram where there is one, because a message that answers "8GB" with
 // "7.5 GiB" reads like a different number.
@@ -101,7 +109,9 @@ func watchResidentMemory(limit int64, ceiling string) (stop func()) {
 		return func() {}
 	}
 	stopAt := memoryStopThreshold(limit)
-	return memWatch(stopAt, memoryWatchInterval, residentBytes, func(rss int64) {
+	prevParseStop := treesitter.ParseStop()
+	treesitter.SetParseStop(stopAt)
+	watchStop := memWatch(stopAt, memoryWatchInterval, residentBytes, func(rss int64) {
 		fmt.Fprintf(os.Stderr,
 			"vyql: the scan reached %s of resident memory, at the safety threshold below %s; stopping\n"+
 				"      exclude unwanted files with -exclude, or raise the ceiling\n",
@@ -109,6 +119,10 @@ func watchResidentMemory(limit int64, ceiling string) (stop func()) {
 		runCleanups()
 		os.Exit(exitFailed)
 	})
+	return func() {
+		treesitter.SetParseStop(prevParseStop)
+		watchStop()
+	}
 }
 
 // armMemoryWatch starts the resident-memory watch for a scan and returns the func
