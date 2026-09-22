@@ -6931,6 +6931,19 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) ([]*funcInfo, bool)
 				return []*funcInfo{f}, false
 			}
 		}
+		// In Ruby a bare call dispatches on self, so the enclosing class's own method is what
+		// runs and a same-named top-level def — reachable only as Object's last-resort private
+		// — must not capture it. Ruby keys every file to the one module "", so a top-level def
+		// anywhere in the program (a spec's `klass = Class.new(X) do def nm…end end` stub)
+		// sits in that flat namespace and, winning the module-level lookup below, silently
+		// stole calls the class makes to its own private methods. Class first, module second.
+		// Left in today's order for the languages that spell a bare call as a module function
+		// (a Python or JavaScript method call is `self.nm` / `this.nm`, never bare `nm`).
+		if moduleTech(l.curFile) == "ruby" && l.curClass != "" {
+			if f := l.funcQual[l.curModule+"::"+l.curClass+"."+nm]; f != nil {
+				return []*funcInfo{f}, false
+			}
+		}
 		if f := l.funcQual[l.curModule+"::"+nm]; f != nil {
 			return []*funcInfo{f}, false
 		}

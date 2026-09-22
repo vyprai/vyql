@@ -32,6 +32,16 @@ type rbConv struct {
 	// singletonSelf is set while converting the body of a `class << self` block, whose `def`s
 	// declare CLASS-level methods rather than instance methods of the enclosing class.
 	singletonSelf bool
+	// pendingBodies carries the statements of a block attached to a call lowered in
+	// EXPRESSION position (`parser = lambda { |src| … }`, `opts = { k: xs.map { … } }`):
+	// expr() cannot return statements, so call() queues them here and the statement being
+	// built drains them beside itself (see stmt). Statement position drains the same
+	// statements, so the block lowers alike wherever the call sits.
+	pendingBodies []nir.Stmt
+	// blockBodiesDone marks a call node whose block was already queued. A call node can be
+	// lowered twice (`if x = lambda { … }` lowers the assignment's right side once as the
+	// condition's value and once as the bound value); the body must lower once.
+	blockBodiesDone map[uintptr]bool
 }
 
 // ExtractRuby parses Ruby files into one NIR Program (all modules keyed "").
@@ -333,7 +343,23 @@ func rbBranchReturn(stmts []nir.Stmt) []nir.Stmt {
 	return stmts
 }
 
+// stmt lowers one statement and drains beside it whatever blocks its expressions queued:
+// a block attached to a call in expression position (a lambda or proc stored as a value)
+// has no statement position of its own, so its body lowers right after the statement that
+// holds the call. The snapshot keeps a nested statement — an inner body lowered while this
+// one is being built — draining only what its own expressions queued.
 func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
+	saved := c.pendingBodies
+	c.pendingBodies = nil
+	out := c.lowerStmt(n)
+	if len(c.pendingBodies) > 0 {
+		out = append(out, c.pendingBodies...)
+	}
+	c.pendingBodies = saved
+	return out
+}
+
+func (c *rbConv) lowerStmt(n *tree_sitter.Node) []nir.Stmt {
 	L := c.loc(n)
 	switch c.kind(n) {
 	case "method", "singleton_method":
@@ -483,13 +509,12 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		if d := c.rbReflectiveDispatchStmt(n); d != nil {
 			out := []nir.Stmt{d}
 			out = append(out, nir.ExprStmt{Value: c.expr(n)})
-			return append(out, c.callBlockStmts(n)...)
+			return out
 		}
 		// A call may carry a trailing block (`coll.each { |x| sink(x) }`, `lambda { |v| … }`).
-		// The block body was previously dropped, hiding sources/sinks inside it. Emit the call,
-		// then the block body inline (see callBlockStmts).
-		out := []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
-		return append(out, c.callBlockStmts(n)...)
+		// The call lowers here as a statement; the block it carries is lowered by call() and
+		// drained beside this statement, wherever in the expression the call sits.
+		return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
 	case "binary":
 		// `bag[key] << v` appends into a container slot in place. The expression
 		// form keeps the taint-propagating Format, but in statement position that
@@ -1688,6 +1713,12 @@ func (c *rbConv) subshell(n *tree_sitter.Node, L string) nir.Expr {
 }
 
 func (c *rbConv) call(n *tree_sitter.Node, L string) nir.Expr {
+	// A trailing block is not an argument of the call — it is statements beside it. A call
+	// in statement position has always had its block lowered next to it; a call reaching
+	// this spot sits in EXPRESSION position (a lambda or proc stored as a value), so the
+	// block is queued here for the enclosing statement to drain. Without it the sink inside
+	// `parser = lambda { |src| … }` has no node in the graph at all.
+	c.queueBlockBody(n)
 	// `obj.send(:m, a)` runs `obj.m(a)`, and that is the call everything downstream
 	// keys on: resolution looks the method up by name, and a source or sink binding
 	// matches the API the code reaches, which is `m` and not `send`. The dispatch as
@@ -1817,8 +1848,29 @@ func (c *rbConv) callStmtWithExtraArg(n *tree_sitter.Node, extra nir.Expr) []nir
 		return c.stmt(n)
 	}
 	call.Args = append(call.Args, extra)
-	out := []nir.Stmt{nir.ExprStmt{Value: call}}
-	return append(out, c.callBlockStmts(n)...)
+	// This builds the statement directly rather than through stmt, so the block the call
+	// just queued (a heredoc call can carry one like any other) is drained here.
+	out := append([]nir.Stmt{nir.ExprStmt{Value: call}}, c.pendingBodies...)
+	c.pendingBodies = nil
+	return out
+}
+
+// queueBlockBody lowers the body of the block a call carries into the pending window, so
+// the statement being built emits it beside itself. call() reaches every call node in
+// expression position, and stmt() drains the window for a call in statement position, so
+// one call lowers one block body wherever it sits.
+func (c *rbConv) queueBlockBody(n *tree_sitter.Node) {
+	if !c.isRbCallNode(n) {
+		return
+	}
+	if c.blockBodiesDone == nil {
+		c.blockBodiesDone = make(map[uintptr]bool)
+	}
+	if c.blockBodiesDone[n.Id()] {
+		return
+	}
+	c.blockBodiesDone[n.Id()] = true
+	c.pendingBodies = append(c.pendingBodies, c.callBlockStmts(n)...)
 }
 
 // callBlockStmts lowers a trailing block on a call (`recv.each { |x| … }`, `lambda { |v| … }`)
