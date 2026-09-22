@@ -1175,6 +1175,8 @@ func (c *rbConv) expr(n *tree_sitter.Node) nir.Expr {
 		return c.string(n, L)
 	case "heredoc_body", "heredoc_content":
 		return c.string(n, L)
+	case "subshell":
+		return c.subshell(n, L)
 	case "regex":
 		if raw, ok := c.rbRegexText(n); ok && rubyRegexMayBacktrack(raw) {
 			return nir.Call{
@@ -1666,6 +1668,23 @@ func (c *rbConv) string(n *tree_sitter.Node, L string) nir.Expr {
 	}
 	// non-interpolated string: carry the literal text for value-matching (`val "…"`).
 	return nir.Const{Loc: L, Value: c.text(n)}
+}
+
+// subshell lowers a backtick or %x(…) shell-string literal — '`pdfinfo #{file}`' — to
+// the execution it performs: the operator is Kernel's backtick method, which takes the
+// command string and runs it through a shell, returning its stdout. Lowering it as just a
+// string value leaves no node a sink concept can attach to — taint followed into the
+// literal's interpolated parts arrives at a value nothing consumes — so it is lowered as
+// that call, with the literal lowered the way an ordinary string is (its interpolated
+// parts the command Format's parts) as the one argument, args[0] of the execution.
+func (c *rbConv) subshell(n *tree_sitter.Node, L string) nir.Expr {
+	return nir.Call{
+		Callee: nir.Name{ID: "Kernel.`", Loc: L},
+		Args:   []nir.Expr{c.string(n, L)},
+		Path:   "Kernel.`",
+		Method: "`",
+		Loc:    L,
+	}
 }
 
 func (c *rbConv) call(n *tree_sitter.Node, L string) nir.Expr {
