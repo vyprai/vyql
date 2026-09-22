@@ -2013,6 +2013,37 @@ binding delegatedSelector {
 	}
 }
 
+// A value-position `case` is a dispatch that picks a value, and the fact the frontend
+// carries for it pairs the label an arm matches on with the value that arm produces.
+// Both sides have to be nameable: the label alone only says the method dispatches on
+// it, and only the value side says what the dispatch hands back.
+func TestV2PresenceNodeCaseArmContextFields(t *testing.T) {
+	sets, err := compileV2BindingsForTest(`
+module bindings.ruby.native;
+binding readVerbOverride {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName == "action_permission" and containsAny(node.context.caseArm, ["play_roles=view", "multiple_play_roles=view"]) and node.context.caseElse == "super"
+  emit issue code.AuthorizationReview at node
+}
+`)
+	if err != nil {
+		t.Fatalf("parser.ParseV2Definitions: %v", err)
+	}
+	flag := sets[0].Mappings[0].Flag
+	if flag.Scope != "function" || len(flag.Predicates) != 3 {
+		t.Fatalf("flag predicates wrong: %+v", flag)
+	}
+	if got := flag.Predicates[0]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "function_name:action_permission" {
+		t.Fatalf("functionName predicate wrong: %+v", got)
+	}
+	if got := flag.Predicates[1]; got.Property != "tokens" || got.Op != "contains_any" ||
+		got.Values[0] != "case_arm:play_roles=view" || got.Values[1] != "case_arm:multiple_play_roles=view" {
+		t.Fatalf("caseArm predicate wrong: %+v", got)
+	}
+	if got := flag.Predicates[2]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "case_else=super" {
+		t.Fatalf("caseElse predicate wrong: %+v", got)
+	}
+}
+
 func TestV2PresenceNodeBoundaryTextOperators(t *testing.T) {
 	sets, err := compileV2BindingsForTest(`
 module bindings.javascript.native;
