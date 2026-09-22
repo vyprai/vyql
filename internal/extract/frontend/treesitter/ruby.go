@@ -42,6 +42,98 @@ type rbConv struct {
 	// lowered twice (`if x = lambda { … }` lowers the assignment's right side once as the
 	// condition's value and once as the bound value); the body must lower once.
 	blockBodiesDone map[uintptr]bool
+	// locals names the local variables of the scope being converted (see rbScopeLocals).
+	// It is saved and restored around each scope's body the way visibility is, because the
+	// conversion is a depth-first walk of one tree and the scopes nest the same way.
+	locals map[string]bool
+}
+
+// rbScopeLocals collects the names a Ruby scope binds as local variables: its own
+// parameters, every assignment target in the body, block parameters, `for` targets and
+// `rescue => e` exception variables. Ruby binds a local for the WHOLE scope the moment an
+// assignment to it appears anywhere in it — a read that textually precedes the assignment
+// still reads the local, never a method — so the walk is order-free. A nested `def`,
+// `class` or `module` opens a scope of its own and is not descended into.
+func (c *rbConv) rbScopeLocals(params, body *tree_sitter.Node) map[string]bool {
+	set := map[string]bool{}
+	c.rbBindParamLocals(params, set)
+	var bind func(n *tree_sitter.Node)
+	bind = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		switch c.kind(n) {
+		case "method", "singleton_method", "class", "module", "singleton_class":
+			return // a scope of its own, with its own locals
+		case "assignment", "operator_assignment":
+			c.rbBindTarget(c.field(n, "left"), set)
+		case "for":
+			c.rbBindTarget(c.field(n, "pattern"), set)
+		case "exception_variable":
+			for _, ch := range c.namedChildren(n) {
+				c.rbBindTarget(ch, set)
+			}
+		case "method_parameters", "block_parameters", "block_parameter", "parameters",
+			"lambda_parameters", "sub_parameters":
+			c.rbBindParamLocals(n, set)
+		}
+		for _, ch := range c.namedChildren(n) {
+			bind(ch)
+		}
+	}
+	bind(body)
+	return set
+}
+
+// rbBindParamLocals records every name a parameter list binds, including the spellings the
+// callable parameter list (params) leaves out — `**opts` and `&blk` bind locals a bare
+// read of which is a read of the local, not a call.
+func (c *rbConv) rbBindParamLocals(n *tree_sitter.Node, set map[string]bool) {
+	if n == nil {
+		return
+	}
+	for _, ch := range c.namedChildren(n) {
+		switch c.kind(ch) {
+		case "identifier":
+			set[c.text(ch)] = true
+		case "left_assignment_list":
+			c.rbBindTarget(ch, set)
+		case "destructured_parameter":
+			// |builder, (name, argument)| binds the inner names too (see
+			// paramIdentifiers); a local they are not is lowered as an implicit
+			// call, which strands the taint the block's join gave them.
+			for _, id := range c.paramIdentifiers(ch) {
+				set[id] = true
+			}
+		default:
+			if nm := c.field(ch, "name"); nm != nil {
+				set[c.text(nm)] = true
+			}
+		}
+	}
+}
+
+// rbBindTarget records an assignment target's name(s) — a plain name, a `*splat`, or one
+// element of an `a, b = …` list.
+func (c *rbConv) rbBindTarget(n *tree_sitter.Node, set map[string]bool) {
+	if n == nil {
+		return
+	}
+	switch c.kind(n) {
+	case "identifier":
+		set[c.text(n)] = true
+	case "left_assignment_list", "splat_parameter", "rest_assignment":
+		for _, ch := range c.namedChildren(n) {
+			c.rbBindTarget(ch, set)
+		}
+	}
+}
+
+// rbIsLocal reports whether the scope being converted binds name as a local variable.
+// Ruby resolves a bare identifier to the local when the scope has one and to a method call
+// on the implicit receiver when it does not.
+func (c *rbConv) rbIsLocal(name string) bool {
+	return name != "" && c.locals[name]
 }
 
 // ExtractRuby parses Ruby files into one NIR Program (all modules keyed "").
@@ -57,6 +149,9 @@ func ExtractRuby(files []string, root string) (nir.Program, error) {
 	build := func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
 		c := &rbConv{src: src, root: root, file: rel}
 		c.strEnv = c.rbBuildStrEnv(tree.RootNode())
+		// The file's top level is a scope too: a bare identifier there that nothing in it
+		// assigns is as much a method call as one inside a method body.
+		c.locals = c.rbScopeLocals(nil, tree.RootNode())
 		body := append(c.rubyModuleContext(tree.RootNode()), c.blockChildren(tree.RootNode())...)
 		body = append(body, c.regexBacktrackObservations(tree.RootNode())...)
 		return nir.Module{Key: "", File: rel, Body: body}, true
@@ -367,6 +462,12 @@ func (c *rbConv) lowerStmt(n *tree_sitter.Node) []nir.Stmt {
 		name := c.text(c.field(n, "name"))
 		params := c.params(c.field(n, "parameters"))
 		out := c.rubyFunctionContext(n)
+		// The body's own locals — its parameters included — are what tells a bare
+		// identifier in it apart from a method call (see expr).
+		oldLocals := c.locals
+		c.locals = c.rbScopeLocals(c.field(n, "parameters"), body)
+		methodBody := c.rbMethodBody(body)
+		c.locals = oldLocals
 		// `def self.x` is a class-level method, and so is every `def` inside `class << self`.
 		// A class is free to declare an instance method of the same name; the two are
 		// different methods, and the flag is what keeps them apart downstream.
@@ -374,7 +475,7 @@ func (c *rbConv) lowerStmt(n *tree_sitter.Node) []nir.Stmt {
 			Name:         name,
 			Params:       params,
 			ParamEntries: c.rbParamEntries(name, params),
-			Body:         c.rbMethodBody(body),
+			Body:         methodBody,
 			Loc:          L,
 			Exported:     c.rubyExportedMethod(name),
 			Static:       c.kind(n) == "singleton_method" || c.singletonSelf,
@@ -388,7 +489,11 @@ func (c *rbConv) lowerStmt(n *tree_sitter.Node) []nir.Stmt {
 		// a class nested inside `class << self` declares ordinary instance methods of its own
 		oldSingleton := c.singletonSelf
 		c.singletonSelf = false
+		// a class body is a scope with its own locals; a method inside it opens another
+		oldLocals := c.locals
+		c.locals = c.rbScopeLocals(nil, c.field(n, "body"))
 		body := c.body(c.field(n, "body"))
+		c.locals = oldLocals
 		c.singletonSelf = oldSingleton
 		c.visibility = oldVisibility
 		out = append(out, nir.ClassDef{Name: c.text(c.field(n, "name")), Bases: bases, Body: body,
@@ -401,7 +506,11 @@ func (c *rbConv) lowerStmt(n *tree_sitter.Node) []nir.Stmt {
 		// `class << self` reopens the enclosing class's singleton class; `class << obj` reopens
 		// some other object's, which says nothing about the enclosing class's methods.
 		c.singletonSelf = c.kind(c.field(n, "value")) == "self"
+		// a `class << …` body is a scope with its own locals, like any other class body
+		oldLocals := c.locals
+		c.locals = c.rbScopeLocals(nil, c.field(n, "body"))
 		body := c.body(c.field(n, "body"))
+		c.locals = oldLocals
 		c.singletonSelf = oldSingleton
 		c.visibility = oldVisibility
 		return body
@@ -1186,7 +1295,18 @@ func (c *rbConv) expr(n *tree_sitter.Node) nir.Expr {
 	}
 	L := c.loc(n)
 	switch c.kind(n) {
-	case "identifier", "constant", "instance_variable", "global_variable":
+	case "identifier":
+		name := c.text(n)
+		if c.rbIsLocal(name) {
+			return nir.Name{ID: name, Loc: L}
+		}
+		// No local of that name is in scope, so Ruby calls the method of the body it is
+		// written in on the implicit self — the same call `path_info()` spells with
+		// parentheses. Lowering it as a name read instead strands the callee's return
+		// value: nothing at this site carries what the method produced, and the trace
+		// into the assignment reading it dead-ends at the callee's return.
+		return nir.Call{Callee: nir.Name{ID: name, Loc: L}, Path: name, Method: name, Loc: L}
+	case "constant", "instance_variable", "global_variable":
 		return nir.Name{ID: c.text(n), Loc: L}
 	case "nil":
 		return nir.Const{Loc: L}
@@ -1730,6 +1850,25 @@ func (c *rbConv) call(n *tree_sitter.Node, L string) nir.Expr {
 	return c.callAsWritten(n, L)
 }
 
+// rbReceiver lowers the receiver of a member call. A bare identifier stays a name
+// read here even when the scope binds no local of that name — the one position
+// where the paren-less-call lowering (see expr) does not apply. The engine keys
+// its receiver routes on the root's shape: a name root with no recorded type
+// still reaches the unique-method-name fallback, while a call-result receiver
+// deliberately does not (a measured Java cost). The attr_reader spelling has no
+// `def` anywhere, so its call resolves to nothing and no result type exists —
+// lowering `coder.decode(x)` with a call receiver would strand the dispatch on a
+// route that refuses to guess, where the name receiver resolved `decode` through
+// the one method of that name. The value a paren-less call returns still flows at
+// every site that reads it as a value; the receiver root is the one place the
+// name is the machinery the callee is looked up by, not a value being consumed.
+func (c *rbConv) rbReceiver(recv *tree_sitter.Node) nir.Expr {
+	if recv != nil && c.kind(recv) == "identifier" {
+		return nir.Name{ID: c.text(recv), Loc: c.loc(recv)}
+	}
+	return c.expr(recv)
+}
+
 // callAsWritten lowers the call exactly as the source spells it.
 func (c *rbConv) callAsWritten(n *tree_sitter.Node, L string) nir.Expr {
 	recv := c.field(n, "receiver")
@@ -1739,7 +1878,7 @@ func (c *rbConv) callAsWritten(n *tree_sitter.Node, L string) nir.Expr {
 	if recv == nil {
 		callee = nir.Name{ID: orQ(method), Loc: L}
 	} else {
-		callee = nir.Attr{Base: c.expr(recv), Attr: orQ(method), Path: path, Loc: L}
+		callee = nir.Attr{Base: c.rbReceiver(recv), Attr: orQ(method), Path: path, Loc: L}
 	}
 	var args []nir.Expr
 	if al := c.field(n, "arguments"); al != nil {
@@ -1813,7 +1952,7 @@ func (c *rbConv) rbDirectDispatch(n *tree_sitter.Node, L string) (nir.Call, bool
 	path := name
 	if recv := c.field(n, "receiver"); recv != nil {
 		path = c.dotted(recv) + "." + name
-		callee = nir.Attr{Base: c.expr(recv), Attr: name, Path: path, Loc: L}
+		callee = nir.Attr{Base: c.rbReceiver(recv), Attr: name, Path: path, Loc: L}
 	} else {
 		callee = nir.Name{ID: name, Loc: L}
 	}
