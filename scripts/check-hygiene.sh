@@ -32,6 +32,14 @@ echo "== no references to unpublished content =="
 hits="$(grep -rInE '(^|[^a-zA-Z])(plan/|poc/|design/|nomad\.md)' . \
   --exclude-dir=.git --exclude-dir=bin --exclude=check-hygiene.sh 2>/dev/null \
   | grep -v 'designDir' || true)"
+# An interior path component is an upstream repository's own layout (e.g. the
+# LiveHelperChat template tree lhc_web/design/defaulttheme/... cited by a spec
+# fixture), not a reference to this repository's planning notes. Only a citation
+# of a top-level location -- the pattern anchored at the start of the path or of
+# a path fragment after a separator or space -- is unpublished content here; a
+# component preceded by a name segment (design/ preceded by another directory,
+# like defaulttheme/design/ or lhc_web/design/) belongs to the cited repo.
+hits="$(printf '%s\n' "$hits" | grep -vE '^[^:]*:[0-9]+:[^:]*[a-zA-Z0-9_]/(plan|poc|design)/' || true)"
 [ -n "$hits" ] && report "reference to content not in this repository" "$hits"
 
 echo "== no internal module path =="
