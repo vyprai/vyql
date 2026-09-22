@@ -226,6 +226,92 @@ store.run = function (v) {
 	}
 }
 
+// Only load-time statements build the namespace: a member assignment inside a function body
+// writes some runtime object (whatever the namespace holds by the time that function runs),
+// so it keeps the plain member-store lowering. Registering it would give every dotted call
+// that spells the same property a callee body — the noise half of this change, unpinned by
+// the sources above, whose member assignments all sit at module level.
+func TestNamespaceMemberAssignmentInsideAFunctionStaysAStore(t *testing.T) {
+	g := lowerJSFile(t, `
+var Ns = {};
+Ns.late = function (x) {
+    Ns.runtime = function (v) {
+        sink(x);
+        sink(v);
+    };
+};
+`)
+	if _, ok := funcDefNames(g)["runtime"]; ok {
+		t.Fatal("a member assignment inside a function body became a function definition; it writes a runtime object, it does not attach the module's namespace surface")
+	}
+	if _, ok := funcDefNames(g)["late"]; !ok {
+		t.Fatal("the load-time member assignment on the same namespace stopped registering")
+	}
+}
+
+// The guarded initialiser is a namespace too: `var Ns = Ns || {}` says the object's members
+// all arrive later by member assignment exactly as the bare literal does, so the helper a
+// member assignment attaches is registered and a dotted call into it carries its argument.
+// The main source above builds the namespace through the typeof guard instead; this pins the
+// `||` arm of namespaceObjectInit on its own.
+func TestGuardedNamespaceInitialiserRegistersMemberFunctions(t *testing.T) {
+	g := lowerJSFile(t, `
+var Ns = Ns || {};
+Ns.consume = function (v) {
+    sink(v);
+};
+Ns.wire = function () {
+    Ns.consume(source());
+};
+`)
+	p := paramOf(g, "consume", "v")
+	arg := callArgOf(g, "Ns.consume", 0)
+	if p == "" {
+		t.Fatal("a member assignment on a guard-initialised namespace did not become a function definition, so the dotted call has no callee body")
+	}
+	if arg == "" {
+		t.Fatal("the namespace member call never lowered")
+	}
+	if !reaches(t, g, arg, p) {
+		t.Fatal("the argument of a dotted call into a guard-initialised namespace did not reach the assigned body's parameter")
+	}
+}
+
+// A class method's `this` is a binding the body inherits (the class's one stable self node),
+// not a slot an iteration callback may rebind: a field the constructor writes through `this`
+// still reaches a `this` read in another method with an each callback sitting in between, and
+// the iterated element is not merged into that binding — inside the callback `this` keeps
+// resolving the way it always did rather than to a node the iteration flows into.
+func TestClassMethodThisSurvivesAnEachCallbackInTheMethod(t *testing.T) {
+	g := lowerJSFile(t, `
+class Widget {
+    constructor(list) {
+        this.list = list;
+    }
+    run() {
+        $.each(this.list, function () {
+            sink(this);
+        });
+    }
+    emit() {
+        use(this.list);
+    }
+}
+`)
+	src := paramOf(g, "constructor", "list")
+	useArg := callArgOf(g, "use", 0)
+	sinkArg := callArgOf(g, "sink", 0)
+	if src == "" || useArg == "" || sinkArg == "" {
+		t.Fatal("the constructor parameter or a this-reading call never lowered")
+	}
+	if !reaches(t, g, src, useArg) {
+		t.Fatal("a field written through this in the constructor stopped reaching a this read in another method; the class's self binding did not survive the each callback")
+	}
+	if reaches(t, g, src, sinkArg) {
+		t.Fatal("the iterated collection was merged into a class method's this; the method's this is a binding the body inherits, not a slot the iteration rebinds")
+	}
+}
+
 // A POPULATED object literal is a complete record, not a namespace being built for later
 // member assignment: `X.fn = X.prototype = { method: … }` already places its members, so a
 // member assignment layered onto it afterwards (`X.fn.load = function …`, the way a library
