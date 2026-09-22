@@ -666,6 +666,14 @@ func (l *lowerer) structFieldOwner(base string, sc *scope) (mod, typ string, ok 
 // languages this does not need to change.
 func goStructFields(file string) bool { return strings.HasSuffix(file, ".go") }
 
+// pyAttrStores gates the object-sensitive store for a dotted assignment target to Python. It is
+// the one frontend that spells an object attribute store as a dotted Assign target rather than a
+// method-less path call (which the object-sensitive slots already handle) or a declared-type
+// field (Go, whose structFieldSlot route above is the measured one). Joining those on the object
+// as well would move detection for languages this change was not measured on — the same line
+// goStructFields and ccArrayFields draw.
+func pyAttrStores(file string) bool { return moduleTech(file) == "python" }
+
 // ccArrayFields gates array-element field slots to the cpp frontend's files — the extension
 // set registry.go hands that frontend. A subscripted field access `arr[i].field` is lowered
 // by every frontend with an Index expression, and joining it on the array would move
@@ -3891,6 +3899,19 @@ func (l *lowerer) classSelfNode(ns, cls, loc string) string {
 	return id
 }
 
+// pyAttrStoreBase is the node a Python object attribute store on `base` parks its value in.
+// Through any other base it is the base's own node — the same one a read of that attribute
+// evaluates — but through the enclosing method's `self` it is the class's stable self node:
+// `self` is a per-method parameter there, so per-method slots would leave a constructor
+// storing a value and the method that reads it back as two unrelated containers. One node per
+// class is the join the implicit-`this` languages already get from makeFuncInfo.
+func (l *lowerer) pyAttrStoreBase(base string, sc *scope, loc string) string {
+	if l.curClass != "" && base == l.selfName {
+		return l.classSelfNode(l.curNS, l.curClass, loc)
+	}
+	return l.eval(nir.Name{ID: base, Loc: loc}, sc)
+}
+
 // isConstructorName reports whether a method of `cls` is the class's constructor. A
 // construction site names the CLASS, not the method, so resolving `new T(a)` to a body needs
 // the declaration the language spells the constructor with: the class's own name (Java, C#,
@@ -4464,6 +4485,16 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 					if mod, typ, known := l.structFieldOwner(base, sc); known {
 						l.flow(targetVal, l.structFieldSlot(mod, typ, field, st.Loc))
 					}
+					// `obj.attr = v` (Python): the target names a field of the BASE OBJECT, so the
+					// value has to land in the slot a later read of that attribute draws its taint
+					// from — the store the method-less field-write call already carries for the
+					// frontends that model one. Without it the write only rebinds the dotted name
+					// in this scope, and the read is a fresh Attr node joined to nothing.
+					if pyAttrStores(l.curFile) {
+						if bn := l.pyAttrStoreBase(base, sc, st.Loc); bn != "" {
+							l.flow(targetVal, l.readFieldSlot(bn, field, st.Loc))
+						}
+					}
 				}
 				if slot := l.moduleGlobalSlot(base); slot != "" {
 					l.globalMutationAnalysisEvent(st.Loc, []string{
@@ -4940,6 +4971,15 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 			slot = l.readFieldSlot(base, ex.Attr, ex.Loc)
 		}
 		l.flow(slot, n)
+		// `self.attr` inside a Python method reads a field of the class's own object. The base is
+		// the METHOD's receiver parameter, so the slot above is per-method and joins nothing
+		// across the class; the one a store through `self` in a sibling method filled sits on
+		// the class's stable self node (see pyAttrStoreBase), which every method shares.
+		if pyAttrStores(l.curFile) && l.curClass != "" {
+			if nm, isName := ex.Base.(nir.Name); isName && nm.ID == l.selfName {
+				l.flow(l.readFieldSlot(l.classSelfNode(l.curNS, l.curClass, ex.Loc), ex.Attr, ex.Loc), n)
+			}
+		}
 		// Recorded rather than merely looked up, so a read on a base that is not (yet) a
 		// tracked container — a local holding an object, not a parameter — still reaches a
 		// write that only becomes visible later, when the base turns into a container or is
