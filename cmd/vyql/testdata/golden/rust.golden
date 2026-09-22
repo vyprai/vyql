@@ -1,3 +1,4 @@
 call analysis.function.context
+call analysis.rust.signature
 call source.value
 call worker.run

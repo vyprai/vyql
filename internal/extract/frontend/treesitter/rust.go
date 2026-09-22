@@ -21,6 +21,11 @@ type rsConv struct {
 	// Drop impl makes, for the types declared in this file.
 	refcountDrops map[string]string
 	implSelfType  string // base type name of the impl block being walked
+	// implHeaderType and implHeaderTrait carry the impl block's own header --
+	// the type being implemented and, when the impl is for one, the trait --
+	// to the methods it declares (rsDeclaredTypeTokens).
+	implHeaderType  string
+	implHeaderTrait string
 	// siblings indexes the file's free-function bodies by name and calleeFacts
 	// memoises each helper's `callee:` facts, both for the one-hop delegated
 	// attribution (rsDelegatedContextTokens).
@@ -127,8 +132,14 @@ func (c *rsConv) stmtH(n *tree_sitter.Node, attrs []string) []nir.Stmt {
 	case "function_item":
 		params := c.params(c.field(n, "parameters"))
 		paramTypes := c.paramTypes(c.field(n, "parameters"))
+		// A function nested in this one's body is not a method of the impl
+		// this one sits in, so the header must not cross into it.
+		outerType, outerTrait := c.implHeaderType, c.implHeaderTrait
+		c.implHeaderType, c.implHeaderTrait = "", ""
 		body := c.block(c.field(n, "body"))
+		c.implHeaderType, c.implHeaderTrait = outerType, outerTrait
 		body = append(body, c.rsFunctionContext(n)...)
+		body = append(body, c.rsDeclaredTypeEvent(n)...)
 		body = append(body, c.rsTypeErasureMetadata(n)...)
 		body = append(body, c.rsRefcountedConversionMetadata(n)...)
 		exported := false
@@ -148,8 +159,18 @@ func (c *rsConv) stmtH(n *tree_sitter.Node, attrs []string) []nir.Stmt {
 		// function_item case has no other way to reach that type.
 		outerSelf := c.implSelfType
 		c.implSelfType = lastSeg(c.dotted(c.field(n, "type")))
+		// The header is kept as written (compacted), so a method's facts can
+		// name the trait being implemented and the type -- with its lifetimes
+		// -- that the receiver is borrowed from.
+		outerType, outerTrait := c.implHeaderType, c.implHeaderTrait
+		c.implHeaderType = rustCompactText(c.text(c.field(n, "type")))
+		c.implHeaderTrait = ""
+		if tr := c.field(n, "trait"); tr != nil {
+			c.implHeaderTrait = rustCompactText(c.text(tr))
+		}
 		out = append(out, c.decls(c.field(n, "body"))...)
 		c.implSelfType = outerSelf
+		c.implHeaderType, c.implHeaderTrait = outerType, outerTrait
 		return out
 	case "mod_item", "trait_item":
 		return c.decls(c.field(n, "body"))
@@ -1297,6 +1318,108 @@ func (c *rsConv) rsExternAbi(fn *tree_sitter.Node) string {
 		}
 	}
 	return ""
+}
+
+// rsDeclaredTypeEvent lowers a function's declaration types to their own
+// analysis.rust.signature presence node, separate from the
+// analysis.function.context event the body feeds.
+//
+// The separation is not cosmetic. A Rust type is full of angle brackets, and
+// shipped bindings use a bare `<` or `>` in the function context's tokens as
+// the carrier of "a comparison exists in this body" -- the bounds check an
+// Index impl owes its contract has no structured token, so the character is
+// the only witness (bindings/rust/index_operator_without_bounds_check.vyql).
+// Declaration types on that node would satisfy the negation for every generic
+// impl in the corpus and unfire the check. On their own node the types reach
+// the data layer without rewriting what any body-scoped predicate reads, the
+// same way delegated `callee:` facts stay keyed apart from a function's own.
+func (c *rsConv) rsDeclaredTypeEvent(fn *tree_sitter.Node) []nir.Stmt {
+	tokens := c.rsDeclaredTypeTokens(fn)
+	if len(tokens) == 0 {
+		return nil
+	}
+	loc := c.loc(fn)
+	path := "analysis.rust.signature"
+	args := []nir.Expr{
+		nir.Const{Loc: loc, Value: "lang=rust"},
+		nir.Const{Loc: loc, Value: "name=" + c.text(c.field(fn, "name"))},
+	}
+	for _, tok := range tokens {
+		args = append(args, nir.Const{Loc: loc, Value: tok})
+	}
+	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: path, Loc: loc},
+		Args:   args,
+		Path:   path,
+		Method: "signature",
+		Loc:    loc,
+	}}}
+}
+
+// rsDeclaredTypeTokens records what a function's declaration itself says about
+// types: the return type after the arrow, each value parameter's declared type,
+// the self receiver's spelling, and -- for a method -- the impl header it sits
+// in, the type being implemented and the trait when the impl is for one.
+//
+// The body-derived facts (rsStructuredContextTokens) say what a function does;
+// none of them can say what it is handed or hands back, because a type lives in
+// the signature, not the body. A weakness whose vulnerable and fixed spellings
+// differ only in types -- items typed by the impl's lifetime rather than the
+// receiver borrow, an owning Iterator declaration over a lending accessor --
+// is invisible at the data layer without these: the two bodies read the same.
+//
+// Types are compacted (whitespace dropped) so a rustfmt line break inside a
+// long generic cannot split one spelling into two. The receiver's spelling is
+// the whole fact: `&self`, `&mut self`, `self` and a typed `self: Pin<&mut
+// Self>` are the four borrow shapes a method can offer, and which one it is
+// decides what the language itself guarantees about the value behind it.
+func (c *rsConv) rsDeclaredTypeTokens(fn *tree_sitter.Node) []string {
+	var out []string
+	add := func(tok string) {
+		if tok != "" {
+			out = append(out, tok)
+		}
+	}
+	if rt := c.field(fn, "return_type"); rt != nil {
+		add("return_type:" + rustCompactText(c.text(rt)))
+	}
+	if params := c.field(fn, "parameters"); params != nil {
+		// The index counts value parameters only, matching params() -- self is
+		// not a parameter to a Rust caller's eye, and Params omits it too.
+		i := 0
+		for _, ch := range c.namedChildren(params) {
+			switch c.kind(ch) {
+			case "self_parameter":
+				add("receiver:" + rustCompactText(c.text(ch)))
+			case "parameter":
+				pat := c.field(ch, "pattern")
+				if pat != nil && c.kind(pat) == "self" {
+					// `self: Pin<&mut Self>` -- a typed receiver is spelled as
+					// a parameter whose pattern is the self keyword; its
+					// declared type is the receiver type.
+					add("receiver:" + rustCompactText(c.text(c.field(ch, "type"))))
+					continue
+				}
+				name := c.patName(pat)
+				if name == "" {
+					continue
+				}
+				add("param_name:" + name)
+				add("param_index:" + itoa(i))
+				if typ := c.field(ch, "type"); typ != nil {
+					add("param_type:" + rustCompactText(c.text(typ)))
+				}
+				i++
+			}
+		}
+	}
+	if c.implHeaderType != "" {
+		add("impl_type:" + c.implHeaderType)
+	}
+	if c.implHeaderTrait != "" {
+		add("impl_trait:" + c.implHeaderTrait)
+	}
+	return dedupeStrings(out)
 }
 
 func (c *rsConv) rsStructuredContextTokens(root *tree_sitter.Node) []string {

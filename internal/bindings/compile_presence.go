@@ -637,6 +637,16 @@ func v2PresenceValuePrefix(field string) string {
 		return "return_identifier:"
 	case "returnType":
 		return "return_type:"
+	// The Rust signature facts: which of the four receiver borrow shapes a
+	// method takes (`receiver:&mut self` compacts to `receiver:&mutself`), and
+	// the impl header a method sits in -- the type being implemented, with its
+	// lifetimes and generics, and the trait when the impl is for one.
+	case "receiver":
+		return "receiver:"
+	case "implType":
+		return "impl_type:"
+	case "implTrait":
+		return "impl_trait:"
 	case "metadataExportAfterSensitiveKey":
 		return "metadata_export_after_sensitive_key:"
 	case "metadataExportAfterSensitiveSource":
