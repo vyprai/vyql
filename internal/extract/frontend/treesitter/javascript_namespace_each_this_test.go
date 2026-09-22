@@ -312,6 +312,67 @@ class Widget {
 	}
 }
 
+// namespaceObjectInit's guard arms are three spellings of the same prologue ("the object
+// exists, keep it; otherwise start empty"), and only `||` is pinned above. These two pin
+// the other named arms on their own, so dropping either switch case regresses loudly
+// instead of silently: a nullish coalesce, and a hand-rolled ternary guard.
+func TestNullishAndTernaryNamespaceInitialisersRegisterMemberFunctions(t *testing.T) {
+	for _, tc := range []struct{ root, guard string }{
+		{"A", "var A = A ?? {};"},
+		{"B", "B = typeof B !== 'undefined' ? B : {};"},
+	} {
+		g := lowerJSFile(t, `
+`+tc.guard+`
+`+tc.root+`.consume = function (v) {
+    sink(v);
+};
+`+tc.root+`.wire = function () {
+    `+tc.root+`.consume(source());
+};
+`)
+		p := paramOf(g, "consume", "v")
+		arg := callArgOf(g, tc.root+".consume", 0)
+		if p == "" {
+			t.Fatalf("%s: a member assignment on a guard-initialised namespace did not become a function definition, so the dotted call has no callee body", tc.guard)
+		}
+		if arg == "" {
+			t.Fatalf("%s: the namespace member call never lowered", tc.guard)
+		}
+		if !reaches(t, g, arg, p) {
+			t.Fatalf("%s: the argument of a dotted call into a guard-initialised namespace did not reach the assigned body's parameter", tc.guard)
+		}
+	}
+}
+
+// scanNamespaces counts an IIFE's body as module-level however the function is invoked —
+// the parenthesized `(function () { … })()` form is pinned above; this pins the unary
+// `!function () { … }()` spelling a minifier emits, so dropping the unary arm of
+// scanNamespaceExpr regresses loudly instead of silently.
+func TestUnaryIIFEBodyBuildsTheNamespaceItRegisters(t *testing.T) {
+	g := lowerJSFile(t, `
+!function () {
+    var Ns = {};
+    Ns.consume = function (v) {
+        sink(v);
+    };
+    Ns.wire = function () {
+        Ns.consume(source());
+    };
+}();
+`)
+	p := paramOf(g, "consume", "v")
+	arg := callArgOf(g, "Ns.consume", 0)
+	if p == "" {
+		t.Fatal("a member assignment inside a unary-IIFE body did not become a function definition, so the dotted call has no callee body")
+	}
+	if arg == "" {
+		t.Fatal("the namespace member call never lowered")
+	}
+	if !reaches(t, g, arg, p) {
+		t.Fatal("the argument of a dotted call into a unary-IIFE namespace did not reach the assigned body's parameter")
+	}
+}
+
 // A POPULATED object literal is a complete record, not a namespace being built for later
 // member assignment: `X.fn = X.prototype = { method: … }` already places its members, so a
 // member assignment layered onto it afterwards (`X.fn.load = function …`, the way a library
