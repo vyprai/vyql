@@ -3748,8 +3748,13 @@ func (c *jsConv) scanNamespaceAssign(assign *tree_sitter.Node) {
 	}
 }
 
-// namespaceObjectInit reports whether an initialiser builds a namespace object: an object
-// literal, or a default/guard around one (`Ns || {}`, `Ns ?? {}`, `cond ? Ns : {}`).
+// namespaceObjectInit reports whether an initialiser builds a namespace object: an EMPTY
+// object literal, or a default/guard around one (`Ns || {}`, `Ns ?? {}`, `cond ? Ns : {}`).
+// Empty is the whole test: `{}` says "an object whose members all arrive later, by member
+// assignment", which is what a namespace is, while a populated literal (`X.prototype =
+// {method: function …}`) describes a complete record whose members are already in place —
+// registering the member assignments a library layers onto such a record (jQuery.fn) would
+// resolve every application `.load()`/`.index()` into the library's internals.
 func (c *jsConv) namespaceObjectInit(v *tree_sitter.Node) bool {
 	v = c.unwrapJsTransparentExpr(v)
 	if v == nil {
@@ -3757,7 +3762,7 @@ func (c *jsConv) namespaceObjectInit(v *tree_sitter.Node) bool {
 	}
 	switch c.kind(v) {
 	case "object":
-		return true
+		return len(c.namedChildren(v)) == 0
 	case "binary_expression":
 		switch c.text(c.field(v, "operator")) {
 		case "||", "&&", "??":
