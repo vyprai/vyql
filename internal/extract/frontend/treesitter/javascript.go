@@ -30,6 +30,12 @@ type jsConv struct {
 	exported    map[string]bool
 	siblings    map[string]*tree_sitter.Node
 	calleeFacts map[string][]string
+	// namespacePaths / namespaceFuncSites come from scanNamespaces, which runs before the
+	// module body is lowered: the dotted paths this module builds namespaces on, and the
+	// start-byte sites of the function expressions those namespaces' member assignments
+	// attach — the `Ns.fn = function …` statements exprStmt turns into FuncDefs.
+	namespacePaths     map[string]bool
+	namespaceFuncSites map[uint]bool
 }
 
 func jsParserFor(lang unsafe.Pointer) func() *tree_sitter.Parser {
@@ -66,6 +72,7 @@ func ExtractJavaScript(files []string, root string) (nir.Program, error) {
 		c.exported = c.exportedNames(root0)
 		c.siblings = c.jsSiblingFunctionBodies(root0)
 		c.calleeFacts = map[string][]string{}
+		c.scanNamespaces(root0)
 		body := append(c.jsModuleContext(root0), c.blockChildren(root0)...)
 		return nir.Module{Key: c.key, File: rel, Imports: c.imports(root0), Body: body}, true
 	}
@@ -3595,6 +3602,175 @@ func (c *jsConv) exportFuncName(left *tree_sitter.Node) string {
 	return ""
 }
 
+// scanNamespaces walks the statements that run at module load — the module top level, the
+// branches of its ifs, and the bodies of the IIFEs a module wraps itself in — and records
+// the namespaces it builds there: the dotted paths assigned an object literal (`var Ns = {}`,
+// `Ns = Ns || {}`, `Ns.Sub = {}`), and the function expressions a member assignment on such a
+// path attaches (`Ns.fn = function …`), keyed by the RHS node's start byte so exprStmt can
+// register them as function definitions. Only load-time statements count: a member store
+// inside a function body writes some runtime object, not the module's namespace surface, and
+// keeps the plain-write lowering it has always had.
+func (c *jsConv) scanNamespaces(root *tree_sitter.Node) {
+	c.namespacePaths = map[string]bool{}
+	c.namespaceFuncSites = map[uint]bool{}
+	for _, st := range c.namedChildren(root) {
+		c.scanNamespaceStmt(st)
+	}
+}
+
+func (c *jsConv) scanNamespaceStmt(n *tree_sitter.Node) {
+	switch c.kind(n) {
+	case "expression_statement":
+		for _, k := range c.namedChildren(n) {
+			c.scanNamespaceExpr(k)
+		}
+	case "statement_block":
+		for _, k := range c.namedChildren(n) {
+			c.scanNamespaceStmt(k)
+		}
+	case "if_statement":
+		c.scanNamespaceBranch(c.field(n, "consequence"))
+		c.scanNamespaceBranch(c.field(n, "alternative"))
+	case "lexical_declaration", "variable_declaration":
+		for _, d := range c.namedChildren(n) {
+			if c.kind(d) != "variable_declarator" {
+				continue
+			}
+			if name := c.field(d, "name"); name != nil && c.kind(name) == "identifier" &&
+				c.namespaceObjectInit(c.field(d, "value")) {
+				c.namespacePaths[c.text(name)] = true
+			}
+		}
+	}
+}
+
+// scanNamespaceBranch flattens one if-branch the way branchBody does (a block, an else_clause
+// wrapper, or a brace-less statement) so a guarded prologue —
+// `if (typeof Ns === 'undefined') { Ns = {} }` — counts as building the namespace.
+func (c *jsConv) scanNamespaceBranch(n *tree_sitter.Node) {
+	if n == nil {
+		return
+	}
+	switch c.kind(n) {
+	case "statement_block":
+		for _, k := range c.namedChildren(n) {
+			c.scanNamespaceStmt(k)
+		}
+	case "else_clause":
+		for _, k := range c.namedChildren(n) {
+			c.scanNamespaceBranch(k)
+		}
+	default:
+		c.scanNamespaceStmt(n)
+	}
+}
+
+func (c *jsConv) scanNamespaceExpr(n *tree_sitter.Node) {
+	switch c.kind(n) {
+	case "parenthesized_expression":
+		for _, k := range c.namedChildren(n) {
+			c.scanNamespaceExpr(k)
+		}
+	case "unary_expression":
+		if arg := c.unaryArg(n); arg != nil {
+			c.scanNamespaceExpr(arg)
+		}
+	case "call_expression":
+		// a module wrapped in an IIFE runs the wrapped statements at load, so the IIFE's
+		// body is module-level for namespace purposes
+		if fn := c.namespaceIIFEFunc(n); fn != nil {
+			if body := c.iifeBody(fn); body != nil {
+				for _, k := range c.namedChildren(body) {
+					c.scanNamespaceStmt(k)
+				}
+			}
+		}
+	case "assignment_expression":
+		c.scanNamespaceAssign(n)
+	}
+}
+
+// namespaceIIFEFunc returns the function node an IIFE call invokes, unwrapping the same
+// parenthesized-expression chain iife does, or nil when the call invokes anything else.
+func (c *jsConv) namespaceIIFEFunc(call *tree_sitter.Node) *tree_sitter.Node {
+	fn := c.field(call, "function")
+	if fn != nil && c.kind(fn) == "parenthesized_expression" {
+		if kids := c.namedChildren(fn); len(kids) > 0 {
+			fn = kids[0]
+		}
+	}
+	if c.isJsFuncNode(fn) {
+		return fn
+	}
+	return nil
+}
+
+// iifeBody returns a function node's statement_block body wherever the grammar put it —
+// the body field, or the first statement_block child (funcBody's lookup, without lowering).
+func (c *jsConv) iifeBody(fn *tree_sitter.Node) *tree_sitter.Node {
+	if body := c.field(fn, "body"); body != nil {
+		return body
+	}
+	for _, ch := range c.namedChildren(fn) {
+		if c.kind(ch) == "statement_block" {
+			return ch
+		}
+	}
+	return nil
+}
+
+func (c *jsConv) scanNamespaceAssign(assign *tree_sitter.Node) {
+	target := c.unwrapJsTransparentExpr(c.field(assign, "left"))
+	rhs := c.field(assign, "right")
+	if target == nil || rhs == nil {
+		return
+	}
+	switch c.kind(target) {
+	case "assignment_expression": // `a = b = …` binds rightward first
+		c.scanNamespaceAssign(target)
+		return
+	case "identifier", "member_expression":
+	default:
+		return
+	}
+	if c.namespaceObjectInit(rhs) {
+		c.namespacePaths[c.dotted(target)] = true
+		return
+	}
+	// `Ns.fn = function …` attaches a helper to a namespace the module built (the DIRECT
+	// parent path was assigned an object literal), so exprStmt registers the body.
+	if c.isJsFuncNode(rhs) {
+		if p := c.dotted(target); strings.Count(p, ".") > 0 {
+			if i := strings.LastIndex(p, "."); c.namespacePaths[p[:i]] {
+				c.namespaceFuncSites[rhs.StartByte()] = true
+			}
+		}
+	}
+}
+
+// namespaceObjectInit reports whether an initialiser builds a namespace object: an object
+// literal, or a default/guard around one (`Ns || {}`, `Ns ?? {}`, `cond ? Ns : {}`).
+func (c *jsConv) namespaceObjectInit(v *tree_sitter.Node) bool {
+	v = c.unwrapJsTransparentExpr(v)
+	if v == nil {
+		return false
+	}
+	switch c.kind(v) {
+	case "object":
+		return true
+	case "binary_expression":
+		switch c.text(c.field(v, "operator")) {
+		case "||", "&&", "??":
+			return c.namespaceObjectInit(c.field(v, "left")) || c.namespaceObjectInit(c.field(v, "right"))
+		}
+	case "ternary_expression":
+		return c.namespaceObjectInit(c.field(v, "consequence")) || c.namespaceObjectInit(c.field(v, "alternative"))
+	case "assignment_expression":
+		return c.namespaceObjectInit(c.field(v, "right"))
+	}
+	return false
+}
+
 func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 	switch c.kind(inner) {
 	case "parenthesized_expression":
@@ -3661,6 +3837,24 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 					exported := !strings.HasPrefix(name, "_")
 					params = c.exportedFuncParams(rhs, exported, params)
 					return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: c.funcBody(rhs), Loc: L, ContextTokens: c.jsFunctionContext(name, rhs), ParamEntries: c.jsParamEntries(name, params, nil), Exported: exported}}
+				}
+			}
+			// `Ns.fn = function …` — a member assignment attaching a helper to a namespace
+			// object this module built (`var Ns = {}` / `Ns = Ns || {}` / `Ns.Sub = {}` at
+			// load). Emit the FuncDef the exports and constructor spellings above already
+			// emit for their forms, named by the property, so a dotted call `Ns.fn(x)` /
+			// `Ns.Sub.fn(x)` resolves to the body; without it the call has no callee body
+			// and the argument's taint terminates at the call site. scanNamespaces holds
+			// the qualifying sites (a member store anywhere else writes some runtime
+			// object and keeps the plain-write lowering it has always had).
+			if c.namespaceFuncSites[rhs.StartByte()] {
+				if name := c.text(c.field(left, "property")); name != "" {
+					params := c.funcParams(rhs)
+					paramTypes := c.funcParamTypes(rhs)
+					if len(params) == 0 {
+						params = c.paramsFromFunctionText(inner)
+					}
+					return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: c.funcBody(rhs), Loc: L, ContextTokens: c.jsFunctionContext(name, rhs), ParamEntries: c.jsParamEntries(name, params, nil)}}
 				}
 			}
 		}
@@ -4906,7 +5100,9 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 		}
 	case "arrow_function", "function_expression", "function":
 		// a single bare arrow param `v => …` is under the `parameter` field, not `parameters`.
-		return nir.Lambda{Params: c.funcParams(n), ParamTypes: c.funcParamTypes(n), Body: c.funcBody(n), Loc: L, ContextTokens: c.jsFunctionContext("<lambda>", n)}
+		// A function expression binds a `this` of its own at every call; an arrow keeps the
+		// lexical one, so only the former reports BindsThis (see nir.Lambda).
+		return nir.Lambda{Params: c.funcParams(n), ParamTypes: c.funcParamTypes(n), Body: c.funcBody(n), Loc: L, ContextTokens: c.jsFunctionContext("<lambda>", n), BindsThis: c.kind(n) != "arrow_function"}
 	case "binary_expression":
 		op := c.text(c.field(n, "operator"))
 		left, right := c.expr(c.field(n, "left")), c.expr(c.field(n, "right"))
