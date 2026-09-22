@@ -184,6 +184,7 @@ type regexAtom struct {
 	group      bool
 	atomic     bool // an (?>…) group: the engine never re-enters it once matched
 	possessive bool // a quantifier with a trailing `+`; the atom cannot give back what it matched
+	complement bool // the set came from a negated class [...], whose alphabet is the whole input minus a few exclusions
 	body       string
 	look       byte // 0, '=' for a positive lookaround, '!' for a negative one
 	nullable   bool
@@ -247,7 +248,11 @@ func regexAtomsOf(seq string, depth int) []regexAtom {
 				i++
 				continue
 			}
-			a.set = regexClassSet(seq[i+1 : end])
+			cls := seq[i+1 : end]
+			if strings.HasPrefix(cls, "^") {
+				a.complement = true
+			}
+			a.set = regexClassSet(cls)
 			i = end + 1
 		case seq[i] == '(':
 			end := regexGroupEnd(seq, i)
@@ -812,6 +817,16 @@ func regexAdjacentOverlap(atoms []regexAtom, depth int, strandAfter bool) bool {
 		}
 		run, ok := regexTailRepeatSet(a, depth)
 		if !ok || run.bounded || isUniversalCharSet(run.set) {
+			continue
+		}
+		if a.complement {
+			// A negated class admits nearly every character, so "the separator
+			// sits in the alphabet both runs share" is vacuously true for it:
+			// the shared-alphabet test cannot tell a slid division from a pinned
+			// one, and reading it as slid reports the canonical safe idiom of a
+			// wide negated run, a literal separator and another negated run
+			// (email matching: [^@\s]+@[^@\s]+\.[^@\s]+) as catastrophic. The
+			// slide is only a signal for runs whose alphabet was spelled out.
 			continue
 		}
 		var slid []regexAtom // mandatory material the run absorbs, walked through

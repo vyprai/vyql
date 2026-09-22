@@ -117,6 +117,14 @@ func TestAmbiguous(t *testing.T) {
 		{false, "rank1111 fixed literal, dot outside the tld class", `^([a-zA-Z0-9_.\-+])+@[a-zA-Z0-9-.]+\.[a-zA-Z0-9-]{2,}$`},
 		{false, "rank2894 possessive value run pins the pair", `<([^>]*\srel\s*=\s*['"]?([^'" >]++)[^>]*)>`},
 
+		// A negated class admits nearly every character, so the shared-alphabet
+		// test cannot distinguish a slid division from a pinned one over it:
+		// the slide is not a signal there. This is the canonical safe email
+		// shape — wide negated runs, literal separators — whose four
+		// RealVuln findings motivated the complement guard.
+		{false, "negated runs around literal separators stay pinned (email)", `^[^@\s]+@[^@\s]+\.[^@\s]+$`},
+		{false, "negated run pair around one literal separator", `^[^@\s]+\.[^@\s]+$`},
+
 		// The atomic wall is opaque from outside in every reading direction: a
 		// repeat buried in an atomic group is not a consumer an enclosing
 		// division can compete for, whether the walk arrives from the nesting
