@@ -10,9 +10,11 @@ import (
 // The three shapes below are the rank 1629 pair (CVE-2026-24486,
 // python-multipart's uploaded filename), which the first review of the attribute
 // store change measured as two new VYQL-PATH-001 findings. They pin, at the rule
-// level, which of the two is the store hop the gap names and which is the library
-// profile's own threat model reaching the same sink — so the definitions side can
-// see exactly what its spec flip owes and nothing beyond it moves silently.
+// level, that the store hop carries the derived filename into the sink while both
+// of the fixed revision's routes hold — the basename control on the filename's own
+// route, and the bare-parameter refusal on the settings parameter's — so the
+// definitions side owes exactly the verbatim vulnerable form's flip to expect and
+// nothing beyond it moves silently.
 //
 // The library profile is the threat model those specs run in: every public-API
 // parameter is an entry a caller may forward attacker-controlled data through, so
@@ -91,16 +93,15 @@ func TestPythonAttrStoreHoldsABasenameReducedFilenameAtTheSink(t *testing.T) {
 	}
 }
 
-// The verbatim fixed revision still reports — through the OTHER labelled
-// parameter. `config` is as public an entry as `file_name` under the library
-// profile, and the upload directory read out of it reaches the same path with no
-// canonicalization on that route, so the basename (a sibling-path control) cannot
-// dominate. A keyed read of a wholly tainted container staying tainted is the
-// container model's own soundness contract (modeledContainerMethod), so the store
-// hop cannot carry one labelled parameter and drop the other. This is the finding
-// the pair's fixed-revision case draws through the hop, and the expectation flip
-// on the definitions side has to account for it.
-func TestPythonAttrStoreCarriesTheLabelledSettingsParameterToo(t *testing.T) {
+// The verbatim fixed revision holds at the sink — BOTH routes closed. The filename's
+// own route the basename control holds (the case above). The other labelled parameter's
+// route — `config`, as public an entry as `file_name` under the library profile — is the
+// bare-parameter store `self._config = config`, and a bare parameter's taint is the
+// caller's whole-object approximation (the library profile labels every parameter), not a
+// value this method derived: persisting it into a class-wide slot is what the store
+// refuses. So the patched form holds at reject as the pair's own header says it must, and
+// the definitions side owes only the verbatim vulnerable form's flip to expect.
+func TestPythonAttrStoreHoldsTheFixedRevisionAtTheSinkThroughBothParameters(t *testing.T) {
 	locs := scanAsLibraryProfile(t, map[string]string{
 		"python_multipart/multipart.py": "import os\n" +
 			"\n" +
@@ -121,7 +122,7 @@ func TestPythonAttrStoreCarriesTheLabelledSettingsParameterToo(t *testing.T) {
 			"        path = os.path.join(file_dir, fname)\n" +
 			"        return open(path, \"w+b\")\n",
 	})
-	if !hasLineSuffix(locs, "multipart.py:18") {
-		t.Fatalf("the labelled settings parameter stored in the constructor did not reach the disk file: %v", locs)
+	if len(locs) != 0 {
+		t.Fatalf("the fixed revision reported traversal: %v", locs)
 	}
 }

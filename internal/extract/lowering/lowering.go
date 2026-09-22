@@ -3899,17 +3899,20 @@ func (l *lowerer) classSelfNode(ns, cls, loc string) string {
 	return id
 }
 
-// pyAttrStoreBase is the node a Python object attribute store on `base` parks its value in.
-// Through any other base it is the base's own node — the same one a read of that attribute
-// evaluates — but through the enclosing method's `self` it is the class's stable self node:
-// `self` is a per-method parameter there, so per-method slots would leave a constructor
-// storing a value and the method that reads it back as two unrelated containers. One node per
-// class is the join the implicit-`this` languages already get from makeFuncInfo.
-func (l *lowerer) pyAttrStoreBase(base string, sc *scope, loc string) string {
-	if l.curClass != "" && base == l.selfName {
-		return l.classSelfNode(l.curNS, l.curClass, loc)
+// pyBareParamValue reports whether the expression is exactly a bare reference to a parameter
+// of the current function. The shape matters because a parameter's taint is the caller's
+// whole-object approximation (the wrapper rule puts every argument's taint on a constructed
+// object, the receiver edge puts the receiver's on `self`): parking THAT in a slot every
+// method of the class reads multiplies one imprecise node class-wide. A value the method
+// DERIVES — a call, a field read, an operator — is what the slot is for; the parameter keeps
+// its own arg→param route into every method that names it.
+func (l *lowerer) pyBareParamValue(e nir.Expr, sc *scope) bool {
+	nm, ok := e.(nir.Name)
+	if !ok {
+		return false
 	}
-	return l.eval(nir.Name{ID: base, Loc: loc}, sc)
+	vn := sc.node[nm.ID]
+	return vn != "" && l.paramObjects[vn]
 }
 
 // isConstructorName reports whether a method of `cls` is the class's constructor. A
@@ -4485,15 +4488,29 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 					if mod, typ, known := l.structFieldOwner(base, sc); known {
 						l.flow(targetVal, l.structFieldSlot(mod, typ, field, st.Loc))
 					}
-					// `obj.attr = v` (Python): the target names a field of the BASE OBJECT, so the
-					// value has to land in the slot a later read of that attribute draws its taint
-					// from — the store the method-less field-write call already carries for the
-					// frontends that model one. Without it the write only rebinds the dotted name
-					// in this scope, and the read is a fresh Attr node joined to nothing.
-					if pyAttrStores(l.curFile) {
-						if bn := l.pyAttrStoreBase(base, sc, st.Loc); bn != "" {
-							l.flow(targetVal, l.readFieldSlot(bn, field, st.Loc))
-						}
+					// `self.attr = v` (Python): the target names a field of the class's own object,
+					// so the value has to land in the slot a later `self.attr` read draws its
+					// taint from — the store the method-less field-write call already carries for
+					// the frontends that model one. Without it the write only rebinds the dotted
+					// name in this scope, and the read is a fresh Attr node joined to nothing.
+					// The slot is the class's stable self node: `self` is a per-method parameter
+					// there, so per-method slots would leave a constructor storing a value and
+					// the method that reads it back as two unrelated containers — the join the
+					// implicit-`this` languages already get from makeFuncInfo. Two shapes stay
+					// out, both measured on the real-repository corpus:
+					//
+					// - a store on any other base (`obj.attr = v`): the base is a local or a
+					//   parameter the caller may alias, and the receiver/alias machinery already
+					//   joins what does join. Standing up per-field slots on every local object
+					//   moved detections there, so the base this carries is the one object every
+					//   method of the class shares by construction.
+					// - a bare parameter as the value (pyBareParamValue): persisting the
+					//   caller's whole-object approximation into a class-wide slot is what
+					//   launders a tainted constructor argument through any method that reads
+					//   the field back.
+					if pyAttrStores(l.curFile) && l.curClass != "" && base == l.selfName &&
+						!l.pyBareParamValue(st.Value, sc) {
+						l.flow(targetVal, l.readFieldSlot(l.classSelfNode(l.curNS, l.curClass, st.Loc), field, st.Loc))
 					}
 				}
 				if slot := l.moduleGlobalSlot(base); slot != "" {
@@ -6460,7 +6477,17 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 		paramOffset := l.paramOffset(target, recvForTargets)
 		if paramOffset == 1 {
 			selfParam := target.params[target.paramNames[0]]
-			l.flow(recvForTargets, selfParam)
+			// A construction's `self` is the fresh object: the arguments' taint already enters
+			// the constructor through its own parameter edges, and the wrapper rule already puts
+			// it on the constructed object for the CALLER to read. Flowing the fresh object's
+			// node taint into `self` as well re-enters every argument's taint as blanket
+			// receiver taint inside the constructor — every `self.attr` read there inherits it,
+			// and a value derived from such a read persists it class-wide through the field
+			// slots. Python only: an implicit-`this` constructor reads `this`, whose node is
+			// the class's own and not the call's result, so it is not this shape.
+			if !(ctorCall && pyAttrStores(l.curFile)) {
+				l.flow(recvForTargets, selfParam)
+			}
 			if l.containers[recvForTargets] != nil {
 				l.aliasReceiverSelf(recvForTargets, selfParam)
 			}
