@@ -77,8 +77,16 @@ func (p *parser) parseFile() (*File, error) {
 		return nil, err
 	}
 	f.Module = name
-	if err := p.expectPunct(";"); err != nil {
-		return nil, err
+	if p.isPunct(";") {
+		p.next()
+	} else if p.isPunct("{") {
+		m, err := p.parseManifest(name)
+		if err != nil {
+			return nil, err
+		}
+		f.Manifest = m
+	} else {
+		return nil, p.errorf("expected ';' or a manifest block after module %q", name)
 	}
 	for p.cur().Kind != TokEOF {
 		if err := p.parseStmt(f); err != nil {
@@ -86,6 +94,79 @@ func (p *parser) parseFile() (*File, error) {
 		}
 	}
 	return f, nil
+}
+
+var manifestImportKinds = map[string]bool{
+	"pattern": true, "query": true, "concept": true, "adapter": true, "model": true,
+}
+
+// parseManifest parses the module block form: version, requires, imports, and
+// the provenance tier that stamps every declaration in the module.
+func (p *parser) parseManifest(name string) (*Manifest, error) {
+	m := &Manifest{Module: name, Pos: p.pos()}
+	p.next() // {
+	for !p.isPunct("}") {
+		if p.cur().Kind != TokIdent {
+			return m, p.errorf("expected a manifest field, got %q", p.cur().Text)
+		}
+		field := p.next().Text
+		switch field {
+		case "version":
+			if p.cur().Kind != TokString {
+				return m, p.errorf("version must be a string, got %q", p.cur().Text)
+			}
+			m.Version = unquote(p.next().Text)
+		case "requires":
+			what, err := p.expectName("ontology or engine")
+			if err != nil {
+				return m, err
+			}
+			if p.cur().Kind != TokString {
+				return m, p.errorf("requires %s must be a string, got %q", what, p.cur().Text)
+			}
+			v := unquote(p.next().Text)
+			if what == "ontology" {
+				m.RequiresOntology = v
+			} else if what == "engine" {
+				m.RequiresEngine = v
+			} else {
+				return m, p.errorf("requires takes ontology or engine, got %q", what)
+			}
+		case "import":
+			kind := ""
+			if (p.cur().Kind == TokIdent || p.cur().Kind == TokKeyword) && manifestImportKinds[p.cur().Text] {
+				kind = p.next().Text
+			}
+			n, err := p.expectDotted("import name")
+			if err != nil {
+				return m, err
+			}
+			m.Imports = append(m.Imports, ManifestImport{Kind: kind, Name: n})
+		case "provenance":
+			tier, err := p.expectName("provenance tier")
+			if err != nil {
+				return m, err
+			}
+			switch tier {
+			case "generated", "validated", "reviewed", "trusted":
+				m.Provenance = tier
+			default:
+				return m, p.errorf("provenance must be generated, validated, reviewed, or trusted, got %q", tier)
+			}
+		case "authors":
+			if p.cur().Kind != TokString {
+				return m, p.errorf("authors must be a string, got %q", p.cur().Text)
+			}
+			p.next()
+		default:
+			return m, p.errorf("unknown manifest field %q", field)
+		}
+	}
+	p.next() // }
+	if m.Provenance == "" {
+		m.Provenance = "trusted" // the module ships with the knowledge base by default
+	}
+	return m, nil
 }
 
 func (p *parser) parseStmt(f *File) error {

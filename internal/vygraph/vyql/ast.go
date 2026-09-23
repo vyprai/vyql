@@ -6,11 +6,30 @@ package vyql
 // File is one parsed .vyql module file.
 type File struct {
 	Module   string
+	Manifest *Manifest // non-nil when the file uses the block form (module.vyql)
 	Concepts []ConceptDecl
 	Threats  []ThreatDecl
 	Adapters []AdapterDecl
 	Rules    []RuleDecl
 	Queries  []QueryDecl
+}
+
+// Manifest is the module block: identity, requirements, imports, and the trust
+// tier every declaration in the module is stamped with.
+type Manifest struct {
+	Module           string
+	Version          string
+	RequiresOntology string
+	RequiresEngine   string
+	Imports          []ManifestImport
+	Provenance       string // generated | validated | reviewed | trusted
+	Pos              Pos
+}
+
+// ManifestImport is one import entry, optionally kind-qualified.
+type ManifestImport struct {
+	Kind string // pattern | query | concept | adapter | model, or empty
+	Name string
 }
 
 // Pos is a 1-based source position.

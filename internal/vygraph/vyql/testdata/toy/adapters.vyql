@@ -1,0 +1,6 @@
+module toy;
+adapter web {
+  meta { fidelity: resolved }
+  source code.path("request.args.get") -> code.HttpInput
+  sink code.path("db.session.execute") -> code.SqlExecution
+}
