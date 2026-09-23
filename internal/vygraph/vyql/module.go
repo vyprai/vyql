@@ -8,22 +8,17 @@ import (
 	"sort"
 
 	"github.com/vyprai/vyql/internal/vygraph/graph"
-	"github.com/vyprai/vyql/internal/vygraph/ontology"
 )
 
 // KB is a loaded knowledge base: the parsed module files, the manifest, and the
 // ontology they declare. Loading is a pure function of the directory contents —
 // files are walked in sorted order, so the same tree always yields the same KB.
 type KB struct {
-	Manifest *Manifest
-	Files    []*File
-	Schemas  *graph.Schemas
-	Onto     *ontology.Ontology
-	Threats  map[string]ThreatDecl
-
-	// Trust is the tier every declaration in this module is stamped with,
-	// taken from the manifest's provenance field (trusted by default).
-	Trust graph.Trust
+	Manifest   *Manifest
+	Files      []*File
+	Schemas    *graph.Schemas
+	*Knowledge // ontology, threats, rule caps, id uniqueness
+	Trust      graph.Trust
 }
 
 func trustOf(tier string) graph.Trust {
@@ -63,7 +58,7 @@ func LoadDir(dir string) (*KB, error) {
 	}
 	sort.Strings(paths)
 
-	kb := &KB{Schemas: graph.NewSchemas(), Threats: map[string]ThreatDecl{}}
+	kb := &KB{Schemas: graph.NewSchemas()}
 	var manifests int
 	for _, path := range paths {
 		src, err := os.ReadFile(path)
@@ -96,8 +91,31 @@ func LoadDir(dir string) (*KB, error) {
 	if len(errs) > 0 {
 		return nil, fmt.Errorf("invalid knowledge under %s: %v", dir, errs)
 	}
-	kb.Onto = built.Onto
-	kb.Threats = built.Threats
+	kb.Knowledge = built
+	kb.Trust = trustOf(kb.Manifest.Provenance)
+	return kb, nil
+}
+
+// KBFromFiles builds a KB directly from parsed files (no directory): the
+// inline-fixture counterpart of LoadDir. The manifest is taken from the first
+// file that carries one, if any.
+func KBFromFiles(files []*File, schemas *graph.Schemas) (*KB, []error) {
+	kb := &KB{Schemas: schemas}
+	for _, f := range files {
+		if f.Manifest != nil {
+			kb.Manifest = f.Manifest
+			break
+		}
+	}
+	if kb.Manifest == nil {
+		kb.Manifest = &Manifest{Module: "inline", Provenance: "trusted"}
+	}
+	built, errs := BuildKnowledge(files, schemas)
+	if len(errs) > 0 {
+		return nil, errs
+	}
+	kb.Files = files
+	kb.Knowledge = built
 	kb.Trust = trustOf(kb.Manifest.Provenance)
 	return kb, nil
 }

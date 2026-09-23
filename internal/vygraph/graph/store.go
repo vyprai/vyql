@@ -91,6 +91,10 @@ func (g *Store) AddLabel(l Label) error {
 func (g *Store) Node(id string) (Node, bool) { n, ok := g.nodes[id]; return n, ok }
 func (g *Store) NodeCount() int              { return len(g.nodes) }
 
+// SchemaOf exposes a registered type schema — evaluators need it to resolve
+// enum member ordering for typed comparisons.
+func (g *Store) SchemaOf(t string) (*TypeSchema, bool) { return g.schemas.Lookup(t) }
+
 func (g *Store) NodesOfType(t string) []Node { return g.collect(g.byType[t]) }
 func (g *Store) NodesOfLayer(l Layer) []Node { return g.collect(g.byLayer[l]) }
 
