@@ -207,11 +207,6 @@ func (p *parser) parseStmt(f *File) error {
 	return nil
 }
 
-var conceptFields = map[string]bool{
-	"taint": true, "vulnerable_to": true, "enabled_by": true,
-	"neutralizes": true, "defends": true, "cwe": true, "capec": true,
-}
-
 func (p *parser) parseConcept() (ConceptDecl, error) {
 	c := ConceptDecl{Pos: p.pos()}
 	p.next() // concept
