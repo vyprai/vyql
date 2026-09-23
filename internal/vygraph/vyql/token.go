@@ -63,7 +63,7 @@ var keywords = map[string]bool{
 	"refines": true, "taint": true, "vulnerable_to": true, "enabled_by": true,
 	"neutralizes": true, "defends": true, "cwe": true, "subsumes": true,
 	"severity": true, "id": true, "confidence_floor": true,
-	"finding": true, "signal": true,
+	"finding": true, "signal": true, "reach": true, "present": true,
 	"unless": true, "sanitized_by": true, "guarded_by": true, "closed_by": true, "anchored": true,
 	"and": true, "or": true, "not": true, "in": true, "any": true, "all": true,
 	"count": true, "has": true,
