@@ -441,14 +441,25 @@ func (c *conv) expr(n *tree_sitter.Node, approx bool) graph.Node {
 	switch n.Kind() {
 	case "assignment", "augmented_assignment", "named_expression":
 		// Emit every child (target and value); the value is the expression's
-		// result. The lowering pass computes the def-use FLOWS from the shape.
-		var last graph.Node
+		// result. The assignment's def-flow — value into the target binding — is
+		// the FLOWS edge the shared lowering threads to later uses.
+		var first, last graph.Node
 		for i := 0; i < int(n.NamedChildCount()); i++ {
 			if d := n.NamedChild(uint(i)); d != nil {
 				if e := c.expr(d, approx); e.ID != "" {
+					if first.ID == "" {
+						first = e
+					}
 					last = e
 				}
 			}
+		}
+		if first.ID != "" && last.ID != "" && first.ID != last.ID {
+			_ = c.f.store.AddEdge(graph.Edge{
+				ID:   "flows:def:" + last.ID + ":" + first.ID,
+				Type: "FLOWS", From: last.ID, To: first.ID,
+				Prov: graph.Provenance{Producer: "python", Build: graph.BuildParsed, Trust: graph.TrustTrusted},
+			})
 		}
 		return last
 	case "identifier":
