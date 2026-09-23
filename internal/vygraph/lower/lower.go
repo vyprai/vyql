@@ -48,7 +48,7 @@ func resolution(g *graph.Store, imports map[string]fepython.Imports) {
 
 			qualify := func(q string) {
 				if stored, ok := g.Node(n.ID); ok {
-					var sf graph.Fields = stored.Fields
+					sf := stored.Fields
 					sf.Set("qualified_path", graph.Str(q))
 					stored.Fields = sf
 					_ = g.Upsert(stored)

@@ -232,7 +232,7 @@ func TestApproxLoweredMarksWitness(t *testing.T) {
 	for _, n := range g.NodesOfType("code.Call") {
 		if v, _ := n.Fields.Get("path"); v.S == "match_case" {
 			stored, _ := g.Node(n.ID)
-			var f graph.Fields = stored.Fields
+			f := stored.Fields
 			f.Set("approx_lowered", graph.Bool(true))
 			stored.Fields = f
 			_ = g.Upsert(stored)

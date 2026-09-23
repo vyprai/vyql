@@ -32,7 +32,7 @@ func New(store *graph.Store) *Frontend {
 func (f *Frontend) Extract(file string, src []byte) error {
 	parser := tree_sitter.NewParser()
 	defer parser.Close()
-	parser.SetLanguage(tree_sitter.NewLanguage(tsjs.Language()))
+	_ = parser.SetLanguage(tree_sitter.NewLanguage(tsjs.Language()))
 	tree := parser.Parse(src, nil)
 	defer tree.Close()
 	root := tree.RootNode()
@@ -370,7 +370,6 @@ func (c *conv) paramName(p *tree_sitter.Node) string {
 	return ""
 }
 
-func (c *conv) exprOf(n *tree_sitter.Node) graph.Node     { return c.expr(n) }
 func (c *conv) exprApprox(n *tree_sitter.Node) graph.Node { return c.expr(n) }
 
 func (c *conv) mustAdd(n *tree_sitter.Node, typ string, fields [][2]string, approx bool) graph.Node {

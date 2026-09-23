@@ -36,4 +36,6 @@ fixture in this package's tests):
   functions so registration-call handlers lower, import specifiers)
 - java: landed (method declarations with formal parameters, field access
   chains, block/constructor bodies, catch/finally regions)
-- golang: fresh go/ast frontend, pending
+- golang: landed (fresh go/ast — receiver-qualified function names, chained
+  calls flattened into dotted syntactic paths, multi-assign def-flows, go/defer
+  expressions, funclits walked as functions)

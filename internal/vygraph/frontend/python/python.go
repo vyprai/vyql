@@ -41,7 +41,7 @@ func New(store *graph.Store) *Frontend {
 func (f *Frontend) Extract(file string, src []byte) error {
 	parser := tree_sitter.NewParser()
 	defer parser.Close()
-	parser.SetLanguage(tree_sitter.NewLanguage(tspython.Language()))
+	_ = parser.SetLanguage(tree_sitter.NewLanguage(tspython.Language()))
 	tree := parser.Parse(src, nil)
 	defer tree.Close()
 	root := tree.RootNode()
