@@ -5,5 +5,5 @@ rule SqlInjection {
 }
 rule Guarded {
   meta { id: "TOY-002" severity: low }
-  present code.SqlParameterization -> signal
+  present code.Review -> signal
 }

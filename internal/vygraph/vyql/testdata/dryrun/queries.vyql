@@ -1,0 +1,7 @@
+module dryrun;
+query reachableInputs(x) { match (x: code.HttpInput) yield x }
+query cookieInputs(x) { match (x: code.Cookie) yield x or { match (x: code.Deserialized) yield x } }
+rule ReviewUnreachableInputs {
+  meta { id: "DRY-REVIEW-001" severity: info }
+  match (x: code.HttpInput) where not reachableInputs(x) -> signal
+}

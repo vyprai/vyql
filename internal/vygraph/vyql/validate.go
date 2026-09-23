@@ -21,16 +21,21 @@ type Knowledge struct {
 
 	// ruleIDs tracks meta.id uniqueness across every validated file.
 	ruleIDs map[string]string
+
+	// queryNames lets where-clause type checking recognize query calls as
+	// boolean predicates rather than unknown functions.
+	queryNames map[string]bool
 }
 
 // NewKnowledge builds an empty knowledge state over the given schemas.
 func NewKnowledge(schemas *graph.Schemas) *Knowledge {
 	return &Knowledge{
-		Onto:     ontology.New(),
-		Schemas:  schemas,
-		Threats:  map[string]ThreatDecl{},
-		RuleCaps: map[string]Confidence{},
-		ruleIDs:  map[string]string{},
+		Onto:       ontology.New(),
+		Schemas:    schemas,
+		Threats:    map[string]ThreatDecl{},
+		RuleCaps:   map[string]Confidence{},
+		ruleIDs:    map[string]string{},
+		queryNames: map[string]bool{},
 	}
 }
 
@@ -39,6 +44,13 @@ func NewKnowledge(schemas *graph.Schemas) *Knowledge {
 func BuildKnowledge(files []*File, schemas *graph.Schemas) (*Knowledge, []error) {
 	kb := NewKnowledge(schemas)
 	var errs []error
+
+	for _, f := range files {
+		for _, q := range f.Queries {
+			kb.queryNames[q.Name] = true
+			kb.queryNames[f.Module+"."+q.Name] = true
+		}
+	}
 
 	for _, f := range files {
 		for _, c := range f.Concepts {
@@ -311,6 +323,9 @@ func (kb *Knowledge) typeExpr(e Expr, env map[string]varInfo, rule string, fail 
 		case "count":
 			return ftype{known: true, k: graph.KindInt}
 		default:
+			if kb.queryNames[x.Name] {
+				return ftype{known: true, k: graph.KindBool} // a query call is a boolean predicate
+			}
 			fail(x.Pos, "rule %q: unknown function %q in where", rule, x.Name)
 			return unknownType
 		}

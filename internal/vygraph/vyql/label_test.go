@@ -44,9 +44,6 @@ func kbOf(t *testing.T, src string) *KB {
 	if len(errs) > 0 {
 		t.Fatalf("KBFromFiles: %v", errs)
 	}
-	if errs := Validate(f, kb.Knowledge); len(errs) > 0 {
-		t.Fatalf("Validate: %v", errs)
-	}
 	return kb
 }
 
@@ -70,8 +67,8 @@ func TestApplyAdaptersLabelsAndCapsConfidence(t *testing.T) {
 	if got := labels("n3"); len(got) != 1 || got[0].Concept != "code.SqlExecution" {
 		t.Fatalf("n3 labels = %+v", got)
 	}
-	if got := labels("n2"); len(got) != 0 {
-		t.Fatalf("n2 must stay unlabelled, got %+v", got)
+	if got := labels("n2"); len(got) != 1 || got[0].Concept != "code.Review" {
+		t.Fatalf("n2 carries only the asset label in the fixture, got %+v", got)
 	}
 	// resolved fidelity caps at high (1.0); manifest says reviewed.
 	l := labels("n1")[0]

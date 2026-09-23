@@ -1,0 +1,17 @@
+module dryrun;
+adapter web {
+  meta { fidelity: resolved }
+  source code.path("request.args.get") -> code.HttpInput
+  source code.path("request.cookies") -> code.Cookie
+  sink code.path("db.session.execute") -> code.SqlExecution
+  sink code.path("subprocess.Popen") where n.path contains "shell" -> code.CommandExecution
+  sink code.path("os.system") -> code.CommandExecution
+  sink code.path("response.write") -> code.HtmlSink
+  control code.path("db.session.bind_params") -> code.SqlParameterization
+  control code.path("html.escape") -> code.HtmlEscape
+  guard code.path("auth.require") -> code.AuthenticationCheck
+}
+adapter crypto {
+  meta { fidelity: syntactic }
+  label code.path("Cipher.getInstance") -> code.WeakCipherReview
+}
