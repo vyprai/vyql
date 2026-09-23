@@ -28,7 +28,7 @@ const (
 	BuildLifted                 // a high-level node built by a lift
 	BuildRelated                // a high-level edge built by a relate
 	BuildResolved               // produced by import/type resolution
-	BuildLabeled                // a concept attached by an adapter
+	BuildLabeled                // a concept attached by a VyQL binding
 	BuildMined                  // inferred by a solver (deviation, a summary)
 	BuildGenerated              // machine-generated, quarantined
 )
@@ -48,7 +48,7 @@ const (
 // Provenance records how a record came to exist (Build) and at what trust tier
 // (Trust). Every Node, Edge and Label carries one.
 type Provenance struct {
-	Producer string // frontend, adapter, or learner id
+	Producer string // producing module: frontend, binding, lift, or learner id
 	Build    Build
 	Trust    Trust
 }

@@ -8,7 +8,7 @@ import (
 	"sort"
 )
 
-// Kind is a concept's role, drawn from the closed ten-kind set.
+// Kind is a concept's role, drawn from the closed ten-kind set (VyQL suite 02 §1).
 // The closed set is what keeps the vocabulary finite and the solvers domain-agnostic.
 // Note: "threat" is deliberately NOT a kind — threats form their own subsumes lattice.
 type Kind string
@@ -16,8 +16,8 @@ type Kind string
 const (
 	KindSource    Kind = "source"    // attacker-influenceable origin
 	KindSink      Kind = "sink"      // dangerous operation
-	KindControl   Kind = "control"   // neutralizer of a threat on a FLOW (sanitized_by)
-	KindGuard     Kind = "guard"     // presence+dominance is the invariant (guarded_by)
+	KindControl   Kind = "control"   // neutralizer of a threat on a FLOW (VyQL suite 02 §2)
+	KindGuard     Kind = "guard"     // presence+dominance is the invariant (VyQL suite 02 §2)
 	KindAsset     Kind = "asset"     // thing worth protecting
 	KindPrivilege Kind = "privilege" // capability in a privilege lattice
 	KindPrincipal Kind = "principal" // actor identity
@@ -33,7 +33,7 @@ var closedKinds = map[Kind]bool{
 }
 
 // Concept is one vocabulary entry. Kinds may be dual-role, but ONLY [control, guard]
-// : one shared identity projecting a control facet (Neutralizes)
+// (VyQL suite 02 §2.1): one shared identity projecting a control facet (Neutralizes)
 // and a guard facet (Defends). Refines is the taint-lattice parent; IsA over Refines is
 // what lets a rule naming a parent fire on every refinement. The threat-binding fields
 // (VulnerableTo/EnabledBy/Neutralizes/Defends) are carried now and consumed by the
@@ -154,7 +154,7 @@ func (o *Ontology) IsA(child, ancestor string) bool {
 }
 
 // OfKind returns every concept carrying kind k as a facet, name-sorted for deterministic
-// output. A dual-role concept appears in both pools.
+// output. A dual-role concept appears in both pools (VyQL suite 02 §2.1).
 func (o *Ontology) OfKind(k Kind) []Concept {
 	var out []Concept
 	for _, c := range o.byName {
