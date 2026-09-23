@@ -791,6 +791,27 @@ func (p *parser) parsePrimary() (Expr, error) {
 		}
 		return nil, p.errorf("unexpected %q in expression", p.cur().Text)
 	case TokIdent:
+		// A bare name followed by '(' is a call — a query reference (the
+		// stratification checker keys on these) rather than a name.
+		if p.toks[p.i+1].Kind == TokPunct && p.toks[p.i+1].Text == "(" {
+			name := p.next().Text
+			p.next() // (
+			var args []Expr
+			for !p.isPunct(")") {
+				a, err := p.parseExpr()
+				if err != nil {
+					return nil, err
+				}
+				args = append(args, a)
+				if p.isPunct(",") {
+					p.next()
+				}
+			}
+			if err := p.expectPunct(")"); err != nil {
+				return nil, err
+			}
+			return &Call{Name: name, Args: args, Pos: pos}, nil
+		}
 		return &Name{Name: p.next().Text, Pos: pos}, nil
 	case TokDottedIdent:
 		text := p.next().Text
