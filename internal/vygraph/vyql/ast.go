@@ -5,13 +5,62 @@ package vyql
 
 // File is one parsed .vyql module file.
 type File struct {
-	Module   string
-	Manifest *Manifest // non-nil when the file uses the block form (module.vyql)
-	Concepts []ConceptDecl
-	Threats  []ThreatDecl
-	Adapters []AdapterDecl
-	Rules    []RuleDecl
-	Queries  []QueryDecl
+	Module     string
+	Manifest   *Manifest // non-nil when the file uses the block form (module.vyql)
+	Concepts   []ConceptDecl
+	Threats    []ThreatDecl
+	Adapters   []AdapterDecl
+	Rules      []RuleDecl
+	Queries    []QueryDecl
+	Lifts      []LiftDecl
+	Relates    []RelateDecl
+	Frameworks []FrameworkDecl
+}
+
+// LiftDecl builds a high-level node from matched low-level nodes, mapping
+// fields and automatically backing the target to its source.
+type LiftDecl struct {
+	Target    string      // high type, e.g. code.Entrypoint
+	From      Expr        // matcher call: code.func(), code.call(...), code.syntacticPath(...)
+	Where     Expr        // optional predicate (decorated_by(glob), field comparisons)
+	Fields    []LiftField // ordered field map
+	Copies    []string    // fields using the copy form `from flows(self) by resolution`
+	Framework string      // non-empty: lift from a framework model's route facts
+	Pos       Pos
+}
+
+// LiftField is one target-field binding.
+type LiftField struct {
+	Name  string
+	Value Expr
+}
+
+// RelateDecl derives a high-level edge between high nodes from low-level
+// structure — by resolution (the call graph) or over FLOWS (the value graph).
+type RelateDecl struct {
+	Edge string // edge type name, e.g. calls
+	From string // high type A
+	To   string // high type B
+	By   string // "resolution" | "FLOWS"
+	Pos  Pos
+}
+
+// FrameworkDecl interprets generic low-level facts (route-registration calls,
+// decorators) into framework knowledge — VyQL, never the frontend.
+type FrameworkDecl struct {
+	Name   string
+	Routes []RouteDecl
+	Pos    Pos
+}
+
+// RouteDecl is one route rule of a framework model.
+type RouteDecl struct {
+	On      Expr // matcher call selecting registration calls or functions
+	Where   Expr // optional predicate
+	Method  Expr // expr over the match, e.g. callee.method or a literal
+	Path    Expr // e.g. arg(0)
+	Handler Expr // e.g. arg(-1)
+	Pos     Pos
 }
 
 // Manifest is the module block: identity, requirements, imports, and the trust

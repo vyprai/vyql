@@ -13,6 +13,7 @@ type Store struct {
 	byLayer map[Layer][]string
 
 	out    map[string][]Edge
+	in     map[string][]Edge
 	edges  map[string]Edge
 	labels map[string][]Label
 }
@@ -24,6 +25,7 @@ func New(s *Schemas) *Store {
 		byType:  map[string][]string{},
 		byLayer: map[Layer][]string{},
 		out:     map[string][]Edge{},
+		in:      map[string][]Edge{},
 		edges:   map[string]Edge{},
 		labels:  map[string][]Label{},
 	}
@@ -64,6 +66,7 @@ func (g *Store) AddEdge(e Edge) error {
 		return fmt.Errorf("edge %q already exists", e.ID)
 	}
 	g.out[e.From] = append(g.out[e.From], e)
+	g.in[e.To] = append(g.in[e.To], e)
 	g.edges[e.ID] = e
 	return nil
 }
@@ -126,6 +129,18 @@ func (g *Store) Out(from, edgeType string) []Edge {
 func (g *Store) LabelsOn(target string) []Label {
 	out := make([]Label, len(g.labels[target]))
 	copy(out, g.labels[target])
+	return out
+}
+
+// In returns edges arriving at id; edgeType "" matches every type.
+func (g *Store) In(id, edgeType string) []Edge {
+	all := g.in[id]
+	var out []Edge
+	for _, e := range all {
+		if edgeType == "" || e.Type == edgeType {
+			out = append(out, e)
+		}
+	}
 	return out
 }
 

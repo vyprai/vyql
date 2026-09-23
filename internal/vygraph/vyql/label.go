@@ -27,29 +27,11 @@ func ApplyAdapters(kb *KB, g *graph.Store) error {
 			if !ok {
 				return fmt.Errorf("adapter %s: matcher is not a call", a.Tech)
 			}
-			if call.Name != "code.path" {
-				return fmt.Errorf("adapter %s: unknown matcher %q", a.Tech, call.Name)
+			nodes, err := matchNodes(g, call)
+			if err != nil {
+				return fmt.Errorf("adapter %s: %w", a.Tech, err)
 			}
-			if len(call.Args) != 1 {
-				return fmt.Errorf("adapter %s: code.path takes one argument", a.Tech)
-			}
-			lit, ok := call.Args[0].(*Literal)
-			if !ok || lit.Kind != TokString {
-				return fmt.Errorf("adapter %s: code.path takes a string literal", a.Tech)
-			}
-			pattern := unquote(lit.Text)
-			for _, n := range g.NodesOfLayer(graph.LayerLow) {
-				spec, ok := pathFieldOf(g, n)
-				if !ok {
-					continue
-				}
-				v, has := n.Fields.Get(spec.Name)
-				if !has || v.Kind != graph.KindString {
-					continue
-				}
-				if !pathMatches(v.S, pattern) {
-					continue
-				}
+			for _, n := range nodes {
 				if b.Where != nil {
 					ok, err := evalWhere(g, b.Where, n)
 					if err != nil {
@@ -77,22 +59,6 @@ func ApplyAdapters(kb *KB, g *graph.Store) error {
 	return nil
 }
 
-// pathFieldOf finds the node type's resolved-path field: the substrate Call and
-// Attr types declare one; nodes of types without a path field are not
-// path-matchable.
-func pathFieldOf(g *graph.Store, n graph.Node) (graph.FieldSpec, bool) {
-	ts, ok := g.SchemaOf(n.Type)
-	if !ok {
-		return graph.FieldSpec{}, false
-	}
-	for _, f := range ts.Fields {
-		if f.Name == "path" && f.Kind == graph.KindString {
-			return f, true
-		}
-	}
-	return graph.FieldSpec{}, false
-}
-
 // pathMatches implements segment-boundary equality, prefix, and suffix.
 func pathMatches(path, arg string) bool {
 	if path == arg {
@@ -107,6 +73,27 @@ func pathMatches(path, arg string) bool {
 	return false
 }
 
+// segTailMatch reports whether a decorator token ends with the glob's segment
+// tail: *.route matches app.route, route matches app.route, but rou matches
+// nothing — the boundary is a whole segment, never a fragment.
+func segTailMatch(token, glob string) bool {
+	segs := func(s string) []string { return strings.Split(s, ".") }
+	t, gp := segs(token), segs(glob)
+	if len(gp) > len(t) {
+		return false
+	}
+	for i := 1; i <= len(gp); i++ {
+		g := gp[len(gp)-i]
+		if g == "*" {
+			continue
+		}
+		if t[len(t)-i] != g {
+			return false
+		}
+	}
+	return true
+}
+
 // ladderFloat maps the ordinal ladder onto the 0..1 confidence the graph record
 // carries: signal=0, possibility=0.25, low=0.5, medium=0.75, high=1.
 func ladderFloat(c Confidence) float64 {
@@ -118,6 +105,32 @@ func ladderFloat(c Confidence) float64 {
 // a 1b binding has exactly one implicit node binding.
 func evalWhere(g *graph.Store, e Expr, n graph.Node) (bool, error) {
 	switch x := e.(type) {
+	case *Call:
+		// decorated_by(glob): a parameter entry of the enclosing function carries
+		// a raw decorator token matching the glob's segment tail.
+		if x.Name == "decorated_by" && len(x.Args) == 1 {
+			lit, ok := x.Args[0].(*Literal)
+			if !ok || lit.Kind != TokString {
+				return false, fmt.Errorf("decorated_by takes a string glob")
+			}
+			glob := unquote(lit.Text)
+			for _, arg := range childArgs(g, n) {
+				if arg.Type != "code.ParamEntry" {
+					continue
+				}
+				d, ok := arg.Fields.Get("decorators")
+				if !ok || d.Kind != graph.KindList {
+					continue
+				}
+				for _, tok := range d.L {
+					if segTailMatch(tok.S, glob) {
+						return true, nil
+					}
+				}
+			}
+			return false, nil
+		}
+		return false, fmt.Errorf("unsupported call in where")
 	case *Literal:
 		if x.Kind != TokBool {
 			return false, fmt.Errorf("literal %q is not boolean", x.Text)

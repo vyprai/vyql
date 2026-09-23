@@ -4,24 +4,16 @@ import (
 	"testing"
 
 	"github.com/vyprai/vyql/internal/vygraph/graph"
+	"github.com/vyprai/vyql/internal/vygraph/nir"
 	"github.com/vyprai/vyql/internal/vygraph/ontology"
 )
 
 func pathStore(t *testing.T) *graph.Store {
 	t.Helper()
 	s := graph.NewSchemas()
-	must := func(ts *graph.TypeSchema) {
-		if err := s.Register(ts); err != nil {
-			t.Fatalf("Register(%s): %v", ts.Type, err)
-		}
+	if err := nir.Register(s); err != nil {
+		t.Fatal(err)
 	}
-	must(&graph.TypeSchema{Type: "code.Call", Layer: graph.LayerLow,
-		Fields: []graph.FieldSpec{{Name: "path", Kind: graph.KindString}}, Key: []string{"path"}})
-	must(&graph.TypeSchema{Type: "code.DataAccess", Layer: graph.LayerHigh,
-		Fields: []graph.FieldSpec{
-			{Name: "table", Kind: graph.KindString},
-			{Name: "op", Kind: graph.KindEnum, Enum: []string{"read", "write"}},
-		}, Key: []string{"table", "op"}})
 	return graph.New(s)
 }
 
@@ -29,6 +21,9 @@ func addCall(t *testing.T, g *graph.Store, id, path string) {
 	t.Helper()
 	var f graph.Fields
 	f.Set("path", graph.Str(path))
+	// The fixture graphs simulate resolution having run: both path fields carry
+	// the same value, so code.path (qualified) and code.syntacticPath both match.
+	f.Set("qualified_path", graph.Str(path))
 	if err := g.AddNode(graph.Node{ID: id, Type: "code.Call", Layer: graph.LayerLow, Fields: f}); err != nil {
 		t.Fatal(err)
 	}

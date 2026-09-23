@@ -169,6 +169,199 @@ func (p *parser) parseManifest(name string) (*Manifest, error) {
 	return m, nil
 }
 
+func (p *parser) parseLift() (LiftDecl, error) {
+	l := LiftDecl{Pos: p.pos()}
+	p.next() // lift
+	target, err := p.expectDotted("high type")
+	if err != nil {
+		return l, err
+	}
+	l.Target = target
+	if err := p.expectKeyword("from"); err != nil {
+		return l, err
+	}
+	switch {
+	case p.isKeyword("framework"):
+		p.next()
+		name, err := p.expectName("framework name")
+		if err != nil {
+			return l, err
+		}
+		l.Framework = name
+	default:
+		m, err := p.parseMatcher()
+		if err != nil {
+			return l, err
+		}
+		l.From = m
+	}
+	if p.isKeyword("where") {
+		p.next()
+		w, err := p.parseExpr()
+		if err != nil {
+			return l, err
+		}
+		l.Where = w
+	}
+	if err := p.expectPunct("{"); err != nil {
+		return l, err
+	}
+	for !p.isPunct("}") {
+		name, err := p.expectName("field name")
+		if err != nil {
+			return l, err
+		}
+		if err := p.expectPunct(":"); err != nil {
+			return l, err
+		}
+		// The copy form: `from flows(self) by resolution` — copy the frontend's
+		// resolved FLOWS facts rather than compute a native expression.
+		if p.isKeyword("from") && p.toks[p.i+1].Kind == TokIdent && p.toks[p.i+1].Text == "flows" {
+			p.next()
+			for _, want := range []string{"flows", "(", "self", ")", "by", "resolution"} {
+				if want == "(" || want == ")" {
+					if err := p.expectPunct(want); err != nil {
+						return l, err
+					}
+					continue
+				}
+				w, err := p.expectName(want)
+				if err != nil {
+					return l, err
+				}
+				_ = w
+			}
+			l.Copies = append(l.Copies, name)
+			continue
+		}
+		v, err := p.parseExpr()
+		if err != nil {
+			return l, err
+		}
+		l.Fields = append(l.Fields, LiftField{Name: name, Value: v})
+	}
+	p.next() // }
+	return l, nil
+}
+
+func (p *parser) parseRelate() (RelateDecl, error) {
+	r := RelateDecl{Pos: p.pos()}
+	p.next() // relate
+	edge, err := p.expectName("edge name")
+	if err != nil {
+		return r, err
+	}
+	r.Edge = edge
+	if err := p.expectKeyword("from"); err != nil {
+		return r, err
+	}
+	from, err := p.expectDotted("high type")
+	if err != nil {
+		return r, err
+	}
+	r.From = from
+	if err := p.expectKeyword("to"); err != nil {
+		return r, err
+	}
+	to, err := p.expectDotted("high type")
+	if err != nil {
+		return r, err
+	}
+	r.To = to
+	switch {
+	case p.cur().Kind == TokIdent && p.cur().Text == "by":
+		p.next()
+		kind, err := p.expectName("derivation")
+		if err != nil {
+			return r, err
+		}
+		if kind != "resolution" {
+			return r, p.errorf("the code-side derivation is by resolution; enclosing/ref land with config")
+		}
+		r.By = "resolution"
+	case p.cur().Kind == TokIdent && p.cur().Text == "over":
+		p.next()
+		edgeType, err := p.expectName("edge type")
+		if err != nil {
+			return r, err
+		}
+		if edgeType != "FLOWS" {
+			return r, p.errorf("over takes FLOWS in the 1c subset")
+		}
+		r.By = "FLOWS"
+	default:
+		return r, p.errorf("relate needs by resolution or over FLOWS")
+	}
+	return r, nil
+}
+
+func (p *parser) parseFramework() (FrameworkDecl, error) {
+	fw := FrameworkDecl{Pos: p.pos()}
+	p.next() // framework
+	name, err := p.expectName("framework name")
+	if err != nil {
+		return fw, err
+	}
+	fw.Name = name
+	if err := p.expectPunct("{"); err != nil {
+		return fw, err
+	}
+	for !p.isPunct("}") {
+		if p.cur().Kind != TokIdent || p.cur().Text != "route" {
+			return fw, p.errorf("expected route, got %q", p.cur().Text)
+		}
+		p.next()
+		if p.cur().Kind != TokIdent || p.cur().Text != "on" {
+			return fw, p.errorf("expected on, got %q", p.cur().Text)
+		}
+		p.next()
+		rt := RouteDecl{Pos: p.pos()}
+		m, err := p.parseMatcher()
+		if err != nil {
+			return fw, err
+		}
+		rt.On = m
+		if p.isKeyword("where") {
+			p.next()
+			w, err := p.parseExpr()
+			if err != nil {
+				return fw, err
+			}
+			rt.Where = w
+		}
+		if err := p.expectPunct("{"); err != nil {
+			return fw, err
+		}
+		for !p.isPunct("}") {
+			fld, err := p.expectName("method, path, or handler")
+			if err != nil {
+				return fw, err
+			}
+			if err := p.expectPunct(":"); err != nil {
+				return fw, err
+			}
+			v, err := p.parseExpr()
+			if err != nil {
+				return fw, err
+			}
+			switch fld {
+			case "method":
+				rt.Method = v
+			case "path":
+				rt.Path = v
+			case "handler":
+				rt.Handler = v
+			default:
+				return fw, p.errorf("unknown route field %q", fld)
+			}
+		}
+		p.next() // }
+		fw.Routes = append(fw.Routes, rt)
+	}
+	p.next() // }
+	return fw, nil
+}
+
 func (p *parser) parseStmt(f *File) error {
 	switch {
 	case p.isKeyword("concept"):
@@ -201,6 +394,24 @@ func (p *parser) parseStmt(f *File) error {
 			return err
 		}
 		f.Queries = append(f.Queries, q)
+	case p.isKeyword("lift") && p.cur().Kind == TokKeyword:
+		l, err := p.parseLift()
+		if err != nil {
+			return err
+		}
+		f.Lifts = append(f.Lifts, l)
+	case p.isKeyword("relate"):
+		r, err := p.parseRelate()
+		if err != nil {
+			return err
+		}
+		f.Relates = append(f.Relates, r)
+	case p.isKeyword("framework"):
+		fw, err := p.parseFramework()
+		if err != nil {
+			return err
+		}
+		f.Frameworks = append(f.Frameworks, fw)
 	default:
 		return p.errorf("expected a declaration (concept, threat, adapter, rule, query), got %q", p.cur().Text)
 	}
@@ -864,6 +1075,25 @@ func (p *parser) parsePrimary() (Expr, error) {
 				return nil, err
 			}
 			return e, nil
+		}
+		// A leading dot is the lift field-map's source-relative reference: .name
+		// reads the matched low node's field.
+		if p.isPunct(".") {
+			p.next()
+			name, err := p.expectName("field name after '.'")
+			if err != nil {
+				return nil, err
+			}
+			fields := []string{name}
+			for p.isPunct(".") {
+				p.next()
+				f, err := p.expectName("field name")
+				if err != nil {
+					return nil, err
+				}
+				fields = append(fields, f)
+			}
+			return &FieldRef{Var: "", Fields: fields, Pos: pos}, nil
 		}
 		return nil, p.errorf("unexpected %q in expression", p.cur().Text)
 	case TokIdent:

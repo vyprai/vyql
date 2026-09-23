@@ -68,6 +68,7 @@ var keywords = map[string]bool{
 	"and": true, "or": true, "not": true, "in": true, "any": true, "all": true,
 	"count": true, "has": true,
 	"under": true, "matches": true, "contains": true, "starts_with": true,
+	"lift": true, "relate": true, "framework": true, "from": true, "to": true,
 }
 
 // multiPunct lists multi-character punctuation, longest-match first. Edge-pattern

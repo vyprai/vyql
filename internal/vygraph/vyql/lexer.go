@@ -60,9 +60,12 @@ func Lex(src string) ([]Token, error) {
 				return nil, lexError(startL, startC, "unterminated string")
 			}
 			push(TokString, src[i-(col-startC):i], startL, startC)
-		case c >= '0' && c <= '9':
+		case c >= '0' && c <= '9' || c == '-' && i+1 < n && src[i+1] >= '0' && src[i+1] <= '9':
 			startC := col
 			j := i
+			if src[i] == '-' {
+				adv(1)
+			}
 			for i < n && src[i] >= '0' && src[i] <= '9' {
 				adv(1)
 			}

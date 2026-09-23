@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/vyprai/vyql/internal/vygraph/graph"
+	"github.com/vyprai/vyql/internal/vygraph/nir"
 	"github.com/vyprai/vyql/internal/vygraph/solver"
 )
 
@@ -44,8 +45,7 @@ func (stubTaint) Solve(g *graph.Store, in solver.Input) ([]solver.Result, error)
 func pathSchemas(t *testing.T) *graph.Schemas {
 	t.Helper()
 	s := graph.NewSchemas()
-	if err := s.Register(&graph.TypeSchema{Type: "code.Call", Layer: graph.LayerLow,
-		Fields: []graph.FieldSpec{{Name: "path", Kind: graph.KindString}}, Key: []string{"path"}}); err != nil {
+	if err := nir.Register(s); err != nil {
 		t.Fatal(err)
 	}
 	return s
