@@ -7194,6 +7194,12 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) ([]*funcInfo, bool)
 		if f, ok := l.uniqueTechFuncInfo(l.funcShort[c.Attr]); ok {
 			return []*funcInfo{f}, false
 		}
+		// The one ambiguity that guard over-counts: a class declaring a CLASS-LEVEL method of
+		// the name beside an INSTANCE one is two declarations of the name but one candidate for
+		// a receiver that is not the class itself. See uniqueInstanceFuncInfo.
+		if f, ok := l.uniqueInstanceFuncInfo(l.funcShort[c.Attr]); ok {
+			return []*funcInfo{f}, false
+		}
 	}
 	return nil, false
 }
@@ -7661,6 +7667,33 @@ func (l *lowerer) uniqueTechFuncInfo(in []*funcInfo) (*funcInfo, bool) {
 		}
 		if found != nil {
 			return nil, false // ambiguous — second compatible match
+		}
+		found = info
+	}
+	return found, found != nil
+}
+
+// uniqueInstanceFuncInfo is uniqueTechFuncInfo over the INSTANCE declarations only: a
+// class-level declaration of the name (`def self.x`, `class << self`) is not a candidate for a
+// member call whose receiver is not the class itself, which is the one call shape that asks —
+// every route that could have named the class has already failed by then (see callNamesClassLevel:
+// "every other receiver is an instance"). So a name that is unique among instance methods is not
+// made ambiguous by a class-level method of it, whether that one sits in the same class or —
+// the shape a Struct block produces, where the instance half is attributed to the enclosing
+// module — in another. The uniqueness guard itself is unchanged: a second INSTANCE declaration
+// of the name, on any class, still refuses.
+func (l *lowerer) uniqueInstanceFuncInfo(in []*funcInfo) (*funcInfo, bool) {
+	if len(in) == 0 {
+		return nil, false
+	}
+	curTech := l.moduleTech[l.curModule]
+	var found *funcInfo
+	for _, info := range in {
+		if info == nil || info.static || !compatibleTech(curTech, l.moduleTech[info.module]) {
+			continue
+		}
+		if found != nil {
+			return nil, false // ambiguous — second compatible instance declaration
 		}
 		found = info
 	}
