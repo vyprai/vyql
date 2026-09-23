@@ -31,6 +31,9 @@ fixture in this package's tests):
 
 ## Languages
 
-- python: landed (this package)
-- javascript, java: same pattern, pending
+- python: landed
+- javascript: landed (member paths, template Format, arrow callbacks walked as
+  functions so registration-call handlers lower, import specifiers)
+- java: landed (method declarations with formal parameters, field access
+  chains, block/constructor bodies, catch/finally regions)
 - golang: fresh go/ast frontend, pending
