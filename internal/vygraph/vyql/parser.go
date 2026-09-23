@@ -188,6 +188,33 @@ func (p *parser) parseLift() (LiftDecl, error) {
 			return l, err
 		}
 		l.Framework = name
+	case p.cur().Kind == TokIdent && p.cur().Text == "doc":
+		// The doc-lift form: from doc where kind == "…" [at "path"] — selects
+		// doc.* nodes by their inherited kind, optionally descended.
+		p.next()
+		l.FromDoc = true
+		if !(p.isKeyword("where") || (p.cur().Kind == TokIdent && p.cur().Text == "where")) {
+			return l, p.errorf("doc lifts need: where kind == \"…\"")
+		}
+		p.next()
+		if p.cur().Kind != TokIdent || p.cur().Text != "kind" {
+			return l, p.errorf("doc lifts select on kind")
+		}
+		p.next()
+		if err := p.expectPunct("=="); err != nil {
+			return l, err
+		}
+		if p.cur().Kind != TokString {
+			return l, p.errorf("doc kind must be a string literal")
+		}
+		l.DocKind = unquote(p.next().Text)
+		if p.cur().Kind == TokIdent && p.cur().Text == "at" {
+			p.next()
+			if p.cur().Kind != TokString {
+				return l, p.errorf("at takes a path string")
+			}
+			l.At = unquote(p.next().Text)
+		}
 	default:
 		m, err := p.parseMatcher()
 		if err != nil {
@@ -195,7 +222,7 @@ func (p *parser) parseLift() (LiftDecl, error) {
 		}
 		l.From = m
 	}
-	if p.isKeyword("where") {
+	if p.isKeyword("where") && !l.FromDoc {
 		p.next()
 		w, err := p.parseExpr()
 		if err != nil {
@@ -275,10 +302,29 @@ func (p *parser) parseRelate() (RelateDecl, error) {
 		if err != nil {
 			return r, err
 		}
-		if kind != "resolution" {
-			return r, p.errorf("the code-side derivation is by resolution; enclosing/ref land with config")
+		switch kind {
+		case "resolution":
+			r.By = "resolution"
+		case "ref":
+			// by ref <fieldA> == <TypeB>.<fieldB> — the key-equality join.
+			r.By = "ref"
+			if err := p.expectPunct("."); err != nil {
+				return r, p.errorf("by ref names the from-field as .<field>")
+			}
+			r.FromField, err = p.expectName("from field")
+			if err != nil {
+				return r, err
+			}
+			if err := p.expectPunct("=="); err != nil {
+				return r, err
+			}
+			r.ToField, err = p.expectDotted("type.field")
+			if err != nil {
+				return r, err
+			}
+		default:
+			return r, p.errorf("derivation is by resolution, over FLOWS, or by ref")
 		}
-		r.By = "resolution"
 	case p.cur().Kind == TokIdent && p.cur().Text == "over":
 		p.next()
 		edgeType, err := p.expectName("edge type")
@@ -1174,11 +1220,19 @@ func (p *parser) parsePrimary() (Expr, error) {
 		// reads the matched low node's field.
 		if p.isPunct(".") {
 			p.next()
-			name, err := p.expectName("field name after '.'")
-			if err != nil {
-				return nil, err
+			// The source-relative reference accepts a dotted path directly:
+			// .metadata.name descends two keyed children of the doc origin.
+			var name string
+			var err error
+			if p.cur().Kind == TokDottedIdent {
+				name = p.next().Text
+			} else {
+				name, err = p.expectName("field name after '.'")
+				if err != nil {
+					return nil, err
+				}
 			}
-			fields := []string{name}
+			fields := splitSegments(name)
 			for p.isPunct(".") {
 				p.next()
 				f, err := p.expectName("field name")

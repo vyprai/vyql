@@ -27,7 +27,11 @@ type LiftDecl struct {
 	Fields    []LiftField // ordered field map
 	Copies    []string    // fields using the copy form `from flows(self) by resolution`
 	Framework string      // non-empty: lift from a framework model's route facts
-	Pos       Pos
+	// Doc-lift form: from doc where kind == "..." at "path".
+	FromDoc bool
+	DocKind string
+	At      string // optional path selector; [*] targets every seq element
+	Pos     Pos
 }
 
 // LiftField is one target-field binding.
@@ -37,13 +41,16 @@ type LiftField struct {
 }
 
 // RelateDecl derives a high-level edge between high nodes from low-level
-// structure — by resolution (the call graph) or over FLOWS (the value graph).
+// structure — by resolution (the call graph), over FLOWS (the value graph), or
+// by ref (a key equality across nodes: the cross-domain resolution join).
 type RelateDecl struct {
-	Edge string // edge type name, e.g. calls
+	Edge string // edge type name, e.g. calls, anchor
 	From string // high type A
 	To   string // high type B
-	By   string // "resolution" | "FLOWS"
-	Pos  Pos
+	By   string // "resolution" | "FLOWS" | "ref"
+	// by ref: FromField == ToType.ToField over the two node sets.
+	FromField, ToField string
+	Pos                Pos
 }
 
 // FrameworkDecl interprets generic low-level facts (route-registration calls,

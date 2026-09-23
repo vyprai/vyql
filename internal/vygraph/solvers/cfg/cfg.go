@@ -144,6 +144,12 @@ func regionRoot(a, b string) string {
 // surviving finding at lowered fidelity — never a weaker thing the
 // suppressor accepts).
 func GuardDischarge(g *graph.Store, opHighID, concept string, labelled func(string) bool) (holds bool, evidence string) {
+	// A guard labelled directly on the guarded node — a framework-injected
+	// auth fact on the entrypoint, a decorator-middleware guard — discharges
+	// trivially: the whole operation carries the guard.
+	if labelled(opHighID) {
+		return true, ""
+	}
 	op, ok := g.Node(opHighID)
 	if ok {
 		if backed, has := g.Backing(opHighID); has {

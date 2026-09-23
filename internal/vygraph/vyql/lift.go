@@ -214,6 +214,12 @@ func ApplyLifts(kb *KB, g *graph.Store) error {
 	}
 	for _, f := range kb.Files {
 		for _, l := range f.Lifts {
+			if l.FromDoc {
+				if err := applyDocLift(kb, g, l); err != nil {
+					return err
+				}
+				continue
+			}
 			if l.Framework != "" {
 				if err := applyFrameworkLift(kb, g, l, facts[l.Framework]); err != nil {
 					return err
@@ -377,6 +383,133 @@ func evalLiftExpr(g *graph.Store, e Expr, n graph.Node) (graph.Value, error) {
 	return graph.Value{}, fmt.Errorf("unsupported lift expression")
 }
 
+// applyDocLift builds high nodes from doc.* origins: select roots by their
+// inherited kind, descend the optional at-path ([*] fans over seq elements),
+// map fields by walking keyed child edges.
+func applyDocLift(kb *KB, g *graph.Store, l LiftDecl) error {
+	var roots []graph.Node
+	for _, typ := range []string{"doc.Map", "doc.Seq"} {
+		for _, n := range g.NodesOfType(typ) {
+			if v, ok := n.Fields.Get("path"); ok && v.S == "$" {
+				if k, ok := n.Fields.Get("kind"); ok && k.S == l.DocKind {
+					roots = append(roots, n)
+				}
+			}
+		}
+	}
+	var origins []graph.Node
+	for _, root := range roots {
+		if l.At == "" {
+			origins = append(origins, root)
+			continue
+		}
+		origins = append(origins, descend(g, root, l.At)...)
+	}
+	for _, origin := range origins {
+		var fields graph.Fields
+		for _, lf := range l.Fields {
+			v := docField(g, origin, lf)
+			if v.Kind != 0 || v.S != "" || v.I != 0 || v.B {
+				fields.Set(lf.Name, coerce(g, l.Target, lf.Name, v))
+			}
+		}
+		if err := upsertHigh(kb, g, l.Target, fields, origin); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// descend walks an at-path: dotted keys and [*] fan-out over sequences.
+func descend(g *graph.Store, n graph.Node, at string) []graph.Node {
+	if at == "" {
+		return []graph.Node{n}
+	}
+	seg, rest := at, ""
+	for i := 0; i < len(at); i++ {
+		if at[i] == '.' && (i+1 < len(at) && at[i+1] != '*' || i+1 >= len(at)) {
+			seg, rest = at[:i], at[i+1:]
+			break
+		}
+	}
+	if seg == "*" || seg == "[*]" {
+		var out []graph.Node
+		for _, e := range g.Out(n.ID, "child") {
+			if c, ok := g.Node(e.To); ok {
+				out = append(out, descend(g, c, rest)...)
+			}
+		}
+		return out
+	}
+	var out []graph.Node
+	for _, e := range g.Out(n.ID, "child") {
+		kf, ok := e.Fields.Get("key")
+		if !ok || kf.S != strings.TrimSuffix(seg, "[*]") {
+			continue
+		}
+		if c, ok := g.Node(e.To); ok {
+			out = append(out, descend(g, c, rest)...)
+		}
+	}
+	return out
+}
+
+// docField resolves one field-map entry over a doc origin: .key walks a keyed
+// child (dotted via ."a.b" quoted descent); a literal passes through.
+func docField(g *graph.Store, origin graph.Node, lf LiftField) graph.Value {
+	switch x := lf.Value.(type) {
+	case *Literal:
+		switch x.Kind {
+		case TokString:
+			return graph.Str(unquote(x.Text))
+		case TokNumber:
+			var i int64
+			if _, err := fmt.Sscanf(x.Text, "%d", &i); err == nil {
+				return graph.Int(i)
+			}
+		case TokBool:
+			return graph.Bool(x.Text == "true")
+		}
+		return graph.Value{}
+	case *FieldRef:
+		cur := origin
+		for _, key := range x.Fields {
+			found := false
+			for _, e := range g.Out(cur.ID, "child") {
+				kf, ok := e.Fields.Get("key")
+				if ok && kf.S == key {
+					if c, ok := g.Node(e.To); ok {
+						cur = c
+						found = true
+						break
+					}
+				}
+			}
+			if !found {
+				return graph.Value{}
+			}
+		}
+		if v, ok := cur.Fields.Get("value"); ok {
+			return typedScalar(v.S)
+		}
+		return graph.Value{}
+	}
+	return graph.Value{}
+}
+
+// typedScalar re-mints a scalar's text toward its natural kind so the target
+// schema's typed fields validate.
+func typedScalar(s string) graph.Value {
+	if s == "true" || s == "false" {
+		return graph.Bool(s == "true")
+	}
+	var i int64
+	if _, err := fmt.Sscanf(s, "%d", &i); err == nil {
+		return graph.Int(i)
+	}
+	return graph.Str(s)
+}
+
 // filtersFromFlows implements the copy form: the frontend's resolved FLOWS
 // reaching the node's child arguments, copied as the list of bound upstream
 // value names with resolved provenance.
@@ -446,6 +579,35 @@ func upsertHigh(kb *KB, g *graph.Store, target string, fields graph.Fields, back
 func ApplyRelates(kb *KB, g *graph.Store) error {
 	for _, f := range kb.Files {
 		for _, r := range f.Relates {
+			if r.By == "ref" {
+				// The key-equality join: A.fromField == B.toField across the
+				// two lifted node sets — the cross-domain resolution edge
+				// (anchor) is ordinary data.
+				toField := r.ToField
+				if i := strings.LastIndex(toField, "."); i >= 0 {
+					toField = toField[i+1:]
+				}
+				for _, a := range g.NodesOfType(r.From) {
+					av, ok := a.Fields.Get(r.FromField)
+					if !ok || av.S == "" {
+						continue
+					}
+					for _, b := range g.NodesOfType(r.To) {
+						bv, ok := b.Fields.Get(toField)
+						if !ok || bv.S != av.S {
+							continue
+						}
+						if err := g.AddEdge(graph.Edge{
+							ID:   "relate:" + r.Edge + ":" + a.ID + ":" + b.ID,
+							Type: r.Edge, From: a.ID, To: b.ID,
+							Prov: graph.Provenance{Producer: "relate", Build: graph.BuildRelated, Trust: kb.Trust},
+						}); err != nil {
+							return err
+						}
+					}
+				}
+				continue
+			}
 			lowType := "CALLS"
 			if r.By == "FLOWS" {
 				lowType = "FLOWS"

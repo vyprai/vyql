@@ -467,6 +467,15 @@ func (p *Program) evalRule(g *graph.Store, r RuleDecl, reg SolverRegistry, sets 
 				}
 				break
 			}
+			// The unless suppressor applies to match bodies exactly as to flow
+			// bodies: a provable discharge (a guard dominating the matched op)
+			// suppresses; unprovable means the finding survives.
+			if b.Unless != nil {
+				proof := &solver.Proof{Source: first, Target: last, Steps: []solver.Step{{From: first, To: last, Via: "match"}}}
+				if p.discharge(g, proof, b.Unless) {
+					continue
+				}
+			}
 			emit(Result{RuleID: r.Meta.ID, Source: first, Target: last, Confidence: conf, Stream: b.Emit})
 		}
 	}
