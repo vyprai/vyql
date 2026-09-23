@@ -269,8 +269,13 @@ func (c *conv) stmt(n *tree_sitter.Node) {
 }
 
 func (c *conv) functionDef(n *tree_sitter.Node, name string) {
+	// The FuncDef's own region IS the function region: it encloses its body,
+	// so region-prefix matching reaches it.
+	saved0 := c.region
+	c.region = "fn:" + name
 	fnNode, ok := c.add(n, "code.FuncDef", [][2]string{{"name", name}, {"qualified_name", c.file}}, false)
 	if !ok {
+		c.region = saved0
 		return
 	}
 	if params := n.ChildByFieldName("parameters"); params != nil {
@@ -309,8 +314,6 @@ func (c *conv) functionDef(n *tree_sitter.Node, name string) {
 			idx++
 		}
 	}
-	saved := c.region
-	c.region = "fn:" + name
 	if body := n.ChildByFieldName("body"); body != nil {
 		switch body.Kind() {
 		case "statement_block", "block", "constructor_body":
@@ -319,7 +322,7 @@ func (c *conv) functionDef(n *tree_sitter.Node, name string) {
 			c.expr(body)
 		}
 	}
-	c.region = saved
+	c.region = saved0
 }
 
 func (c *conv) paramName(p *tree_sitter.Node) string {

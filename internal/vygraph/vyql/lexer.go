@@ -69,6 +69,14 @@ func Lex(src string) ([]Token, error) {
 			for i < n && src[i] >= '0' && src[i] <= '9' {
 				adv(1)
 			}
+			// Float literal: a dot followed by a digit extends the number (a
+			// trailing dot with no digit stays a punct).
+			if i+1 < n && src[i] == '.' && src[i+1] >= '0' && src[i+1] <= '9' {
+				adv(1)
+				for i < n && src[i] >= '0' && src[i] <= '9' {
+					adv(1)
+				}
+			}
 			push(TokNumber, src[j:i], line, startC)
 		case isIdentStart(c):
 			startL, startC, j := line, col, i

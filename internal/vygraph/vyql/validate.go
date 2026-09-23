@@ -184,7 +184,35 @@ func Validate(f *File, kb *Knowledge) []error {
 				fail(r.Pos, "rule %q: unknown confidence_floor %q", r.Name, r.Meta.ConfidenceFloor)
 			}
 		}
+		if r.Body.Deviates != nil {
+			d := r.Body.Deviates
+			if r.Body.Emit == EmitFinding {
+				fail(r.Pos, "rule %q: a deviates body emits signal, never finding — the clamp is by construction", r.Name)
+			}
+			switch d.Selector {
+			case "same_router", "same_model", "same_annotation_class":
+			default:
+				fail(d.Pos, "rule %q: unknown peer selector %q (registered: same_router, same_model, same_annotation_class)", r.Name, d.Selector)
+			}
+			c, ok := kb.Onto.Get(d.Feature)
+			if !ok {
+				fail(d.Pos, "rule %q: deviates names undefined concept %q", r.Name, d.Feature)
+			} else if !c.HasKind("guard") && !c.HasKind("control") {
+				fail(d.Pos, "rule %q: the deviates feature must be a guard or control concept; %q is %v", r.Name, d.Feature, c.Kinds)
+			}
+			if d.MinGroup < 2 {
+				fail(d.Pos, "rule %q: min_group must be at least 2", r.Name)
+			}
+			if d.Threshold <= 0 || d.Threshold > 1 {
+				fail(d.Pos, "rule %q: threshold must be in (0,1]", r.Name)
+			}
+		}
 		kb.checkBody(r.Name, r.Body, fail)
+	}
+	for _, gh := range f.GuardHints {
+		if _, ok := kb.Onto.Get(gh.Concept); !ok {
+			fail(gh.Pos, "guard_hint names undefined concept %q", gh.Concept)
+		}
 	}
 	for _, q := range f.Queries {
 		kb.checkBody(q.Name, q.Body, fail)

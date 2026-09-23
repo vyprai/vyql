@@ -3,6 +3,7 @@ package vyql
 import (
 	"fmt"
 
+	"github.com/vyprai/vyql/internal/vygraph/deviate"
 	"github.com/vyprai/vyql/internal/vygraph/engine"
 	"github.com/vyprai/vyql/internal/vygraph/graph"
 	"github.com/vyprai/vyql/internal/vygraph/solver"
@@ -376,6 +377,32 @@ func (p *Program) evalRule(g *graph.Store, r RuleDecl, reg SolverRegistry, sets 
 
 	b := r.Body
 	switch {
+	case b.Deviates != nil:
+		// The deviation clause operates over the bound match set: partition by
+		// the selector key, detect the guard-ish feature, emit signals for
+		// outliers. Routing is by construction — the emit is signal-only.
+		bindings, err := p.evalMatch(g, b, sets)
+		if err != nil {
+			return err
+		}
+		var members []string
+		for _, bind := range bindings {
+			for _, pat := range b.Match {
+				if len(pat.Nodes) > 0 {
+					if v := pat.Nodes[len(pat.Nodes)-1].Var; v != "" {
+						members = append(members, bind[v])
+					}
+				}
+			}
+		}
+		keyFn := p.selectorKey(g, b.Deviates.Selector)
+		carryFn := p.featureCarrier(g, b.Deviates.Feature)
+		for _, res := range deviate.Deviate(members, keyFn, carryFn,
+			deviate.Params{MinGroup: b.Deviates.MinGroup, Threshold: b.Deviates.Threshold}) {
+			emit(Result{RuleID: r.Meta.ID, Source: res.Source(), Target: res.Target(),
+				Confidence: ladderFloat(ConfSignal), Stream: EmitSignal,
+				Proof: solver.ProofTree(res)})
+		}
 	case b.Sugar != nil && b.Sugar.Verb == "present":
 		for _, id := range engine.NodesWithConcept(g, p.KB.Onto, b.Sugar.From) {
 			if b.Where != nil {
@@ -444,6 +471,111 @@ func (p *Program) evalRule(g *graph.Store, r RuleDecl, reg SolverRegistry, sets 
 		}
 	}
 	return nil
+}
+
+// selectorKey builds the peer-group key function for a registered selector,
+// computed over the lifted domain roles the graph already indexes (the frozen
+// schema from the prototype run): the decorator class for
+// same_annotation_class, the accessed table for same_model, the router role
+// for same_router.
+func (p *Program) selectorKey(g *graph.Store, selector string) func(string) string {
+	switch selector {
+	case "same_annotation_class":
+		return func(id string) string {
+			n, ok := g.Node(id)
+			if !ok {
+				return ""
+			}
+			// The member's backing FuncDef carries ParamEntries whose decorator
+			// tokens name the annotation class.
+			backed := n
+			if b, has := g.Backing(id); has {
+				backed = b
+			}
+			for _, e := range g.Out(backed.ID, "child") {
+				c, ok := g.Node(e.To)
+				if !ok || c.Type != "code.ParamEntry" {
+					continue
+				}
+				if d, ok := c.Fields.Get("decorators"); ok && d.Kind == graph.KindList && len(d.L) > 0 {
+					return d.L[0].S
+				}
+			}
+			return ""
+		}
+	case "same_model":
+		return func(id string) string {
+			n, ok := g.Node(id)
+			if !ok {
+				return ""
+			}
+			backed := n
+			if b, has := g.Backing(id); has {
+				backed = b
+			}
+			tables := ""
+			for _, e := range g.Out(backed.ID, "CALLS") {
+				_ = e
+			}
+			// Functions touching the same table: key by the accessed table of
+			// DataAccess nodes they anchor to (Phase 4 wires the anchor edge;
+			// today the key comes from call-site table facts where present).
+			for _, da := range g.NodesOfType("code.DataAccess") {
+				if b, has := g.Backing(da.ID); has && b.ID == backed.ID {
+					if t, ok := da.Fields.Get("table"); ok {
+						tables += t.S + ","
+					}
+				}
+			}
+			return tables
+		}
+	case "same_router":
+		return func(id string) string {
+			n, ok := g.Node(id)
+			if !ok {
+				return ""
+			}
+			// The router role is the framework-registration parent: entrypoints
+			// under one registration object share its receiver prefix.
+			if b, has := g.Backing(id); has {
+				if v, ok := b.Fields.Get("path"); ok && v.S != "" {
+					segs := splitFirst(v.S)
+					if segs != "" {
+						return segs
+					}
+				}
+			}
+			if v, ok := n.Fields.Get("httpPath"); ok {
+				return v.S
+			}
+			return ""
+		}
+	}
+	return func(string) string { return "" }
+}
+
+func splitFirst(path string) string {
+	for i := 0; i < len(path); i++ {
+		if path[i] == '.' {
+			return path[:i]
+		}
+	}
+	return ""
+}
+
+// featureCarrier builds the membership predicate: a node carries the feature
+// when it — or its low backing, where adapter and hint labels land — is
+// labelled with the concept through the ontology's refines lattice.
+func (p *Program) featureCarrier(g *graph.Store, concept string) func(string) bool {
+	return func(id string) bool {
+		if p.labelledAs(g, id, concept) {
+			return true
+		}
+		if b, has := g.Backing(id); has && p.labelledAs(g, b.ID, concept) {
+			return true
+		}
+		return false
+	}
 }
 
 // flowConfidence mins the rule-level confidence with the fidelity of the

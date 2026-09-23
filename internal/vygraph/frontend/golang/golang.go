@@ -144,8 +144,11 @@ func (c *conv) decl(d ast.Decl) {
 	if fd.Recv != nil && len(fd.Recv.List) > 0 {
 		name = receiverType(fd.Recv.List[0].Type) + "." + name
 	}
+	saved0 := c.region
+	c.region = "fn:" + name
 	fnNode, ok := c.add(fd.Pos(), "code.FuncDef", [][2]string{{"name", name}, {"qualified_name", c.file}}, false)
 	if !ok {
+		c.region = saved0
 		return
 	}
 	if fd.Type != nil && fd.Type.Params != nil {
@@ -173,12 +176,10 @@ func (c *conv) decl(d ast.Decl) {
 			}
 		}
 	}
-	saved := c.region
-	c.region = "fn:" + name
 	if fd.Body != nil {
 		c.stmts(fd.Body.List)
 	}
-	c.region = saved
+	c.region = saved0
 }
 
 func receiverType(e ast.Expr) string {

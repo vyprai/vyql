@@ -194,7 +194,11 @@ func (c *conv) stmt(n *tree_sitter.Node) {
 	}
 	switch n.Kind() {
 	case "function_declaration":
-		c.functionDef(n, c.text(n.ChildByFieldName("name")))
+		name := "anon"
+		if nm := n.ChildByFieldName("name"); nm != nil {
+			name = c.text(nm)
+		}
+		c.functionDef(n, name)
 	case "method_definition", "arrow_function", "function":
 		name := "anon"
 		if nm := n.ChildByFieldName("name"); nm != nil {
@@ -306,8 +310,13 @@ func (c *conv) stmt(n *tree_sitter.Node) {
 }
 
 func (c *conv) functionDef(n *tree_sitter.Node, name string) {
+	// The FuncDef's own region IS the function region: it encloses its body,
+	// so region-prefix matching reaches it.
+	saved0 := c.region
+	c.region = "fn:" + name
 	fnNode, ok := c.add(n, "code.FuncDef", [][2]string{{"name", name}, {"qualified_name", c.file}}, false)
 	if !ok {
+		c.region = saved0
 		return
 	}
 	if params := n.ChildByFieldName("parameters"); params != nil {
@@ -346,8 +355,6 @@ func (c *conv) functionDef(n *tree_sitter.Node, name string) {
 			idx++
 		}
 	}
-	saved := c.region
-	c.region = "fn:" + name
 	if body := n.ChildByFieldName("body"); body != nil {
 		if body.Kind() == "statement_block" {
 			c.stmts(body)
@@ -355,7 +362,7 @@ func (c *conv) functionDef(n *tree_sitter.Node, name string) {
 			c.expr(body)
 		}
 	}
-	c.region = saved
+	c.region = saved0
 }
 
 func (c *conv) paramName(p *tree_sitter.Node) string {
@@ -481,7 +488,11 @@ func (c *conv) member(n *tree_sitter.Node) graph.Node {
 	obj := n.ChildByFieldName("object")
 	prop := n.ChildByFieldName("property")
 	path := c.text(n)
-	node := c.mustAdd(n, "code.Attr", [][2]string{{"path", path}, {"attr", c.text(prop)}}, false)
+	attr := ""
+	if prop != nil {
+		attr = c.text(prop)
+	}
+	node := c.mustAdd(n, "code.Attr", [][2]string{{"path", path}, {"attr", attr}}, false)
 	if obj != nil {
 		if base := c.expr(obj); base.ID != "" {
 			c.child(node, base)
@@ -494,7 +505,10 @@ func (c *conv) member(n *tree_sitter.Node) graph.Node {
 func (c *conv) call(n *tree_sitter.Node) graph.Node {
 	fnNode := n.ChildByFieldName("function")
 	args := n.ChildByFieldName("arguments")
-	callee := c.text(fnNode)
+	callee := ""
+	if fnNode != nil {
+		callee = c.text(fnNode)
+	}
 	method := ""
 	segs := strings.Split(callee, ".")
 	if len(segs) > 1 {
@@ -503,7 +517,7 @@ func (c *conv) call(n *tree_sitter.Node) graph.Node {
 	node := c.mustAdd(n, "code.Call", [][2]string{
 		{"path", callee}, {"callee", callee}, {"method", method},
 	}, n.Kind() == "new_expression")
-	if fnNode != nil && (fnNode.Kind() == "member_expression") {
+	if fnNode != nil && fnNode.Kind() == "member_expression" {
 		if base := c.expr(fnNode); base.ID != "" {
 			c.child(node, base)
 		}

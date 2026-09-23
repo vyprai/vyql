@@ -412,6 +412,30 @@ func (p *parser) parseStmt(f *File) error {
 			return err
 		}
 		f.Frameworks = append(f.Frameworks, fw)
+	case p.cur().Kind == TokIdent && p.cur().Text == "guard_hint":
+		p.next()
+		if p.cur().Kind != TokIdent || p.cur().Text != "identifier" {
+			return p.errorf("guard_hint syntax: identifier matches \"glob\"")
+		}
+		p.next()
+		// "matches" is a lexer keyword (the string operator); accept it in the
+		// hint position by kind.
+		if !(p.isKeyword("matches") || (p.cur().Kind == TokIdent && p.cur().Text == "matches")) {
+			return p.errorf("guard_hint syntax: identifier matches \"glob\"")
+		}
+		p.next()
+		if p.cur().Kind != TokString {
+			return p.errorf("guard_hint glob must be a string")
+		}
+		glob := unquote(p.next().Text)
+		if err := p.expectPunct("->"); err != nil {
+			return err
+		}
+		c, err := p.expectDotted("concept")
+		if err != nil {
+			return err
+		}
+		f.GuardHints = append(f.GuardHints, GuardHintDecl{Glob: glob, Concept: c, Pos: p.pos()})
 	default:
 		return p.errorf("expected a declaration (concept, threat, adapter, rule, query), got %q", p.cur().Text)
 	}
@@ -798,6 +822,16 @@ func (p *parser) parseBody(emit bool) (RuleBody, error) {
 		}
 		b.Where = w
 	}
+	if p.isKeyword("match") || p.cur().Kind == TokIdent && p.cur().Text == "deviates" {
+		// The deviation clause follows the match that binds the members.
+		if p.cur().Kind == TokIdent && p.cur().Text == "deviates" {
+			d, err := p.parseDeviates()
+			if err != nil {
+				return b, err
+			}
+			b.Deviates = d
+		}
+	}
 	if emit {
 		if err := p.expectPunct("->"); err != nil {
 			return b, err
@@ -831,6 +865,66 @@ func (p *parser) parseBody(emit bool) (RuleBody, error) {
 		b.Yield = v
 	}
 	return b, nil
+}
+
+// parseDeviates parses `deviates from peers by <sel> missing (guard|control)
+// <Concept> [min_group N] [threshold F]`.
+func (p *parser) parseDeviates() (*Deviates, error) {
+	d := &Deviates{Pos: p.pos(), MinGroup: 8, Threshold: 0.8}
+	p.next() // deviates
+	for _, want := range []string{"from", "peers", "by"} {
+		if !(p.isKeyword(want) || (p.cur().Kind == TokIdent && p.cur().Text == want)) {
+			return d, p.errorf("deviates syntax: expected %q", want)
+		}
+		p.next()
+	}
+	sel, err := p.expectName("peer selector")
+	if err != nil {
+		return d, err
+	}
+	d.Selector = sel
+	if !(p.isKeyword("missing") || (p.cur().Kind == TokIdent && p.cur().Text == "missing")) {
+		return d, p.errorf("deviates needs: missing (guard|control) <Concept>")
+	}
+	p.next()
+	kindTok := p.next()
+	kind := kindTok.Text
+	if !(kindTok.Kind == TokKeyword || kindTok.Kind == TokIdent) || (kind != "guard" && kind != "control") {
+		return d, p.errorf("the feature kind is guard or control, got %q", kind)
+	}
+	c, err := p.expectDotted("feature concept")
+	if err != nil {
+		return d, err
+	}
+	d.Feature = c
+	for {
+		switch {
+		case p.cur().Kind == TokIdent && p.cur().Text == "min_group":
+			p.next()
+			n := p.next()
+			if n.Kind != TokNumber {
+				return d, p.errorf("min_group takes an integer")
+			}
+			var v int
+			if _, err := fmt.Sscanf(n.Text, "%d", &v); err != nil {
+				return d, err
+			}
+			d.MinGroup = v
+		case p.cur().Kind == TokIdent && p.cur().Text == "threshold":
+			p.next()
+			n := p.next()
+			if n.Kind != TokNumber {
+				return d, p.errorf("threshold takes a float")
+			}
+			var v float64
+			if _, err := fmt.Sscanf(n.Text, "%f", &v); err != nil {
+				return d, err
+			}
+			d.Threshold = v
+		default:
+			return d, nil
+		}
+	}
 }
 
 func (p *parser) parseFlowSugar() (*Sugar, error) {

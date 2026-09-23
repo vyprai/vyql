@@ -15,6 +15,7 @@ type File struct {
 	Lifts      []LiftDecl
 	Relates    []RelateDecl
 	Frameworks []FrameworkDecl
+	GuardHints []GuardHintDecl
 }
 
 // LiftDecl builds a high-level node from matched low-level nodes, mapping
@@ -153,13 +154,32 @@ type QueryDecl struct {
 // RuleBody is the shared shape of rule and query bodies. Rules end in an emit
 // (and optional unless); queries end in `yield <var>`.
 type RuleBody struct {
-	Match  []Pattern // non-empty for match bodies
-	Sugar  *Sugar    // non-nil for sugar bodies (taint/reach/present)
-	Where  Expr
-	Emit   EmitKind // Finding or Signal
-	Unless *Suppressor
-	Yield  string // query form: the yielded binding variable
-	Pos    Pos
+	Match    []Pattern // non-empty for match bodies
+	Sugar    *Sugar    // non-nil for sugar bodies (taint/reach/present)
+	Where    Expr
+	Deviates *Deviates // non-nil for deviation bodies (signal-only)
+	Emit     EmitKind  // Finding or Signal
+	Unless   *Suppressor
+	Yield    string // query form: the yielded binding variable
+	Pos      Pos
+}
+
+// Deviates is the deviation clause: peers by a registered selector, the
+// missing guard-ish feature, and the knobs.
+type Deviates struct {
+	Selector  string // same_router | same_model | same_annotation_class
+	Feature   string // the concept whose absence is the signal
+	MinGroup  int
+	Threshold float64
+	Pos       Pos
+}
+
+// GuardHintDecl is a declared guard-ish seed: an identifier shape mapping to
+// the concept it seeds — versioned knowledge, never hidden solver state.
+type GuardHintDecl struct {
+	Glob    string
+	Concept string
+	Pos     Pos
 }
 
 // EmitKind distinguishes the two output streams.

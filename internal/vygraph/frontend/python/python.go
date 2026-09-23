@@ -346,11 +346,16 @@ func (c *conv) functionDef(n *tree_sitter.Node) {
 		}
 	}
 	decorators := c.decoratorsOf(n)
+	// The FuncDef's own region IS the function region: it encloses its body,
+	// so region-prefix matching (peer grouping, cfg) reaches the body.
+	saved0 := c.region
+	c.region = "fn:" + name
 	fnNode, ok := c.add(n, "code.FuncDef", [][2]string{
 		{"name", name},
 		{"qualified_name", c.file}, // refined by the lowering pass
 	}, false)
 	if !ok {
+		c.region = saved0
 		return
 	}
 	for _, p := range params {
@@ -381,12 +386,10 @@ func (c *conv) functionDef(n *tree_sitter.Node) {
 		c.f.order++
 		c.child(fnNode, pnode)
 	}
-	saved := c.region
-	c.region = "fn:" + name
 	if body != nil {
 		c.stmts(body, name)
 	}
-	c.region = saved
+	c.region = saved0
 }
 
 func (c *conv) decoratorsOf(fn *tree_sitter.Node) []string {
