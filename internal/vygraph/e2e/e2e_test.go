@@ -54,7 +54,7 @@ func runFull(t *testing.T) *vyql.Output {
 	if err := fe.Extract("app.py", src); err != nil {
 		t.Fatalf("frontend: %v", err)
 	}
-	if err := lower.Run(g, fe.Imports); err != nil {
+	if err := lower.Run(g, fe.ImportTable()); err != nil {
 		t.Fatalf("lower: %v", err)
 	}
 
@@ -118,7 +118,7 @@ func TestFullPipelineDataAccessAndEntrypoint(t *testing.T) {
 	if err := fe.Extract("app.py", src); err != nil {
 		t.Fatal(err)
 	}
-	if err := lower.Run(g, fe.Imports); err != nil {
+	if err := lower.Run(g, fe.ImportTable()); err != nil {
 		t.Fatal(err)
 	}
 	kb, err := vyql.LoadDir("testdata/full")
@@ -173,7 +173,7 @@ func TestFullPipelineSanitizerSuppresses(t *testing.T) {
 	if err := fe.Extract("app.py", src); err != nil {
 		t.Fatal(err)
 	}
-	if err := lower.Run(g, fe.Imports); err != nil {
+	if err := lower.Run(g, fe.ImportTable()); err != nil {
 		t.Fatal(err)
 	}
 	kb, err := vyql.LoadDir("testdata/full")

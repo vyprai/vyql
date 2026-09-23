@@ -754,6 +754,24 @@ func (c *conv) unop(n *tree_sitter.Node, approx bool) graph.Node {
 // Store exposes the accumulated store.
 func (f *Frontend) Store() *graph.Store { return f.store }
 
+// ImportTable flattens the per-file import tables into one shape the shared
+// lowering consumes: file -> local alias -> fully-qualified module path. Both
+// import forms fold together (`import x.y as z` and `from x import y`).
+func (f *Frontend) ImportTable() map[string]map[string]string {
+	out := map[string]map[string]string{}
+	for file, imp := range f.Imports {
+		m := map[string]string{}
+		for alias, mod := range imp.Modules {
+			m[alias] = mod
+		}
+		for alias, mod := range imp.From {
+			m[alias] = mod
+		}
+		out[file] = m
+	}
+	return out
+}
+
 // SortedFiles returns the import table's files in deterministic order.
 func (f *Frontend) SortedFiles() []string {
 	var out []string

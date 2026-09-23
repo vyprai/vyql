@@ -10,13 +10,12 @@ import (
 	"sort"
 	"strings"
 
-	fepython "github.com/vyprai/vyql/internal/vygraph/frontend/python"
 	"github.com/vyprai/vyql/internal/vygraph/graph"
 )
 
 // Run computes resolution and FLOWS over an extracted store. imports maps each
-// file to its import table (from the frontends).
-func Run(g *graph.Store, imports map[string]fepython.Imports) error {
+// file to its alias->module table (each frontend's ImportTable()).
+func Run(g *graph.Store, imports map[string]map[string]string) error {
 	resolution(g, imports)
 	if err := childFlows(g); err != nil {
 		return err
@@ -27,7 +26,7 @@ func Run(g *graph.Store, imports map[string]fepython.Imports) error {
 // resolution fills qualified_path on Call/Attr/Index nodes from the import
 // tables and the program's own function definitions, and materializes CALLS
 // edges from resolved call sites to their callees.
-func resolution(g *graph.Store, imports map[string]fepython.Imports) {
+func resolution(g *graph.Store, imports map[string]map[string]string) {
 	// Index the program's functions by name for intra-module resolution.
 	funcs := map[string]graph.Node{}
 	for _, fd := range g.NodesOfType("code.FuncDef") {
@@ -42,7 +41,7 @@ func resolution(g *graph.Store, imports map[string]fepython.Imports) {
 				continue
 			}
 			fileV, _ := n.Fields.Get("file")
-			imp := imports[fileV.S]
+			mods := imports[fileV.S]
 			segs := strings.Split(pathV.S, ".")
 			head, rest := segs[0], segs[1:]
 
@@ -55,11 +54,7 @@ func resolution(g *graph.Store, imports map[string]fepython.Imports) {
 				}
 			}
 
-			if mod, ok := imp.Modules[head]; ok {
-				qualify(strings.Join(append([]string{mod}, rest...), "."))
-				continue
-			}
-			if mod, ok := imp.From[head]; ok {
+			if mod, ok := mods[head]; ok {
 				qualify(strings.Join(append([]string{mod}, rest...), "."))
 				continue
 			}

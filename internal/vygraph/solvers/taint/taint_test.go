@@ -41,7 +41,7 @@ func program(t *testing.T, src string) *graph.Store {
 	if err := fe.Extract("app.py", []byte(src)); err != nil {
 		t.Fatalf("Extract: %v", err)
 	}
-	if err := lower.Run(g, fe.Imports); err != nil {
+	if err := lower.Run(g, fe.ImportTable()); err != nil {
 		t.Fatalf("lower: %v", err)
 	}
 	return g

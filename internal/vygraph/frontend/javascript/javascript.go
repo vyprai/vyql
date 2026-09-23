@@ -591,3 +591,13 @@ func (c *conv) binary(n *tree_sitter.Node) graph.Node {
 }
 
 func (f *Frontend) Store() *graph.Store { return f.store }
+
+// ImportTable flattens the per-file import tables into the one shape the
+// shared lowering consumes: file -> local alias -> module path.
+func (f *Frontend) ImportTable() map[string]map[string]string {
+	out := map[string]map[string]string{}
+	for file, imp := range f.Imports {
+		out[file] = imp.Modules
+	}
+	return out
+}

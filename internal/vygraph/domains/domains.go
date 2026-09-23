@@ -29,6 +29,18 @@ func Register(s *graph.Schemas) error {
 		}, Key: []string{"handler"}}); err != nil {
 		return err
 	}
+	if err := must(&graph.TypeSchema{Type: "code.DataAccess", Layer: graph.LayerHigh,
+		Fields: []graph.FieldSpec{
+			{Name: "table", Kind: graph.KindString},
+			{Name: "op", Kind: graph.KindEnum, Enum: []string{"read", "write"}},
+			{Name: "filters", Kind: graph.KindList, Elem: graph.KindString},
+		}, Key: []string{"table", "op"}}); err != nil {
+		return err
+	}
+	if err := must(&graph.TypeSchema{Type: "code.Function", Layer: graph.LayerHigh,
+		Fields: []graph.FieldSpec{{Name: "name", Kind: graph.KindString}}, Key: []string{"name"}}); err != nil {
+		return err
+	}
 	if err := must(&graph.TypeSchema{Type: "iac.Resource", Layer: graph.LayerHigh,
 		Fields: []graph.FieldSpec{
 			{Name: "kind", Kind: graph.KindString},

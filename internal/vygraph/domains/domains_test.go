@@ -141,7 +141,7 @@ func buildGraph(t *testing.T) *graph.Store {
 	if err := fe.Extract("handler.py", psrc); err != nil {
 		t.Fatal(err)
 	}
-	if err := lower.Run(g, fe.Imports); err != nil {
+	if err := lower.Run(g, fe.ImportTable()); err != nil {
 		t.Fatal(err)
 	}
 	return g

@@ -34,11 +34,21 @@ func trustOf(tier string) graph.Trust {
 	}
 }
 
+// LoadDirSchemas loads a module directory validating against a caller-supplied
+// schema registry (the pipeline's full set: NIR + doc + domain types).
+func LoadDirSchemas(dir string, schemas *graph.Schemas) (*KB, error) {
+	return loadDir(dir, schemas)
+}
+
 // LoadDir loads a module directory: every *.vyql file, walked in sorted order.
 // Exactly one file must carry the manifest block (module.vyql by convention);
 // every other file must use the header form and declare the same module name.
 // Duplicate declarations across files are an error, not a last-writer-wins.
 func LoadDir(dir string) (*KB, error) {
+	return loadDir(dir, graph.NewSchemas())
+}
+
+func loadDir(dir string, schemas *graph.Schemas) (*KB, error) {
 	var paths []string
 	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -58,7 +68,7 @@ func LoadDir(dir string) (*KB, error) {
 	}
 	sort.Strings(paths)
 
-	kb := &KB{Schemas: graph.NewSchemas()}
+	kb := &KB{Schemas: schemas}
 	var manifests int
 	for _, path := range paths {
 		src, err := os.ReadFile(path)
