@@ -356,6 +356,10 @@ func evalLiftExpr(g *graph.Store, e Expr, n graph.Node) (graph.Value, error) {
 			return graph.Bool(x.Text == "true"), nil
 		}
 		return graph.Value{}, fmt.Errorf("unsupported literal")
+	case *Name:
+		// A bare name in a lift field map resolves as its text; coerce re-mints
+		// toward the target's declared kind (enum members arrive this way).
+		return graph.Str(x.Name), nil
 	case *FieldRef:
 		if x.Var == "callee" && len(x.Fields) == 1 && x.Fields[0] == "method" {
 			if v, ok := n.Fields.Get("method"); ok {

@@ -214,8 +214,10 @@ func (kb *Knowledge) checkBinding(b BindingDecl, fail func(Pos, string, ...any))
 		fail(b.Pos, "matcher must be a call")
 		return
 	}
-	if call.Name != "code.path" {
-		fail(b.Pos, "unknown matcher %q (the 1b surface implements code.path)", call.Name)
+	switch call.Name {
+	case "code.path", "code.syntacticPath", "code.call", "code.func":
+	default:
+		fail(b.Pos, "unknown matcher %q (implemented: code.path, code.syntacticPath, code.call, code.func)", call.Name)
 	}
 }
 

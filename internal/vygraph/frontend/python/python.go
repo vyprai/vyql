@@ -400,7 +400,10 @@ func (c *conv) decoratorsOf(fn *tree_sitter.Node) []string {
 	for i := 0; i < int(p.NamedChildCount()); i++ {
 		d := p.NamedChild(uint(i))
 		if d != nil && d.Kind() == "decorator" {
-			out = append(out, strings.TrimPrefix(c.text(d), "@"))
+			// Record the decorator's dotted name: the raw token is a generic
+			// fact, and a clean segment path is what knowledge matches on.
+			name := strings.SplitN(strings.TrimPrefix(c.text(d), "@"), "(", 2)[0]
+			out = append(out, name)
 		}
 	}
 	return out

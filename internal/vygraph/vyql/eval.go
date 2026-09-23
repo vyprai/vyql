@@ -6,6 +6,7 @@ import (
 	"github.com/vyprai/vyql/internal/vygraph/engine"
 	"github.com/vyprai/vyql/internal/vygraph/graph"
 	"github.com/vyprai/vyql/internal/vygraph/solver"
+	"github.com/vyprai/vyql/internal/vygraph/solvers/cfg"
 )
 
 // Run evaluates the program against the store: queries first (stratum by
@@ -416,7 +417,9 @@ func (p *Program) evalRule(g *graph.Store, r RuleDecl, reg SolverRegistry, sets 
 			if b.Unless != nil && p.discharge(g, proof, b.Unless) {
 				continue
 			}
-			emit(Result{RuleID: r.Meta.ID, Source: res.Source(), Target: res.Target(), Confidence: conf, Stream: b.Emit, Proof: proof})
+			emit(Result{RuleID: r.Meta.ID, Source: res.Source(), Target: res.Target(),
+				Confidence: p.flowConfidence(conf, g, res.Source(), res.Target()),
+				Stream:     b.Emit, Proof: proof})
 		}
 	default:
 		bindings, err := p.evalMatch(g, b, sets)
@@ -443,6 +446,21 @@ func (p *Program) evalRule(g *graph.Store, r RuleDecl, reg SolverRegistry, sets 
 	return nil
 }
 
+// flowConfidence mins the rule-level confidence with the fidelity of the
+// labels that armed the flow: a syntactic-only source caps the finding at
+// medium — the ladder composes downward.
+func (p *Program) flowConfidence(ruleConf float64, g *graph.Store, src, dst string) float64 {
+	out := ruleConf
+	for _, id := range []string{src, dst} {
+		for _, l := range g.LabelsOn(id) {
+			if l.Confidence < out {
+				out = l.Confidence
+			}
+		}
+	}
+	return out
+}
+
 // ruleConfidence computes min(rule floor, 1.0), then capped by any validation
 // cap (a low-level type reference clamps to medium).
 func (p *Program) ruleConfidence(r RuleDecl) float64 {
@@ -461,21 +479,37 @@ func (p *Program) ruleConfidence(r RuleDecl) float64 {
 }
 
 // discharge decides an unless suppressor for one witness. Suppression requires
-// PROOF: sanitized_by is provable in 1b when a control
-// carrying the concept sits on the witnessed flow; guarded_by, closed_by and
-// anchored need CFG regions or anchors (Phase 2/4) and are therefore NOT
+// PROOF: sanitized_by is provable in-band when a
+// control carrying the concept sits on the witnessed flow; guarded_by and
+// closed_by are decided by the cfg solver's dominance relations over the
+// endpoints' backings; anchored needs anchors (Phase 4) and is therefore NOT
 // provable here — the safe polarity keeps the finding.
 func (p *Program) discharge(g *graph.Store, proof *solver.Proof, s *Suppressor) bool {
-	if s.Kind != "sanitized_by" {
+	switch s.Kind {
+	case "sanitized_by":
+		for _, step := range proof.Steps {
+			if p.labelledAs(g, step.To, s.Concept) || p.labelledAs(g, step.From, s.Concept) {
+				return true
+			}
+		}
+		return false
+	case "guarded_by":
+		holds, _ := cfg.GuardDischarge(g, proof.Target, s.Concept, func(id string) bool {
+			return p.labelledAs(g, id, s.Concept)
+		})
+		return holds
+	case "closed_by":
+		for _, layer := range []graph.Layer{graph.LayerLow, graph.LayerHigh} {
+			for _, n := range g.NodesOfLayer(layer) {
+				if !p.labelledAs(g, n.ID, s.Concept) {
+					continue
+				}
+				if holds, _, _ := cfg.PostDominates(g, n.ID, proof.Target); holds {
+					return true
+				}
+			}
+		}
 		return false
 	}
-	for _, step := range proof.Steps {
-		if p.labelledAs(g, step.To, s.Concept) {
-			return true
-		}
-		if p.labelledAs(g, step.From, s.Concept) {
-			return true
-		}
-	}
-	return false
+	return false // anchored: unprovable without Phase 4 anchors — finding survives
 }
