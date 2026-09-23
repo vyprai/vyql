@@ -296,7 +296,7 @@ func (c *conv) stmt(n *tree_sitter.Node, fnName string) {
 				case "finally_clause":
 					for j := 0; j < int(d.NamedChildCount()); j++ {
 						if e := d.NamedChild(uint(j)); e.Kind() == "block" {
-							c.in(outer+"/finally", func() { c.stmts(e, fnName) })
+							c.in(outer, func() { c.stmts(e, fnName) })
 						}
 					}
 				}
