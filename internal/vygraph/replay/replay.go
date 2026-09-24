@@ -120,21 +120,18 @@ func RunRank(rk Rank, kbDir, cacheDir string, opts pipeline.Options) (*Outcome, 
 		if err := os.RemoveAll(dl.dir); err != nil {
 			return nil, err
 		}
-		// Resolve the rev: the fix SHA via ls-remote; its parent via the
-		// GitHub commit API (ls-remote cannot resolve `sha^`).
+		// The fix SHA is already known (from the pool); only the parent
+		// needs resolving, via the GitHub commit API (ls-remote cannot
+		// resolve raw SHAs or sha^ expressions).
 		var sha string
 		var err error
 		if strings.HasSuffix(dl.rev, "^") {
-			fixSHA, rerr := revRemote(rk.URL(), strings.TrimSuffix(dl.rev, "^"))
-			if rerr != nil {
-				return nil, fmt.Errorf("resolve fix %s: %w", dl.rev, rerr)
-			}
-			sha, err = parentSHA(rk.Owner, rk.Repo, fixSHA)
+			sha, err = parentSHA(rk.Owner, rk.Repo, rk.Fix)
 			if err != nil {
-				return nil, fmt.Errorf("resolve parent of %s: %w", fixSHA, err)
+				return nil, fmt.Errorf("resolve parent of %s: %w", rk.Fix, err)
 			}
 		} else {
-			sha, err = revRemote(rk.URL(), dl.rev)
+			sha = rk.Fix
 		}
 		if err != nil {
 			return nil, fmt.Errorf("resolve %s: %w", dl.rev, err)
