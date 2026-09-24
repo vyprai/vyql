@@ -7,7 +7,11 @@
 package replay
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -96,44 +100,38 @@ type Outcome struct {
 // and applies the differential gate: some (rule, file) present on the
 // vulnerable side and absent on the fixed side.
 func RunRank(rk Rank, kbDir, cacheDir string, opts pipeline.Options) (*Outcome, error) {
-	repoDir := filepath.Join(cacheDir, slug(rk.Owner+"-"+rk.Repo))
-	if _, err := os.Stat(repoDir); err != nil {
-		if out, err := exec.Command("git", "clone", "--depth=1", "--filter=blob:none", "--no-checkout", rk.URL(), repoDir).CombinedOutput(); err != nil {
-			return nil, fmt.Errorf("clone %s: %v: %s", rk.URL(), err, strings.TrimSpace(string(out)))
+	// Tarball-based replay: download the two trees directly from the host's
+	// archive endpoint instead of git-cloning — large repos (the java corpus)
+	// bottleneck on clone metadata even blobless; an archive fetch is
+	// proportional to the tree size alone.
+	vulnDir := filepath.Join(cacheDir, fmt.Sprintf("r%d-vuln", rk.Rank))
+	fixDir := filepath.Join(cacheDir, fmt.Sprintf("r%d-fix", rk.Rank))
+	for _, dl := range []struct {
+		dir string
+		rev string
+	}{
+		{vulnDir, rk.Fix + "^"},
+		{fixDir, rk.Fix},
+	} {
+		if _, err := os.Stat(filepath.Join(dl.dir, ".replay-done")); err == nil {
+			continue // cached from a prior run
+		}
+		if err := os.RemoveAll(dl.dir); err != nil {
+			return nil, err
+		}
+		// Resolve the rev through a bare ls-remote (cheap), then fetch the tarball.
+		sha, err := revRemote(rk.URL(), dl.rev)
+		if err != nil {
+			return nil, fmt.Errorf("resolve %s: %w", dl.rev, err)
+		}
+		tarURL := fmt.Sprintf("https://%s/%s/%s/archive/%s.tar.gz", rk.Host, rk.Owner, rk.Repo, sha)
+		if err := fetchTarball(tarURL, dl.dir); err != nil {
+			return nil, fmt.Errorf("fetch %s: %w", tarURL, err)
+		}
+		if err := os.WriteFile(filepath.Join(dl.dir, ".replay-done"), []byte(sha), 0o644); err != nil {
+			return nil, err
 		}
 	}
-	// Ensure both commits exist locally.
-	for _, rev := range []string{rk.Fix, rk.Fix + "^"} {
-		if err := exec.Command("git", "-C", repoDir, "cat-file", "-e", rev+"^{commit}").Run(); err != nil {
-			if out, err2 := exec.Command("git", "-C", repoDir, "fetch", "--filter=blob:none", "origin", rev).CombinedOutput(); err2 != nil {
-				// Fall back to a full fetch of the ref range.
-				if out2, err3 := exec.Command("git", "-C", repoDir, "fetch", "--unshallow").CombinedOutput(); err3 != nil {
-					return nil, fmt.Errorf("fetch %s: %v / %v: %s %s", rev, err2, err3,
-						strings.TrimSpace(string(out)), strings.TrimSpace(string(out2)))
-				}
-			}
-		}
-	}
-	vulnSHA, err := rev(repoDir, rk.Fix+"^")
-	if err != nil {
-		return nil, fmt.Errorf("resolve vulnerable parent: %w", err)
-	}
-	fixSHA, err := rev(repoDir, rk.Fix)
-	if err != nil {
-		return nil, fmt.Errorf("resolve fix: %w", err)
-	}
-	vulnDir, err := worktree(repoDir, fmt.Sprintf("r%d-vuln", rk.Rank), vulnSHA)
-	if err != nil {
-		return nil, err
-	}
-	fixDir, err := worktree(repoDir, fmt.Sprintf("r%d-fix", rk.Rank), fixSHA)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		_ = exec.Command("git", "-C", repoDir, "worktree", "remove", "--force", vulnDir).Run()
-		_ = exec.Command("git", "-C", repoDir, "worktree", "remove", "--force", fixDir).Run()
-	}()
 
 	vulnRes, err := pipeline.Run(vulnDir, kbDir, opts)
 	if err != nil {
@@ -144,10 +142,9 @@ func RunRank(rk Rank, kbDir, cacheDir string, opts pipeline.Options) (*Outcome, 
 		return nil, fmt.Errorf("fixed run: %w", err)
 	}
 
-	// The focused differential: only findings in files the fix commit touched
-	// count. Unrelated noise elsewhere survives on both sides — the same
-	// tolerance v2's own rank review records.
-	touched, err := diffFiles(repoDir, vulnSHA, fixSHA)
+	// The focused differential: only findings in files that differ between
+	// the two trees count. Unrelated noise elsewhere survives on both sides.
+	touched, err := diffTrees(vulnDir, fixDir)
 	if err != nil {
 		return nil, err
 	}
@@ -231,6 +228,59 @@ func diffHunks(repoDir, vuln, fix string) (map[string][][2]int, error) {
 	return hunks, nil
 }
 
+// diffTrees returns the set of files that differ between two directory trees.
+func diffTrees(aDir, bDir string) (map[string]bool, error) {
+	files := map[string]bool{}
+	var walk func(rel string, dir string, into map[string]string) error
+	walk = func(rel string, dir string, into map[string]string) error {
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			return nil // unreadable subtree: skip
+		}
+		for _, e := range entries {
+			name := rel
+			if name == "" {
+				name = e.Name()
+			} else {
+				name = name + "/" + e.Name()
+			}
+			full := filepath.Join(dir, e.Name())
+			if e.IsDir() {
+				if err := walk(name, full, into); err != nil {
+					return err
+				}
+				continue
+			}
+			data, err := os.ReadFile(full)
+			if err != nil {
+				continue
+			}
+			into[name] = string(data)
+		}
+		return nil
+	}
+	aFiles := map[string]string{}
+	bFiles := map[string]string{}
+	if err := walk("", aDir, aFiles); err != nil {
+		return nil, err
+	}
+	if err := walk("", bDir, bFiles); err != nil {
+		return nil, err
+	}
+	for name, aData := range aFiles {
+		bData, ok := bFiles[name]
+		if !ok || aData != bData {
+			files[name] = true
+		}
+	}
+	for name := range bFiles {
+		if _, ok := aFiles[name]; !ok {
+			files[name] = true
+		}
+	}
+	return files, nil
+}
+
 // lineOf extracts the line number from a node id (file:line:col:type).
 func lineOf(nodeID string) int {
 	parts := strings.SplitN(nodeID, ":", 3)
@@ -248,6 +298,82 @@ func fileOf(nodeID string) string {
 		return nodeID
 	}
 	return parts[0]
+}
+
+// revRemote resolves a rev to a SHA via ls-remote (no clone needed).
+func revRemote(url, rev string) (string, error) {
+	out, err := exec.Command("git", "ls-remote", url, rev).CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("ls-remote %s %s: %v", url, rev, err)
+	}
+	line := strings.TrimSpace(string(out))
+	if line == "" {
+		return "", fmt.Errorf("ls-remote: no ref %s", rev)
+	}
+	return strings.Fields(line)[0], nil
+}
+
+// fetchTarball downloads and extracts a GitHub archive tarball into dir.
+func fetchTarball(url, dir string) error {
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+	gz, err := gzip.NewReader(resp.Body)
+	if err != nil {
+		return err
+	}
+	defer gz.Close()
+	tr := tar.NewReader(gz)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		// The tarball has a top-level directory (repo-sha); strip it.
+		name := hdr.Name
+		if i := strings.IndexByte(name, '/'); i >= 0 {
+			name = name[i+1:]
+		} else {
+			continue // the top-level directory entry itself
+		}
+		if name == "" {
+			continue
+		}
+		target := filepath.Join(dir, filepath.FromSlash(name))
+		switch hdr.Typeflag {
+		case tar.TypeDir:
+			if err := os.MkdirAll(target, 0o755); err != nil {
+				return err
+			}
+		case tar.TypeReg:
+			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+				return err
+			}
+			f, err := os.Create(target)
+			if err != nil {
+				return err
+			}
+			if _, err := io.Copy(f, tr); err != nil {
+				f.Close()
+				return err
+			}
+			f.Close()
+		case tar.TypeSymlink:
+			_ = os.Symlink(hdr.Linkname, target)
+		}
+	}
+	return nil
 }
 
 func rev(dir, rev string) (string, error) {

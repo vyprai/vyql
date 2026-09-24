@@ -42,16 +42,21 @@ def list_users(req):
     rows = session.execute("SELECT * FROM users WHERE name = :name", {"name": q})
     return rows
 `
-	repo := initRepo(t, map[string]string{"app.py": vulnSrc}, "vulnerable")
-	fixSHA := commit(t, repo, "app.py", fixSrc, "fixed")
-
 	cache := filepath.Join(t.TempDir(), "cache")
-	// Point the rank at the local repo directly by cloning it into the cache.
-	rk := Rank{Rank: 1, Repo: filepath.Base(repo), Owner: "local", Host: "", CVE: "CVE-0000-0000", Fix: fixSHA, Lang: "python"}
-	local := filepath.Join(cache, slug(rk.Owner+"-"+rk.Repo))
-	if err := exec.Command("git", "clone", localCloneSrc(repo), local).Run(); err != nil {
-		t.Fatalf("clone local: %v", err)
+	vulnDir := filepath.Join(cache, "r1-vuln")
+	fixDir := filepath.Join(cache, "r1-fix")
+	for d, src := range map[string]string{vulnDir: vulnSrc, fixDir: fixSrc} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(d, "app.py"), []byte(src), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(d, ".replay-done"), []byte("test"), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
+	rk := Rank{Rank: 1, Repo: "test", Owner: "local", Host: "", CVE: "CVE-0000-0000", Fix: "unused", Lang: "python"}
 
 	oc, err := RunRank(rk, kbDir, cache, pipeline.Options{})
 	if err != nil {
@@ -163,5 +168,3 @@ func commit(t *testing.T, dir, name, content, msg string) string {
 	}
 	return strings.TrimSpace(string(out))
 }
-
-func localCloneSrc(dir string) string { return dir }
