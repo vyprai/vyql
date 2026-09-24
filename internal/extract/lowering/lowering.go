@@ -63,6 +63,12 @@ type lowerer struct {
 	// See receiver_field_type.go.
 	fieldCtorWrites []fieldCtorWrite
 	fieldCtorTypes  map[string]string
+	// ctorParamFields holds, per class, the constructor parameters the constructor stores
+	// into a this.<field> ("modkey::Class" -> pairs), and ctorFieldArgs the per-(class,
+	// field) node the construction sites and the this.<field>(...) dispatches are joined
+	// on ("modkey::Class\x1ffield" -> node id). See ctor_param_field.go.
+	ctorParamFields map[string][]ctorParamField
+	ctorFieldArgs   map[string]string
 	// globalCtorTypes holds the one constructor type each module-level variable's writes
 	// agree on ("ns\x1fname" -> type, or globalCtorConflict when they do not agree), for the
 	// languages whose module globals resolve to a slot node rather than to the construction
@@ -3141,6 +3147,8 @@ func newLowerer(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 		resolveImports:   resolveImports,
 		ctorTypes:        ctorTypes,
 		fieldCtorTypes:   map[string]string{},
+		ctorParamFields:  map[string][]ctorParamField{},
+		ctorFieldArgs:    map[string]string{},
 		globalCtorTypes:  map[string]string{},
 		phiOperands:      map[string][]string{},
 		g:                newGraphStore(estimateGraphNodeHint(prog)),
@@ -3522,6 +3530,7 @@ func (l *lowerer) run() error {
 	l.collectAddressTaken()
 	l.collectGlobalCtorTypes() // before the field pass: a field write may construct through a factory-returned global
 	l.collectFieldCtorTypes()
+	l.collectCtorParamFields() // joins construction sites with the classes' own methods: settled before either lowers (see ctor_param_field.go)
 	for _, m := range l.prog.Modules {
 		l.curModule, l.curClass, l.curNS, l.curFile = m.Key, "", ModuleNS(m), m.File
 		body := l.bodyOf(m)
@@ -6376,6 +6385,14 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	if dynamicCallback {
 		targets = l.dynamicCallbackTargets()
 	}
+	// `this.<field>(...)` whose field is filled from a constructor parameter: the call's real
+	// callee is the function value a construction site passed for that parameter, which no
+	// declaration names. Route the arguments to the per-(class, field) node those sites'
+	// function literals are fed from (see ctor_param_field.go); the call keeps every edge it
+	// had as an unresolved call.
+	if len(targets) == 0 {
+		l.flowCtorFieldArgs(call, args)
+	}
 	mapped := l.flowTemplateRender(call, argVals, recvNode, result)
 	for _, target := range targets {
 		if reachOnly {
@@ -6476,6 +6493,12 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 				result = l.syntheticCall(analysisFunctionResult.path, analysisFunctionResult.method, result, call.Loc, entry.Tokens...)
 			}
 		}
+	}
+	// a construction site is where a function-typed constructor parameter gets its value:
+	// join this site's function-literal arguments with the `this.<field>(...)` dispatches of
+	// the class being built. See ctor_param_field.go.
+	for _, target := range targets {
+		l.pairCtorFieldArgs(target, recvForTargets, argVals)
 	}
 	// string-keyed dispatch: `presets.apply('env')` runs whatever a plugin registered under
 	// that key, an edge no callee name reaches. See dispatch_key.go.

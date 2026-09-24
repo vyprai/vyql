@@ -143,6 +143,52 @@ func modPhpB(hash string, extra []nir.Stmt) nir.Module {
 		Body: []nir.Stmt{nir.FuncDef{Name: "handler", Params: []string{"req"}, Loc: "b.php:1", Body: body}}}
 }
 
+// modCtorClass builds the class module of a constructor-param-field pairing: the constructor
+// stores its parameter into this.toolExecutor, and handle dispatches this.toolExecutor(request)
+// into whatever function value a construction site injected there. See ctor_param_field.go.
+func modCtorClass(hash string, extraMethod *nir.FuncDef) nir.Module {
+	methods := []nir.Stmt{
+		nir.FuncDef{Name: "constructor", Params: []string{"toolExecutor"}, Loc: "cls.js:2", Body: []nir.Stmt{
+			nir.ExprStmt{Value: nir.Call{
+				Callee: nir.Attr{Base: nir.Name{ID: "this", Loc: "cls.js:3"}, Attr: "toolExecutor", Path: "this.toolExecutor", Loc: "cls.js:3"},
+				Args:   []nir.Expr{nir.Name{ID: "toolExecutor", Loc: "cls.js:3"}},
+				Path:   "this.toolExecutor", Loc: "cls.js:3",
+			}},
+		}},
+		nir.FuncDef{Name: "handle", Params: []string{"request"}, Loc: "cls.js:5", Body: []nir.Stmt{
+			nir.Return{Value: nir.Call{
+				Callee: nir.Attr{Base: nir.Name{ID: "this", Loc: "cls.js:6"}, Attr: "toolExecutor", Path: "this.toolExecutor", Loc: "cls.js:6"},
+				Args:   []nir.Expr{nir.Name{ID: "request", Loc: "cls.js:6"}},
+				Path:   "this.toolExecutor", Method: "toolExecutor", Loc: "cls.js:6",
+			}},
+		}},
+	}
+	if extraMethod != nil {
+		methods = append(methods, *extraMethod)
+	}
+	return nir.Module{Key: "cls", File: "cls.js", Hash: hash, Body: []nir.Stmt{
+		nir.ClassDef{Name: "Handlers", Loc: "cls.js:1", Body: methods}}}
+}
+
+// modCtorSite builds the construction-site module: new Handlers injected with an arrow whose
+// body holds the sink. extra appends statements, so a second version lowers fresh while the
+// class module is replayed from the body cache (and vice versa).
+func modCtorSite(hash string, extra []nir.Stmt) nir.Module {
+	body := []nir.Stmt{
+		nir.ExprStmt{Value: nir.Call{
+			Callee: nir.Name{ID: "Handlers", Loc: "site.js:2"},
+			Args: []nir.Expr{nir.Lambda{Params: []string{"name", "args"}, Loc: "site.js:2", Body: []nir.Stmt{
+				nir.ExprStmt{Value: nir.Call{Callee: nir.Name{ID: "execSync", Loc: "site.js:3"},
+					Args: []nir.Expr{nir.Name{ID: "args", Loc: "site.js:3"}}, Path: "execSync", Method: "execSync", Loc: "site.js:3"}},
+			}}},
+			Path: "Handlers", Method: "Handlers", Loc: "site.js:2",
+		}},
+	}
+	body = append(body, extra...)
+	return nir.Module{Key: "site", File: "site.js", Hash: hash, Body: []nir.Stmt{
+		nir.FuncDef{Name: "start", Params: []string{"input"}, Loc: "site.js:1", Body: body}}}
+}
+
 // snapshot renders a store as a sorted, comparable string (nodes with type+props, edges,
 // labels). Two graphs are equivalent iff their snapshots match — a stronger invariant than
 // finding-equality (identical graphs ⇒ identical binding/taint/rule output).
@@ -231,6 +277,15 @@ func TestIncrementalEquivalence(t *testing.T) {
 		// overload set replayed from the pass-1 cache: the caller's module is edited, so the
 		// class carrying both declarations is restored from the cache rather than re-registered.
 		{"overload set, callee module reused", prog(modOverload("srv1")...), prog(modOverload("srv2")...)},
+		// ctor-param-field pairing: the two halves live in different modules, joined on a node
+		// the preparatory pass mints, so replaying one module's cached body must reproduce the
+		// same join a fresh lowering of both makes.
+		{"ctor field pairing, class module reused", prog(modCtorClass("cls1", nil), modCtorSite("site1", nil)),
+			prog(modCtorClass("cls1", nil), modCtorSite("site2", []nir.Stmt{
+				nir.ExprStmt{Value: nir.Call{Callee: nir.Name{ID: "log", Loc: "site.js:9"}, Path: "log", Method: "log", Loc: "site.js:9"}},
+			}))},
+		{"ctor field pairing, site module reused", prog(modCtorClass("cls1", nil), modCtorSite("site1", nil)),
+			prog(modCtorClass("cls2", &nir.FuncDef{Name: "close", Loc: "cls.js:8"}), modCtorSite("site1", nil))},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -243,6 +298,36 @@ func TestIncrementalEquivalence(t *testing.T) {
 				t.Errorf("incremental graph != full graph after edit\n--- incremental ---\n%s\n--- full ---\n%s", got, want)
 			}
 		})
+	}
+}
+
+// The ctor-field pairing must survive the module order and the body cache: the dispatch edge
+// is recorded by the class's module, the injected-literal edge by the construction site's,
+// and the join node is minted before either lowers — so editing one module (the other's body
+// replayed from cache) reproduces exactly the graph a fresh lowering of both produces. The
+// reachability half is asserted first so the equivalence half cannot pass vacuously.
+func TestCtorFieldPairingSurvivesTheIncrementalCache(t *testing.T) {
+	p := prog(modCtorClass("cls1", nil), modCtorSite("site1", nil))
+	full := lowerFull(t, p)
+	from := inheritedParamNode(t, full, "Handlers", "handle", "request")
+	sinkArg := findNodeID(t, full, "code.Arg", "loc", "site.js:3")
+	if sinkArg == "" {
+		t.Fatal("the injected arrow's sink argument never lowered")
+	}
+	reach, err := usg.BFS(full, from, "FLOWS", 40)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reach[sinkArg] {
+		t.Fatal("the ctor-field pairing is absent from a full lower; the incremental check below would pass vacuously")
+	}
+	cache := memDelta{}
+	_ = lowerInc(t, p, cache)
+	edited := prog(modCtorClass("cls1", nil), modCtorSite("site2", []nir.Stmt{
+		nir.ExprStmt{Value: nir.Call{Callee: nir.Name{ID: "log", Loc: "site.js:9"}, Path: "log", Method: "log", Loc: "site.js:9"}},
+	}))
+	if got, want := snapshot(t, lowerInc(t, edited, cache)), snapshot(t, lowerFull(t, edited)); got != want {
+		t.Fatalf("incremental graph != full graph after the construction-site edit\n--- incremental ---\n%s\n--- full ---\n%s", got, want)
 	}
 }
 

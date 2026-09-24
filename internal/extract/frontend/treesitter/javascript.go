@@ -3151,6 +3151,11 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		params := c.exportedFuncParams(n, exported, c.funcParams(n))
 		paramTypes := c.funcParamTypes(n)
 		body := c.funcBody(n)
+		// a TypeScript constructor parameter property runs `this.<name> = <name>` before
+		// the body; emit that store like the hand-written one (see paramPropertyStores).
+		if pre := c.paramPropertyStores(n); len(pre) > 0 {
+			body = append(pre, body...)
+		}
 		decorators := c.jsDecoratorTokens(n)
 		out := []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, ContextTokens: c.jsFunctionContext(name, n), Decorators: decorators, ParamEntries: c.jsParamEntries(name, params, decorators), Exported: exported}}
 		// A factory function returns its API as an object literal of shorthand
@@ -4254,6 +4259,62 @@ func (c *jsConv) patternParamBindings(fn *tree_sitter.Node) []nir.Stmt {
 		out = append(out, nir.Assign{Targets: rest, Value: nir.Name{ID: slot, Loc: loc}, Decl: true, Loc: loc})
 	}
 	return out
+}
+
+// paramPropertyStores lowers the implicit member stores a TypeScript constructor parameter
+// property makes: `constructor(private toolExecutor: Fn) {}` runs `this.toolExecutor =
+// toolExecutor` before the body does. The store is what makes the property a real field the
+// class's other methods see -- without it the parameter is a plain local, and the value a
+// construction site passed for it exists nowhere on the object.
+func (c *jsConv) paramPropertyStores(fn *tree_sitter.Node) []nir.Stmt {
+	params := c.paramsFieldOf(fn)
+	if params == nil {
+		return nil
+	}
+	var out []nir.Stmt
+	for _, ch := range c.namedChildren(params) {
+		field := c.paramPropertyName(ch)
+		if field == "" {
+			continue
+		}
+		L := c.loc(ch)
+		// the member-write lowering of `this.<field> = <field>` (see exprStmt): a path
+		// call with no method, so the store is spelled exactly as a hand-written one.
+		out = append(out, nir.ExprStmt{Value: nir.Call{
+			Callee: nir.Attr{Base: nir.Name{ID: "this", Loc: L}, Attr: field, Path: "this." + field, Loc: L},
+			Args:   []nir.Expr{nir.Name{ID: field, Loc: L}},
+			Path:   "this." + field,
+			Loc:    L,
+		}})
+	}
+	return out
+}
+
+// paramPropertyName returns the property a constructor parameter declares when it is a
+// TypeScript parameter property -- a parameter whose accessibility (`private`/`public`/
+// `protected`) or `readonly` modifier makes it bind `this.<name> = <name>` on construction.
+// "" when the parameter is a plain one. The modifiers precede the pattern in the grammar, and
+// `readonly` is an anonymous token, so the prefix is read off the raw children.
+func (c *jsConv) paramPropertyName(ch *tree_sitter.Node) string {
+	switch c.kind(ch) {
+	case "required_parameter", "optional_parameter":
+	default:
+		return ""
+	}
+	pat := c.field(ch, "pattern")
+	if pat == nil || c.kind(pat) != "identifier" {
+		return ""
+	}
+	for _, mod := range children(ch) {
+		if sameTSNode(mod, pat) {
+			return "" // the pattern ends the modifier prefix: none was present
+		}
+		switch c.kind(mod) {
+		case "accessibility_modifier", "readonly":
+			return c.text(pat)
+		}
+	}
+	return ""
 }
 
 func (c *jsConv) exportedFuncParams(fn *tree_sitter.Node, exported bool, params []string) []string {

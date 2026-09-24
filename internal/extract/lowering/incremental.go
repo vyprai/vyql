@@ -117,6 +117,7 @@ func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[strin
 	l.collectAddressTaken()    // walks prog NIR (present for all modules, cached or not) → sound here too
 	l.collectGlobalCtorTypes() // same walk, same guarantee: a cached module still contributes its global writes; before the field pass, which may construct through one
 	l.collectFieldCtorTypes()  // same walk, same guarantee: a cached module still contributes its field writes
+	l.collectCtorParamFields() // same walk, same guarantee: a cached module still contributes its constructor param→field stores
 	sigFP := l.sigFingerprint()
 	t1 := nowNano()
 
@@ -367,6 +368,13 @@ func (d *pass1Delta) replay(l *lowerer, base usg.Store, modkey, ns string) {
 		l.funcQual[f.Qual] = fi
 		l.funcOverloads[f.Qual] = append(l.funcOverloads[f.Qual], fi)
 		l.funcShort[f.Short] = append(l.funcShort[f.Short], fi)
+		// register derives classCtors from the same fact (a FuncDef whose name is the class's
+		// constructor); replay has to derive it too, or a cached class module loses its
+		// construction sites: a `new T(a)` in a freshly-lowered module would find no ctor and
+		// the arguments would never reach T's constructor parameters.
+		if fi.ctor && fi.cls != "" {
+			l.classCtors[modkey+"::"+fi.cls] = f.Qual
+		}
 		// A body re-lowered because some OTHER module's signature moved still resolves its own
 		// receivers against this table, so the replay has to contribute it exactly as register
 		// would (see paramDeclType).
