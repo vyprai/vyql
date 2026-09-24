@@ -144,10 +144,21 @@ func RunRank(rk Rank, kbDir, cacheDir string, opts pipeline.Options) (*Outcome, 
 		return nil, fmt.Errorf("fixed run: %w", err)
 	}
 
+	// The focused differential: only findings in files the fix commit touched
+	// count. Unrelated noise elsewhere survives on both sides — the same
+	// tolerance v2's own rank review records ("unrelated noise remains").
+	touched, err := diffFiles(repoDir, vulnSHA, fixSHA)
+	if err != nil {
+		return nil, err
+	}
 	oc := &Outcome{Rank: rk, Vuln: map[Loc]int{}, Fixed: map[Loc]int{}}
 	collect := func(res *pipeline.Result, into map[Loc]int) {
 		for _, f := range res.Output.Findings {
-			into[Loc{Rule: f.RuleID, File: fileOf(f.Source)}]++
+			file := fileOf(f.Source)
+			if !touched[file] {
+				continue
+			}
+			into[Loc{Rule: f.RuleID, File: file}]++
 		}
 	}
 	collect(vulnRes, oc.Vuln)
@@ -162,6 +173,21 @@ func RunRank(rk Rank, kbDir, cacheDir string, opts pipeline.Options) (*Outcome, 
 	}
 	oc.Note = fmt.Sprintf("%d vuln findings, all still present on fixed", len(oc.Vuln))
 	return oc, nil
+}
+
+// diffFiles lists the files a fix commit changed, relative to the repo root.
+func diffFiles(repoDir, vuln, fix string) (map[string]bool, error) {
+	out, err := exec.Command("git", "-C", repoDir, "diff", "--name-only", vuln, fix).CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("diff --name-only: %v", err)
+	}
+	files := map[string]bool{}
+	for _, f := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		if f != "" {
+			files[f] = true
+		}
+	}
+	return files, nil
 }
 
 // fileOf extracts the file from a node id (file:line:col:type).

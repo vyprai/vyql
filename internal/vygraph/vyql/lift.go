@@ -50,6 +50,27 @@ func matchNodes(g *graph.Store, call *Call) ([]graph.Node, error) {
 		}
 		return out, nil
 	}
+	// A call's receiver base shares the call's start position (the Attr
+	// `a.b` under the Call `a.b(...)`). Both carry the path, so matchers and
+	// lifts would double-fire per site; the Call is the canonical site.
+	dedupeReceivers := func(calls, attrs []graph.Node) []graph.Node {
+		if len(calls) == 0 {
+			return attrs
+		}
+		callPos := map[string]bool{}
+		for _, c := range calls {
+			callPos[posKey(c)] = true
+		}
+		out := attrs[:0]
+		for _, a := range attrs {
+			if !callPos[posKey(a)] {
+				out = append(out, a)
+			}
+		}
+		return out
+	}
+	_ = dedupeReceivers
+
 	switch call.Name {
 	case "code.func":
 		pats, err := argPats()
@@ -74,9 +95,15 @@ func matchNodes(g *graph.Store, call *Call) ([]graph.Node, error) {
 	case "code.call":
 		return matchTyped("qualified_path", "code.Call")
 	case "code.path":
-		return matchTyped("qualified_path", "code.Call", "code.Attr", "code.Index")
+		calls, _ := matchTyped("qualified_path", "code.Call")
+		attrs, _ := matchTyped("qualified_path", "code.Attr")
+		idx, _ := matchTyped("qualified_path", "code.Index")
+		return append(append(calls, dedupeReceivers(calls, attrs)...), idx...), nil
 	case "code.syntacticPath":
-		return matchTyped("path", "code.Call", "code.Attr", "code.Index")
+		calls, _ := matchTyped("path", "code.Call")
+		attrs, _ := matchTyped("path", "code.Attr")
+		idx, _ := matchTyped("path", "code.Index")
+		return append(append(calls, dedupeReceivers(calls, attrs)...), idx...), nil
 	default:
 		return nil, fmt.Errorf("unknown matcher %q", call.Name)
 	}
@@ -637,4 +664,14 @@ func ApplyRelates(kb *KB, g *graph.Store) error {
 		}
 	}
 	return nil
+}
+
+// posKey renders a node's file:line:col site key.
+func posKey(n graph.Node) string {
+	var b [3]string
+	f, _ := n.Fields.Get("file")
+	l, _ := n.Fields.Get("line")
+	c, _ := n.Fields.Get("col")
+	b[0], b[1], b[2] = f.S, l.String(), c.String()
+	return b[0] + ":" + b[1] + ":" + b[2]
 }

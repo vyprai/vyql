@@ -2,6 +2,7 @@ package vyql
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/vyprai/vyql/internal/vygraph/deviate"
 	"github.com/vyprai/vyql/internal/vygraph/engine"
@@ -404,6 +405,9 @@ func (p *Program) evalRule(g *graph.Store, r RuleDecl, reg SolverRegistry, sets 
 				Proof: solver.ProofTree(res)})
 		}
 	case b.Sugar != nil && b.Sugar.Verb == "present":
+		// Dedupe by source position: a call and its receiver base share a
+		// start position, and both carry the label — one present per site.
+		seenAt := map[string]bool{}
 		for _, id := range engine.NodesWithConcept(g, p.KB.Onto, b.Sugar.From) {
 			if b.Where != nil {
 				node, _ := g.Node(id)
@@ -415,6 +419,11 @@ func (p *Program) evalRule(g *graph.Store, r RuleDecl, reg SolverRegistry, sets 
 					continue
 				}
 			}
+			pos := positionOf(id)
+			if seenAt[pos] {
+				continue
+			}
+			seenAt[pos] = true
 			emit(Result{RuleID: r.Meta.ID, Source: id, Target: id, Confidence: conf, Stream: b.Emit})
 		}
 	case b.Sugar != nil:
@@ -653,4 +662,14 @@ func (p *Program) discharge(g *graph.Store, proof *solver.Proof, s *Suppressor) 
 		return false
 	}
 	return false // anchored: unprovable without Phase 4 anchors — finding survives
+}
+
+// positionOf renders a node id's file:line:col prefix — the site key for
+// present-dedup.
+func positionOf(nodeID string) string {
+	parts := strings.SplitN(nodeID, ":", 4)
+	if len(parts) < 3 {
+		return nodeID
+	}
+	return parts[0] + ":" + parts[1] + ":" + parts[2]
 }

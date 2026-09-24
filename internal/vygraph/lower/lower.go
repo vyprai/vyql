@@ -110,22 +110,41 @@ func nameThreading(g *graph.Store) error {
 		region string
 	}
 	byName := map[string][]occ{}
-	for _, n := range g.NodesOfType("code.Name") {
-		local, ok := n.Fields.Get("local")
-		if !ok || local.S == "" {
-			continue
+	thread := func(nodes []graph.Node, keyOf func(graph.Node) (string, bool)) {
+		for _, n := range nodes {
+			key, ok := keyOf(n)
+			if !ok || key == "" {
+				continue
+			}
+			fileV, _ := n.Fields.Get("file")
+			orderV, _ := n.Fields.Get("order")
+			regionV, _ := n.Fields.Get("region")
+			byName[fileV.S+"|"+key] = append(byName[fileV.S+"|"+key], occ{id: n.ID, order: orderV.I, region: regionV.S})
 		}
-		fileV, _ := n.Fields.Get("file")
-		orderV, _ := n.Fields.Get("order")
-		regionV, _ := n.Fields.Get("region")
-		key := fileV.S + "|" + local.S
-		byName[key] = append(byName[key], occ{id: n.ID, order: orderV.I, region: regionV.S})
 	}
+	thread(g.NodesOfType("code.Name"), func(n graph.Node) (string, bool) {
+		v, ok := n.Fields.Get("local")
+		return v.S, ok
+	})
+	// Attribute and subscript reads thread by their dotted path within the
+	// file — the write-self.X-in-__init__, read-self.X-in-method shape.
+	thread(g.NodesOfType("code.Index"), func(n graph.Node) (string, bool) {
+		v, ok := n.Fields.Get("path")
+		return v.S, ok
+	})
 	for _, occs := range byName {
 		sort.Slice(occs, func(i, j int) bool { return occs[i].order < occs[j].order })
 		for i := 1; i < len(occs); i++ {
 			prev, cur := occs[i-1], occs[i]
-			if !sameFunction(prev.region, cur.region) {
+			if strings.Contains(prev.id, ":code.Name") && !sameFunction(prev.region, cur.region) {
+				continue // locals thread within their function
+			}
+			// subscript paths thread file-wide by design
+			if redefinedThrough(g, prev.id) {
+				// `x = f(x)`: the occurrence inside f is the OLD value; the
+				// call's result is the continuation. Threading from the
+				// argument would carry the pre-transform value past the
+				// transform — the sanitized value must not inherit it.
 				continue
 			}
 			if err := g.AddEdge(graph.Edge{
@@ -137,7 +156,76 @@ func nameThreading(g *graph.Store) error {
 			}
 		}
 	}
+	// Attribute threading is prefix-based: a value bound into `a.b` flows to
+	// every later read whose path extends it (`a.b.c`) in the same file. This
+	// is the write-in-__init__, read-in-method shape, and the chained-read
+	// decomposition — a def on a prefix reaches its extensions. An
+	// over-approximation by design (no field sensitivity), which is the safe
+	// direction for taint.
+	type attrOcc struct {
+		id    string
+		order int64
+		path  string
+	}
+	byFile := map[string][]attrOcc{}
+	for _, n := range g.NodesOfType("code.Attr") {
+		pv, ok := n.Fields.Get("path")
+		if !ok || pv.S == "" {
+			continue
+		}
+		fv, _ := n.Fields.Get("file")
+		ov, _ := n.Fields.Get("order")
+		byFile[fv.S] = append(byFile[fv.S], attrOcc{id: n.ID, order: ov.I, path: pv.S})
+	}
+	files := make([]string, 0, len(byFile))
+	for f := range byFile {
+		files = append(files, f)
+	}
+	sort.Strings(files)
+	for _, f := range files {
+		occs := byFile[f]
+		sort.Slice(occs, func(i, j int) bool { return occs[i].order < occs[j].order })
+		for i := 0; i < len(occs); i++ {
+			for j := i + 1; j < len(occs); j++ {
+				a, b := occs[i], occs[j]
+				if redefinedThrough(g, a.id) {
+					continue // the transform is the continuation, not the old value
+				}
+				if b.path == a.path || strings.HasPrefix(b.path, a.path+".") {
+					if err := g.AddEdge(graph.Edge{
+						ID:   fmt.Sprintf("flows:attr:%s:%s", a.id, b.id),
+						Type: "FLOWS", From: a.id, To: b.id,
+						Prov: graph.Provenance{Producer: "lower", Build: graph.BuildResolved, Trust: graph.TrustTrusted},
+					}); err != nil {
+						return err
+					}
+				}
+			}
+		}
+	}
 	return nil
+}
+
+// redefinedThrough reports whether the node's value flowed into a call that
+// also re-binds a variable (a def-flow out): the `x = f(x)` shape. The call's
+// result is the value's continuation; threading from the argument past the
+// call would let the pre-transform taint bypass the transform.
+func redefinedThrough(g *graph.Store, id string) bool {
+	for _, e := range g.Out(id, "FLOWS") {
+		if !strings.HasPrefix(e.ID, "flows:child:") {
+			continue
+		}
+		to, ok := g.Node(e.To)
+		if !ok || to.Type != "code.Call" {
+			continue
+		}
+		for _, de := range g.Out(to.ID, "FLOWS") {
+			if strings.HasPrefix(de.ID, "flows:def:") {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // sameFunction reports whether two region paths sit in the same function

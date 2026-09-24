@@ -547,6 +547,12 @@ func (c *conv) attr(n *tree_sitter.Node, approx bool) graph.Node {
 	for i := 0; i < int(n.NamedChildCount()); i++ {
 		d := n.NamedChild(uint(i))
 		if d.Kind() == "identifier" {
+			if last != nil {
+				// `a.b` with two plain identifiers: the FIRST is the base —
+				// without emitting it, every method-call receiver chain
+				// (x.method()) loses its value flow.
+				base = last
+			}
 			last = d
 		} else {
 			base = d
@@ -610,6 +616,16 @@ func (c *conv) call(n *tree_sitter.Node, approx bool) graph.Node {
 		{"callee", callee},
 		{"method", method},
 	}, approx)
+	// The receiver flows into the call: `data.get(k)` cannot be understood
+	// without the value of `data`, and taint through a receiver (the tainted
+	// object's method result) is the common web-read shape.
+	if fnNode := n.ChildByFieldName("function"); fnNode != nil {
+		if fnNode.Kind() == "attribute" || fnNode.Kind() == "identifier" {
+			if base := c.expr(fnNode, approx); base.ID != "" {
+				c.child(node, base)
+			}
+		}
+	}
 	if args != nil {
 		for i := 0; i < int(args.NamedChildCount()); i++ {
 			a := args.NamedChild(uint(i))
