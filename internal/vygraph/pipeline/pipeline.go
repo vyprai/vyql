@@ -215,6 +215,16 @@ func Run(srcDir, kbDir string, opts Options) (*Result, error) {
 					_ = g.Upsert(n)
 				}
 			}
+			// Edges too: the child/FLOWS/CALLS edges the frontends built
+			// during extraction live in the worker store; without them the
+			// merged graph has no flow paths at all.
+			for _, layer := range []graph.Layer{graph.LayerLow, graph.LayerHigh} {
+				for _, n := range r.store.NodesOfLayer(layer) {
+					for _, e := range r.store.Out(n.ID, "") {
+						_ = g.AddEdge(e)
+					}
+				}
+			}
 			for file, mods := range r.imports {
 				if existing, ok := imports[file]; !ok {
 					imports[file] = mods
