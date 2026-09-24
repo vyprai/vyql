@@ -105,8 +105,9 @@ func RunRank(rk Rank, kbDir, cacheDir string, opts pipeline.Options) (*Outcome, 
 	// archive endpoint instead of git-cloning — large repos (the java corpus)
 	// bottleneck on clone metadata even blobless; an archive fetch is
 	// proportional to the tree size alone.
-	vulnDir := filepath.Join(cacheDir, fmt.Sprintf("r%d-vuln", rk.Rank))
-	fixDir := filepath.Join(cacheDir, fmt.Sprintf("r%d-fix", rk.Rank))
+	key := slug(rk.Owner + "-" + rk.Repo + "-" + rk.CVE)
+	vulnDir := filepath.Join(cacheDir, key+"-vuln")
+	fixDir := filepath.Join(cacheDir, key+"-fix")
 	for _, dl := range []struct {
 		dir string
 		rev string

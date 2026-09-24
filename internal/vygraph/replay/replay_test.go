@@ -44,8 +44,8 @@ def list_users(req):
     return rows
 `
 	cache := filepath.Join(t.TempDir(), "cache")
-	vulnDir := filepath.Join(cache, "r1-vuln")
-	fixDir := filepath.Join(cache, "r1-fix")
+	vulnDir := filepath.Join(cache, slug("local-test-CVE-0000-0000")+"-vuln")
+	fixDir := filepath.Join(cache, slug("local-test-CVE-0000-0000")+"-fix")
 	for d, src := range map[string]string{vulnDir: vulnSrc, fixDir: fixSrc} {
 		if err := os.MkdirAll(d, 0o755); err != nil {
 			t.Fatal(err)
