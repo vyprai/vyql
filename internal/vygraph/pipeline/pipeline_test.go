@@ -58,10 +58,17 @@ func TestPipelineToleratesBadFiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
-	// tree-sitter error recovery means even broken python yields a tree; the
-	// contract is that a bad file never fails the scan.
-	if res.Files["python"] < 1 || res.Files["doc"] != 0 {
-		t.Fatalf("counts = %v (want >=1 python, bad.json skipped)", res.Files)
+	// The contract is that a bad file never fails the scan. The per-lang
+	// counter tracks attempted files (the cap applies to reads, not parses);
+	// the store itself carries no nodes from the unparseable json.
+	if res.Files["python"] < 1 {
+		t.Fatalf("counts = %v (want >=1 python)", res.Files)
+	}
+	// No doc.Map/Seq/Scalar from the bad json.
+	for _, typ := range []string{"doc.Map", "doc.Seq", "doc.Scalar"} {
+		if n := res.Graph.NodesOfType(typ); len(n) > 0 {
+			t.Fatalf("unparseable json contributed %d %s nodes", len(n), typ)
+		}
 	}
 }
 
