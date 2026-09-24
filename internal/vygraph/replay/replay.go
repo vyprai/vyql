@@ -127,17 +127,16 @@ func RunRank(rk Rank, kbDir, cacheDir string, opts pipeline.Options) (*Outcome, 
 		// needs resolving, via the GitHub commit API (ls-remote cannot
 		// resolve raw SHAs or sha^ expressions).
 		var sha string
-		var err error
 		if strings.HasSuffix(dl.rev, "^") {
-			sha, err = parentSHA(rk.Owner, rk.Repo, rk.Fix)
-			if err != nil {
-				return nil, fmt.Errorf("resolve parent of %s: %w", rk.Fix, err)
+			// Resolve the parent via a depth-2 shallow fetch — no API, no
+			// rate limit. Fetch the fix commit plus one parent, then read
+			// the parent SHA from the fetched history.
+			sha = resolveParent(rk.URL(), rk.Fix)
+			if sha == "" {
+				return nil, fmt.Errorf("resolve parent of %s: shallow fetch failed", rk.Fix)
 			}
 		} else {
 			sha = rk.Fix
-		}
-		if err != nil {
-			return nil, fmt.Errorf("resolve %s: %w", dl.rev, err)
 		}
 		tarURL := fmt.Sprintf("https://%s/%s/%s/archive/%s.tar.gz", rk.Host, rk.Owner, rk.Repo, sha)
 		if err := fetchTarball(tarURL, dl.dir); err != nil {
@@ -326,6 +325,33 @@ func revRemote(url, rev string) (string, error) {
 		return "", fmt.Errorf("ls-remote: no ref %s", rev)
 	}
 	return strings.Fields(line)[0], nil
+}
+
+// resolveParent fetches the fix commit plus one parent (depth=2) into a
+// bare temp repo and reads the parent SHA — no API, no rate limit.
+func resolveParent(url, fixSHA string) string {
+	tmp, err := os.MkdirTemp("", "vygraph-parent")
+	if err != nil {
+		return ""
+	}
+	defer os.RemoveAll(tmp)
+	run := func(args ...string) (string, error) {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = tmp
+		cmd.Env = append(os.Environ(), "GIT_DIR="+tmp)
+		out, err := cmd.CombinedOutput()
+		return strings.TrimSpace(string(out)), err
+	}
+	_, _ = run("init", "--bare", "-q", tmp)
+	_, err = run("fetch", "--depth=2", url, fixSHA)
+	if err != nil {
+		return ""
+	}
+	out, err := run("rev-parse", "FETCH_HEAD^")
+	if err != nil {
+		return ""
+	}
+	return out
 }
 
 // parentSHA resolves a commit's first parent SHA via the GitHub API,
