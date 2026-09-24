@@ -19,6 +19,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/vyprai/vyql/internal/vygraph/pipeline"
 )
@@ -326,16 +328,35 @@ func revRemote(url, rev string) (string, error) {
 	return strings.Fields(line)[0], nil
 }
 
-// parentSHA resolves a commit's first parent SHA via the GitHub API.
+// parentSHA resolves a commit's first parent SHA via the GitHub API,
+// retrying with backoff on rate-limit 403s (unauthenticated: 60/hour).
+var apiMu sync.Mutex // serialize API calls to avoid burst rate-limiting
+
 func parentSHA(owner, repo, sha string) (string, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/commits/%s", owner, repo, sha)
-	resp, err := http.Get(url)
-	if err != nil {
-		return "", err
+	var resp *http.Response
+	var err error
+	for attempt := 0; attempt < 3; attempt++ {
+		apiMu.Lock()
+		resp, err = http.Get(url)
+		apiMu.Unlock()
+		if err != nil {
+			return "", err
+		}
+		if resp.StatusCode == 200 {
+			break
+		}
+		if resp.StatusCode == 403 || resp.StatusCode == 429 {
+			resp.Body.Close()
+			time.Sleep(time.Duration(attempt+1) * 5 * time.Second)
+			continue
+		}
+		resp.Body.Close()
+		return "", fmt.Errorf("GitHub API HTTP %d", resp.StatusCode)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		return "", fmt.Errorf("GitHub API HTTP %d", resp.StatusCode)
+		return "", fmt.Errorf("GitHub API HTTP %d after retries", resp.StatusCode)
 	}
 	var commit struct {
 		Parents []struct {
