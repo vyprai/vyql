@@ -53,7 +53,12 @@ type conv struct {
 	skip   map[string]bool
 }
 
-func (c *conv) text(n *tree_sitter.Node) string { return string(c.src[n.StartByte():n.EndByte()]) }
+func (c *conv) text(n *tree_sitter.Node) string {
+	if n == nil {
+		return ""
+	}
+	return string(c.src[n.StartByte():n.EndByte()])
+}
 
 func (c *conv) add(n *tree_sitter.Node, typ string, fields [][2]string, approx bool) (graph.Node, bool) {
 	id := c.id(n, typ)
