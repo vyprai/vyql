@@ -310,10 +310,11 @@ func (p *packageConverter) flush() {
 	pkgMethods := scratch.methodMap(allDecls)
 	pkgIfaces := scratch.interfaceMethodSets(allDecls)
 	pkgFields := scratch.structFieldMap(allDecls)
+	pkgFuncs := packageFuncMap(p.files)
 	p.repo.note(p.pkgKey, pkgFields)
 	mod := p.byPkg[p.pkgKey]
 	for i, f := range p.files {
-		c := &conv{fset: p.fset, file: p.displays[i], pkgMethods: pkgMethods, pkgIfaces: pkgIfaces, pkgFields: pkgFields, repo: p.repo}
+		c := &conv{fset: p.fset, file: p.displays[i], pkgMethods: pkgMethods, pkgIfaces: pkgIfaces, pkgFields: pkgFields, pkgFuncs: pkgFuncs, repo: p.repo}
 		c.fileImports, c.dotImports = importNames(f)
 		mod.Imports = append(mod.Imports, c.imports(f)...)
 		mod.Body = append(mod.Body, c.decls(f.Decls)...)
@@ -321,6 +322,32 @@ func (p *packageConverter) flush() {
 	p.pkgKey = ""
 	p.files = nil
 	p.displays = nil
+}
+
+// packageFuncMap indexes the buffered package's package-level functions by
+// name, for the delegated context hop (goDelegatedContextTokens). Go resolves a
+// bare identifier call against its package, not its file, so the index spans
+// every buffered file and hands every file's conversion the same one. Methods
+// are absent -- resolving `s.review(g)` needs the receiver's type, and a value
+// of interface type can name any implementation -- and a bodyless declaration
+// has no facts to read.
+func packageFuncMap(files []*ast.File) map[string]*ast.FuncDecl {
+	var funcs map[string]*ast.FuncDecl
+	for _, f := range files {
+		for _, d := range f.Decls {
+			fd, ok := d.(*ast.FuncDecl)
+			if !ok || fd.Recv != nil || fd.Body == nil || fd.Name == nil {
+				continue
+			}
+			if funcs == nil {
+				funcs = map[string]*ast.FuncDecl{}
+			}
+			if _, dup := funcs[fd.Name.Name]; !dup {
+				funcs[fd.Name.Name] = fd
+			}
+		}
+	}
+	return funcs
 }
 
 // ExtractDir parses every .go file under root (recursively, skipping vendor,
@@ -441,6 +468,14 @@ type conv struct {
 	// model, the shape large monorepos use) resolves through repo instead, by the
 	// names fileImports/dotImports spell it under.
 	pkgFields map[string][]string
+	// pkgFuncs maps each package-level function's name to its declaration, so the
+	// delegated context hop can read a bare-identifier callee's own body from
+	// anywhere in the package (packageConverter.flush builds it; nil when this
+	// file converts in isolation, which disables the hop).
+	pkgFuncs map[string]*ast.FuncDecl
+	// calleeFacts caches the `callee:`-keyed facts of the package functions this
+	// file's contexts have already asked for (goCalleeFacts).
+	calleeFacts map[string][]string
 	// repo is the scan-wide field index every package of the extraction shares: it
 	// carries the declared field sets of packages already converted and parses a not
 	// yet converted one on demand, so the universe of a cross-package bound type is
@@ -1049,8 +1084,20 @@ func (c *conv) funcDef(name, recv string, typ *ast.FuncType, bodyNode *ast.Block
 	if cache := parsecache.Shared(); cache != nil {
 		body = cache.DeferFunctionBody(body)
 	}
+	tokens := c.goFunctionTokens(name, typ, bodyNode)
+	// Delegated facts ride behind the function's own and only in the room the
+	// context cap leaves: a caller whose own behaviour saturates the context
+	// keeps exactly the context it had.
+	if delegated := c.goDelegatedContextTokens(name, typ, bodyNode); len(delegated) > 0 {
+		if room := 512 - len(tokens); room > 0 {
+			if len(delegated) > room {
+				delegated = delegated[:room]
+			}
+			tokens = append(tokens, delegated...)
+		}
+	}
 	return nir.FuncDef{Name: name, Recv: recv, Returns: c.resultTypeName(typ), Params: params, ParamTypes: paramTypes, Body: body, Loc: loc,
-		ContextTokens: c.goFunctionTokens(name, typ, bodyNode),
+		ContextTokens: tokens,
 		ParamEntries:  c.goParamEntries(name, params, paramTypes), Exported: exported}
 }
 
@@ -2422,6 +2469,126 @@ func (c *conv) goFunctionTokens(name string, typ *ast.FuncType, body *ast.BlockS
 		return true
 	})
 	return out
+}
+
+// A check a Go function delegates -- `if err := isValidPath(name); err != nil` --
+// leaves nothing behind in the caller's context but the helper's name, because
+// goFunctionTokens collects from the caller's own body subtree. Nothing can then
+// require that the helper is the one performing the validation the weakness
+// turns on, and the caller of a helper that checks reads identically to the
+// caller of one that does not -- which is the shape a fix that moves the control
+// into another function takes, and why the JavaScript, Python and Rust
+// frontends already emit these one-hop facts.
+//
+// Only what the helper does crosses the hop: the calls it makes, the literals it
+// names, the qualified names it reads. Its identifiers and expressions stay
+// behind, because a helper's local variable names describe the incident it was
+// written for rather than the behaviour anything can require of it.
+//
+// The hop resolves a bare identifier callee against pkgFuncs -- the buffered
+// package, the unit Go resolves such a call against -- and its facts are
+// re-keyed under one `callee:` prefix (`callee:call=test`), never merged into
+// the caller's own families, so nothing that asks what this function does can be
+// satisfied by what a helper it calls does instead.
+const (
+	goDelegatedCalleeLimit    = 8
+	goDelegatedCalleeFacts    = 24
+	goDelegatedTokenLimit     = 64
+	goDelegatedCalleeBodyMaxB = 8192
+)
+
+func (c *conv) goDelegatedContextTokens(name string, typ *ast.FuncType, body *ast.BlockStmt) []string {
+	if body == nil || len(c.pkgFuncs) == 0 {
+		return nil
+	}
+	// The index is keyed by name over the package, so a callee this function
+	// received as a parameter is not the package function that name happens to
+	// hold there. Neither is the function itself.
+	seenCallee := map[string]bool{name: true}
+	if typ != nil && typ.Params != nil {
+		for _, p := range typ.Params.List {
+			for _, n := range p.Names {
+				seenCallee[n.Name] = true
+			}
+		}
+	}
+	seenTok := map[string]bool{}
+	callees := 0
+	var out []string
+	ast.Inspect(body, func(n ast.Node) bool {
+		if len(out) >= goDelegatedTokenLimit || callees >= goDelegatedCalleeLimit {
+			return false
+		}
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		// A bare identifier callee is the sibling-helper form; a member call
+		// (`s.review(g)`) needs a receiver resolved, which this does not do.
+		callee := c.path(call.Fun)
+		if callee == "" || strings.Contains(callee, ".") || seenCallee[callee] {
+			return true
+		}
+		seenCallee[callee] = true
+		// A name that resolves to nothing -- a builtin, a conversion, a helper
+		// another package declares -- spends no budget: only a callee whose body
+		// was actually read counts against it.
+		if facts := c.goCalleeFacts(callee); len(facts) > 0 {
+			callees++
+			for _, tok := range facts {
+				if len(out) >= goDelegatedTokenLimit {
+					break
+				}
+				if seenTok[tok] {
+					continue
+				}
+				seenTok[tok] = true
+				out = append(out, tok)
+			}
+		}
+		return true
+	})
+	return out
+}
+
+// goCalleeFacts is the `callee:`-keyed view of one package function's own
+// facts, computed once per file. The function's facts are its body subtree's
+// alone: the hop never recurses, so a chain of helpers contributes only its
+// first link.
+func (c *conv) goCalleeFacts(name string) []string {
+	if facts, ok := c.calleeFacts[name]; ok {
+		return facts
+	}
+	facts := c.goCalleeFactsUncached(name)
+	if c.calleeFacts == nil {
+		c.calleeFacts = map[string][]string{}
+	}
+	c.calleeFacts[name] = facts
+	return facts
+}
+
+func (c *conv) goCalleeFactsUncached(name string) []string {
+	decl := c.pkgFuncs[name]
+	if decl == nil || decl.End()-decl.Pos() > goDelegatedCalleeBodyMaxB {
+		return nil
+	}
+	var facts []string
+	for _, tok := range c.goFunctionTokens(name, decl.Type, decl.Body) {
+		key, value, ok := strings.Cut(tok, ":")
+		if !ok || value == "" {
+			continue
+		}
+		switch key {
+		case "call", "call_path", "literal", "selector":
+		default:
+			continue
+		}
+		facts = append(facts, "callee:"+key+"="+value)
+		if len(facts) >= goDelegatedCalleeFacts {
+			break
+		}
+	}
+	return facts
 }
 
 func (c *conv) goAppendCopyToken(e ast.Expr) string {
