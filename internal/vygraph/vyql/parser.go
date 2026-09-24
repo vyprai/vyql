@@ -660,6 +660,22 @@ func (p *parser) parseBinding() (BindingDecl, error) {
 		return b, err
 	}
 	b.Matcher = m
+	b.Arg = -1
+	// The sink-only arg qualifier: which argument position carries the
+	// dangerous string. A value flowing into a non-dangerous argument does
+	// not arm the sink.
+	if p.cur().Kind == TokIdent && p.cur().Text == "arg" {
+		p.next()
+		n := p.next()
+		if n.Kind != TokNumber {
+			return b, p.errorf("arg takes an integer position")
+		}
+		var v int
+		if _, err := fmt.Sscanf(n.Text, "%d", &v); err != nil {
+			return b, p.errorf("bad arg position %q", n.Text)
+		}
+		b.Arg = v
+	}
 	if p.isKeyword("where") {
 		p.next()
 		w, err := p.parseExpr()

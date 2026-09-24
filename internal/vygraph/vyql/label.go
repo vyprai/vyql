@@ -32,6 +32,16 @@ func ApplyAdapters(kb *KB, g *graph.Store) error {
 				return fmt.Errorf("adapter %s: %w", a.Tech, err)
 			}
 			for _, n := range nodes {
+				// Sink-only arg qualifier: stamp the dangerous position on
+				// the node so the solver can gate the walk's arrival.
+				if b.Keyword == "sink" && b.Arg >= 0 {
+					if stored, ok := g.Node(n.ID); ok {
+						var sf = stored.Fields
+						sf.Set("sink_arg", graph.Int(int64(b.Arg)))
+						stored.Fields = sf
+						_ = g.Upsert(stored)
+					}
+				}
 				if b.Where != nil {
 					ok, err := evalWhere(g, b.Where, n)
 					if err != nil {

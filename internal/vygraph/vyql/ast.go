@@ -129,6 +129,7 @@ type BindingDecl struct {
 	Matcher Expr   // a Call (matcher) — string sugar desugared by the parser
 	Where   Expr   // optional native filter
 	Concept string
+	Arg     int // sink-only: which argument position carries the dangerous string (-1 = all)
 	Pos     Pos
 }
 

@@ -58,6 +58,36 @@ type reach struct {
 	notes []string // fidelity markers: taint-through, approx_lowered
 }
 
+// sinkArgOK reports whether the walk's arrival at a target respects the
+// sink's declared dangerous-argument position: a value flowing into a
+// non-dangerous argument does not arm the sink. The arrival node is the
+// From of the last path step; its position among the target's children is
+// the argument index.
+func sinkArgOK(g *graph.Store, targetID string, path []solver.Step) bool {
+	target, ok := g.Node(targetID)
+	if !ok {
+		return true
+	}
+	argV, has := target.Fields.Get("sink_arg")
+	if !has || argV.Kind != graph.KindInt {
+		return true // no arg qualifier: all positions dangerous
+	}
+	wantArg := argV.I
+	if len(path) == 0 {
+		return true // direct hit with no path (source == sink)
+	}
+	arrival := path[len(path)-1].From
+	children := g.Out(targetID, "child")
+	for i, e := range children {
+		if e.To == arrival {
+			return int64(i) == wantArg
+		}
+	}
+	// The arrival node is not a direct child (it came via threading or a
+	// def-flow); the dangerous position only filters direct child arrivals.
+	return true
+}
+
 // walk BFS's the FLOWS graph from src, descending CALLS edges with
 // position-matched argument instantiation and a visited-pair fixpoint cut.
 func (s *Solver) walk(g *graph.Store, src string, targets map[string]bool) []reach {
@@ -73,7 +103,7 @@ func (s *Solver) walk(g *graph.Store, src string, targets map[string]bool) []rea
 	for len(queue) > 0 {
 		cur := queue[0]
 		queue = queue[1:]
-		if targets[cur.id] {
+		if targets[cur.id] && sinkArgOK(g, cur.id, cur.path) {
 			results = append(results, reach{dst: cur.id, path: cur.path, notes: cur.notes})
 			// continue walking: a sink may also be a conduit to further sinks
 		}
