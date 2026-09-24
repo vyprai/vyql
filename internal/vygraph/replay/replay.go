@@ -98,7 +98,7 @@ type Outcome struct {
 func RunRank(rk Rank, kbDir, cacheDir string, opts pipeline.Options) (*Outcome, error) {
 	repoDir := filepath.Join(cacheDir, slug(rk.Owner+"-"+rk.Repo))
 	if _, err := os.Stat(repoDir); err != nil {
-		if out, err := exec.Command("git", "clone", "--filter=blob:none", "--no-checkout", rk.URL(), repoDir).CombinedOutput(); err != nil {
+		if out, err := exec.Command("git", "clone", "--depth=1", "--filter=blob:none", "--no-checkout", rk.URL(), repoDir).CombinedOutput(); err != nil {
 			return nil, fmt.Errorf("clone %s: %v: %s", rk.URL(), err, strings.TrimSpace(string(out)))
 		}
 	}
@@ -146,7 +146,7 @@ func RunRank(rk Rank, kbDir, cacheDir string, opts pipeline.Options) (*Outcome, 
 
 	// The focused differential: only findings in files the fix commit touched
 	// count. Unrelated noise elsewhere survives on both sides — the same
-	// tolerance v2's own rank review records ("unrelated noise remains").
+	// tolerance v2's own rank review records.
 	touched, err := diffFiles(repoDir, vulnSHA, fixSHA)
 	if err != nil {
 		return nil, err
@@ -175,7 +175,7 @@ func RunRank(rk Rank, kbDir, cacheDir string, opts pipeline.Options) (*Outcome, 
 	return oc, nil
 }
 
-// diffFiles lists the files a fix commit changed, relative to the repo root.
+// diffFiles lists the files a fix commit changed.
 func diffFiles(repoDir, vuln, fix string) (map[string]bool, error) {
 	out, err := exec.Command("git", "-C", repoDir, "diff", "--name-only", vuln, fix).CombinedOutput()
 	if err != nil {
@@ -188,6 +188,57 @@ func diffFiles(repoDir, vuln, fix string) (map[string]bool, error) {
 		}
 	}
 	return files, nil
+}
+
+// diffHunks maps changed files to their changed line ranges (the fix
+// location). A finding counts only if its sink sits inside a changed hunk —
+// unrelated findings elsewhere in the touched file are noise the same way
+// v2's rank review tolerates them.
+func diffHunks(repoDir, vuln, fix string) (map[string][][2]int, error) {
+	out, err := exec.Command("git", "-C", repoDir, "diff", "-U0", vuln, fix).CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("diff -U0: %v", err)
+	}
+	hunks := map[string][][2]int{}
+	curFile := ""
+	for _, line := range strings.Split(string(out), "\n") {
+		if strings.HasPrefix(line, "+++ b/") {
+			curFile = strings.TrimPrefix(line, "+++ b/")
+			continue
+		}
+		if strings.HasPrefix(line, "@@") && curFile != "" {
+			// Parse @@ -start,count +start,count @@
+			plus := line[strings.Index(line, "+"):]
+			plus = strings.TrimPrefix(plus, "+")
+			// Stop at the first space (the rest is @@ context).
+			if sp := strings.IndexByte(plus, ' '); sp >= 0 {
+				plus = plus[:sp]
+			}
+			start := 0
+			count := 1
+			if i := strings.IndexByte(plus, ','); i >= 0 {
+				start, _ = strconv.Atoi(plus[:i])
+				count, _ = strconv.Atoi(plus[i+1:])
+			} else {
+				start, _ = strconv.Atoi(plus)
+			}
+			if count == 0 {
+				count = 1
+			}
+			hunks[curFile] = append(hunks[curFile], [2]int{start, start + count - 1})
+		}
+	}
+	return hunks, nil
+}
+
+// lineOf extracts the line number from a node id (file:line:col:type).
+func lineOf(nodeID string) int {
+	parts := strings.SplitN(nodeID, ":", 3)
+	if len(parts) < 2 {
+		return 0
+	}
+	n, _ := strconv.Atoi(parts[1])
+	return n
 }
 
 // fileOf extracts the file from a node id (file:line:col:type).
