@@ -9,6 +9,7 @@ package replay
 import (
 	"archive/tar"
 	"compress/gzip"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -119,8 +120,22 @@ func RunRank(rk Rank, kbDir, cacheDir string, opts pipeline.Options) (*Outcome, 
 		if err := os.RemoveAll(dl.dir); err != nil {
 			return nil, err
 		}
-		// Resolve the rev through a bare ls-remote (cheap), then fetch the tarball.
-		sha, err := revRemote(rk.URL(), dl.rev)
+		// Resolve the rev: the fix SHA via ls-remote; its parent via the
+		// GitHub commit API (ls-remote cannot resolve `sha^`).
+		var sha string
+		var err error
+		if strings.HasSuffix(dl.rev, "^") {
+			fixSHA, rerr := revRemote(rk.URL(), strings.TrimSuffix(dl.rev, "^"))
+			if rerr != nil {
+				return nil, fmt.Errorf("resolve fix %s: %w", dl.rev, rerr)
+			}
+			sha, err = parentSHA(rk.Owner, rk.Repo, fixSHA)
+			if err != nil {
+				return nil, fmt.Errorf("resolve parent of %s: %w", fixSHA, err)
+			}
+		} else {
+			sha, err = revRemote(rk.URL(), dl.rev)
+		}
 		if err != nil {
 			return nil, fmt.Errorf("resolve %s: %w", dl.rev, err)
 		}
@@ -311,6 +326,31 @@ func revRemote(url, rev string) (string, error) {
 		return "", fmt.Errorf("ls-remote: no ref %s", rev)
 	}
 	return strings.Fields(line)[0], nil
+}
+
+// parentSHA resolves a commit's first parent SHA via the GitHub API.
+func parentSHA(owner, repo, sha string) (string, error) {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/commits/%s", owner, repo, sha)
+	resp, err := http.Get(url)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("GitHub API HTTP %d", resp.StatusCode)
+	}
+	var commit struct {
+		Parents []struct {
+			SHA string `json:"sha"`
+		} `json:"parents"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&commit); err != nil {
+		return "", err
+	}
+	if len(commit.Parents) == 0 {
+		return "", fmt.Errorf("commit %s has no parent (root commit)", sha)
+	}
+	return commit.Parents[0].SHA, nil
 }
 
 // fetchTarball downloads and extracts a GitHub archive tarball into dir.
