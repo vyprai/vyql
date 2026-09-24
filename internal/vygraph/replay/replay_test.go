@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/vyprai/vyql/internal/vygraph/pipeline"
@@ -102,25 +103,53 @@ func TestReplayCorpus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pass, fail, errN := 0, 0, 0
-	for i, rk := range ranks {
-		if limit > 0 && i >= limit {
-			break
+	// Concurrent rank execution: 4 ranks in parallel multiplies throughput
+	// (the per-rank pipeline is CPU-bound on tree-sitter parsing; running
+	// ranks concurrently uses the remaining cores).
+	concurrency := 4
+	if s := os.Getenv("VYGRAPH_REPLAY_CONCURRENCY"); s != "" {
+		if c, err := strconv.Atoi(s); err == nil && c > 0 {
+			concurrency = c
 		}
-		oc, err := RunRank(rk, kbDir, cache, pipeline.Options{})
-		if err != nil {
+	}
+	if limit > 0 && limit < len(ranks) {
+		ranks = ranks[:limit]
+	}
+	type result struct {
+		rk  Rank
+		oc  *Outcome
+		err error
+	}
+	results := make([]result, len(ranks))
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, concurrency)
+	for i, rk := range ranks {
+		wg.Add(1)
+		go func(idx int, r Rank) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			oc, err := RunRank(r, kbDir, cache, pipeline.Options{})
+			results[idx] = result{rk: r, oc: oc, err: err}
+		}(i, rk)
+	}
+	wg.Wait()
+
+	pass, fail, errN := 0, 0, 0
+	for _, res := range results {
+		if res.err != nil {
 			errN++
-			fmt.Printf("rank %-5d %-14s ERROR %v\n", rk.Rank, rk.CVE, err)
+			fmt.Printf("rank %-5d %-14s ERROR %v\n", res.rk.Rank, res.rk.CVE, res.err)
 			continue
 		}
 		status := "FAIL"
-		if oc.Pass {
+		if res.oc.Pass {
 			status = "PASS"
 			pass++
 		} else {
 			fail++
 		}
-		fmt.Printf("rank %-5d %-14s %s %s\n", rk.Rank, rk.CVE, status, oc.Note)
+		fmt.Printf("rank %-5d %-14s %s %s\n", res.rk.Rank, res.rk.CVE, status, res.oc.Note)
 	}
 	fmt.Printf("TOTAL ranks=%d pass=%d fail=%d error=%d rate=%.1f%%\n",
 		pass+fail+errN, pass, fail, errN, 100.0*float64(pass)/float64(pass+fail+errN+1))
