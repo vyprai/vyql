@@ -294,6 +294,42 @@ func applyFrameworkLift(kb *KB, g *graph.Store, l LiftDecl, facts []routeFact) e
 		if !found {
 			continue // a registration whose handler is not in the graph: skip, not error
 		}
+		// The inject clause (implicit): the handler's parameters are HTTP
+		// input. Label the Name nodes in the handler's body that match the
+		// handler's parameter names — the taint solver walks from these, not
+		// from ParamEntry nodes (which have no outgoing FLOWS).
+		handlerNameV, _ := handler.Fields.Get("name")
+		paramNames := map[string]bool{}
+		for _, e := range g.Out(handler.ID, "child") {
+			pe, ok := g.Node(e.To)
+			if !ok || pe.Type != "code.ParamEntry" {
+				continue
+			}
+			pn, _ := pe.Fields.Get("name")
+			if pn.S != "" && pn.S != "self" && pn.S != "cls" {
+				paramNames[pn.S] = true
+			}
+		}
+		if len(paramNames) > 0 {
+			handlerRegion := "fn:" + handlerNameV.S
+			for _, n := range g.NodesOfType("code.Name") {
+				local, _ := n.Fields.Get("local")
+				region, _ := n.Fields.Get("region")
+				if !paramNames[local.S] || !strings.HasPrefix(region.S, handlerRegion) {
+					continue
+				}
+				_ = g.AddLabel(graph.Label{
+					Target:     n.ID,
+					Concept:    "code.HttpInput",
+					Confidence: 0.75, // syntactic fidelity: inferred from the decorator
+					Prov: graph.Provenance{
+						Producer: "framework",
+						Build:    graph.BuildLabeled,
+						Trust:    kb.Trust,
+					},
+				})
+			}
+		}
 		var fields graph.Fields
 		for _, lf := range l.Fields {
 			v := graph.Value{}
