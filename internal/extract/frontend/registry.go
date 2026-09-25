@@ -43,7 +43,7 @@ var languages = sync.OnceValue(func() []Language {
 	return []Language{
 		{"go", map[string]bool{".go": true}, golang.Extract, bindings.GoBindings},
 		{"python", map[string]bool{".py": true}, treesitter.ExtractPython, bindings.PythonBindings},
-		{"javascript", map[string]bool{".js": true, ".jsx": true, ".ts": true, ".tsx": true, ".mjs": true, ".cjs": true, ".vue": true, ".html": true, ".htm": true},
+		{"javascript", map[string]bool{".js": true, ".jsx": true, ".ts": true, ".tsx": true, ".mts": true, ".cts": true, ".mjs": true, ".cjs": true, ".vue": true, ".html": true, ".htm": true},
 			treesitter.ExtractJavaScript, bindings.JsBindings},
 		{"ruby", map[string]bool{".rb": true, ".erb": true}, treesitter.ExtractRuby, bindings.RubyBindings},
 		{"java", map[string]bool{".java": true}, treesitter.ExtractJava, bindings.JavaBindings},
