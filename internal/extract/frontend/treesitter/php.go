@@ -33,6 +33,13 @@ type phConv struct {
 	// appended after the statement containing the expression by stmt, so the
 	// class's methods become FuncDefs in the enclosing statement list.
 	hoisted []nir.Stmt
+	// siblings indexes this file's own function and method declarations for the
+	// delegated context hop (phpDelegatedContextTokens). Built once per file in
+	// ExtractPHP; empty for the Blade echo fragments, which declare nothing.
+	siblings phpSiblings
+	// calleeFacts memoises each resolved sibling's `callee:` facts, computed
+	// once per file (phpCalleeFacts).
+	calleeFacts map[string][]string
 }
 
 // phpBaseClauseTokens returns the base-clause type names of a class-like
@@ -163,6 +170,7 @@ func ExtractPHP(files []string, root string) (nir.Program, error) {
 		phpNormalizeLegacyScriptTags,
 		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
 			c := &phConv{src: src, root: root, file: rel}
+			c.siblings = c.phpIndexSiblings(tree.RootNode())
 			body := c.block(tree.RootNode())
 			body = append(body, c.phpBladeEchoStmts()...)
 			body = append(body, c.phpModuleContext(tree.RootNode())...)
@@ -599,7 +607,285 @@ func (c *phConv) phpFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
 	}
 	tokens = append(tokens, c.phpAstContextTokens(c.field(fn, "attributes"))...)
 	tokens = append(tokens, c.phpAstContextTokens(body)...)
+	tokens = append(tokens, c.phpDelegatedContextTokens(fn)...)
 	return c.phpContextCall("analysis.function.context", c.loc(fn), "context", tokens, c.text(body))
+}
+
+// phpSiblings is one file's own declaration index for the delegated context hop:
+// a top-level function_definition under its bare name, and every class-like
+// declaration's method_declaration under class name then method name. A name the
+// file declares twice is declined rather than guessed at, and a function nested
+// inside another function or an if-arm is absent, because whether that one exists
+// is a runtime fact rather than a name resolution.
+type phpSiblings struct {
+	functions map[string]*tree_sitter.Node
+	methods   map[string]map[string]*tree_sitter.Node
+}
+
+func (s phpSiblings) empty() bool {
+	return len(s.functions) == 0 && len(s.methods) == 0
+}
+
+// phpIndexSiblings indexes the declarations a call inside this file can resolve
+// without knowing a value's type. It is the PHP instance of the index the Go,
+// Python, JavaScript and Rust frontends build for the same hop, and its unit is
+// the file for the same reason theirs is the module or the package: the converter
+// lowers one file at a time, so a callee another file declares -- a WordPress
+// builtin like update_option, a helper the plugin includes -- spends no budget.
+func (c *phConv) phpIndexSiblings(root *tree_sitter.Node) phpSiblings {
+	var s phpSiblings
+	if root == nil {
+		return s
+	}
+	addFunction := func(n *tree_sitter.Node) {
+		name := c.text(c.field(n, "name"))
+		if name == "" {
+			return
+		}
+		if s.functions == nil {
+			s.functions = map[string]*tree_sitter.Node{}
+		}
+		if _, dup := s.functions[name]; !dup {
+			s.functions[name] = n
+		} else {
+			// A conditional redeclaration makes the bare name name either
+			// body, so the hop declines both.
+			s.functions[name] = nil
+		}
+	}
+	addClass := func(n *tree_sitter.Node) {
+		cls := c.text(c.field(n, "name"))
+		body := c.field(n, "body")
+		if cls == "" || body == nil {
+			return
+		}
+		for _, m := range c.namedChildren(body) {
+			if c.kind(m) != "method_declaration" {
+				continue
+			}
+			name := c.text(c.field(m, "name"))
+			if name == "" {
+				continue
+			}
+			if s.methods == nil {
+				s.methods = map[string]map[string]*tree_sitter.Node{}
+			}
+			if s.methods[cls] == nil {
+				s.methods[cls] = map[string]*tree_sitter.Node{}
+			}
+			if _, dup := s.methods[cls][name]; !dup {
+				s.methods[cls][name] = m
+			} else {
+				// Two declarations of one class name -- two namespaces in a
+				// file, a conditional redeclaration -- make `C::m()` name
+				// either, so the hop declines both.
+				s.methods[cls][name] = nil
+			}
+		}
+	}
+	var topLevel func(*tree_sitter.Node)
+	topLevel = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		switch c.kind(n) {
+		case "namespace_definition":
+			// Braces are a lexical grouping the converter flattens, and the
+			// semicolon form's statements are siblings of the declaration already.
+			for _, st := range c.namedChildren(c.field(n, "body")) {
+				topLevel(st)
+			}
+		case "function_definition":
+			addFunction(n)
+		case "class_declaration", "interface_declaration", "trait_declaration", "enum_declaration":
+			addClass(n)
+		}
+	}
+	for _, st := range c.namedChildren(root) {
+		topLevel(st)
+	}
+	return s
+}
+
+// phpResolvedCallee reports the sibling a call names, when the file itself
+// declares it under a name PHP resolves without a value's type. That is a bare
+// unqualified function name, `$this->m()` / `self::m()` / `static::m()` inside
+// the class that declares m, and `C::m()` for a class this file declares -- the
+// one place the PHP port reaches further than the Go, Python and JavaScript
+// ones, whose helper idiom is the bare identifier. There a member call is
+// declined because the receiver's type is unknown; `$this` and a class named
+// outright are not unknown, they are what the language substitutes, and the
+// method is where a WordPress handler's delegation actually lives. Everything
+// else stays behind: a qualified name resolves through a namespace this index
+// does not carry, `parent::` names the base clause (a different, unresolved
+// target, the same reason `dotted` leaves it alone), and `$var->m()` needs the
+// receiver's type.
+func (c *phConv) phpResolvedCallee(n *tree_sitter.Node) (string, *tree_sitter.Node) {
+	switch c.kind(n) {
+	case "function_call_expression":
+		fn := c.field(n, "function")
+		if fn == nil || c.kind(fn) != "name" {
+			return "", nil
+		}
+		name := c.text(fn)
+		if decl := c.siblings.functions[name]; decl != nil {
+			return "f:" + name, decl
+		}
+		return "", nil
+	case "member_call_expression":
+		obj := c.field(n, "object")
+		if obj == nil || c.kind(obj) != "variable_name" || c.text(obj) != "$this" || c.className == "" {
+			return "", nil
+		}
+		return c.phpResolvedMethod(c.className, n)
+	case "scoped_call_expression":
+		scope := c.field(n, "scope")
+		if scope == nil {
+			return "", nil
+		}
+		switch c.kind(scope) {
+		case "relative_scope":
+			if text := c.text(scope); (text == "self" || text == "static") && c.className != "" {
+				return c.phpResolvedMethod(c.className, n)
+			}
+		case "name":
+			return c.phpResolvedMethod(c.text(scope), n)
+		}
+	}
+	return "", nil
+}
+
+func (c *phConv) phpResolvedMethod(cls string, n *tree_sitter.Node) (string, *tree_sitter.Node) {
+	if cls == "" {
+		return "", nil
+	}
+	name := c.text(c.field(n, "name"))
+	if name == "" {
+		return "", nil
+	}
+	if decl := c.siblings.methods[cls][name]; decl != nil {
+		return "m:" + cls + "." + name, decl
+	}
+	return "", nil
+}
+
+// A check a PHP function or method delegates -- the wp_verify_nonce a WordPress
+// handler states at its top, a write an options class factors into
+// update_all -- leaves nothing behind in the caller's context but the helper's
+// name, because phpAstContextTokens collects from the caller's own body subtree.
+// Nothing can then require that the helper is the one performing the validation
+// or the write the weakness turns on, and the caller of a helper that checks
+// reads identically to the caller of one that does not -- which is the shape a
+// fix that moves the control into another function takes, and why the Go, Python,
+// JavaScript and Rust frontends already emit these one-hop facts.
+//
+// Only what the helper does crosses the hop: the calls it makes and the member
+// paths it reads. Its identifiers, arguments and expressions stay behind,
+// because a helper's local variable names describe the incident it was written
+// for rather than the behaviour anything can require of it. PHP names no bare
+// literal family (phpLiteralTokens values only ever ride behind assign_literal:
+// or property_literal:), so no callee:literal= occurs, exactly as no
+// callee:regex= occurs for Python.
+//
+// The facts are re-keyed under one `callee:` prefix (`callee:call=test`), never
+// merged into the caller's own families, so nothing that asks what this function
+// does can be satisfied by what a helper it calls does instead.
+const (
+	phpDelegatedCalleeLimit    = 8
+	phpDelegatedCalleeFacts    = 24
+	phpDelegatedTokenLimit     = 64
+	phpDelegatedCalleeBodyMaxB = 8192
+)
+
+func (c *phConv) phpDelegatedContextTokens(fn *tree_sitter.Node) []string {
+	body := c.field(fn, "body")
+	if body == nil || c.siblings.empty() {
+		return nil
+	}
+	// The index is keyed by name, so the callee is identified by the declaration
+	// it resolved to; the function's own declaration is that one under a
+	// self-call, and recursion attributes nothing. PHP keeps functions and
+	// variables in separate namespaces, so no parameter can shadow a callee's
+	// name the way it can in Go, Python or JavaScript.
+	seenCallee := map[*tree_sitter.Node]bool{fn: true}
+	seenTok := map[string]bool{}
+	callees := 0
+	var out []string
+	var walk func(*tree_sitter.Node)
+	walk = func(cur *tree_sitter.Node) {
+		if cur == nil || len(out) >= phpDelegatedTokenLimit || callees >= phpDelegatedCalleeLimit {
+			return
+		}
+		switch c.kind(cur) {
+		case "function_call_expression", "member_call_expression", "scoped_call_expression":
+			key, decl := c.phpResolvedCallee(cur)
+			if decl != nil && !seenCallee[decl] {
+				seenCallee[decl] = true
+				// A name that resolves to nothing -- a builtin, a framework
+				// function another file declares, a method the base clause
+				// holds -- spends no budget: only a callee whose body was
+				// actually read counts against it.
+				if facts := c.phpCalleeFacts(key, decl); len(facts) > 0 {
+					callees++
+					for _, tok := range facts {
+						if len(out) >= phpDelegatedTokenLimit {
+							break
+						}
+						if seenTok[tok] {
+							continue
+						}
+						seenTok[tok] = true
+						out = append(out, tok)
+					}
+				}
+			}
+		}
+		for _, ch := range c.namedChildren(cur) {
+			walk(ch)
+		}
+	}
+	walk(body)
+	return out
+}
+
+// phpCalleeFacts is the `callee:`-keyed view of one sibling's own facts,
+// computed once per file. The sibling's facts are its body subtree's alone,
+// exactly as its own analysis.function.context collects them: the hop never
+// recurses, so a chain of helpers contributes only its first link.
+func (c *phConv) phpCalleeFacts(key string, decl *tree_sitter.Node) []string {
+	if facts, ok := c.calleeFacts[key]; ok {
+		return facts
+	}
+	facts := c.phpCalleeFactsUncached(decl)
+	if c.calleeFacts == nil {
+		c.calleeFacts = map[string][]string{}
+	}
+	c.calleeFacts[key] = facts
+	return facts
+}
+
+func (c *phConv) phpCalleeFactsUncached(decl *tree_sitter.Node) []string {
+	body := c.field(decl, "body")
+	if body == nil || body.EndByte()-body.StartByte() > phpDelegatedCalleeBodyMaxB {
+		return nil
+	}
+	var facts []string
+	for _, tok := range c.phpAstContextTokens(body) {
+		key, value, ok := strings.Cut(tok, ":")
+		if !ok || value == "" {
+			continue
+		}
+		switch key {
+		case "call", "call_path", "selector":
+		default:
+			continue
+		}
+		facts = append(facts, "callee:"+key+"="+value)
+		if len(facts) >= phpDelegatedCalleeFacts {
+			break
+		}
+	}
+	return facts
 }
 
 func (c *phConv) phpClassContext(cls *tree_sitter.Node, name string) []nir.Stmt {
