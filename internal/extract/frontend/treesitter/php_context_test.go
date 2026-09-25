@@ -1211,3 +1211,102 @@ function helper($input) { return $input; }
 		t.Fatalf("parameter entries not all found: theme=%v token=%v input=%v", sawTheme, sawToken, sawInput)
 	}
 }
+
+// A dispatcher's callback is recognisable only by what its body does — construct
+// the framework's response object, add commands to it, return it — and a
+// parameter entry is the only node a source binding can label an entry point's
+// parameters at. The entry therefore has to carry the body's own calls, in the
+// same `call_path:`/`call:` key the body's scope context already uses, so a
+// binding can key the parameters on that contract instead of on the application's
+// own function names.
+func TestPHPParamEntriesCarryBodyCalls(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "Callback.php")
+	src := []byte(`<?php
+class Page {
+  private function scrub($v) { return $v; }
+}
+function ChangeAdminsInfos($aid, $vk)
+{
+  global $userbank;
+  $objResponse = new xajaxResponse();
+  $vk = Page::scrub($vk);
+  $objResponse->addScript("ShowBox");
+  $GLOBALS['db']->Execute("UPDATE t SET vk = ?", array($vk));
+  $wipe = function ($p) { return unlink($p); };
+  return $objResponse;
+}`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractPHP([]string{path}, dir)
+	if err != nil {
+		t.Fatalf("ExtractPHP: %v", err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatalf("Lower: %v", err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var entry, scope string
+	sawEntry := false
+	for _, n := range nodes {
+		if n.Type != "code.Call" {
+			continue
+		}
+		switch n.Prop("callee_path") {
+		case "analysis.parameter.entry":
+			if strings.Contains(n.Prop("str_args"), "param_name:$vk") {
+				entry, sawEntry = n.Prop("str_args"), true
+			}
+		case "analysis.function.context":
+			if strings.Contains(n.Prop("str_args"), "function_name:ChangeAdminsInfos") {
+				scope = n.Prop("str_args")
+			}
+		}
+	}
+	if !sawEntry {
+		t.Fatal("no parameter entry for $vk")
+	}
+	for _, want := range []string{
+		"call_path:Page.scrub",
+		"call:scrub",
+		"call_path:$objResponse.addScript",
+		"call:addScript",
+		"call_path:$GLOBALS.Execute",
+		"call:Execute",
+	} {
+		if !strings.Contains(entry, want) {
+			t.Fatalf("$vk entry missing the body call %q; entry=%q", want, entry)
+		}
+		if !strings.Contains(scope, want) {
+			t.Fatalf("function scope context and parameter entry disagree on %q: scope=%q entry=%q", want, scope, entry)
+		}
+	}
+	// `new X(...)` calls X's constructor, and the framework contract a callback's
+	// parameters are keyed on is spelled with that construction. The scope context
+	// has no call token for it, so this is the one body call only the entry records.
+	for _, want := range []string{"call_path:xajaxResponse", "call:xajaxResponse"} {
+		if !strings.Contains(entry, want) {
+			t.Fatalf("$vk entry missing the constructed type %q; entry=%q", want, entry)
+		}
+	}
+	for _, unwanted := range []string{
+		// argument text describes the incident, not behaviour a binding can require
+		"call_arg:",
+		"assign_literal:",
+		// a nested callable is a different function with entries of its own
+		"call_path:unlink",
+		"call:unlink",
+		// identity facts are the entry's own, not the body's
+		"identifier:",
+		"return:",
+	} {
+		if strings.Contains(entry, unwanted) {
+			t.Fatalf("$vk entry carried %q; entry=%q", unwanted, entry)
+		}
+	}
+}
