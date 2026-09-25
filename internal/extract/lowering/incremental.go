@@ -523,6 +523,22 @@ func (l *lowerer) sigFingerprint() string {
 			fmt.Fprintf(h, "L %s %s=%s\n", cf, fld, l.classFields[cf][fld])
 		}
 	}
+	// the members a framework invokes are folded into OTHER modules' bodies — a handler that
+	// names a class as a parameter type mints member events from the class's own validator
+	// evidence (see parameterMemberAnalysisEvents). The module that changed is the class's,
+	// not the handler's, so without this line a validator edit would replay every handler's
+	// stale body delta.
+	hooks := l.memberHookIndex()
+	hookKeys := make([]string, 0, len(hooks))
+	for k := range hooks {
+		hookKeys = append(hookKeys, k)
+	}
+	sort.Strings(hookKeys)
+	for _, k := range hookKeys {
+		for _, hook := range hooks[k] {
+			fmt.Fprintf(h, "H %s %s %v\n", k, hook.name, hook.decorators)
+		}
+	}
 	return hex.EncodeToString(h.Sum(nil))
 }
 

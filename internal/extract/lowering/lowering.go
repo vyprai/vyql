@@ -123,6 +123,10 @@ type lowerer struct {
 	addrTaken        map[string]bool            // short names referenced as a VALUE anywhere (candidate dynamic-callback targets)
 	addrTakenReady   bool                       // true once addrTaken has been collected for the whole program
 	lexSrc           map[string]string          // lexical-binding slot -> the binding it was promoted from (see ensureLexicalBinding)
+	// memberHooks is the lazily-built index of the class members a framework invokes, keyed
+	// "modkey::Class" (see parameterMemberAnalysisEvents). nil means not built yet; a non-nil
+	// empty map means built and empty.
+	memberHooks map[string][]paramMemberHook
 
 	curModule     string   // resolution key (may be "" for languages with a flat namespace, e.g. PHP)
 	curNS         string   // per-FILE node-id namespace (unique even when curModule is "") — see ModuleNS
@@ -1850,6 +1854,7 @@ var (
 	analysisFunctionResult  = analysisEventSpec{path: "analysis.function.result", method: "result"}
 	analysisClassContext    = analysisEventSpec{path: "analysis.class.context", method: "context"}
 	analysisParameterEntry  = analysisEventSpec{path: "analysis.parameter.entry", method: "entry"}
+	analysisParameterMember = analysisEventSpec{path: "analysis.parameter.member", method: "member"}
 	analysisGlobalMutation  = analysisEventSpec{path: "analysis.global.mutation", method: "mutation"}
 )
 
@@ -2033,6 +2038,144 @@ func (l *lowerer) parameterEntry(paramNode, loc string, tokens []string) {
 	}
 	call := l.nodeInline("Call", loc, nil, analysisParameterEntry.method, analysisParameterEntry.path, strings.Join(tokens, "\x00"), "")
 	l.flow(call, paramNode)
+}
+
+// paramMemberEventLimit bounds the member events one function's parameters can mint, so a
+// class with dozens of decorated members costs a bounded number of nodes per handler that
+// names it as a parameter type.
+const paramMemberEventLimit = 16
+
+// paramMemberHookLimit bounds the members one class contributes to the hook index, mirroring
+// the delegated-callee bounds: the first few members by name, not a transitive summary of the
+// class.
+const paramMemberHookLimit = 8
+
+// paramMemberHook is one class member a framework invokes: its declaration name plus the
+// decorator evidence its own parameter entries carry.
+type paramMemberHook struct {
+	name       string
+	decorators []string
+}
+
+// parameterMemberAnalysisEvents mints the members a framework applies while building this
+// function's arguments. A parameter entry already says "an external caller or framework
+// populates this parameter"; what it cannot say is what the framework DID while building the
+// value — a validation a framework runs over a request-body model is a call in no function's
+// graph, so a control written in it can neither dominate the endpoint's sink nor be credited
+// by any coverage clause, however the control is spelled.
+//
+// The link is resolution, not vocabulary: a parameter whose declared type resolves to a class
+// in the program is built by consulting that class, and a member of it whose OWN arguments a
+// framework populates (it has parameter entries, carrying decorator evidence) is one the
+// framework invokes. Which of those members is a validation, and what it validates, is
+// binding data — the event carries the member's name and its decorators and nothing else.
+//
+// The event is minted at the head of the function's own region, ahead of every body node, so
+// it dominates each sink in the function: the framework applies the member before the
+// function runs, on every path into it.
+func (l *lowerer) parameterMemberAnalysisEvents(info *funcInfo, st nir.FuncDef) {
+	if info == nil || len(l.effectiveParamEntries(info)) == 0 {
+		return // an argument nothing external populates is not one a framework built
+	}
+	hooks := l.memberHookIndex()
+	if len(hooks) == 0 {
+		return
+	}
+	imports := l.importTables[l.curModule]
+	emitted := 0
+	for i, p := range st.Params {
+		typ := info.paramTypes[p]
+		if typ == "" || info.params[p] == "" {
+			continue
+		}
+		pair, ok := l.resolveTypeName(typ, imports)
+		if !ok {
+			continue
+		}
+		for _, hook := range hooks[pair[0]+"::"+pair[1]] {
+			if emitted >= paramMemberEventLimit {
+				return
+			}
+			emitted++
+			tokens := append([]string{
+				"function_name:" + st.Name,
+				"param_name:" + p,
+				"param_index:" + strconv.Itoa(i),
+				"param_type:" + typ,
+				"member_name:" + hook.name,
+			}, hook.decorators...)
+			l.parameterMember(info.params[p], st.Loc, tokens)
+		}
+	}
+}
+
+func (l *lowerer) parameterMember(paramNode, loc string, tokens []string) {
+	if paramNode == "" || len(tokens) == 0 {
+		return
+	}
+	if loc == "" {
+		loc = "?:0"
+	}
+	call := l.nodeInline("Call", loc, nil, analysisParameterMember.method, analysisParameterMember.path, strings.Join(tokens, "\x00"), "")
+	l.flow(call, paramNode)
+}
+
+// memberHookIndex indexes the class members a framework invokes, keyed by declaring class.
+// Built once, after pass 1 has registered every module, from the members' own parameter
+// entries — the one fact that survives the pass-1 cache (fiGob.ParamEntries), so a module
+// replayed from the cache contributes its members exactly as a freshly-registered one does.
+func (l *lowerer) memberHookIndex() map[string][]paramMemberHook {
+	if l.memberHooks != nil {
+		return l.memberHooks
+	}
+	byClass := map[string][]paramMemberHook{}
+	for _, fi := range l.funcQual {
+		if fi.cls == "" || len(fi.paramEntries) == 0 {
+			continue
+		}
+		var decs []string
+		seen := map[string]bool{}
+		for _, pe := range fi.paramEntries {
+			for _, tok := range paramEntryDecoratorTokens(pe) {
+				if !seen[tok] {
+					seen[tok] = true
+					decs = append(decs, tok)
+				}
+			}
+		}
+		if len(decs) == 0 {
+			continue
+		}
+		key := fi.module + "::" + fi.cls
+		byClass[key] = append(byClass[key], paramMemberHook{name: fi.name, decorators: decs})
+	}
+	out := make(map[string][]paramMemberHook, len(byClass))
+	for key, hooks := range byClass {
+		sort.Slice(hooks, func(i, j int) bool { return hooks[i].name < hooks[j].name })
+		if len(hooks) > paramMemberHookLimit {
+			hooks = hooks[:paramMemberHookLimit]
+		}
+		out[key] = hooks
+	}
+	l.memberHooks = out
+	return out
+}
+
+// paramEntryDecoratorTokens is the decorator evidence one parameter entry carries: the
+// spellings the Python and JavaScript frontends record for a decorated declaration. A member
+// with none is not one a framework hooks, and a frontend that records none contributes no
+// members at all.
+func paramEntryDecoratorTokens(pe nir.ParamEntry) []string {
+	var out []string
+	for _, tok := range pe.Tokens {
+		switch {
+		case strings.HasPrefix(tok, "decorator_path:"),
+			strings.HasPrefix(tok, "decorator_method:"),
+			strings.HasPrefix(tok, "route_path:"):
+			out = append(out, tok)
+		}
+	}
+	return out
 }
 
 func (l *lowerer) syntheticCall(path, method, id, loc string, valToks ...string) string {
@@ -4319,6 +4462,9 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		saveDecorators := l.curDecorators
 		l.curDecorators = append(append([]string{}, st.ContextTokens...), st.Decorators...)
 		l.functionContextAnalysisEvent(st.Loc, l.curDecorators)
+		// Ahead of every body node, so a member a framework applies while building an
+		// argument dominates each sink in this function (see parameterMemberAnalysisEvents).
+		l.parameterMemberAnalysisEvents(info, st)
 		saveStatic := l.curStatic
 		l.curStatic = st.Static // a nested `def` is an instance method again, so this is not inherited
 		saveFunc := l.curFunc
