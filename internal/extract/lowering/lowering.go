@@ -672,6 +672,14 @@ func (l *lowerer) structFieldOwner(base string, sc *scope) (mod, typ string, ok 
 // languages this does not need to change.
 func goStructFields(file string) bool { return strings.HasSuffix(file, ".go") }
 
+// pyAttrStores gates the object-sensitive store for a dotted assignment target to Python. It is
+// the one frontend that spells an object attribute store as a dotted Assign target rather than a
+// method-less path call (which the object-sensitive slots already handle) or a declared-type
+// field (Go, whose structFieldSlot route above is the measured one). Joining those on the object
+// as well would move detection for languages this change was not measured on — the same line
+// goStructFields and ccArrayFields draw.
+func pyAttrStores(file string) bool { return moduleTech(file) == "python" }
+
 // ccArrayFields gates array-element field slots to the cpp frontend's files — the extension
 // set registry.go hands that frontend. A subscripted field access `arr[i].field` is lowered
 // by every frontend with an Index expression, and joining it on the array would move
@@ -3900,6 +3908,22 @@ func (l *lowerer) classSelfNode(ns, cls, loc string) string {
 	return id
 }
 
+// pyBareParamValue reports whether the expression is exactly a bare reference to a parameter
+// of the current function. The shape matters because a parameter's taint is the caller's
+// whole-object approximation (the wrapper rule puts every argument's taint on a constructed
+// object, the receiver edge puts the receiver's on `self`): parking THAT in a slot every
+// method of the class reads multiplies one imprecise node class-wide. A value the method
+// DERIVES — a call, a field read, an operator — is what the slot is for; the parameter keeps
+// its own arg→param route into every method that names it.
+func (l *lowerer) pyBareParamValue(e nir.Expr, sc *scope) bool {
+	nm, ok := e.(nir.Name)
+	if !ok {
+		return false
+	}
+	vn := sc.node[nm.ID]
+	return vn != "" && l.paramObjects[vn]
+}
+
 // isConstructorName reports whether a method of `cls` is the class's constructor. A
 // construction site names the CLASS, not the method, so resolving `new T(a)` to a body needs
 // the declaration the language spells the constructor with: the class's own name (Java, C#,
@@ -4473,6 +4497,30 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 					if mod, typ, known := l.structFieldOwner(base, sc); known {
 						l.flow(targetVal, l.structFieldSlot(mod, typ, field, st.Loc))
 					}
+					// `self.attr = v` (Python): the target names a field of the class's own object,
+					// so the value has to land in the slot a later `self.attr` read draws its
+					// taint from — the store the method-less field-write call already carries for
+					// the frontends that model one. Without it the write only rebinds the dotted
+					// name in this scope, and the read is a fresh Attr node joined to nothing.
+					// The slot is the class's stable self node: `self` is a per-method parameter
+					// there, so per-method slots would leave a constructor storing a value and
+					// the method that reads it back as two unrelated containers — the join the
+					// implicit-`this` languages already get from makeFuncInfo. Two shapes stay
+					// out, both measured on the real-repository corpus:
+					//
+					// - a store on any other base (`obj.attr = v`): the base is a local or a
+					//   parameter the caller may alias, and the receiver/alias machinery already
+					//   joins what does join. Standing up per-field slots on every local object
+					//   moved detections there, so the base this carries is the one object every
+					//   method of the class shares by construction.
+					// - a bare parameter as the value (pyBareParamValue): persisting the
+					//   caller's whole-object approximation into a class-wide slot is what
+					//   launders a tainted constructor argument through any method that reads
+					//   the field back.
+					if pyAttrStores(l.curFile) && l.curClass != "" && base == l.selfName &&
+						!l.pyBareParamValue(st.Value, sc) {
+						l.flow(targetVal, l.readFieldSlot(l.classSelfNode(l.curNS, l.curClass, st.Loc), field, st.Loc))
+					}
 				}
 				if slot := l.moduleGlobalSlot(base); slot != "" {
 					l.globalMutationAnalysisEvent(st.Loc, []string{
@@ -4949,6 +4997,15 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 			slot = l.readFieldSlot(base, ex.Attr, ex.Loc)
 		}
 		l.flow(slot, n)
+		// `self.attr` inside a Python method reads a field of the class's own object. The base is
+		// the METHOD's receiver parameter, so the slot above is per-method and joins nothing
+		// across the class; the one a store through `self` in a sibling method filled sits on
+		// the class's stable self node (see pyAttrStoreBase), which every method shares.
+		if pyAttrStores(l.curFile) && l.curClass != "" {
+			if nm, isName := ex.Base.(nir.Name); isName && nm.ID == l.selfName {
+				l.flow(l.readFieldSlot(l.classSelfNode(l.curNS, l.curClass, ex.Loc), ex.Attr, ex.Loc), n)
+			}
+		}
 		// Recorded rather than merely looked up, so a read on a base that is not (yet) a
 		// tracked container — a local holding an object, not a parameter — still reaches a
 		// write that only becomes visible later, when the base turns into a container or is
@@ -6437,7 +6494,17 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 		paramOffset := l.paramOffset(target, recvForTargets)
 		if paramOffset == 1 {
 			selfParam := target.params[target.paramNames[0]]
-			l.flow(recvForTargets, selfParam)
+			// A construction's `self` is the fresh object: the arguments' taint already enters
+			// the constructor through its own parameter edges, and the wrapper rule already puts
+			// it on the constructed object for the CALLER to read. Flowing the fresh object's
+			// node taint into `self` as well re-enters every argument's taint as blanket
+			// receiver taint inside the constructor — every `self.attr` read there inherits it,
+			// and a value derived from such a read persists it class-wide through the field
+			// slots. Python only: an implicit-`this` constructor reads `this`, whose node is
+			// the class's own and not the call's result, so it is not this shape.
+			if !(ctorCall && pyAttrStores(l.curFile)) {
+				l.flow(recvForTargets, selfParam)
+			}
 			if l.containers[recvForTargets] != nil {
 				l.aliasReceiverSelf(recvForTargets, selfParam)
 			}
