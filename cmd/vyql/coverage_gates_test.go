@@ -1032,6 +1032,14 @@ func TestProductionDefinitionsDoNotUseLegacyV1ParserOrBridge(t *testing.T) {
 		}
 		rel, _ := filepath.Rel(root, path)
 		rel = filepath.ToSlash(rel)
+		// The v3 engine tree (internal/vygraph) implements the VyGraph design
+		// suite, whose grammar legitimately spells the words these gates police:
+		// adapter statements and the sanitized_by/guarded_by/closed_by suppressor
+		// verbs. The gates exist to keep v2's own code consistent after the
+		// bindings rename; v3 is a separate generation and out of their scope.
+		if strings.HasPrefix(rel, "internal/vygraph/") {
+			return nil
+		}
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return err
@@ -1172,6 +1180,11 @@ func TestProductionGoUsesV2BindingTerminology(t *testing.T) {
 			return err
 		}
 		if d.IsDir() || filepath.Ext(path) != ".go" || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		// See TestProductionDefinitionsDoNotUseLegacyV1ParserOrBridge: the v3
+		// engine tree legitimately uses the v3 grammar's adapter vocabulary.
+		if rel, _ := filepath.Rel(root, path); strings.HasPrefix(filepath.ToSlash(rel), "internal/vygraph/") {
 			return nil
 		}
 		data, err := os.ReadFile(path)

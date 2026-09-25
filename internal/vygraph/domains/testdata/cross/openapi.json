@@ -1,0 +1,21 @@
+{
+  "kind": "OpenAPI",
+  "openapi": "3.0.0",
+  "paths": {
+    "/users": {
+      "get": {
+        "operationId": "listUsers",
+        "security": [{"adminAuth": []}]
+      },
+      "delete": {
+        "operationId": "deleteUser",
+        "security": [{"adminAuth": []}]
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "health"
+      }
+    }
+  }
+}
