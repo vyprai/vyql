@@ -2128,11 +2128,7 @@ func (l *lowerer) memberHookIndex() map[string][]paramMemberHook {
 	if l.memberHooks != nil {
 		return l.memberHooks
 	}
-	type candidate struct {
-		name       string
-		decorators []string
-	}
-	byClass := map[string][]candidate{}
+	byClass := map[string][]paramMemberHook{}
 	for _, fi := range l.funcQual {
 		if fi.cls == "" || len(fi.paramEntries) == 0 {
 			continue
@@ -2151,17 +2147,13 @@ func (l *lowerer) memberHookIndex() map[string][]paramMemberHook {
 			continue
 		}
 		key := fi.module + "::" + fi.cls
-		byClass[key] = append(byClass[key], candidate{name: fi.name, decorators: decs})
+		byClass[key] = append(byClass[key], paramMemberHook{name: fi.name, decorators: decs})
 	}
 	out := make(map[string][]paramMemberHook, len(byClass))
-	for key, cands := range byClass {
-		sort.Slice(cands, func(i, j int) bool { return cands[i].name < cands[j].name })
-		if len(cands) > paramMemberHookLimit {
-			cands = cands[:paramMemberHookLimit]
-		}
-		hooks := make([]paramMemberHook, 0, len(cands))
-		for _, c := range cands {
-			hooks = append(hooks, paramMemberHook{name: c.name, decorators: c.decorators})
+	for key, hooks := range byClass {
+		sort.Slice(hooks, func(i, j int) bool { return hooks[i].name < hooks[j].name })
+		if len(hooks) > paramMemberHookLimit {
+			hooks = hooks[:paramMemberHookLimit]
 		}
 		out[key] = hooks
 	}
