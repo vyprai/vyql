@@ -204,3 +204,66 @@ func TestLowerKeepsOneModuleGlobalTypePerFile(t *testing.T) {
 		}
 	}
 }
+
+// A `.mts`/`.cts` file is a TypeScript ES module, and the JavaScript frontend claims it —
+// CVE-2026-25931 lives in packages/_server/src/config/documentSettings.mts. Being claimed is
+// not enough: the module has to lower as the JS-family module it is, so its top-level
+// bindings are the module's globals — the one slot a function writing the name and a function
+// reading it meet on. Lowered as a file outside the JS module family, `load`'s write and
+// `use`'s read become unrelated nodes and the taint between them stops at module scope,
+// which is how a claimed file answers a binding for the wrong reason.
+func TestLowerFlowsThroughAModuleLevelBindingInATypeScriptESModule(t *testing.T) {
+	for _, file := range []string{"app.mts", "app.cts"} {
+		prog := jsModule(file,
+			nir.Assign{Targets: []string{"current"}, Value: jsStrLit(file+":1", "seed"), Decl: true},
+			// `current = u` inside a function: the write must land on the module's slot,
+			// not on a node private to `load`.
+			nir.FuncDef{Name: "load", Params: []string{"u"}, Loc: file + ":2", Body: []nir.Stmt{
+				nir.Assign{Targets: []string{"current"}, Value: nir.Name{ID: "u", Loc: file + ":3"}},
+			}},
+			nir.FuncDef{Name: "use", Loc: file + ":5", Body: []nir.Stmt{
+				nir.ExprStmt{Value: nir.Call{
+					Callee: nir.Name{ID: "sink", Loc: file + ":6"},
+					Args:   []nir.Expr{nir.Name{ID: "current", Loc: file + ":6"}},
+					Path:   "sink", Method: "sink", Loc: file + ":6",
+				}},
+			}},
+		)
+		g, err := LowerTyped(prog, true, nil)
+		if err != nil {
+			t.Fatalf("%s: lower: %v", file, err)
+		}
+		src := findNodeID(t, g, "code.Param", "name", "u", "func", "load")
+		reach, err := usg.BFS(g, src, "FLOWS", 40)
+		if err != nil {
+			t.Fatalf("%s: bfs: %v", file, err)
+		}
+		if !reach[findNodeID(t, g, "code.Call", "callee_path", "sink")] {
+			t.Errorf("%s: what `load` writes to the module-level `current` does not reach the sink in `use`; a TypeScript ES module resolves its top-level bindings through the module global the .ts/.mjs forms do", file)
+		}
+	}
+}
+
+// The tech a module answers decides which other modules' declarations its calls may resolve
+// to, and an answer of "" is compatible with every language — a .mts module would take a
+// candidate from a Java or Python module of the same name. A TypeScript ES module answers
+// typescript, so it stays inside the JS family with the .ts/.mjs siblings it lowers beside.
+func TestTypeScriptESModulesResolveInsideTheJSFamily(t *testing.T) {
+	own := moduleTech("packages/_server/src/config/documentSettings.mts")
+	if own != "typescript" {
+		t.Fatalf("moduleTech(.mts) = %q, want typescript", own)
+	}
+	if moduleTech("documentSettings.cts") != "typescript" {
+		t.Fatalf("moduleTech(.cts) = %q, want typescript", moduleTech("documentSettings.cts"))
+	}
+	for _, other := range []string{"loader.ts", "loader.tsx", "loader.js", "loader.mjs", "loader.cjs"} {
+		if !compatibleTech(own, moduleTech(other)) {
+			t.Errorf("a .mts module cannot resolve a declaration in %s; the JS family is one family", other)
+		}
+	}
+	for _, other := range []string{"Loader.java", "loader.py", "loader.rb"} {
+		if compatibleTech(own, moduleTech(other)) {
+			t.Errorf("a .mts module may resolve a declaration in %s; a TypeScript module is not compatible with another language's module", other)
+		}
+	}
+}

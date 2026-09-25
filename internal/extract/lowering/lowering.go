@@ -3519,7 +3519,7 @@ func moduleTech(file string) string {
 		return "java"
 	case strings.HasSuffix(file, ".js"), strings.HasSuffix(file, ".jsx"), strings.HasSuffix(file, ".mjs"), strings.HasSuffix(file, ".cjs"), strings.HasSuffix(file, ".html"), strings.HasSuffix(file, ".htm"):
 		return "javascript"
-	case strings.HasSuffix(file, ".ts"), strings.HasSuffix(file, ".tsx"):
+	case strings.HasSuffix(file, ".ts"), strings.HasSuffix(file, ".tsx"), strings.HasSuffix(file, ".mts"), strings.HasSuffix(file, ".cts"):
 		return "typescript"
 	case strings.HasSuffix(file, ".py"):
 		return "python"
@@ -3827,7 +3827,7 @@ func usesModuleGlobalSlots(file string) bool {
 }
 
 func isJSLikeModule(file string) bool {
-	for _, ext := range []string{".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"} {
+	for _, ext := range []string{".js", ".jsx", ".ts", ".tsx", ".mts", ".cts", ".mjs", ".cjs"} {
 		if strings.HasSuffix(file, ext) {
 			return true
 		}

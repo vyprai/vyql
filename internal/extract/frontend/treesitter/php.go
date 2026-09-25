@@ -332,7 +332,7 @@ func (c *phConv) stmtOne(n *tree_sitter.Node) []nir.Stmt {
 			Params:        params,
 			ParamTypes:    ptypes,
 			ContextTokens: c.phpFunctionTokens(name),
-			ParamEntries:  c.phpParamEntries(name, params, ptypes, reviewTokens, exported),
+			ParamEntries:  c.phpParamEntries(name, params, ptypes, reviewTokens, exported, c.field(n, "body")),
 			Body:          body,
 			Loc:           L,
 			Exported:      exported,
@@ -2162,7 +2162,76 @@ func phpIsWPListTableColumn(name string) bool {
 	return name == "column_default" || strings.HasPrefix(name, "column_")
 }
 
-func (c *phConv) phpParamEntries(name string, params []string, ptypes map[string]string, reviewTokens []string, exported bool) []nir.ParamEntry {
+// phpParamEntryCallCap bounds how many of a body's distinct callees reach one
+// parameter entry. The entry repeats its body's calls once per parameter, so an
+// unbounded walk would let one sprawling handler dominate the payload; the first
+// callees in document order are also the ones a framework contract spells at the
+// top of the body (construct the framework's object, then act on it).
+const phpParamEntryCallCap = 64
+
+// phpBodyCallTokens is a function body's own calls in the same key the body's
+// scope context already uses — `call_path:` for the dotted callee, `call:` for
+// its final segment — so a binding can require of a parameter entry the same
+// body fact it can already require of the function's scope. A parameter entry is
+// the only node a source binding can label an entry point's parameters at, and
+// the contract that makes those parameters entry points is a fact about the body
+// rather than the signature: a dispatcher's callback constructs the framework's
+// response object and returns it, so the construction is recorded as the call it
+// is (`new X(...)` calls X's constructor). Argument text stays behind — it
+// describes the incident the body was written for, not behaviour anything can
+// require of the function. A nested callable is stopped at rather than entered:
+// it is a different function with parameter entries of its own.
+func (c *phConv) phpBodyCallTokens(body *tree_sitter.Node) []string {
+	if body == nil {
+		return nil
+	}
+	seen := map[string]bool{}
+	var out []string
+	add := func(path string) {
+		if path == "" || seen[path] {
+			return
+		}
+		seen[path] = true
+		out = append(out, "call_path:"+path)
+		if method := lastSeg(path); method != "" {
+			out = append(out, "call:"+method)
+		}
+	}
+	var walk func(*tree_sitter.Node)
+	walk = func(cur *tree_sitter.Node) {
+		if cur == nil || len(out) >= phpParamEntryCallCap {
+			return
+		}
+		switch c.kind(cur) {
+		case "function_call_expression", "member_call_expression", "scoped_call_expression":
+			add(c.dotted(cur))
+		case "object_creation_expression":
+			add(c.phpCreatedType(cur))
+		case "function_definition", "method_declaration", "anonymous_function",
+			"anonymous_function_creation_expression", "arrow_function":
+			return
+		}
+		for _, ch := range c.namedChildren(cur) {
+			walk(ch)
+		}
+	}
+	walk(body)
+	return out
+}
+
+// phpCreatedType is the class name an object_creation_expression instantiates, in
+// the dotted form a call path uses. `new $factory(...)` and `new class {...}`
+// name no class and report "".
+func (c *phConv) phpCreatedType(n *tree_sitter.Node) string {
+	for _, ch := range c.namedChildren(n) {
+		if c.kind(ch) == "name" || c.kind(ch) == "qualified_name" {
+			return c.dotted(ch)
+		}
+	}
+	return ""
+}
+
+func (c *phConv) phpParamEntries(name string, params []string, ptypes map[string]string, reviewTokens []string, exported bool, body *tree_sitter.Node) []nir.ParamEntry {
 	if len(params) == 0 {
 		return nil
 	}
@@ -2187,6 +2256,7 @@ func (c *phConv) phpParamEntries(name string, params []string, ptypes map[string
 	if exported {
 		visibility = "function_visibility:public"
 	}
+	bodyCalls := c.phpBodyCallTokens(body)
 	var out []nir.ParamEntry
 	for i, p := range params {
 		tokens := append([]string{}, functionTypes...)
@@ -2198,6 +2268,7 @@ func (c *phConv) phpParamEntries(name string, params []string, ptypes map[string
 		if t := ptypes[p]; t != "" {
 			tokens = append(tokens, "param_type:"+t)
 		}
+		tokens = append(tokens, bodyCalls...)
 		out = append(out, nir.ParamEntry{Param: p, Tokens: tokens})
 	}
 	return out

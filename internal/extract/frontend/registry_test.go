@@ -259,6 +259,106 @@ func TestCTPFilesAreClaimedByThePHPFrontend(t *testing.T) {
 	}
 }
 
+// A TypeScript ES module is a `.mts`/`.cts` file, and CVE-2026-25931 lives entirely in
+// them: packages/_server/src/config/documentSettings.mts reads cSpell.trustedWorkspace and
+// forwards it into ConfigLoader.setIsTrusted. The JavaScript frontend already routes those
+// extensions to the TypeScript grammar, but the registry never claimed them, so such a file
+// fell through every language filter, contributed no module, and nothing written inside it
+// could be labelled a source or a sink.
+func TestMTSAndCTSFilesAreClaimedByTheJavaScriptFrontend(t *testing.T) {
+	dir := t.TempDir()
+	// The CVE's own shape: a class method reading a configuration value and handing it
+	// to the loader's trust grant. The parameter type annotation is TypeScript, so the
+	// assertions also prove the file reached the TypeScript grammar rather than the
+	// JavaScript one reading it as one error.
+	src := `import { ConfigLoader } from './configLoader';
+
+export class DocumentSettings {
+	private readonly loader: ConfigLoader;
+
+	public _determineIsTrusted(config: WorkspaceConfiguration): void {
+		const trusted = config.get('cSpell.trustedWorkspace');
+		this.loader.setIsTrusted(!!trusted);
+	}
+}
+`
+	for _, name := range []string{"documentSettings.mts", "documentSettings.cts"} {
+		path := filepath.Join(dir, name)
+		if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+			t.Fatal(err)
+		}
+
+		entries := treesitter.ListAllFiles(dir)
+		class := frontend.ClassifyEntries(entries)
+		var claimed []string
+		var lang frontend.Language
+		for _, lg := range frontend.Languages() {
+			for _, f := range lg.FilesFor(entries, class) {
+				if f == path {
+					claimed = append(claimed, lg.Name)
+					lang = lg
+				}
+			}
+		}
+		if len(claimed) != 1 || claimed[0] != "javascript" {
+			t.Fatalf("%s must be claimed by the javascript frontend alone (claimed by %v); a TypeScript ES module is left unparsed", name, claimed)
+		}
+
+		prog, err := lang.Extract([]string{path}, dir)
+		if err != nil {
+			t.Fatalf("javascript frontend: %v", err)
+		}
+		if len(prog.Modules) != 1 {
+			t.Fatalf("%s: javascript frontend produced %d modules, want 1", name, len(prog.Modules))
+		}
+
+		seen := map[string]bool{}
+		var expr func(nir.Expr)
+		var body func([]nir.Stmt)
+		expr = func(e nir.Expr) {
+			switch x := e.(type) {
+			case nir.Call:
+				seen["call "+x.Path] = true
+				for _, a := range x.Args {
+					expr(a)
+				}
+			case nir.Attr:
+				seen["attr "+x.Path] = true
+				expr(x.Base)
+			case nir.Name:
+				seen["name "+x.ID] = true
+			}
+		}
+		body = func(sts []nir.Stmt) {
+			for _, st := range sts {
+				switch s := st.(type) {
+				case nir.ClassDef:
+					body(s.Body)
+				case nir.FuncDef:
+					// `config: WorkspaceConfiguration` is a TypeScript annotation; the
+					// JavaScript grammar has nowhere to put it, so this also proves the
+					// file reached the grammar the frontend routes .mts/.cts to.
+					if s.Name == "_determineIsTrusted" && s.ParamTypes["config"] != "" {
+						seen["paramtype "+s.ParamTypes["config"]] = true
+					}
+					body(s.Body)
+				case nir.Assign:
+					expr(s.Value)
+				case nir.ExprStmt:
+					expr(s.Value)
+				}
+			}
+		}
+		body(prog.Modules[0].Body)
+
+		for _, want := range []string{"call config.get", "call this.loader.setIsTrusted", "paramtype WorkspaceConfiguration"} {
+			if !seen[want] {
+				t.Errorf("%s: javascript frontend did not produce %q; got %v", name, want, seen)
+			}
+		}
+	}
+}
+
 // proseDoc is documentation text of the kind a `.pl` name actually carries in the
 // wild: a Polish README, with e-mail addresses, `%s` printf placeholders and
 // `->` arrows in URLs — code-shaped tokens a loose shape check could mistake for
