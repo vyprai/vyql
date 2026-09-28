@@ -47,6 +47,10 @@ type Result struct {
 // skipDirs never carry source worth extracting.
 var skipDirs = map[string]bool{
 	".git": true, "node_modules": true, "vendor": true,
+	"static": true, "test": true, "tests": true, "docs": true,
+	"examples": true, "__pycache__": true, ".tox": true, ".venv": true,
+	"venv": true, "site-packages": true, "dist": true, "build": true,
+	"migrations": true, "fixtures": true, "benchmarks": true,
 }
 
 // Run extracts and evaluates one source tree against one KB directory.
