@@ -1357,6 +1357,7 @@ func TestMigrationLedgerDoesNotCarryStaleV1BridgeSuggestions(t *testing.T) {
 var languagesAwaitingDefinitions = map[string]bool{
 	"actionscript": true,
 	"haskell":      true,
+	"cairo":        true,
 }
 
 func skipIfAwaitingDefinitions(t *testing.T, lang string) {

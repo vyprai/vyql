@@ -60,6 +60,10 @@ var languages = sync.OnceValue(func() []Language {
 		{"swift", map[string]bool{".swift": true}, treesitter.ExtractSwift, bindings.SwiftBindings},
 		{"perl", map[string]bool{".pl": true, ".pm": true, ".cgi": true}, treesitter.ExtractPerl, bindings.PerlBindings},
 		{"solidity", map[string]bool{".sol": true}, treesitter.ExtractSolidity, bindings.SolidityBindings},
+		// Cairo (Starknet). One grammar reads both eras of the language: Cairo 0
+		// (`func`/`end`, the pre-migration Starknet contracts) and Cairo 1 (`fn`,
+		// everything since 2023).
+		{"cairo", map[string]bool{".cairo": true}, treesitter.ExtractCairo, bindings.CairoBindings},
 		{"objc", map[string]bool{".m": true}, treesitter.ExtractObjC, bindings.ObjCBindings},
 		{"elixir", map[string]bool{".ex": true, ".exs": true}, treesitter.ExtractElixir, bindings.ElixirBindings},
 		{"dart", map[string]bool{".dart": true}, treesitter.ExtractDart, bindings.DartBindings},
