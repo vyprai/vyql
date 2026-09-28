@@ -497,3 +497,359 @@ func TestGSPFilesAreClaimedByTheConfigFrontend(t *testing.T) {
 		t.Fatalf("no single frontend claims %s (claimed by %v); a Grails template is left unparsed", filepath.Base(path), claimed)
 	}
 }
+
+// A `.cairo` file has to be claimed by a registered frontend and parsed into
+// calls. Until one was, Starknet contracts fell through every language filter —
+// the campaign evidence for the account-signature family counted 43 unread
+// `.cairo` files in one repository — so nothing in them could be labelled a
+// source or a sink and no rule could reach them. The corpus is Cairo 0
+// (`func`/`end`, `@storage_var`), which is what the first block pins; the second
+// pins Cairo 1 (`fn`, `#[attribute]`), which the same grammar reads.
+func TestCairoFilesAreClaimedAndParsedIntoCalls(t *testing.T) {
+	dir := t.TempDir()
+	src := `%lang starknet
+from starkware.starknet.common.syscalls import call_contract
+
+@storage_var
+func Balance(owner : felt) -> (res : felt):
+end
+
+namespace Account:
+    func is_valid_signature(hash : felt, signature_len : felt, signature : felt*) -> (is_valid : felt):
+        let (local sig_r : felt) = signature[0]
+        let (_public_key) = Balance.read()
+        return (is_valid=TRUE)
+    end
+
+    @view
+    func execute{
+            syscall_ptr : felt*,
+            range_check_ptr,
+        }(calldata_len : felt, calldata : felt*, nonce : felt):
+        let (tx_info) = get_tx_info()
+        let (local ecdsa_ptr : felt*) = alloc()
+        let (is_valid) = is_valid_signature(tx_info.transaction_hash, tx_info.signature_len, tx_info.signature)
+        assert is_valid = TRUE
+        let (response) = call_contract(contract_address=tx_info.account_address, function_selector=nonce, calldata=calldata, calldata_len=calldata_len)
+        Balance.write(nonce)
+        return (response=response)
+    end
+end
+`
+	path := filepath.Join(dir, "library.cairo")
+	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	entries := treesitter.ListAllFiles(dir)
+	class := frontend.ClassifyEntries(entries)
+	var claimed []string
+	var lang frontend.Language
+	for _, lg := range frontend.Languages() {
+		for _, f := range lg.FilesFor(entries, class) {
+			if f == path {
+				claimed = append(claimed, lg.Name)
+				lang = lg
+			}
+		}
+	}
+	if len(claimed) != 1 || claimed[0] != "cairo" {
+		t.Fatalf("no single frontend claims %s (claimed by %v); a .cairo file is left unparsed", filepath.Base(path), claimed)
+	}
+
+	prog, err := lang.Extract([]string{path}, dir)
+	if err != nil {
+		t.Fatalf("%s frontend: %v", lang.Name, err)
+	}
+	if len(prog.Modules) != 1 {
+		t.Fatalf("%s frontend produced %d modules, want 1", lang.Name, len(prog.Modules))
+	}
+	mod := prog.Modules[0]
+	var sawImport bool
+	for _, im := range mod.Imports {
+		if im.Local == "call_contract" && im.Module == "starkware.starknet.common.syscalls" {
+			sawImport = true
+		}
+	}
+	if !sawImport {
+		t.Errorf("%s frontend recorded no import of call_contract; got %v", lang.Name, mod.Imports)
+	}
+
+	seen := map[string]bool{}
+	funcs := map[string]nir.FuncDef{}
+	var expr func(nir.Expr)
+	var body func([]nir.Stmt)
+	expr = func(e nir.Expr) {
+		switch x := e.(type) {
+		case nir.Call:
+			seen["call "+x.Path] = true
+			for _, a := range x.Args {
+				expr(a)
+			}
+		case nir.Attr:
+			seen["attr "+x.Path] = true
+			expr(x.Base)
+		case nir.Index:
+			seen["index "+x.Path] = true
+		case nir.Pair:
+			expr(x.Value)
+		}
+	}
+	body = func(sts []nir.Stmt) {
+		for _, st := range sts {
+			switch s := st.(type) {
+			case nir.ClassDef:
+				body(s.Body)
+			case nir.FuncDef:
+				funcs[s.Name] = s
+				body(s.Body)
+			case nir.Assign:
+				expr(s.Value)
+			case nir.ExprStmt:
+				expr(s.Value)
+			case nir.Return:
+				expr(s.Value)
+			}
+		}
+	}
+	body(mod.Body)
+
+	for _, want := range []string{
+		"call Balance.read", "call Balance.write", "call call_contract",
+		"call is_valid_signature", "call get_tx_info", "call alloc",
+		"attr tx_info.transaction_hash", "attr tx_info.signature", "index signature",
+	} {
+		if !seen[want] {
+			t.Errorf("%s frontend did not produce %q; got %v", lang.Name, want, seen)
+		}
+	}
+
+	// The entry point's shape is what a binding names: its declared parameters,
+	// the decorator it carries, and the storage accessor it writes through.
+	exec, ok := funcs["execute"]
+	if !ok {
+		t.Fatalf("%s frontend produced no execute function; got %v", lang.Name, funcNames(funcs))
+	}
+	if want := []string{"calldata_len", "calldata", "nonce"}; !sameStrings(exec.Params, want) {
+		t.Errorf("execute params = %v, want %v", exec.Params, want)
+	}
+	if len(exec.ParamEntries) != len(exec.Params) {
+		t.Errorf("execute ParamEntries = %d, want one per parameter (%d)", len(exec.ParamEntries), len(exec.Params))
+	} else {
+		for i, pe := range exec.ParamEntries {
+			if !containsString(pe.Tokens, "decorator:view") {
+				t.Errorf("execute ParamEntries[%d].Tokens = %v, want the function's own decorator", i, pe.Tokens)
+			}
+		}
+	}
+	if !containsString(exec.ContextTokens, "implicit:syscall_ptr") {
+		t.Errorf("execute ContextTokens = %v, want the implicit builtin segment recorded", exec.ContextTokens)
+	}
+	if !containsString(exec.ContextTokens, "lang=cairo") {
+		t.Errorf("execute ContextTokens = %v, want lang=cairo", exec.ContextTokens)
+	}
+	// A signature check that does not reach the call it guards is still a call
+	// site the graph must carry, and the underscore convention marks privacy.
+	if priv, ok := funcs["_public_key"]; ok {
+		t.Errorf("_public_key lowered as a function; underscore names are locals, got %+v", priv)
+	}
+	if sv, ok := funcs["Balance"]; !ok || !containsString(sv.Decorators, "storage_var") {
+		t.Errorf("storage var Balance decorators = %v, want storage_var", sv.Decorators)
+	}
+}
+
+// Cairo 1 is the same language after the 2023 migration: `fn` instead of `func`,
+// `#[attribute]` instead of `@decorator`, blocks instead of `:`/`end`. The
+// grammar reads both so one binding set labels either, and this pins the parts
+// of the modern dialect a binding names: the attribute on the module, the
+// storage struct's members, and `self.storage.write(...)` calls.
+func TestCairoOneFilesAreClaimedAndParsedIntoCalls(t *testing.T) {
+	dir := t.TempDir()
+	src := `use starknet::get_caller_address;
+
+#[starknet::component]
+pub mod VaultComponent {
+    #[storage]
+    pub struct Storage {
+        pub vault_balance: u256,
+    }
+
+    pub impl VaultImpl<TContractState> of interface::IVault<ComponentState<TContractState>> {
+        pub fn withdraw(ref self: ComponentState<TContractState>, owner: ContractAddress, amount: u256) -> bool {
+            let caller = get_caller_address();
+            self.vault_balance.write(self.vault_balance.read() - amount);
+            true
+        }
+    }
+}
+`
+	path := filepath.Join(dir, "vault.cairo")
+	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	entries := treesitter.ListAllFiles(dir)
+	class := frontend.ClassifyEntries(entries)
+	var claimed []string
+	var lang frontend.Language
+	for _, lg := range frontend.Languages() {
+		for _, f := range lg.FilesFor(entries, class) {
+			if f == path {
+				claimed = append(claimed, lg.Name)
+				lang = lg
+			}
+		}
+	}
+	if len(claimed) != 1 || claimed[0] != "cairo" {
+		t.Fatalf("no single frontend claims %s (claimed by %v)", filepath.Base(path), claimed)
+	}
+
+	prog, err := lang.Extract([]string{path}, dir)
+	if err != nil {
+		t.Fatalf("%s frontend: %v", lang.Name, err)
+	}
+
+	calls := map[string]bool{}
+	var classes []nir.ClassDef
+	var funcs []nir.FuncDef
+	var walk func([]nir.Stmt)
+	walk = func(sts []nir.Stmt) {
+		for _, st := range sts {
+			switch s := st.(type) {
+			case nir.ClassDef:
+				classes = append(classes, s)
+				walk(s.Body)
+			case nir.FuncDef:
+				funcs = append(funcs, s)
+				walk(s.Body)
+			case nir.Assign:
+				if s.Value != nil {
+					collectCalls(s.Value, calls)
+				}
+			case nir.ExprStmt:
+				collectCalls(s.Value, calls)
+			case nir.Return:
+				collectCalls(s.Value, calls)
+			case nir.Block:
+				walk(s.Stmts)
+			}
+		}
+	}
+	walk(prog.Modules[0].Body)
+
+	var vault nir.ClassDef
+	for _, cd := range classes {
+		if cd.Name == "Storage" {
+			vault = cd
+		}
+	}
+	if vault.Name != "Storage" {
+		t.Fatalf("no Storage struct lowered; classes = %v", classNames(classes))
+	}
+	if !containsString(vault.Members, "vault_balance") {
+		t.Errorf("Storage members = %v, want vault_balance", vault.Members)
+	}
+	if !containsString(vault.Annotations, "storage") {
+		t.Errorf("Storage annotations = %v, want the #[storage] attribute", vault.Annotations)
+	}
+	var modClass nir.ClassDef
+	for _, cd := range classes {
+		if cd.Name == "VaultComponent" {
+			modClass = cd
+		}
+	}
+	if modClass.Name != "VaultComponent" || !containsString(modClass.Annotations, "starknet.component") {
+		t.Errorf("VaultComponent annotations = %v, want starknet.component", modClass.Annotations)
+	}
+	var withdraw *nir.FuncDef
+	for i := range funcs {
+		if funcs[i].Name == "withdraw" {
+			withdraw = &funcs[i]
+		}
+	}
+	if withdraw == nil {
+		t.Fatalf("no withdraw function lowered; funcs = %v", funcNames2(funcs))
+	}
+	// `self` is the receiver, not a parameter the caller supplies.
+	if want := []string{"owner", "amount"}; !sameStrings(withdraw.Params, want) {
+		t.Errorf("withdraw params = %v, want %v (self is the receiver)", withdraw.Params, want)
+	}
+	if !withdraw.Exported {
+		t.Errorf("withdraw Exported = false; a pub fn is part of the public surface")
+	}
+	for _, want := range []string{"self.vault_balance.write", "self.vault_balance.read", "get_caller_address"} {
+		if !calls[want] {
+			t.Errorf("%s frontend did not produce call %q; got %v", lang.Name, want, calls)
+		}
+	}
+}
+
+func collectCalls(e nir.Expr, into map[string]bool) {
+	switch x := e.(type) {
+	case nir.Call:
+		into[x.Path] = true
+		for _, a := range x.Args {
+			collectCalls(a, into)
+		}
+	case nir.Seq:
+		for _, p := range x.Parts {
+			collectCalls(p, into)
+		}
+	case nir.BinOp:
+		collectCalls(x.Left, into)
+		collectCalls(x.Right, into)
+	case nir.Pair:
+		collectCalls(x.Value, into)
+	case nir.Attr:
+		collectCalls(x.Base, into)
+	case nir.Index:
+		collectCalls(x.Base, into)
+	case nir.Thru:
+		collectCalls(x.Inner, into)
+	}
+}
+
+func containsString(xs []string, v string) bool {
+	for _, x := range xs {
+		if x == v {
+			return true
+		}
+	}
+	return false
+}
+
+func sameStrings(got, want []string) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for i := range got {
+		if got[i] != want[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func funcNames(m map[string]nir.FuncDef) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	return out
+}
+
+func funcNames2(fs []nir.FuncDef) []string {
+	out := make([]string, 0, len(fs))
+	for _, f := range fs {
+		out = append(out, f.Name)
+	}
+	return out
+}
+
+func classNames(cs []nir.ClassDef) []string {
+	out := make([]string, 0, len(cs))
+	for _, c := range cs {
+		out = append(out, c.Name)
+	}
+	return out
+}

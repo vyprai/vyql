@@ -1263,6 +1263,8 @@ func PerlBindings() []Applicator { return BindingsFor("perl") }
 
 func SolidityBindings() []Applicator { return BindingsFor("solidity") }
 
+func CairoBindings() []Applicator { return BindingsFor("cairo") }
+
 func ObjCBindings() []Applicator { return BindingsFor("objc") }
 
 func ActionScriptBindings() []Applicator { return BindingsFor("actionscript") }

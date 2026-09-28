@@ -32,6 +32,10 @@ var nirGoldenCases = map[string]struct{ ext, code string }{
 	"groovy":       {".groovy", "def h(source, worker) {\n  def v = source.value(\"q\")\n  worker.run(\"prefix \" + v)\n}\n"},
 	"actionscript": {".as", "package m {\n\tpublic class C {\n\t\tpublic function h(source:Source, worker:Worker):void {\n\t\t\tvar x:String = source.value(\"q\");\n\t\t\tworker.run(\"prefix \" + x);\n\t\t}\n\t}\n}\n"},
 	"haskell":      {".hs", "module H where\n\nimport qualified Data.Text as T\n\nh source worker = do\n  let u = value source \"q\"\n  run worker (\"prefix \" <> T.pack u)\n"},
+	// Cairo 1, exercising the source/assign/concat/call shape the other snippets
+	// use. Felt arithmetic stands in for concatenation: a string in Cairo is a
+	// felt, and `+` on felts is how fragments join.
+	"cairo": {".cairo", "fn h(source: felt, worker: felt) -> felt {\n    let u = source.value('q');\n    worker.run('prefix' + u)\n}\n"},
 }
 
 func usgStructuralSummary(t *testing.T, ext, code string) string {
