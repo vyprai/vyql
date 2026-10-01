@@ -59,3 +59,68 @@ binding staleChannelCursor {
 		}
 	}
 }
+
+// node.context.loopWriteDoubleStep reads the C/C++ frontend's per-loop fact that a
+// loop's own header advances the index its body writes through. The two token sets
+// below are the CVE-2025-68973 shape before and after its fix: the fix removes the
+// copy loop's header increment only, so the read loop below it still spells
+// `loop_update:n++` and the copy write itself is unchanged on both sides. Only the
+// per-loop token separates them.
+func TestLoopWriteDoubleStepContextFieldSeparatesCopyLoopFromSiblingLoop(t *testing.T) {
+	sets, err := compileV2BindingsForTest(`
+module bindings.c.test;
+
+binding copyLoopDoubleStepWriteCursor {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.loopWriteDoubleStep exists and node.context.assignShape contains "ID[]=ID.FIELD[]"
+  emit issue custom.CopyLoopDoubleStepWriteCursor at node
+}
+`)
+	if err != nil {
+		t.Fatalf("parse loop-write-double-step context flag: %v", err)
+	}
+	set := firstBindingSet(t, sets)
+	var pred PresencePredicate
+	found := false
+	for _, p := range set.Mappings[0].Flag.Predicates {
+		if len(p.Values) == 1 && p.Values[0] == "loop_write_double_step:" {
+			pred, found = p, true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("no loopWriteDoubleStep predicate in %+v", set.Mappings[0].Flag.Predicates)
+	}
+	if pred.Property != "tokens" || pred.Op != "exists" {
+		t.Fatalf("loopWriteDoubleStep predicate wrong: %+v", pred)
+	}
+
+	// Everything the two revisions of g10/armor.c agree on: the header increment,
+	// because the read loop below the copy loop spells it too, and the copy write.
+	shared := []string{
+		"lang=c",
+		"name=armor_filter",
+		"loop_update:n++",
+		"assign_shape:ID[]=ID.FIELD[]",
+		"loop_cursor:n:def=straight:step=yes",
+	}
+	cases := []struct {
+		name   string
+		tokens []string
+		want   int
+	}{
+		{"vulnerable", append(append([]string{}, shared...), "loop_write_double_step:n"), 1},
+		{"fixed", append([]string{}, shared...), 0},
+	}
+	for _, tc := range cases {
+		spec := specFromBindingSet(set)
+		store := usg.NewInMemStore()
+		store.AddNode(usg.Node{ID: "ctx", Type: "code.Call", Loc: "armor.c:1", Scope: "armor.c/armor_filter", Props: map[string]string{
+			"callee_path": "analysis.function.context",
+			"method":      "context",
+			"str_args":    strings.Join(tc.tokens, "\x00"),
+		}})
+		if got := spec.presenceApplicator().Apply(store); len(got) != tc.want {
+			t.Fatalf("%s: loop-write-double-step flag matches = %d, want %d: %+v", tc.name, len(got), tc.want, got)
+		}
+	}
+}

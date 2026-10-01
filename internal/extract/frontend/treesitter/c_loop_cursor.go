@@ -42,7 +42,16 @@ func ccIsLoopKind(kind string) bool {
 // two textually identical resets cannot collapse the two loops that see them.
 //
 // Each loop also emits `loop_update:<clause>` for its own `for` update clause, which
-// no token previously recorded at all.
+// no token previously recorded at all. The clause on its own names only a spelling,
+// and one a sibling loop repeats: `loop_update:n++` is in the set once whether one
+// loop or three advance `n` that way, and whether any of them writes through `n` or
+// not. A loop whose header advances the very index its body writes through —
+// `for(; n < size; n++) buf[n++] = src[pos++];` — therefore also emits
+//
+//	loop_write_double_step:<var>
+//
+// which is a fact about that loop alone and cannot be satisfied by a clause some
+// other loop spells.
 //
 // The analysis is a source-order walk with a may-join: a definition a loop makes is
 // loop-carried afterwards whether or not the loop was entered, and a branch that
@@ -129,6 +138,11 @@ func (c *ccConv) ccLoopCursorVisitLoop(n *tree_sitter.Node, state map[string]str
 		if text := compactCExprText(c.text(update)); text != "" {
 			add("loop_update:" + text)
 		}
+		for _, name := range c.ccUpdateClauseCursors(update) {
+			if facts.writeStepIdx[name] {
+				add("loop_write_double_step:" + name)
+			}
+		}
 	}
 	// The back edge. Only a loop nested inside this one leaves a cursor behind: this
 	// loop's own step, and any assignment its body makes, define the element the body
@@ -162,10 +176,15 @@ type ccLoopFacts struct {
 	// `*p`). `p[i]` is left out on purpose: an indexed read off a base pointer is the
 	// idiom that does not depend on where a previous loop left the cursor.
 	derefs []string
+	// writeStepIdx holds every name this loop advances in place as the index of what
+	// it assigns to (`buf[n++] = src[pos++]` steps `n`, the write index, and not
+	// `pos`, the read one), which is a step the loop's own header cannot also be
+	// taking without stepping the write index twice per iteration.
+	writeStepIdx map[string]bool
 }
 
 func (c *ccConv) ccLoopFacts(loop *tree_sitter.Node) ccLoopFacts {
-	facts := ccLoopFacts{defined: map[string]bool{}, nested: map[string]bool{}}
+	facts := ccLoopFacts{defined: map[string]bool{}, nested: map[string]bool{}, writeStepIdx: map[string]bool{}}
 	seen := map[string]bool{}
 	var walk func(n *tree_sitter.Node, inNested bool)
 	walk = func(n *tree_sitter.Node, inNested bool) {
@@ -173,10 +192,11 @@ func (c *ccConv) ccLoopFacts(loop *tree_sitter.Node) ccLoopFacts {
 			return
 		}
 		kind := c.kind(n)
-		var defines, deref string
+		var defines, deref, writeStep string
 		switch kind {
 		case "assignment_expression":
 			defines = c.ccCursorIdentifier(c.field(n, "left"))
+			writeStep = c.ccWriteStepIndex(c.field(n, "left"))
 		case "init_declarator":
 			defines = c.declName(c.field(n, "declarator"))
 		case "update_expression":
@@ -196,6 +216,9 @@ func (c *ccConv) ccLoopFacts(loop *tree_sitter.Node) ccLoopFacts {
 				facts.nested[defines] = true
 			}
 		}
+		if writeStep != "" {
+			facts.writeStepIdx[writeStep] = true
+		}
 		if deref != "" && !seen[deref] {
 			seen[deref] = true
 			facts.derefs = append(facts.derefs, deref)
@@ -206,6 +229,43 @@ func (c *ccConv) ccLoopFacts(loop *tree_sitter.Node) ccLoopFacts {
 	}
 	walk(loop, false)
 	return facts
+}
+
+// ccWriteStepIndex names the cursor an assignment target advances as it writes
+// through it: the index of `buf[n++]`, which is `n`. "" when the target is not a
+// subscript or its index does not advance in place.
+func (c *ccConv) ccWriteStepIndex(target *tree_sitter.Node) string {
+	if target == nil || c.kind(target) != "subscript_expression" {
+		return ""
+	}
+	idx := c.field(target, "index")
+	if idx == nil || c.kind(idx) != "update_expression" {
+		return ""
+	}
+	return c.ccCursorIdentifier(c.field(idx, "argument"))
+}
+
+// ccUpdateClauseCursors names, in source order, every cursor a `for` header's update
+// clause advances in place -- `n++` names `n`, `i++,p--` names both.
+func (c *ccConv) ccUpdateClauseCursors(update *tree_sitter.Node) []string {
+	var out []string
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		if c.kind(n) == "update_expression" {
+			if name := c.ccCursorIdentifier(c.field(n, "argument")); name != "" {
+				out = append(out, name)
+			}
+			return
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(update)
+	return out
 }
 
 func (c *ccConv) ccCursorIdentifier(n *tree_sitter.Node) string {

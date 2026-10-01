@@ -183,6 +183,100 @@ void walk(struct node *head, int n, int flag) {
 	}
 }
 
+// The CVE-2025-68973 shape, reduced to the two loops armor_filter keeps beside each
+// other: a copy loop whose header advances the same index its body writes through,
+// and under it the read loop that fills what is left of the buffer, whose header
+// spells the identical `n++`. The fix removes the copy loop's own header increment
+// and nothing else.
+//
+// So neither fact the function-scope context records separates the two revisions:
+// `loop_update:n++` survives the fix because the read loop still spells it, and the
+// copy write itself is untouched. What the header advance belongs to -- this loop's
+// own body stepping the index it writes through -- is the only distinguishing fact,
+// and it can only be recorded per loop.
+const ccDoubleStepVulnerable = `
+void armor_filter(struct afx *afx, byte *buf, size_t size) {
+	size_t n = 0;
+	if (afx->buffer_len) {
+		for (; n < size && afx->buffer_pos < afx->buffer_len; n++)
+			buf[n++] = afx->buffer[afx->buffer_pos++];
+		if (afx->buffer_pos >= afx->buffer_len)
+			afx->buffer_len = 0;
+	}
+	for (; n < size; n++) {
+		int c = iobuf_get(a);
+		if (c == -1)
+			break;
+		buf[n] = c & 0xff;
+	}
+}
+`
+
+const ccDoubleStepFixed = `
+void armor_filter(struct afx *afx, byte *buf, size_t size) {
+	size_t n = 0;
+	if (afx->buffer_len) {
+		for (; n < size && afx->buffer_pos < afx->buffer_len;)
+			buf[n++] = afx->buffer[afx->buffer_pos++];
+		if (afx->buffer_pos >= afx->buffer_len)
+			afx->buffer_len = 0;
+	}
+	for (; n < size; n++) {
+		int c = iobuf_get(a);
+		if (c == -1)
+			break;
+		buf[n] = c & 0xff;
+	}
+}
+`
+
+func TestCLoopCursorTokensCorrelateUpdateClauseWithWriteIndex(t *testing.T) {
+	vulnerable := ccContextTokensFor(t, "armor_filter", "double_step.c", ccDoubleStepVulnerable)
+	fixed := ccContextTokensFor(t, "armor_filter", "double_step_fixed.c", ccDoubleStepFixed)
+
+	const doubleStep = "loop_write_double_step:n"
+	if !ccHasToken(vulnerable, doubleStep) {
+		t.Fatalf("vulnerable context missing %q; context=%q", doubleStep, strings.Join(vulnerable, "\x00"))
+	}
+	if ccHasToken(fixed, doubleStep) {
+		t.Fatalf("fixed context carries %q; context=%q", doubleStep, strings.Join(fixed, "\x00"))
+	}
+
+	// The facts either revision shares, so a formulation over them alone cannot
+	// separate the copy loop from the read loop beside it.
+	for _, tokens := range [][]string{vulnerable, fixed} {
+		if !ccHasToken(tokens, "loop_update:n++") {
+			t.Fatalf("expected loop_update:n++ in both contexts; context=%q", strings.Join(tokens, "\x00"))
+		}
+		if !ccHasToken(tokens, "assign_shape:ID[]=ID.FIELD[]") {
+			t.Fatalf("expected the copy-write shape in both contexts; context=%q", strings.Join(tokens, "\x00"))
+		}
+	}
+}
+
+// The token is the correlation, not either half of it on its own: a header that
+// advances one index over a body that writes through another, a read that steps its
+// index, and a write that steps its index outside any loop at all, are the ordinary
+// copy idiom.
+func TestCLoopCursorTokensSkipUncorrelatedWriteIndexSteps(t *testing.T) {
+	tokens := ccContextTokensFor(t, "copy", "uncorrelated.c", `
+void copy(byte *buf, byte *src, int n, int size, int j) {
+	for (int i = 0; i < size; i++) {
+		buf[j++] = src[i];
+	}
+	for (int i = 0; i < size; i++) {
+		buf[i] = src[i++];
+	}
+	buf[n++] = src[0];
+}
+`)
+	for _, unwanted := range []string{"loop_write_double_step:i", "loop_write_double_step:j", "loop_write_double_step:n"} {
+		if ccHasToken(tokens, unwanted) {
+			t.Fatalf("uncorrelated write step reported: %q; context=%q", unwanted, strings.Join(tokens, "\x00"))
+		}
+	}
+}
+
 // An indexed read off a base pointer does not depend on where an earlier loop left
 // the cursor, so it is not reported as one.
 func TestCLoopCursorSkipsIndexedBaseReads(t *testing.T) {

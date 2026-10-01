@@ -627,6 +627,12 @@ func v2PresenceValuePrefix(field string) string {
 		return "loop_cursor:"
 	case "loopUpdate":
 		return "loop_update:"
+	// One loop advancing the same index in its header and as the subscript it writes
+	// through in its body, which steps that write index twice per iteration. Unlike
+	// loopUpdate this names a loop, not a spelling, so a sibling loop repeating the
+	// clause cannot satisfy it.
+	case "loopWriteDoubleStep":
+		return "loop_write_double_step:"
 	case "loopProgressHiddenInCall":
 		return "loop_progress_hidden_in_call="
 	case "convertSvgMultiSvgSanitizerBypass":
