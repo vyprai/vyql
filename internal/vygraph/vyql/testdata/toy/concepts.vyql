@@ -1,0 +1,7 @@
+module toy;
+concept code.UntrustedData : source { taint: [UntrustedData] }
+concept code.HttpInput : source { refines: code.UntrustedData taint: [UntrustedData] cwe: [CWE_20] }
+concept code.SqlExecution : sink { vulnerable_to: [Injection] enabled_by: [UntrustedData] cwe: [CWE_89] }
+concept code.SqlParameterization : control { neutralizes: [Injection] }
+threat Injection { }
+concept code.Review : asset { }

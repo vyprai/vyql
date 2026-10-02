@@ -1,0 +1,29 @@
+module dryrun;
+rule SqlInjection {
+  meta { id: "DRY-INJ-001" severity: high cwe: [CWE_89] }
+  taint code.HttpInput -> code.SqlExecution -> finding unless sanitized_by code.SqlParameterization
+}
+rule CookieToHtml {
+  meta { id: "DRY-XSS-001" severity: medium cwe: [CWE_79] }
+  taint code.Cookie -> code.HtmlSink -> finding unless sanitized_by code.HtmlEscape
+}
+rule CommandInjection {
+  meta { id: "DRY-CMD-001" severity: critical cwe: [CWE_78] confidence_floor: high }
+  taint code.HttpInput -> code.CommandExecution -> finding unless sanitized_by code.CommandShellout
+}
+rule PathTraversal {
+  meta { id: "DRY-PATH-001" severity: high }
+  taint code.HttpInput -> code.FilePathAccess -> finding unless sanitized_by code.PathCanonicalization
+}
+rule Ssrf {
+  meta { id: "DRY-SSRF-001" severity: medium }
+  taint code.Deserialized -> code.OutboundRequest -> finding
+}
+rule UnauthenticatedSensitiveOp {
+  meta { id: "DRY-AUTHZ-001" severity: high cwe: [CWE_862] }
+  match (x: code.SqlExecution) -[:FLOWS]-> (h: code.AuthenticationCheck) -> finding unless guarded_by code.AuthzGate
+}
+rule WeakCipherPresent {
+  meta { id: "DRY-CRYPTO-001" severity: low }
+  present code.WeakCipherReview -> signal
+}
