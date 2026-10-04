@@ -103,6 +103,7 @@ type lowerer struct {
 	moduleGlobals  map[string]map[string]string // JS/TS module-level binding name -> stable slot node
 	classStatics   map[string]string            // "Class::$prop" -> the one node standing for that static property
 	staticDeclMemo map[string]string            // memoized "class-as-written\x00$prop" -> declaring class
+	ivarSlots      map[string]string            // "Class\x1f@ivar" -> the one node standing for that Ruby instance variable
 
 	// mutGlobals holds the module-level variables the module currently being lowered assigns
 	// from inside one of its own function bodies. Rebuilt per module by lowerModuleBody.
@@ -3312,6 +3313,7 @@ func newLowerer(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 		moduleGlobals:    map[string]map[string]string{},
 		classStatics:     map[string]string{},
 		staticDeclMemo:   map[string]string{},
+		ivarSlots:        map[string]string{},
 		containers:       map[string]*containerInfo{},
 		pendingReads:     map[string]map[string][]string{},
 		structFields:     map[string]string{},
@@ -3885,6 +3887,41 @@ func (l *lowerer) classStaticSlot(name string) string {
 	slot := l.nodeInlineWithID(sigID("", "__static", "var", key), "Name", l.curFile,
 		map[string]string{"class_static": "true"}, key, key, "", "")
 	l.classStatics[key] = slot
+	return slot
+}
+
+// rubyIvarSlot returns the one node standing for ONE instance variable of ONE Ruby class,
+// keyed by the class's name. A Ruby class is one class however many files reopen it, but
+// the implicit-`this` node a member's element slot hangs off is per-file, so a write and a
+// read of the same `@ivar` in different files — a controller and the ERB view the framework
+// renders from it, which runs with a copy of that controller's instance variables — are two
+// slots nothing joins. Every element slot minted for the member (see memberElemSlot) is
+// bridged to this node in both directions, which makes the class's storage the class's and
+// not the file's. The id is name-derived so a cached module's edges to it stay valid across
+// runs (see nodeWithID); the node itself matches no path, having neither method nor callee.
+func (l *lowerer) rubyIvarSlot(cls, ivar string) string {
+	key := cls + "\x1f" + ivar
+	if slot := l.ivarSlots[key]; slot != "" {
+		return slot
+	}
+	slot := l.nodeInlineWithID(sigID("", "__ivar", "var", key), "Name", l.curFile,
+		map[string]string{"ruby_ivar": "true"}, "", "", "", "")
+	l.ivarSlots[key] = slot
+	return slot
+}
+
+// memberElemSlot returns the receiver's element slot for one declared member of class cls,
+// bridging it to the class-wide slot when the member is a Ruby instance variable (members
+// that keep the `@` sigil — a shape no other language's member names have). Other members
+// return the element slot unchanged.
+func (l *lowerer) memberElemSlot(self, cls, member, loc string) string {
+	slot := l.elemNode(self, member, loc)
+	if !strings.HasPrefix(member, "@") {
+		return slot
+	}
+	iv := l.rubyIvarSlot(cls, member)
+	l.flow(slot, iv)
+	l.flow(iv, slot)
 	return slot
 }
 
@@ -4644,7 +4681,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 						l.flow(targetVal, d)
 					}
 				} else if self := sc.node["this"]; self != "" {
-					l.flow(targetVal, l.elemNode(self, t, st.Loc))
+					l.flow(targetVal, l.memberElemSlot(self, l.curClass, t, st.Loc))
 				}
 			}
 			if sc.lex[t] && !st.Decl {
@@ -4705,7 +4742,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 					l.flow(n, d)
 				}
 			} else if self := sc.node["this"]; self != "" {
-				l.flow(n, l.elemNode(self, st.Target, st.Loc))
+				l.flow(n, l.memberElemSlot(self, l.curClass, st.Target, st.Loc))
 			}
 		}
 		sc.setNode(st.Target, n)
@@ -5053,7 +5090,7 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		// so they stay untouched — sink matching is preserved.)
 		if l.curClass != "" {
 			if self := sc.node["this"]; self != "" && l.classMemberSet(l.curModule, l.curClass)[ex.ID] {
-				return l.elemNode(self, ex.ID, ex.Loc)
+				return l.memberElemSlot(self, l.curClass, ex.ID, ex.Loc)
 			}
 		}
 		var props map[string]string

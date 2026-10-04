@@ -146,12 +146,18 @@ func ExtractRuby(files []string, root string) (nir.Program, error) {
 			ruby = append(ruby, f)
 		}
 	}
-	build := func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
+	// newConv is the converter both the Ruby and the ERB paths build a module from: the same
+	// string environment and the same top-level locals, wherever the statements came from.
+	newConv := func(src []byte, rel string, tree *tree_sitter.Tree) *rbConv {
 		c := &rbConv{src: src, root: root, file: rel}
 		c.strEnv = c.rbBuildStrEnv(tree.RootNode())
 		// The file's top level is a scope too: a bare identifier there that nothing in it
 		// assigns is as much a method call as one inside a method body.
 		c.locals = c.rbScopeLocals(nil, tree.RootNode())
+		return c
+	}
+	build := func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
+		c := newConv(src, rel, tree)
 		body := append(c.rubyModuleContext(tree.RootNode()), c.blockChildren(tree.RootNode())...)
 		body = append(body, c.regexBacktrackObservations(tree.RootNode())...)
 		return nir.Module{Key: "", File: rel, Body: body}, true
@@ -163,14 +169,14 @@ func ExtractRuby(files []string, root string) (nir.Program, error) {
 			return p
 		},
 		build)
-	mods = append(mods, parseERBModules(erb, root, build)...)
+	mods = append(mods, parseERBModules(erb, root, newConv)...)
 	return nir.Program{SelfName: "self", Modules: mods}, nil
 }
 
 func parseERBModules(
 	files []string,
 	root string,
-	build func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool),
+	newConv func(src []byte, rel string, tree *tree_sitter.Tree) *rbConv,
 ) []nir.Module {
 	if len(files) == 0 {
 		return nil
@@ -192,17 +198,111 @@ func parseERBModules(
 			parser.Close()
 			continue
 		}
-		m, good := build(code, f, relPath(root, f)+"#erb.rb", tree)
+		rel := relPath(root, f) + "#erb.rb"
+		c := newConv(code, rel, tree)
+		body := c.rubyModuleContext(tree.RootNode())
+		stmts := c.blockChildren(tree.RootNode())
+		stmts = append(stmts, c.regexBacktrackObservations(tree.RootNode())...)
 		tree.Close()
 		parser.Close()
-		if good {
-			m.Body = append(m.Body, erbUnescapedHrefInterpolationObservations(src, relPath(root, f)+"#erb.rb")...)
-			m.Body = append(m.Body, erbHTMLEscapedURLHrefObservations(src, relPath(root, f)+"#erb.rb")...)
-			m.Hash = contentHash(src)
-			out = append(out, m)
+		// A template inside the framework's view layout renders as part of the controller
+		// the layout names, so its statements lower as that controller's method (below).
+		if ctrl := rbViewControllerClass(rel); ctrl != "" && len(stmts) > 0 {
+			body = append(body, nir.FuncDef{
+				Name: rbViewMethodName(rel),
+				Recv: ctrl,
+				Body: stmts,
+				Loc:  rel + ":1",
+			})
+		} else {
+			body = append(body, stmts...)
 		}
+		body = append(body, erbUnescapedHrefInterpolationObservations(src, rel)...)
+		body = append(body, erbHTMLEscapedURLHrefObservations(src, rel)...)
+		out = append(out, nir.Module{Key: "", File: rel, Body: body, Hash: contentHash(src)})
 	}
 	return out
+}
+
+// rbViewControllerClass names the controller class a template renders from, by the layout
+// convention the framework resolves views with: `app/views/<controller path>/<action>…​.erb`
+// is what `<controller path>Controller` renders for that action, and rendering copies the
+// controller's instance variables into the view — the template's `@ivar` reads are reads of
+// storage the controller filled. "" for a template outside the layout (no `views/`
+// directory above it, or one sitting directly inside it), which stays a top-level module.
+func rbViewControllerClass(rel string) string {
+	if i := strings.Index(rel, "#"); i >= 0 {
+		rel = rel[:i] // the `#erb.rb` marker names the synthesized source, not the template
+	}
+	rel = strings.ReplaceAll(rel, "\\", "/")
+	vi := strings.LastIndex(rel, "/views/")
+	if vi < 0 {
+		return ""
+	}
+	// drop the template's own file name: the controller is named by the directories above it
+	rest := rel[vi+len("/views/"):]
+	si := strings.LastIndex(rest, "/")
+	if si <= 0 {
+		return ""
+	}
+	var parts []string
+	for _, seg := range strings.Split(rest[:si], "/") {
+		if seg == "" {
+			return ""
+		}
+		parts = append(parts, rbCamelize(seg))
+	}
+	return strings.Join(parts, "::") + "Controller"
+}
+
+// rbCamelize spells a snake_case path segment the way a class name is spelled: each
+// underscore-bound word capitalized, `_` dropped (`admin_links` → `AdminLinks`).
+func rbCamelize(seg string) string {
+	out := make([]byte, 0, len(seg))
+	up := true
+	for i := 0; i < len(seg); i++ {
+		ch := seg[i]
+		if ch == '_' {
+			up = true
+			continue
+		}
+		if up {
+			if ch >= 'a' && ch <= 'z' {
+				ch -= 'a' - 'A'
+			}
+			up = false
+		}
+		out = append(out, ch)
+	}
+	return string(out)
+}
+
+// rbViewMethodName names the synthetic method a template's statements lower inside: the
+// action the file spells (`show.html.erb` → `__view_show`), so two templates of one
+// controller keep their own bodies and no real method name is shadowed — nothing source
+// writes calls a name with the `__view_` prefix.
+func rbViewMethodName(rel string) string {
+	if i := strings.Index(rel, "#"); i >= 0 {
+		rel = rel[:i]
+	}
+	if i := strings.LastIndex(rel, "/"); i >= 0 {
+		rel = rel[i+1:]
+	}
+	if i := strings.Index(rel, "."); i >= 0 {
+		rel = rel[:i]
+	}
+	var b strings.Builder
+	b.WriteString("__view_")
+	for i := 0; i < len(rel); i++ {
+		ch := rel[i]
+		switch {
+		case ch == '_', ch >= '0' && ch <= '9', ch >= 'a' && ch <= 'z', ch >= 'A' && ch <= 'Z':
+			b.WriteByte(ch)
+		default:
+			b.WriteByte('_')
+		}
+	}
+	return b.String()
 }
 
 var erbHrefInterpolationRe = regexp.MustCompile(`(?i)\bhref\s*=\s*["'][^"']*#\{([^}]*)\}`)
