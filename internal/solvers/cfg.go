@@ -14,10 +14,18 @@ import (
 // directly as a per-node control-region path + program order (lowerer.node): g dominates
 // s iff g's region is an ancestor of (or equal to) s's region AND g precedes s in order.
 //
+// Region ancestry alone cannot express the shape a guard routinely takes: written inside
+// the arm of a conditional whose every sibling arm EXITS the function, it is on every
+// path to the code that follows the construct without being an ancestor of any of it.
+// The exit markers the lowering records for those arms make the shape visible, so
+// Dominates takes the graph's ExitIndex and answers for it too — see
+// dominatesThroughExits. A nil index, or a graph lowered without markers, leaves the
+// region/order relation answering exactly as it did.
+//
 // Each function has a distinct region root, so this is intraprocedural by construction;
 // when the metadata is absent (a frontend not yet converted to structured NIR) it returns
 // false and callers fall back to presence semantics — never a false suppression.
-func Dominates(store usg.Store, gID, sID string) bool {
+func Dominates(store usg.Store, exits *ExitIndex, gID, sID string) bool {
 	if gID == "" || sID == "" {
 		return false
 	}
@@ -26,7 +34,10 @@ func Dominates(store usg.Store, gID, sID string) bool {
 	if !ok1 || !ok2 {
 		return false
 	}
-	return dominatesRegion(gn.Prop("region"), gn.Prop("order"), sn.Prop("region"), sn.Prop("order"))
+	if dominatesRegion(gn.Prop("region"), gn.Prop("order"), sn.Prop("region"), sn.Prop("order")) {
+		return true
+	}
+	return dominatesThroughExits(exits, gn.Prop("region"), gn.Prop("order"), sn.Prop("region"), sn.Prop("order"))
 }
 
 // Reaches reports whether node a can reach node b on a CFG path — a executes, then b can
@@ -276,12 +287,123 @@ func dominatesRegion(gRegion, gOrder, sRegion, sOrder string) bool {
 	return go_ < so_
 }
 
+// dominatesThroughExits is the half of forward dominance the region tree cannot express:
+// g sits inside one arm of a conditional and s follows the construct, so no ancestry
+// relates the two, yet every sibling arm that could have bypassed g's arm leaves the
+// function instead. A scope check is written in exactly that shape:
+//
+//	if let Some(re) = &scope.open {
+//	    if !re.is_match(path) { return Err(..) }   // the guard, in the then arm
+//	} else {
+//	    return Err(..)                              // the sibling that leaves
+//	}
+//	open::that_detached(path)                       // reached only through the guard's arm
+//
+// Walking g's region up to the deepest region that encloses s crosses one conditional per
+// step, and each of those conditionals' OTHER arm must leave the function. A `return`
+// written at the top level of that arm is what says it does; one nested deeper is
+// conditional, and an arm with no marker at all falls through, so neither counts.
+//
+// Only the arms of one `if` are crossed, because theirs are the two arm names a region
+// segment carries on its own — the sibling is named without walking the graph. A match
+// arm's siblings are not enumerable from the segment, and a loop body may not run at all,
+// so a guard in either still dominates nothing after it: the answer the region tree has
+// always given, and the one a nil index (an unconverted frontend, a store built by hand)
+// keeps giving here.
+func dominatesThroughExits(exits *ExitIndex, gRegion, gOrder, sRegion, sOrder string) bool {
+	if exits == nil {
+		return false
+	}
+	g, err1 := strconv.Atoi(gOrder)
+	s, err2 := strconv.Atoi(sOrder)
+	if err1 != nil || err2 != nil || g >= s {
+		return false
+	}
+	join := commonRegion(gRegion, sRegion)
+	if join == "" {
+		return false // no shared enclosing region: different modules or function roots
+	}
+	for cur := gRegion; cur != join; {
+		i := strings.LastIndexByte(cur, '/')
+		if i < 0 {
+			return false
+		}
+		parent, seg := cur[:i], cur[i+1:]
+		construct, arm, ok := ifArmSegment(seg)
+		if !ok {
+			return false // a match arm, a loop body, an inline function body: not an if arm
+		}
+		sibling := parent + "/" + construct + "." + otherArm(arm)
+		if sRegion == sibling || strings.HasPrefix(sRegion, sibling+"/") {
+			return false // s IS in the sibling arm: the very path that never met g
+		}
+		if !exits.regionExits(sibling) {
+			return false // the sibling arm falls through, so a path around g's arm exists
+		}
+		cur = parent
+	}
+	return true
+}
+
+// commonRegion returns the deepest region enclosing both a and b — the longest run of
+// leading path segments the two share. "" when they share none.
+func commonRegion(a, b string) string {
+	if a == "" || b == "" {
+		return ""
+	}
+	i := 0
+	for {
+		ea, eb := segmentEnd(a, i), segmentEnd(b, i)
+		if a[i:ea] != b[i:eb] {
+			if i == 0 {
+				return ""
+			}
+			return a[:i-1]
+		}
+		if ea == len(a) || eb == len(b) {
+			return a[:ea] // one is a region-prefix of the other: the shorter is the common one
+		}
+		i = ea + 1
+	}
+}
+
+// ifArmSegment names the conditional a region segment opens: "if7.t" is the then arm of
+// the construct "if7". ok is false for anything else — an arm of a match, a loop body, a
+// try clause, a function root, or an inline body ("#…"), none of which is one of the two
+// arms of a plain conditional.
+func ifArmSegment(seg string) (construct, arm string, ok bool) {
+	i := strings.IndexByte(seg, '.')
+	if i < 0 {
+		return "", "", false
+	}
+	construct, arm = seg[:i], seg[i+1:]
+	if arm != "t" && arm != "e" {
+		return "", "", false
+	}
+	if rest, isIf := strings.CutPrefix(construct, "if"); !isIf || !isDigits(rest) {
+		return "", "", false
+	}
+	return construct, arm, true
+}
+
+// otherArm names the arm of one conditional that arm is not.
+func otherArm(arm string) string {
+	if arm == "t" {
+		return "e"
+	}
+	return "t"
+}
+
 // ExitIndex holds the conditional-exit markers of a graph (usg.ExitNodeType), grouped by
 // the function-root region they sit under so answering a question about one function never
 // walks another's. Build it once per store and reuse it: the markers do not change while a
 // rule set is evaluated.
 type ExitIndex struct {
 	byRoot map[string][]exitPoint
+	// byRegion holds the regions a `return` is written at the top level of — the arms
+	// every path through leaves the function from. A marker nested deeper than that is
+	// conditional and names no region here.
+	byRegion map[string]bool
 }
 
 // exitPoint is one `return`/`raise` written inside a control region.
@@ -295,7 +417,7 @@ type exitPoint struct {
 // unconverted frontend, a store built by hand) yields an empty index, under which
 // PostDominatesCovered answers exactly as the region/order approximation always did.
 func NewExitIndex(store usg.Store) *ExitIndex {
-	x := &ExitIndex{byRoot: map[string][]exitPoint{}}
+	x := &ExitIndex{byRoot: map[string][]exitPoint{}, byRegion: map[string]bool{}}
 	if store == nil {
 		return x
 	}
@@ -313,11 +435,19 @@ func NewExitIndex(store usg.Store) *ExitIndex {
 		if region == "" || err != nil {
 			continue
 		}
+		x.byRegion[region] = true
 		root := regionRoot(region)
 		x.byRoot[root] = append(x.byRoot[root],
 			exitPoint{region: region, order: order, guard: n.Prop(usg.ExitGuardProp)})
 	}
 	return x
+}
+
+// regionExits reports whether a `return` is written at the top level of region: its
+// statements run in order and nothing after such a return is reachable, so every path
+// through the region leaves the function there.
+func (x *ExitIndex) regionExits(region string) bool {
+	return x != nil && x.byRegion[region]
 }
 
 // release is one candidate release site, resolved once per PostDominatesCovered call.

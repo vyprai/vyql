@@ -221,6 +221,10 @@ func (c *rsConv) stmtH(n *tree_sitter.Node, attrs []string) []nir.Stmt {
 		return []nir.Stmt{c.rsIf(n)}
 	case "match_expression":
 		return c.rsMatch(n, "")
+	case "return_expression":
+		// a block's tail `return x` with no semicolon is not wrapped in an
+		// expression_statement, so it arrives here directly.
+		return c.rsReturn(n)
 	case "block":
 		return c.block(n)
 	}
@@ -2235,6 +2239,8 @@ func (c *rsConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{c.rsIf(inner)}
 	case "match_expression":
 		return c.rsMatch(inner, "")
+	case "return_expression":
+		return c.rsReturn(inner)
 	}
 	if c.kind(inner) == "assignment_expression" {
 		left := c.field(inner, "left")
@@ -2245,6 +2251,25 @@ func (c *rsConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.ExprStmt{Value: right}}
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(inner)}}
+}
+
+// rsReturn lowers `return expr;`. The operand keeps its place in the body — its calls are
+// lowered as the expression it is — and the return itself becomes a BARE nir.Return,
+// because what the graph needs from a Rust `return` is the control fact, not the value: a
+// return written inside a branch ends the function there, which is what the exit marker
+// the lowering records says and what solvers.Dominates and PostDominatesCovered read to
+// tell a branch that leaves from one that falls through. Routing the operand through
+// nir.Return would ALSO flow it into the function's result node, and no Rust value reaches
+// that node today — a block's tail expression does not either — so it would make
+// `return x;` and `x` disagree about whether a caller sees the value for no reason this
+// needs. rsResultExprs is the pass that does read return operands, for the refcount
+// escape analysis.
+func (c *rsConv) rsReturn(n *tree_sitter.Node) []nir.Stmt {
+	var out []nir.Stmt
+	if kids := c.namedChildren(n); len(kids) > 0 {
+		out = append(out, nir.ExprStmt{Value: c.expr(kids[0])})
+	}
+	return append(out, nir.Return{})
 }
 
 func (c *rsConv) block(block *tree_sitter.Node) []nir.Stmt {

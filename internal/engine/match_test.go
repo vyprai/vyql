@@ -470,6 +470,75 @@ rule DominatedFlow {
 	}
 }
 
+func TestTaintDominatesCoveredBySuppressesThroughSiblingExits(t *testing.T) {
+	rule := `
+module test;
+rule DominatedFlow {
+  taint custom.Input -> custom.Target as sink
+  unless sink.dominates coveredBy custom.Transform
+}
+`
+	// if configured { if !transform(x) { return } } [else { return }]
+	// sink(x)
+	newStore := func(siblingExits bool) *usg.InMemStore {
+		g := usg.NewInMemStore()
+		g.AddNode(usg.Node{ID: "input", Type: "code.Call", Loc: "sample.go:5"})
+		g.AddLabel("input", usg.Label{Concept: "custom.Input"})
+		g.AddNode(usg.Node{ID: "guard", Type: "code.Call", Loc: "sample.go:7", Region: "sample.go/fn1/if1.t", Order: 7, HasOrder: true})
+		g.AddLabel("guard", coverageLabel("custom.Transform", "dominates"))
+		g.AddNode(usg.Node{ID: "early", Type: usg.ExitNodeType, Loc: "sample.go:8", Region: "sample.go/fn1/if1.t/if2.t", Order: 8, HasOrder: true})
+		if siblingExits {
+			g.AddNode(usg.Node{ID: "sibling", Type: usg.ExitNodeType, Loc: "sample.go:10", Region: "sample.go/fn1/if1.e", Order: 10, HasOrder: true})
+		}
+		g.AddNode(usg.Node{ID: "sink", Type: "code.Call", Loc: "sample.go:12", Region: "sample.go/fn1", Order: 12, HasOrder: true})
+		g.AddLabel("sink", usg.Label{Concept: "custom.Target"})
+		g.AddEdge(usg.Edge{Type: "FLOWS", Src: "input", Dst: "sink"})
+		return g
+	}
+
+	if c := compileEvalV2(t, rule, newStore(false)); c[0] != 1 {
+		t.Fatalf("a conditional the flow can pass without entering does not cover the sink, got %d", c[0])
+	}
+	if c := compileEvalV2(t, rule, newStore(true)); c[0] != 0 {
+		t.Fatalf("a check whose sibling arm leaves the function covers every path to the sink, got %d", c[0])
+	}
+}
+
+// The endpoint arm of guard coverage is the one the shipped injection rules
+// spell (`unless endpoint coveredBy …`), and it consults the same
+// solvers.Dominates as the dominates arm above: a check inside the surviving
+// arm of a conditional whose sibling leaves covers the sink that follows.
+func TestEndpointCoveredBySuppressesThroughSiblingExits(t *testing.T) {
+	rule := `
+module test;
+rule GuardedFlow {
+  taint custom.Input -> custom.Target as sink
+  unless sink.endpoint coveredBy custom.Transform
+}
+`
+	newStore := func(siblingExits bool) *usg.InMemStore {
+		g := usg.NewInMemStore()
+		g.AddNode(usg.Node{ID: "input", Type: "code.Call", Loc: "sample.go:5"})
+		g.AddLabel("input", usg.Label{Concept: "custom.Input"})
+		g.AddNode(usg.Node{ID: "guard", Type: "code.Call", Loc: "sample.go:7", Region: "sample.go/fn1/if1.t", Order: 7, HasOrder: true})
+		g.AddLabel("guard", coverageLabel("custom.Transform", "endpoint"))
+		if siblingExits {
+			g.AddNode(usg.Node{ID: "sibling", Type: usg.ExitNodeType, Loc: "sample.go:9", Region: "sample.go/fn1/if1.e", Order: 9, HasOrder: true})
+		}
+		g.AddNode(usg.Node{ID: "sink", Type: "code.Call", Loc: "sample.go:11", Region: "sample.go/fn1", Order: 11, HasOrder: true})
+		g.AddLabel("sink", usg.Label{Concept: "custom.Target"})
+		g.AddEdge(usg.Edge{Type: "FLOWS", Src: "input", Dst: "sink"})
+		return g
+	}
+
+	if c := compileEvalV2(t, rule, newStore(false)); c[0] != 1 {
+		t.Fatalf("a conditional the flow can pass without entering does not cover the endpoint, got %d", c[0])
+	}
+	if c := compileEvalV2(t, rule, newStore(true)); c[0] != 0 {
+		t.Fatalf("a check whose sibling arm leaves the function covers the endpoint, got %d", c[0])
+	}
+}
+
 func TestMatchGuardedByDominatingBranchConditionWithQualifiedConcepts(t *testing.T) {
 	rule := `
 module vypr.memory;

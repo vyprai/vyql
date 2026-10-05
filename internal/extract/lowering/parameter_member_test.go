@@ -101,7 +101,7 @@ func TestLowerParameterMemberDominatesEndpointSink(t *testing.T) {
 	if event == "" || sink == "" || param == "" {
 		t.Fatalf("event=%q sink=%q param=%q", event, sink, param)
 	}
-	if !solvers.Dominates(g, event, sink) {
+	if !solvers.Dominates(g, solvers.NewExitIndex(g), event, sink) {
 		t.Fatalf("member event %s does not dominate endpoint sink %s", event, sink)
 	}
 	// the event also flows to the parameter it validates, so a source labelled on the
