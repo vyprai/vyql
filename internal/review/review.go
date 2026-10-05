@@ -319,6 +319,12 @@ func CollectWithPolicy(g usg.Store, reviewConcepts map[string]ConceptInfo, displ
 	out := []Item{}
 	seen := map[string]bool{}
 	identity := resultpolicy.MustDefaultIdentity()
+	// The exit markers nearby checks read dominance against, built once for the whole
+	// collection and only when something is going to ask.
+	var exits *solvers.ExitIndex
+	if display.includeNearbyChecks {
+		exits = solvers.NewExitIndex(g)
+	}
 	for _, n := range nodes {
 		labels, _ := g.Labels(n.ID)
 		for _, l := range labels {
@@ -345,7 +351,7 @@ func CollectWithPolicy(g usg.Store, reviewConcepts map[string]ConceptInfo, displ
 				Provenance: labelProvenance(l),
 			}
 			if info.kind == "target" && display.includeNearbyChecks {
-				cp.NearbyChecks = relatedChecks(g, byID, n.ID, info.expected, reviewConcepts, display.nearbyCheckLimit, lifecycle)
+				cp.NearbyChecks = relatedChecks(g, exits, byID, n.ID, info.expected, reviewConcepts, display.nearbyCheckLimit, lifecycle)
 			}
 			out = append(out, cp)
 		}
@@ -370,7 +376,7 @@ func dedupKey(identity resultpolicy.IdentityPolicy, concept string, n usg.Node) 
 	})
 }
 
-func relatedChecks(g usg.Store, nodes map[string]usg.Node, targetID string, expected []string, reviewConcepts map[string]ConceptInfo, limit int, lifecycle resultpolicy.LifecyclePolicy) []RelatedCheck {
+func relatedChecks(g usg.Store, exits *solvers.ExitIndex, nodes map[string]usg.Node, targetID string, expected []string, reviewConcepts map[string]ConceptInfo, limit int, lifecycle resultpolicy.LifecyclePolicy) []RelatedCheck {
 	want := map[string]bool{}
 	for _, c := range expected {
 		want[c] = true
@@ -427,7 +433,7 @@ func relatedChecks(g usg.Store, nodes map[string]usg.Node, targetID string, expe
 			if len(labels) == 0 {
 				continue
 			}
-			if solvers.Dominates(g, id, targetID) {
+			if solvers.Dominates(g, exits, id, targetID) {
 				add(id, concept, "dominates target", labels[0])
 			} else if precedesInSameFunction(nodes[id], nodes[targetID]) {
 				add(id, concept, "same function before target", labels[0])

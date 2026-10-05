@@ -638,7 +638,7 @@ func (e *Engine) neutralizerAdvisoryEvidence(path []string, sinkID string, sinkC
 					if about := l.Detail["about"]; about != "*" && !sinkConcepts[about] {
 						continue
 					}
-					if solvers.Dominates(e.Store, gid, sinkID) {
+					if solvers.Dominates(e.Store, e.exitIndex(), gid, sinkID) {
 						add("guard", l.Detail["pattern"])
 					}
 				}
@@ -1220,7 +1220,7 @@ func (e *Engine) endpointGuarded(path []string, sinkID, control string) bool {
 					continue
 				}
 				if sinkCFG && e.hasCFG(ed.Src) {
-					if solvers.Dominates(e.Store, ed.Src, sinkID) {
+					if solvers.Dominates(e.Store, e.exitIndex(), ed.Src, sinkID) {
 						return true // guard dominates → covers every path → suppress
 					}
 					continue // non-dominating guard → keep looking for one that does
@@ -1267,7 +1267,7 @@ func (e *Engine) endpointGuarded(path []string, sinkID, control string) bool {
 			if !nodeHasConcreteCoverage(e.labels(gid), control, "endpoint") {
 				continue
 			}
-			if gid != sinkID && e.hasCFG(gid) && solvers.Dominates(e.Store, gid, sinkID) {
+			if gid != sinkID && e.hasCFG(gid) && solvers.Dominates(e.Store, e.exitIndex(), gid, sinkID) {
 				return true
 			}
 		}
@@ -1461,7 +1461,7 @@ func (e *Engine) dominatesGuarded(targetID, control string) bool {
 		return false
 	}
 	for _, gid := range e.dominanceGuardCandidates(control) {
-		if gid != targetID && solvers.Dominates(e.Store, gid, targetID) {
+		if gid != targetID && solvers.Dominates(e.Store, e.exitIndex(), gid, targetID) {
 			return true
 		}
 	}
@@ -1679,7 +1679,7 @@ func (e *Engine) flowGuarded(path []string, control string) bool {
 				continue
 			}
 			for _, later := range path[i+1:] {
-				if later != gid && e.hasCFG(later) && solvers.Dominates(e.Store, gid, later) {
+				if later != gid && e.hasCFG(later) && solvers.Dominates(e.Store, e.exitIndex(), gid, later) {
 					return true
 				}
 			}

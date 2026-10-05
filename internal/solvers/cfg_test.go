@@ -39,6 +39,110 @@ func TestDominatesRegion(t *testing.T) {
 	}
 }
 
+// The one shape the region tree cannot express: a guard written inside the arm of a
+// conditional whose every sibling arm EXITS the function is on every path to the code
+// that follows the construct, without being an ancestor of any of it. The exit markers
+// the lowering records for those arms are what make it visible.
+func TestDominatesThroughSiblingExits(t *testing.T) {
+	// if let Some(re) = &scope.open {        // if2
+	//     if !re.is_match(path) { return }  // if3, wholly inside the then arm
+	// } else {
+	//     warn(); return                    // the sibling that leaves
+	// }
+	// open::that_detached(path)
+	//
+	// add stamps one node; the exits are what the relation reads.
+	add := func(s *usg.InMemStore, id, typ, region string, order int32) {
+		if err := s.AddNode(usg.Node{ID: id, Type: typ, Loc: "scope.rs:1", Region: region,
+			Order: order, HasOrder: true}); err != nil {
+			t.Fatalf("add %s: %v", id, err)
+		}
+	}
+	build := func(elseExits bool) *usg.InMemStore {
+		s := usg.NewInMemStore()
+		add(s, "guard", "code.Call", "scope.rs/fn1/if2.t", 4)
+		add(s, "innerExit", usg.ExitNodeType, "scope.rs/fn1/if2.t/if3.t", 6)
+		add(s, "elseWarn", "code.Call", "scope.rs/fn1/if2.e", 8)
+		if elseExits {
+			add(s, "elseExit", usg.ExitNodeType, "scope.rs/fn1/if2.e", 9)
+		}
+		add(s, "sink", "code.Call", "scope.rs/fn1", 12)
+		return s
+	}
+
+	covered := build(true)
+	if !Dominates(covered, NewExitIndex(covered), "guard", "sink") {
+		t.Error("a guard whose every sibling arm leaves the function dominates what follows the branch")
+	}
+	// The relation is about the path to the sink, not the sink: a second sink in a
+	// construct of its own after the branch is reached through the same arm.
+	add(covered, "laterSink", "code.Call", "scope.rs/fn1/sw5.c0", 14)
+	if !Dominates(covered, NewExitIndex(covered), "guard", "laterSink") {
+		t.Error("a sink in a later construct of the same body is reached through the same surviving arm")
+	}
+
+	// No else at all — the shape the vulnerable revision of the scope is — leaves the
+	// condition able to skip the guard entirely.
+	vulnerable := build(false)
+	if Dominates(vulnerable, NewExitIndex(vulnerable), "guard", "sink") {
+		t.Error("a single-armed conditional can be skipped, so its guard dominates nothing after it")
+	}
+	// An exit NESTED in the sibling arm is conditional: that arm still falls through.
+	add(vulnerable, "nestedExit", usg.ExitNodeType, "scope.rs/fn1/if2.e/if4.t", 9)
+	if Dominates(vulnerable, NewExitIndex(vulnerable), "guard", "sink") {
+		t.Error("a sibling arm that returns only on a nested condition still falls through")
+	}
+	// No markers anywhere (an unconverted frontend, a store built by hand).
+	if Dominates(build(false), nil, "guard", "sink") {
+		t.Error("without exit markers the region/order relation is all there is")
+	}
+
+	// Each conditional between the guard and the sink must have its other arm leave, not
+	// just the outermost: a guard behind a second condition is on its arm's paths only.
+	nested := usg.NewInMemStore()
+	add(nested, "deepGuard", "code.Call", "scope.rs/fn1/if2.t/if6.t", 4)
+	add(nested, "outerExit", usg.ExitNodeType, "scope.rs/fn1/if2.e", 7)
+	add(nested, "innerElse", "code.Call", "scope.rs/fn1/if2.t/if6.e", 8)
+	add(nested, "sink", "code.Call", "scope.rs/fn1", 12)
+	if Dominates(nested, NewExitIndex(nested), "deepGuard", "sink") {
+		t.Error("a guard behind a second condition is on its arm's paths only")
+	}
+	add(nested, "innerExit", usg.ExitNodeType, "scope.rs/fn1/if2.t/if6.e", 9)
+	if !Dominates(nested, NewExitIndex(nested), "deepGuard", "sink") {
+		t.Error("with both sibling arms leaving, the nested guard dominates what follows")
+	}
+
+	// Shapes that stay exactly as the region tree always answered them.
+	other := usg.NewInMemStore()
+	add(other, "loopGuard", "code.Call", "scope.rs/fn1/loop2", 3)
+	add(other, "loopExit", usg.ExitNodeType, "scope.rs/fn1/loop2", 4)
+	add(other, "caseGuard", "code.Call", "scope.rs/fn1/sw3.c0", 5)
+	add(other, "sink", "code.Call", "scope.rs/fn1", 12)
+	if Dominates(other, NewExitIndex(other), "loopGuard", "sink") {
+		t.Error("a loop body may not run at all, so a guard in it dominates nothing after it")
+	}
+	if Dominates(other, NewExitIndex(other), "caseGuard", "sink") {
+		t.Error("a match arm's siblings are not enumerable from its segment, so it is not read as dominating")
+	}
+
+	// Order and function boundaries still decide.
+	reversed := build(true)
+	if Dominates(reversed, NewExitIndex(reversed), "sink", "guard") {
+		t.Error("code after the branch does not dominate the guard that precedes it")
+	}
+	add(reversed, "elseSink", "code.Call", "scope.rs/fn1/if2.e", 10)
+	if Dominates(reversed, NewExitIndex(reversed), "guard", "elseSink") {
+		t.Error("a sink written in the sibling arm is on the path that never met the guard")
+	}
+	crossFn := usg.NewInMemStore()
+	add(crossFn, "guard", "code.Call", "scope.rs/fn1/if2.t", 4)
+	add(crossFn, "elseExit", usg.ExitNodeType, "scope.rs/fn1/if2.e", 9)
+	add(crossFn, "sink", "code.Call", "scope.rs/fn2", 12)
+	if Dominates(crossFn, NewExitIndex(crossFn), "guard", "sink") {
+		t.Error("dominance is intraprocedural: a branch of one function covers nothing in another")
+	}
+}
+
 // Reaches: a can reach b iff order(a)<order(b) and regions are comparable (not siblings).
 func TestReachesRegion(t *testing.T) {
 	cases := []struct {

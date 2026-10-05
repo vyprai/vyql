@@ -314,7 +314,7 @@ func (e *Engine) evalSolverCall(call parser.SolverCall, env map[string]string) (
 		bIDs := e.resolveArg(call.Args[1], env)
 		for _, a := range aIDs {
 			for _, b := range bIDs {
-				if solvers.Dominates(e.Store, a, b) {
+				if solvers.Dominates(e.Store, e.exitIndex(), a, b) {
 					return true, []string{"dominates " + a + " -> " + b}
 				}
 			}
