@@ -1,0 +1,9 @@
+module full;
+rule SqlInjection {
+  meta { id: "FULL-INJ-001" severity: high cwe: [CWE_89] }
+  taint code.HttpInput -> code.SqlExecution -> finding unless sanitized_by code.SqlParameterization
+}
+rule WeakCipherPresent {
+  meta { id: "FULL-CRYPTO-001" severity: low }
+  present code.WeakCipherReview -> signal
+}

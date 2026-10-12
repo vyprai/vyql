@@ -1,0 +1,9 @@
+module toy;
+rule SqlInjection {
+  meta { id: "TOY-001" severity: high cwe: [CWE_89] }
+  taint code.HttpInput -> code.SqlExecution -> finding unless sanitized_by code.SqlParameterization
+}
+rule Guarded {
+  meta { id: "TOY-002" severity: low }
+  present code.Review -> signal
+}

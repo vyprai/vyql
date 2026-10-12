@@ -89,3 +89,4 @@ file is build and test input; it is not loaded at scan time.
 | go.opentelemetry.io/otel/trace | Apache-2.0 |
 | golang.org/x/sys/unix | BSD-3-Clause |
 | google.golang.org/protobuf | BSD-3-Clause |
+| gopkg.in/yaml.v3 | MIT |

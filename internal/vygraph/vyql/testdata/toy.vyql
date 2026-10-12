@@ -1,0 +1,6 @@
+module toy;
+concept code.HttpInput : source { taint: [UntrustedData] cwe: [CWE_20] }
+rule SqlInjection {
+  meta { id: "TOY-001" severity: high cwe: [CWE_89] }
+  taint code.HttpInput -> code.SqlExecution -> finding unless sanitized_by code.SqlParameterization
+}

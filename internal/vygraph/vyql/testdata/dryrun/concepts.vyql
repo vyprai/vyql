@@ -1,0 +1,28 @@
+module dryrun;
+threat Injection { }
+threat CrossSiteScripting { }
+threat CommandInjection { subsumes: [Injection] }
+threat PathTraversal { }
+threat Ssrf { }
+threat BrokenAccessControl { }
+
+concept code.UntrustedData : source { taint: [UntrustedData] }
+concept code.HttpInput : source { refines: code.UntrustedData taint: [UntrustedData] cwe: [CWE_20] }
+concept code.Cookie : source { refines: code.UntrustedData taint: [UntrustedData] cwe: [CWE_565] }
+concept code.Deserialized : source { refines: code.UntrustedData taint: [UntrustedData] cwe: [CWE_502] }
+
+concept code.SqlExecution : sink { vulnerable_to: [Injection] enabled_by: [UntrustedData] cwe: [CWE_89] }
+concept code.HtmlSink : sink { vulnerable_to: [CrossSiteScripting] enabled_by: [UntrustedData] cwe: [CWE_79] }
+concept code.CommandExecution : sink { vulnerable_to: [CommandInjection] enabled_by: [UntrustedData] cwe: [CWE_78] }
+concept code.FilePathAccess : sink { vulnerable_to: [PathTraversal] enabled_by: [UntrustedData] cwe: [CWE_22] }
+concept code.OutboundRequest : sink { vulnerable_to: [Ssrf] enabled_by: [UntrustedData] cwe: [CWE_918] }
+
+concept code.SqlParameterization : control { neutralizes: [Injection] }
+concept code.HtmlEscape : control { neutralizes: [CrossSiteScripting] }
+concept code.CommandShellout : control { neutralizes: [CommandInjection] }
+concept code.PathCanonicalization : control { neutralizes: [PathTraversal] }
+
+concept code.AuthenticationCheck : guard { defends: [BrokenAccessControl] cwe: [CWE_862] }
+concept code.AuthzGate : control | guard { neutralizes: [BrokenAccessControl] defends: [BrokenAccessControl] }
+
+concept code.WeakCipherReview : asset { }

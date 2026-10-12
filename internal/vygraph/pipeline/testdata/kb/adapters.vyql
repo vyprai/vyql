@@ -1,0 +1,15 @@
+module full;
+adapter web {
+  meta { fidelity: syntactic }
+  source code.syntacticPath("req.args.get") -> code.HttpInput
+  sink code.path("db.session.execute") -> code.SqlExecution
+}
+adapter crypto {
+  meta { fidelity: syntactic }
+  label code.syntacticPath("cipher.new") -> code.WeakCipherReview
+}
+
+adapter controls {
+  meta { fidelity: syntactic }
+  control code.syntacticPath("shlex.quote") -> code.SqlParameterization
+}

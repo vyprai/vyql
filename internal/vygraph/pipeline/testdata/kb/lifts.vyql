@@ -1,0 +1,17 @@
+module full;
+framework flask {
+  route on code.func() where decorated_by("flask.route") {
+    method: "GET"
+    path:   "/users"
+    handler: .name
+  }
+}
+lift code.Entrypoint from framework flask {
+  httpMethod: .method
+  handler:    .handler
+}
+lift code.DataAccess from code.path("db.session.execute") {
+  table: "users"
+  op: read
+  filters: from flows(self) by resolution
+}
