@@ -6702,7 +6702,7 @@
           "vyql_v0.6.1_linux_amd64.tar.gz": 29,
           "vyql_v0.6.1_linux_amd64.tar.gz.sha256": 29,
           "vyql_v0.6.1_linux_arm64.tar.gz": 24,
-          "vyql_v0.6.1_linux_arm64.tar.gz.sha256": 17
+          "vyql_v0.6.1_linux_arm64.tar.gz.sha256": 18
         },
         "v0.6.0": {
           "vyql_v0.6.0_darwin_amd64.tar.gz": 1,
