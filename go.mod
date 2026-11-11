@@ -1,6 +1,6 @@
 module github.com/vyprai/vyql
 
-go 1.26.6
+go 1.26.11
 
 // A published version cannot be removed from the module proxy, only retracted:
 // proxy.golang.org has it cached and sum.golang.org has recorded its hash, both
@@ -39,7 +39,7 @@ require (
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/flatbuffers v25.2.10+incompatible // indirect
-	github.com/klauspost/compress v1.18.0 // indirect
+	github.com/klauspost/compress v1.20.4 // indirect
 	github.com/mattn/go-pointer v0.0.1 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel v1.41.0 // indirect
